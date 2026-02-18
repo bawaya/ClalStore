@@ -39,5 +39,10 @@
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "wrangler": "^4.66.0"
+  },
+  "overrides": {
+    "@cloudflare/next-on-pages": {
+      "next": "$next"
+    }
   }
 }
