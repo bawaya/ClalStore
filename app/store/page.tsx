@@ -1,7 +1,7 @@
 import { getProducts, getHeroes, getLinePlans } from "@/lib/store/queries";
 import { StoreClient } from "@/components/store/StoreClient";
 
-export const revalidate = 60; // ISR — revalidate every 60s
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: "ClalMobile — المتجر",

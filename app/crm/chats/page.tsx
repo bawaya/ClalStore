@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
 import { StatCard } from "@/components/admin/shared";

@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useCallback } from "react";
 import { useScreen, useDebounce } from "@/lib/hooks";
 import { CUSTOMER_SEGMENT } from "@/lib/constants";

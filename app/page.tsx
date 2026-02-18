@@ -6,7 +6,7 @@
 import { getProducts, getLinePlans } from "@/lib/store/queries";
 import { HomeClient } from "@/components/website/HomeClient";
 
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: "ClalMobile — وكيل رسمي لـ HOT Mobile | أجهزة وباقات",
