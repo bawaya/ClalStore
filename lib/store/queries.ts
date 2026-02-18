@@ -14,6 +14,7 @@ export async function getProducts(options?: {
   limit?: number;
 }): Promise<Product[]> {
   const supabase = createServerSupabase();
+  if (!supabase) return [];
   let query = supabase
     .from("products")
     .select("*")
@@ -36,6 +37,7 @@ export async function getProducts(options?: {
 
 export async function getProduct(id: string): Promise<Product | null> {
   const supabase = createServerSupabase();
+  if (!supabase) return null;
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -50,6 +52,7 @@ export async function getProduct(id: string): Promise<Product | null> {
 // ===== Heroes =====
 export async function getHeroes(): Promise<Hero[]> {
   const supabase = createServerSupabase();
+  if (!supabase) return [];
   const { data } = await supabase
     .from("heroes")
     .select("*")
@@ -62,6 +65,7 @@ export async function getHeroes(): Promise<Hero[]> {
 // ===== Line Plans =====
 export async function getLinePlans(): Promise<LinePlan[]> {
   const supabase = createServerSupabase();
+  if (!supabase) return [];
   const { data } = await supabase
     .from("line_plans")
     .select("*")
@@ -74,6 +78,7 @@ export async function getLinePlans(): Promise<LinePlan[]> {
 // ===== Categories =====
 export async function getCategories(): Promise<Category[]> {
   const supabase = createServerSupabase();
+  if (!supabase) return [];
   const { data } = await supabase
     .from("categories")
     .select("*")
@@ -89,6 +94,7 @@ export async function validateCoupon(
   orderTotal: number
 ): Promise<{ valid: boolean; discount: number; message: string }> {
   const supabase = createServerSupabase();
+  if (!supabase) return { valid: false, discount: 0, message: "خدمة غير متاحة" };
 
   const { data: coupon } = await supabase
     .from("coupons")
@@ -134,6 +140,7 @@ export async function validateCoupon(
 // ===== Settings =====
 export async function getSettings(): Promise<Record<string, string>> {
   const supabase = createServerSupabase();
+  if (!supabase) return {};
   const { data } = await supabase.from("settings").select("*");
 
   const settings: Record<string, string> = {};

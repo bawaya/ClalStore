@@ -98,8 +98,8 @@ export async function generateConversationSummary(conversationId: string): Promi
     if (!messages || messages.length === 0) return "لا توجد رسائل";
 
     // Build summary from message history
-    const userMessages = messages.filter(m => m.role === "user");
-    const intents = [...new Set(messages.filter(m => m.intent).map(m => m.intent))];
+    const userMessages = messages.filter((m: any) => m.role === "user");
+    const intents = [...new Set(messages.filter((m: any) => m.intent).map((m: any) => m.intent))];
 
     const summary = [
       `عدد الرسائل: ${messages.length}`,
