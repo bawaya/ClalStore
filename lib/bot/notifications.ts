@@ -1,0 +1,68 @@
+// =====================================================
+// ClalMobile — Notification Service
+// Sends WhatsApp notifications for order events
+// Called from order API after create/status change
+// =====================================================
+
+import { sendWhatsAppText, notifyTeam } from "./whatsapp";
+import { buildOrderNotification, buildStatusNotification } from "./engine";
+
+// ===== New Order: Notify Team =====
+export async function notifyNewOrder(
+  orderId: string,
+  customerName: string,
+  customerPhone: string,
+  total: number,
+  source: string
+) {
+  try {
+    // 1. Notify team
+    const teamMsg = buildOrderNotification(orderId, customerName, total, source);
+    await notifyTeam(teamMsg);
+
+    // 2. Confirm to customer
+    const custMsg = `✅ *تم استلام طلبك!*\n\n📦 رقم الطلب: ${orderId}\n💰 المبلغ: ₪${total.toLocaleString()}\n\nالفريق سيتواصل معك قريباً.\nللاستفسار أرسل رقم طلبك في أي وقت.`;
+    await sendWhatsAppText(customerPhone, custMsg);
+  } catch (err) {
+    console.error("Notification error (new order):", err);
+    // Don't throw — notification failure shouldn't block order
+  }
+}
+
+// ===== Order Status Change: Notify Customer =====
+export async function notifyStatusChange(
+  orderId: string,
+  customerPhone: string,
+  newStatus: string
+) {
+  // Only notify on meaningful status changes
+  const notifyStatuses = ["approved", "shipped", "delivered", "rejected"];
+  if (!notifyStatuses.includes(newStatus)) return;
+
+  try {
+    const msg = buildStatusNotification(orderId, newStatus);
+    await sendWhatsAppText(customerPhone, msg);
+  } catch (err) {
+    console.error("Notification error (status):", err);
+  }
+}
+
+// ===== Reminder: No Reply =====
+export async function sendNoReplyReminder(
+  orderId: string,
+  customerPhone: string,
+  attempt: number
+) {
+  try {
+    const msgs = [
+      `📞 *${orderId}*\n\nحاولنا نتواصل معك بخصوص طلبك.\nالرجاء الرد على الهاتف أو راسلنا هنا! 🙏`,
+      `📞📞 *${orderId}*\n\nالمحاولة الثانية! طلبك بانتظار ردك.\nتواصل معنا على 054-9414448`,
+      `⚠️ *${orderId}*\n\nالمحاولة الأخيرة! إذا ما رديت خلال 24 ساعة قد يُلغى الطلب.\n📞 054-9414448`,
+    ];
+
+    const msg = msgs[Math.min(attempt - 1, 2)];
+    await sendWhatsAppText(customerPhone, msg);
+  } catch (err) {
+    console.error("Notification error (no reply):", err);
+  }
+}

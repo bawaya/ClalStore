@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap");
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    direction: rtl;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: "Tajawal", "Heebo", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    background: #09090b;
+    color: #fafafa;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Hebrew override */
+  [lang="he"] body,
+  [dir="ltr"] body {
+    font-family: "Heebo", "Tajawal", sans-serif;
+    direction: ltr;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #09090b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #27272a;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3f3f46;
+  }
+
+  /* Inputs */
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border-color: #c41040 !important;
+  }
+
+  /* Selection */
+  ::selection {
+    background: rgba(196, 16, 64, 0.3);
+    color: #fafafa;
+  }
+}
+
+@layer components {
+  /* Shared card style */
+  .card {
+    @apply bg-[#111114] rounded-[14px] border border-[#27272a];
+  }
+
+  /* Shared input style */
+  .input {
+    @apply w-full bg-[#09090b] border border-[#27272a] rounded-[10px] text-[#fafafa] outline-none;
+    @apply px-3 py-2.5 text-sm;
+    @apply focus:border-[#c41040];
+  }
+
+  /* Shared button styles */
+  .btn-primary {
+    @apply px-5 py-2.5 rounded-[10px] border-none bg-[#c41040] text-white font-bold cursor-pointer;
+    @apply hover:bg-[#a30d35] transition-colors;
+  }
+
+  .btn-outline {
+    @apply px-5 py-2.5 rounded-[10px] border border-[#27272a] bg-transparent text-[#fafafa] font-bold cursor-pointer;
+    @apply hover:bg-[#18181b] transition-colors;
+  }
+
+  /* Badge */
+  .badge {
+    @apply px-2.5 py-1 rounded-md font-bold whitespace-nowrap;
+    font-size: 12px;
+  }
+
+  /* Chip */
+  .chip {
+    @apply px-3 py-1.5 rounded-lg border border-[#27272a] text-xs font-semibold cursor-pointer bg-transparent text-[#71717a];
+    @apply hover:bg-[#18181b] transition-colors;
+  }
+
+  .chip-active {
+    @apply bg-[rgba(196,16,64,0.08)] text-[#c41040] border-[#c41040];
+  }
+}
+
+@layer utilities {
+  /* RTL-aware margin/padding */
+  .ms-auto {
+    margin-inline-start: auto;
+  }
+  .me-auto {
+    margin-inline-end: auto;
+  }
+
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+}
