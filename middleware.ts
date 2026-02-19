@@ -84,7 +84,8 @@ export async function middleware(request: NextRequest) {
 
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/crm";
+    url.pathname = request.nextUrl.searchParams.get("redirect") || "/crm";
+    url.searchParams.delete("redirect");
     return NextResponse.redirect(url);
   }
 

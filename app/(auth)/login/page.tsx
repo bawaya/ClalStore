@@ -18,7 +18,8 @@ export default function LoginPage() {
       // TODO: Replace with actual Supabase auth when connected
       const { signIn } = await import("@/lib/auth");
       await signIn(email, password);
-      window.location.href = "/crm";
+      const params = new URLSearchParams(window.location.search);
+      window.location.href = params.get("redirect") || "/crm";
     } catch (err: any) {
       setError(err.message || "خطأ في تسجيل الدخول");
     } finally {
