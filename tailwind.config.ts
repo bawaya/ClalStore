@@ -37,7 +37,7 @@ const config: Config = {
       },
       fontFamily: {
         arabic: ["Tajawal", "sans-serif"],
-        hebrew: ["Heebo", "sans-serif"],
+        hebrew: ["David Libre", "Heebo", "serif"],
       },
       borderRadius: {
         card: "14px",
