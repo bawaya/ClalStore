@@ -79,8 +79,8 @@ export function Logo({ size = 36, showText = false, className = "", label, subti
       return;
     }
 
-    // Fetch from settings API
-    fetch("/api/admin/settings")
+    // Fetch from public settings API (no auth required)
+    fetch("/api/settings/public")
       .then((r) => r.json())
       .then((data) => {
         const url = data.settings?.logo_url || "";
