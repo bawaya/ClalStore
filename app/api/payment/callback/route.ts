@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — Payment Callback
 // POST: Rivhit calls this after payment on hosted page

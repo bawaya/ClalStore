@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — POST /api/coupons/validate
 // Validates a coupon code against the database

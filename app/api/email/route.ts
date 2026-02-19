@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — Email API
 // POST: Send transactional emails

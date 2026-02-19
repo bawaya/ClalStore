@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
 import { getPipelineDeals, createDeal, updateDeal, deleteDeal } from "@/lib/crm/queries";
 

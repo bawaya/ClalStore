@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — Payment API
 // POST: Create Rivhit hosted payment page URL

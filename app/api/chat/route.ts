@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — WebChat API (Season 5)
 // POST: Process chat message via new engine

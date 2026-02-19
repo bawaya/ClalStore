@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { getProducts, getHeroes, getLinePlans } from "@/lib/store/queries";
 import { StoreClient } from "@/components/store/StoreClient";
 

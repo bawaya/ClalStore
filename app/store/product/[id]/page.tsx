@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { notFound } from "next/navigation";
 import { getProduct, getProducts } from "@/lib/store/queries";
 import { ProductDetailClient } from "@/components/store/ProductDetail";

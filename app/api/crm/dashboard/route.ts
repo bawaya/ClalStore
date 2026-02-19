@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextResponse } from "next/server";
 import { getCRMDashboard } from "@/lib/crm/queries";
 

@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — Image Upload API
 // Uses lib/storage.ts for Supabase Storage

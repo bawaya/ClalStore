@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — Admin Products API
 // GET: list all | POST: create | PUT: update | DELETE

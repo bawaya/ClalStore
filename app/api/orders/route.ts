@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — POST /api/orders
 // Creates order + customer in Supabase

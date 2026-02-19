@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — WhatsApp Webhook (Season 5)
 // POST: Receive from yCloud → new engine

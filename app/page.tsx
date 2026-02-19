@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — Homepage (Landing Page)
 // Server Component: fetches products + plans from DB

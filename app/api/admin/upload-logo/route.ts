@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 // =====================================================
 // ClalMobile — Admin Logo Upload API
 // POST: Upload logo → Supabase "brand" bucket
