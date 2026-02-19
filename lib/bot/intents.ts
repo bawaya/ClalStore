@@ -14,6 +14,7 @@ export type BotIntent =
   | "warranty_return"
   | "order_tracking"
   | "line_plans"
+  | "contact_info"
   | "complaint"
   | "human_request"
   | "greeting"
@@ -139,9 +140,14 @@ export function detectIntent(message: string): DetectedIntent {
     return { intent: "order_tracking", params: { orderId: orderMatch[0].toUpperCase() }, confidence: 0.95, language: lang };
   }
 
-  // 3. Explicit human request
-  if (/موظف|بشر|شخص|حقيقي|נציג|אדם|human|agent|أتكلم مع|بدي احكي/i.test(lower)) {
+  // 3. Explicit human request — MUST be before buy_now since "بدي" can overlap
+  if (/موظف|بشر|شخص|حقيقي|נציג|אדם|human|agent|أتكلم مع|بدي احكي|اتواصل مع|تواصل مع|احكي مع|كلم |ابغى اكلم|بدي اكلم|ابي اتكلم|ممكن احكي|بدي اتواصل|ابغى اتواصل|اتكلم مع/i.test(lower)) {
     return { intent: "human_request", params: {}, confidence: 0.9, language: lang };
+  }
+
+  // 3.5 Contact info request (address, phone, how to reach)
+  if (/عنوان|وين أنتم|فين أنتم|وين انتم|فين انتم|عنوانكم|كيف اوصل|כתובת|איפה אתם|مكانكم|فرع|فين المحل|وين المحل|رقم.*محل|رقم.*تلفون|رقم.*هاتف|رقمكم|اتصل بكم|تلفونكم|هاتفكم|وين مكانكم/i.test(lower)) {
+    return { intent: "contact_info", params: {}, confidence: 0.9, language: lang };
   }
 
   // 4. Complaint / anger
@@ -246,8 +252,9 @@ export function detectIntent(message: string): DetectedIntent {
     }
   }
 
-  // 16. Generic buy intent
-  if (/أبغى|أبي|بدي|أريد|اطلب|أشتري|شراء|اريد|ابغى|ابي|רוצה|לקנות|buy|want/i.test(lower)) {
+  // 16. Generic buy intent — exclude communication verbs
+  if (/أبغى|أبي|بدي|أريد|اطلب|أشتري|شراء|اريد|ابغى|ابي|רוצה|לקנות|buy|want/i.test(lower)
+    && !/احكي|اتواصل|اكلم|اتكلم|موظف|شخص|contact|talk|speak/i.test(lower)) {
     const priceRange = extractPriceRange(text);
     return { intent: "buy_now", params: priceRange, confidence: 0.6, language: lang };
   }

@@ -215,11 +215,19 @@ export async function processMessage(
   }
 
   // 7. Check if user is answering a qualification question
+  // BUT: if the user explicitly asks for human/complaint/tracking/contact — break out of qualification
   if (session.qualification.step > 0 && session.qualification.step < 5) {
-    const response = await handleQualificationAnswer(session, text, detected, channel);
-    await saveMessage(session.conversationId, "bot", response.text, detected.intent);
-    await setSession(session);
-    return { ...response, conversationId: session.conversationId };
+    const escapeIntents: BotIntent[] = ["human_request", "complaint", "greeting", "order_tracking", "contact_info", "thanks"];
+    if (escapeIntents.includes(detected.intent)) {
+      // User wants to leave qualification — reset and route normally
+      session.qualification = { step: 0 };
+      session.qualifyingIntent = undefined;
+    } else {
+      const response = await handleQualificationAnswer(session, text, detected, channel);
+      await saveMessage(session.conversationId, "bot", response.text, detected.intent);
+      await setSession(session);
+      return { ...response, conversationId: session.conversationId };
+    }
   }
 
   // 8. Route by intent
@@ -282,6 +290,9 @@ async function routeIntent(
 
     case "human_request":
       return handleEscalation(session, "human_request", lang);
+
+    case "contact_info":
+      return handleContactInfo(session);
 
     case "csat_response":
       return handleCsatResponse(session, detected);
@@ -647,6 +658,18 @@ async function handleLinePlans(session: SessionState): Promise<BotResponse> {
       ? `${formatted}\n\n📞 للتفعيل تواصل معنا أو اختر "كلم موظف"`
       : `${formatted}\n\nלהפעלה צרו קשר`,
     quickReplies: isAr ? ["👤 كلم موظف", "📱 المنتجات", "📦 حالة طلبي"] : ["👤 נציג", "📱 מוצרים"],
+  };
+}
+
+async function handleContactInfo(session: SessionState): Promise<BotResponse> {
+  const isAr = session.language !== "he";
+  return {
+    text: isAr
+      ? `📍 *عنوان المحل:* الناصرة\n📞 *هاتف:* 054-9414448\n📱 *واتساب:* wa.me/972549414448\n🌐 *الموقع:* clalmobile.com\n\nكيف ثاني بقدر أساعدك؟`
+      : `📍 *כתובת:* נצרת\n📞 *טלפון:* 054-9414448\n📱 *וואטסאפ:* wa.me/972549414448\n🌐 *אתר:* clalmobile.com\n\nאיך עוד אפשר לעזור?`,
+    quickReplies: isAr
+      ? ["📱 المنتجات", "📡 الباقات", "👤 كلم موظف"]
+      : ["📱 מוצרים", "📡 חבילות", "👤 נציג"],
   };
 }
 
