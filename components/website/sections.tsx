@@ -36,7 +36,7 @@ export function Navbar() {
         {scr.desktop && (
           <div className="flex items-center gap-5">
             {links.map((l) => (
-              <Link key={l.href} href={l.href} className="text-muted text-sm hover:text-white transition-colors">{l.label}</Link>
+              <Link key={l.href} href={l.href} className="text-white font-bold text-sm hover:text-brand transition-colors">{l.label}</Link>
             ))}
           </div>
         )}
@@ -57,7 +57,7 @@ export function Navbar() {
         <div className="bg-surface-card border-t border-surface-border px-4 py-3 space-y-2">
           {links.map((l) => (
             <Link key={l.href} href={l.href} onClick={() => setMenuOpen(false)}
-              className="block text-right text-muted text-sm py-1.5 hover:text-white">{l.label}</Link>
+              className="block text-right text-white font-bold text-sm py-1.5 hover:text-brand">{l.label}</Link>
           ))}
         </div>
       )}
@@ -69,7 +69,7 @@ export function Navbar() {
 export function HeroSection() {
   const scr = useScreen();
   return (
-    <section className="relative overflow-hidden" style={{ paddingTop: scr.mobile ? 80 : 100, paddingBottom: scr.mobile ? 40 : 80 }}>
+    <section className="relative overflow-hidden" style={{ paddingTop: scr.mobile ? 100 : 120, paddingBottom: scr.mobile ? 40 : 80 }}>
       {/* BG gradient */}
       <div className="absolute inset-0 pointer-events-none" style={{
         background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(196,16,64,0.15) 0%, transparent 70%)",
