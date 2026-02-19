@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     console.error("Chat API error:", err);
     return NextResponse.json(
-      { text: "عذراً حصل خطأ. حاول مرة ثانية أو تواصل معنا:\n📞 054-9414448", quickReplies: [], escalate: false },
+      { text: "عذراً حصل خطأ. حاول مرة ثانية أو تواصل معنا:\n📞 053-3337653", quickReplies: [], escalate: false },
       { status: 200 }
     );
   }

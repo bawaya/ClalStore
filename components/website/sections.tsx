@@ -149,7 +149,7 @@ export function StatsStrip() {
 // ===== Featured Products =====
 export function FeaturedProducts({ products }: { products: any[] }) {
   const scr = useScreen();
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   return (
     <section style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
@@ -166,7 +166,7 @@ export function FeaturedProducts({ products }: { products: any[] }) {
                 {p.type === "device" ? "📱" : "🔌"}
               </div>
               <div className="text-muted text-[11px] mb-0.5">{p.brand}</div>
-              <div className="font-bold text-right" style={{ fontSize: scr.mobile ? 13 : 15 }}>{p.name_ar}</div>
+              <div className="font-bold text-right" style={{ fontSize: scr.mobile ? 13 : 15 }} dir="ltr">{p.name_ar}</div>
               <div className="flex items-center justify-between mt-1">
                 {p.old_price && <span className="text-dim line-through text-[12px]">₪{Number(p.old_price).toLocaleString()}</span>}
                 <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 14 : 16 }}>₪{Number(p.price).toLocaleString()}</span>
@@ -187,7 +187,7 @@ export function FeaturedProducts({ products }: { products: any[] }) {
 // ===== Line Plans Section =====
 export function LinePlansSection({ plans }: { plans: any[] }) {
   const scr = useScreen();
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   return (
     <section id="plans" className="bg-surface-card border-y border-surface-border" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
@@ -205,13 +205,13 @@ export function LinePlansSection({ plans }: { plans: any[] }) {
               background: l.popular ? "rgba(196,16,64,0.03)" : undefined,
             }}>
               {l.popular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand text-white text-[11px] font-bold px-3 py-0.5 rounded-full">{t("plans.popular")}</div>}
-              <div className="font-black" style={{ fontSize: scr.mobile ? 14 : 18 }}>{l.name_ar}</div>
+              <div className="font-black" style={{ fontSize: scr.mobile ? 14 : 18 }}>{lang === "he" ? (l.name_he || l.name_ar) : l.name_ar}</div>
               <div className="font-black text-brand my-2" style={{ fontSize: scr.mobile ? 28 : 36 }}>{l.data_amount}</div>
               <div className="text-muted mb-3" style={{ fontSize: scr.mobile ? 12 : 14 }}>
                 <span className="font-black text-white" style={{ fontSize: scr.mobile ? 18 : 24 }}>₪{l.price}</span>{t("plans.perMonth")}
               </div>
               <div className="space-y-1 mb-4">
-                {(l.features_ar || []).slice(0, 4).map((f: string, i: number) => (
+                {(lang === "he" ? (l.features_he?.length ? l.features_he : l.features_ar) : (l.features_ar || [])).slice(0, 4).map((f: string, i: number) => (
                   <div key={i} className="text-muted" style={{ fontSize: scr.mobile ? 12 : 14 }}>✓ {f}</div>
                 ))}
               </div>
@@ -355,8 +355,8 @@ export function Footer() {
     {
       title: t("footer.contactUs"),
       links: [
-        { href: "tel:0549414448", label: "📞 054-9414448" },
-        { href: "https://wa.me/972549414448", label: "💬 WhatsApp" },
+        { href: "tel:0533337653", label: "📞 053-3337653" },
+        { href: "https://wa.me/972533337653", label: "💬 WhatsApp" },
         { href: "mailto:info@clalmobile.com", label: "📧 info@clalmobile.com" },
       ],
     },

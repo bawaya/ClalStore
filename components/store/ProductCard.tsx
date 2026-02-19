@@ -6,6 +6,7 @@ import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
 import { calcDiscount } from "@/lib/utils";
+import { getBrandLogo } from "@/lib/brand-logos";
 import type { Product, ProductColor } from "@/types/database";
 
 export function ProductCard({ product: p }: { product: Product }) {
@@ -78,14 +79,27 @@ export function ProductCard({ product: p }: { product: Product }) {
       {/* Info */}
       <div style={{ padding: scr.mobile ? "10px 10px 14px" : "14px 16px 18px" }}>
         <div
-          className="text-muted font-semibold mb-0.5"
-          style={{ fontSize: scr.mobile ? 9 : 10 }}
+          className="flex items-center gap-1.5 mb-1"
         >
-          {p.brand}
+          {getBrandLogo(p.brand) && (
+            <img
+              src={getBrandLogo(p.brand)!}
+              alt={p.brand}
+              className="flex-shrink-0"
+              style={{ width: scr.mobile ? 16 : 20, height: scr.mobile ? 16 : 20 }}
+            />
+          )}
+          <span
+            className="text-white font-extrabold uppercase tracking-wide"
+            style={{ fontSize: scr.mobile ? 13 : 15 }}
+          >
+            {p.brand}
+          </span>
         </div>
         <div
           className="font-extrabold mb-1.5 leading-tight"
           style={{ fontSize: scr.mobile ? 13 : 15 }}
+          dir="ltr"
         >
           {p.name_ar}
         </div>

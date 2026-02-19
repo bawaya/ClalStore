@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useScreen, useToast } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
 import { calcDiscount } from "@/lib/utils";
+import { getBrandLogo } from "@/lib/brand-logos";
 import { StoreHeader } from "./StoreHeader";
 import { ProductCard } from "./ProductCard";
 import type { Product, ProductColor } from "@/types/database";
@@ -17,6 +19,7 @@ export function ProductDetailClient({
   related: Product[];
 }) {
   const scr = useScreen();
+  const { t, lang } = useLang();
   const addItem = useCart((s) => s.addItem);
   const { toasts, show } = useToast();
   const [selColor, setSelColor] = useState(0);
@@ -27,23 +30,27 @@ export function ProductDetailClient({
   const specs = (p.specs || {}) as Record<string, string>;
   const disc = p.old_price ? calcDiscount(p.price, p.old_price) : 0;
 
+  /* Device names always English (name_ar holds English names like "Galaxy S25 Ultra") */
+  const productName = p.name_ar;
+  const colorName = colors[selColor]?.name_ar;
+
   const specLabels: Record<string, string> = {
-    screen: "الشاشة", camera: "الكاميرا", battery: "البطارية",
-    cpu: "المعالج", ram: "RAM", weight: "الوزن",
+    screen: t("detail.screen"), camera: t("detail.camera"), battery: t("detail.battery"),
+    cpu: t("detail.cpu"), ram: "RAM", weight: t("detail.weight"),
   };
 
   const handleAdd = () => {
     addItem({
       productId: p.id,
-      name: p.name_ar,
+      name: productName,
       brand: p.brand,
       type: p.type as "device" | "accessory",
       price: p.price,
       image: p.image_url || undefined,
-      color: colors[selColor]?.name_ar,
+      color: colorName,
       storage: storage[selStorage],
     });
-    show("🛒 تمت الإضافة للسلة");
+    show(t("detail.addedToCart"));
   };
 
   return (
@@ -68,7 +75,7 @@ export function ProductDetailClient({
               const colorImg = colors[selColor]?.image;
               const imgSrc = colorImg || p.image_url;
               return imgSrc ? (
-                <img src={imgSrc} alt={p.name_ar} className="max-h-[80%] max-w-[80%] object-contain" />
+                <img src={imgSrc} alt={productName} className="max-h-[80%] max-w-[80%] object-contain" />
               ) : (
                 <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
                   {p.type === "device" ? "📱" : "🔌"}
@@ -79,17 +86,22 @@ export function ProductDetailClient({
 
           {/* Info */}
           <div className="flex-1">
-            <div className="flex gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5">
               {p.featured && (
                 <span className="badge" style={{ background: "rgba(196,16,64,0.15)", color: "#c41040" }}>
-                  🔥 الأكثر مبيعاً
+                  {t("store.bestSeller")}
                 </span>
               )}
-              <span className="text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>{p.brand}</span>
+              <div className="flex items-center gap-1.5">
+                {getBrandLogo(p.brand) && (
+                  <img src={getBrandLogo(p.brand)!} alt={p.brand} style={{ width: scr.mobile ? 18 : 22, height: scr.mobile ? 18 : 22 }} />
+                )}
+                <span className="text-white font-extrabold uppercase tracking-wide" style={{ fontSize: scr.mobile ? 14 : 16 }}>{p.brand}</span>
+              </div>
             </div>
 
-            <h1 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 28 }}>
-              {p.name_ar}
+            <h1 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 28 }} dir="ltr">
+              {productName}
             </h1>
 
             {/* Price */}
@@ -110,12 +122,12 @@ export function ProductDetailClient({
             {/* Type info */}
             {p.type === "device" && (
               <div className="bg-state-info/10 rounded-[10px] p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                <span className="text-state-info">📋 الأجهزة تخضع لفحص ومراجعة — الفريق يتواصل معك</span>
+                <span className="text-state-info">{t("detail.deviceNote")}</span>
               </div>
             )}
             {p.type === "accessory" && (
               <div className="bg-state-success/10 rounded-[10px] p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                <span className="text-state-success">⚡ إكسسوارات — دفع مباشر + شحن فوري</span>
+                <span className="text-state-success">{t("detail.accessoryNote")}</span>
               </div>
             )}
 
@@ -123,7 +135,7 @@ export function ProductDetailClient({
             {colors.length > 0 && (
               <div className="mb-3">
                 <div className="text-muted mb-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-                  اللون: {colors[selColor]?.name_ar}
+                  {t("detail.color")} {colorName}
                 </div>
                 <div className="flex gap-1.5">
                   {colors.map((c, i) => (
@@ -146,7 +158,7 @@ export function ProductDetailClient({
             {/* Storage */}
             {storage.length > 0 && (
               <div className="mb-4">
-                <div className="text-muted mb-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>السعة</div>
+                <div className="text-muted mb-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t("detail.storage")}</div>
                 <div className="flex gap-1">
                   {storage.map((s, i) => (
                     <button
@@ -164,7 +176,7 @@ export function ProductDetailClient({
             {/* Stock */}
             {p.stock > 0 && p.stock <= 5 && (
               <div className="text-state-warning mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                ⚠️ باقي {p.stock} قطع فقط!
+                {t("detail.lowStock").replace("{n}", String(p.stock))}
               </div>
             )}
             {p.stock === 0 && (
@@ -180,7 +192,7 @@ export function ProductDetailClient({
               className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ fontSize: scr.mobile ? 14 : 16, padding: "14px 20px" }}
             >
-              {p.stock === 0 ? "❌ غير متوفر" : "🛒 أضف للسلة"}
+              {p.stock === 0 ? t("detail.unavailable") : `🛒 ${t("store.addToCart")}`}
             </button>
           </div>
         </div>
@@ -189,7 +201,7 @@ export function ProductDetailClient({
         {Object.keys(specs).length > 0 && (
           <div className="card mt-4 p-4" style={{ marginTop: scr.mobile ? 12 : 24 }}>
             <h3 className="font-extrabold mb-2.5 text-right" style={{ fontSize: scr.mobile ? 12 : 16 }}>
-              📋 المواصفات
+              {t("detail.specs")}
             </h3>
             <div
               className="grid gap-1.5"
@@ -210,13 +222,13 @@ export function ProductDetailClient({
         )}
 
         {/* Description */}
-        {p.description_ar && (
+        {((lang === "he" && p.description_he) || p.description_ar) && (
           <div className="card mt-4 p-4">
             <h3 className="font-extrabold mb-2 text-right" style={{ fontSize: scr.mobile ? 12 : 16 }}>
-              📝 الوصف
+              {t("detail.description")}
             </h3>
             <p className="text-muted leading-relaxed text-right" style={{ fontSize: scr.mobile ? 11 : 13 }}>
-              {p.description_ar}
+              {lang === "he" ? (p.description_he || p.description_ar) : p.description_ar}
             </p>
           </div>
         )}
@@ -225,7 +237,7 @@ export function ProductDetailClient({
         {related.length > 0 && (
           <div style={{ marginTop: scr.mobile ? 20 : 32 }}>
             <h3 className="font-extrabold text-center mb-3" style={{ fontSize: scr.mobile ? 14 : 18 }}>
-              منتجات مشابهة
+              {t("detail.similar")}
             </h3>
             <div
               className="grid gap-2"

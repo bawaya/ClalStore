@@ -75,7 +75,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
               className="text-muted"
               style={{ fontSize: scr.mobile ? 7 : 9 }}
             >
-              وكيل رسمي لـ HOT Mobile
+              {t("store.hotAgent")}
             </div>
           </Link>
         )}

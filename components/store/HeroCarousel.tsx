@@ -2,32 +2,37 @@
 
 import { useState, useEffect } from "react";
 import { useScreen } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 import type { Hero } from "@/types/database";
 
 // Fallback heroes when DB is empty
 const FALLBACK_HEROES: Hero[] = [
   {
-    id: "h1", title_ar: "عروض الصيف 🔥", title_he: "", subtitle_ar: "خصومات حتى 40% على أجهزة Samsung",
-    subtitle_he: "", image_url: "", link_url: "", cta_text_ar: "تسوّق الآن", cta_text_he: "", sort_order: 1, active: true, created_at: "",
+    id: "h1", title_ar: "عروض الصيف 🔥", title_he: "מבצעי קיץ 🔥", subtitle_ar: "خصومات حتى 40% على أجهزة Samsung",
+    subtitle_he: "הנחות עד 40% על מכשירי Samsung", image_url: "", link_url: "", cta_text_ar: "تسوّق الآن", cta_text_he: "קנה עכשיו", sort_order: 1, active: true, created_at: "",
   },
   {
-    id: "h2", title_ar: "iPhone 17 وصل!", title_he: "", subtitle_ar: "اطلب الآن واحصل على كفر MagSafe مجاناً",
-    subtitle_he: "", image_url: "", link_url: "", cta_text_ar: "اطلب الآن", cta_text_he: "", sort_order: 2, active: true, created_at: "",
+    id: "h2", title_ar: "iPhone 17 وصل!", title_he: "iPhone 17 הגיע!", subtitle_ar: "اطلب الآن واحصل على كفر MagSafe مجاناً",
+    subtitle_he: "הזמן עכשיו וקבל כיסוי MagSafe במתנה", image_url: "", link_url: "", cta_text_ar: "اطلب الآن", cta_text_he: "הזמן עכשיו", sort_order: 2, active: true, created_at: "",
   },
 ];
 
 export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
   const scr = useScreen();
+  const { lang } = useLang();
   const items = heroes && heroes.length > 0 ? heroes : FALLBACK_HEROES;
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
     if (items.length <= 1) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % items.length), 4000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setIdx((i) => (i + 1) % items.length), 4000);
+    return () => clearInterval(timer);
   }, [items.length]);
 
   const h = items[idx];
+  const title = lang === "he" ? (h.title_he || h.title_ar) : h.title_ar;
+  const subtitle = lang === "he" ? (h.subtitle_he || h.subtitle_ar) : h.subtitle_ar;
+  const ctaText = lang === "he" ? (h.cta_text_he || h.cta_text_ar) : h.cta_text_ar;
 
   return (
     <div
@@ -51,15 +56,15 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
           className="font-black mb-1.5"
           style={{ fontSize: scr.mobile ? 20 : 32 }}
         >
-          {h.title_ar}
+          {title}
         </h2>
         <p
           className="text-muted mb-3"
           style={{ fontSize: scr.mobile ? 11 : 16 }}
         >
-          {h.subtitle_ar}
+          {subtitle}
         </p>
-        {h.cta_text_ar && (
+        {ctaText && (
           <button
             className="btn-primary"
             style={{
@@ -67,7 +72,7 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
               fontSize: scr.mobile ? 12 : 14,
             }}
           >
-            {h.cta_text_ar}
+            {ctaText}
           </button>
         )}
       </div>
