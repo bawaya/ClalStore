@@ -28,7 +28,8 @@ interface Props {
 
 export function StoreClient({ products, heroes, linePlans }: Props) {
   const scr = useScreen();
-  const [cat, setCat] = useState("all");
+  const [typeCat, setTypeCat] = useState("all");
+  const [brandCat, setBrandCat] = useState("all");
   const [search, setSearch] = useState("");
 
   const items = products.length > 0 ? products : FALLBACK_PRODUCTS;
@@ -40,9 +41,12 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
 
   const filtered = useMemo(() => {
     let list = items;
-    if (cat === "device") list = list.filter((p) => p.type === "device");
-    else if (cat === "accessory") list = list.filter((p) => p.type === "accessory");
-    else if (cat !== "all") list = list.filter((p) => p.brand === cat);
+    // Type filter
+    if (typeCat === "device") list = list.filter((p) => p.type === "device");
+    else if (typeCat === "accessory") list = list.filter((p) => p.type === "accessory");
+    // Brand filter
+    if (brandCat !== "all") list = list.filter((p) => p.brand === brandCat);
+    // Search
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -53,13 +57,12 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
       );
     }
     return list;
-  }, [items, cat, search]);
+  }, [items, typeCat, brandCat, search]);
 
-  const categories = [
+  const typeCategories = [
     { key: "all", label: "الكل" },
     { key: "device", label: "📱 أجهزة" },
     { key: "accessory", label: "🔌 إكسسوارات" },
-    ...brands.map((b) => ({ key: b, label: b })),
   ];
 
   const gridCols = scr.mobile
@@ -95,7 +98,23 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
           </div>
         </div>
 
-        {/* Categories */}
+        {/* Type filter */}
+        <div
+          className="flex gap-1 mb-2 overflow-x-auto"
+          style={{ flexWrap: scr.desktop ? "wrap" : "nowrap" }}
+        >
+          {typeCategories.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setTypeCat(c.key)}
+              className={`chip whitespace-nowrap ${typeCat === c.key ? "chip-active" : ""}`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Brand filter */}
         <div
           className="flex gap-1 mb-3 overflow-x-auto"
           style={{
@@ -103,13 +122,19 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
             flexWrap: scr.desktop ? "wrap" : "nowrap",
           }}
         >
-          {categories.map((c) => (
+          <button
+            onClick={() => setBrandCat("all")}
+            className={`chip whitespace-nowrap ${brandCat === "all" ? "chip-active" : ""}`}
+          >
+            كل الشركات
+          </button>
+          {brands.map((b) => (
             <button
-              key={c.key}
-              onClick={() => setCat(c.key)}
-              className={`chip whitespace-nowrap ${cat === c.key ? "chip-active" : ""}`}
+              key={b}
+              onClick={() => setBrandCat(b)}
+              className={`chip whitespace-nowrap ${brandCat === b ? "chip-active" : ""}`}
             >
-              {c.label}
+              {b}
             </button>
           ))}
         </div>

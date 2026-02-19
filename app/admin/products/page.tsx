@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
@@ -26,6 +26,7 @@ export default function ProductsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("all");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -109,12 +110,20 @@ export default function ProductsPage() {
     e.target.value = "";
   };
 
-  const filtered = filter === "all" ? products
-    : filter === "device" ? products.filter((p) => p.type === "device")
-    : filter === "accessory" ? products.filter((p) => p.type === "accessory")
-    : filter === "low" ? products.filter((p) => p.stock > 0 && p.stock <= 5)
-    : filter === "out" ? products.filter((p) => p.stock === 0)
-    : products;
+  const adminBrands = useMemo(
+    () => [...new Set(products.map((p) => p.brand))].sort(),
+    [products]
+  );
+
+  const filtered = useMemo(() => {
+    let list = products;
+    if (filter === "device") list = list.filter((p) => p.type === "device");
+    else if (filter === "accessory") list = list.filter((p) => p.type === "accessory");
+    else if (filter === "low") list = list.filter((p) => p.stock > 0 && p.stock <= 5);
+    else if (filter === "out") list = list.filter((p) => p.stock === 0);
+    if (brandFilter !== "all") list = list.filter((p) => p.brand === brandFilter);
+    return list;
+  }, [products, filter, brandFilter]);
 
   const openCreate = () => { setForm(EMPTY); setEditId(null); setModal(true); };
   const openEdit = (p: Product) => { setForm({ ...p }); setEditId(p.id); setModal(true); };
@@ -157,8 +166,8 @@ export default function ProductsPage() {
     <div>
       <PageHeader title="📱 المنتجات" count={products.length} onAdd={openCreate} addLabel="منتج جديد" />
 
-      {/* Filters */}
-      <div className="flex gap-1 mb-3 overflow-x-auto">
+      {/* Filters — Type + Stock */}
+      <div className="flex gap-1 mb-2 overflow-x-auto">
         {[
           { k: "all", l: "الكل" }, { k: "device", l: "📱 أجهزة" },
           { k: "accessory", l: "🔌 إكسسوارات" }, { k: "low", l: "⚠️ مخزون منخفض" },
@@ -166,6 +175,16 @@ export default function ProductsPage() {
         ].map((f) => (
           <button key={f.k} onClick={() => setFilter(f.k)}
             className={`chip whitespace-nowrap ${filter === f.k ? "chip-active" : ""}`}>{f.l}</button>
+        ))}
+      </div>
+
+      {/* Filters — Brand */}
+      <div className="flex gap-1 mb-3 overflow-x-auto">
+        <button onClick={() => setBrandFilter("all")}
+          className={`chip whitespace-nowrap ${brandFilter === "all" ? "chip-active" : ""}`}>كل الشركات</button>
+        {adminBrands.map((b) => (
+          <button key={b} onClick={() => setBrandFilter(b)}
+            className={`chip whitespace-nowrap ${brandFilter === b ? "chip-active" : ""}`}>{b}</button>
         ))}
       </div>
 
