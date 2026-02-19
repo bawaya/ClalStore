@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useCart } from "@/lib/store/cart";
 import { StoreHeader } from "@/components/store/StoreHeader";
+import { Footer } from "@/components/website/sections";
 import {
   validatePhone, validateIsraeliID, validateEmail,
   validateBranch, validateAccount,
@@ -561,6 +562,7 @@ export default function CartPage() {
           {t.message}
         </div>
       ))}
+      <Footer />
     </div>
   );
 }

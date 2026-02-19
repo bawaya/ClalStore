@@ -9,6 +9,7 @@ import { calcDiscount } from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
 import { StoreHeader } from "./StoreHeader";
 import { ProductCard } from "./ProductCard";
+import { Footer } from "@/components/website/sections";
 import type { Product, ProductColor } from "@/types/database";
 
 export function ProductDetailClient({
@@ -261,6 +262,8 @@ export function ProductDetailClient({
           {t.message}
         </div>
       ))}
+
+      <Footer />
     </div>
   );
 }

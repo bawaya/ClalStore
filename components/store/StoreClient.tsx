@@ -7,6 +7,7 @@ import { StoreHeader } from "./StoreHeader";
 import { HeroCarousel } from "./HeroCarousel";
 import { ProductCard } from "./ProductCard";
 import { LinePlans } from "./LinePlans";
+import { Footer } from "@/components/website/sections";
 import type { Product, Hero, LinePlan } from "@/types/database";
 
 // Fallback products when DB is empty (development)
@@ -158,6 +159,8 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
         {/* Lines */}
         <LinePlans plans={linePlans} />
       </div>
+
+      <Footer />
     </div>
   );
 }
