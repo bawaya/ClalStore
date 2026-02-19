@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "@/styles/globals.css";
+import { CookieConsent } from "@/components/shared/CookieConsent";
 
 export const metadata: Metadata = {
   title: "ClalMobile — وكيل رسمي لـ HOT Mobile",
@@ -49,6 +50,7 @@ export default function RootLayout({
       </head>
       <body className="font-arabic bg-surface-bg text-white min-h-screen antialiased" style={{ backgroundColor: '#09090b', color: '#fafafa' }}>
         {children}
+        <CookieConsent />
       </body>
     </html>
   );

@@ -19,7 +19,6 @@ const nextConfig = {
     return [
       { source: "/shop", destination: "/store", permanent: true },
       { source: "/products", destination: "/store", permanent: true },
-      { source: "/privacy", destination: "/legal", permanent: true },
       { source: "/terms", destination: "/legal", permanent: true },
     ];
   },

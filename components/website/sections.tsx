@@ -336,6 +336,7 @@ export function Footer() {
         { href: "/faq", label: "أسئلة شائعة" },
         { href: "/contact", label: "تواصل معنا" },
         { href: "/legal", label: "الشروط والأحكام" },
+        { href: "/privacy", label: "سياسة الخصوصية" },
       ],
     },
     {
@@ -377,7 +378,7 @@ export function Footer() {
 
         {/* Bottom */}
         <div className="border-t border-surface-border mt-6 pt-4 flex items-center justify-between">
-          <Link href="/legal" className="text-dim text-[11px] hover:text-muted">سياسة الخصوصية</Link>
+          <Link href="/privacy" className="text-dim text-[11px] hover:text-muted">سياسة الخصوصية | מדיניות פרטיות</Link>
           <span className="text-dim text-[11px]">© {year} ClalMobile. جميع الحقوق محفوظة.</span>
         </div>
       </div>
