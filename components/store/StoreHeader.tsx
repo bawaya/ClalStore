@@ -59,14 +59,21 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
             width: scr.mobile ? 40 : 46,
             height: scr.mobile ? 40 : 46,
             fontSize: scr.mobile ? 18 : 20,
-            background: itemCount > 0 ? 'linear-gradient(135deg, #c41040 0%, #ff4060 100%)' : 'rgba(196,16,64,0.12)',
-            border: itemCount > 0 ? 'none' : '1px solid rgba(196,16,64,0.3)',
+            background: itemCount > 0 ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' : 'rgba(5,150,105,0.12)',
+            border: itemCount > 0 ? 'none' : '1px solid rgba(16,185,129,0.35)',
+            boxShadow: itemCount > 0 ? '0 2px 10px rgba(16,185,129,0.4)' : 'none',
           }}
         >
           🛒
           {itemCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-white text-brand font-black flex items-center justify-center shadow-md"
-              style={{ width: scr.mobile ? 20 : 22, height: scr.mobile ? 20 : 22, fontSize: scr.mobile ? 10 : 11 }}>
+            <span className="absolute -top-1.5 -right-1.5 rounded-full font-black flex items-center justify-center"
+              style={{
+                width: scr.mobile ? 20 : 22, height: scr.mobile ? 20 : 22,
+                fontSize: scr.mobile ? 10 : 11,
+                background: '#fff',
+                color: '#059669',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+              }}>
               {itemCount}
             </span>
           )}

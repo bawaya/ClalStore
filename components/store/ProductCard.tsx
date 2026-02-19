@@ -132,11 +132,12 @@ export function ProductCard({ product: p }: { product: Product }) {
           </div>
           <button
             onClick={handleAddToCart}
-            className={`${scr.mobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all active:scale-95 text-white rounded-lg font-extrabold shadow-lg`}
+            className={`${scr.mobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all active:scale-95 text-white rounded-lg font-extrabold`}
             style={{
-              background: 'linear-gradient(135deg, #c41040 0%, #ff4060 100%)',
+              background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
               padding: scr.mobile ? '6px 10px' : '6px 12px',
               fontSize: scr.mobile ? 11 : 12,
+              boxShadow: '0 2px 8px rgba(16,185,129,0.35)',
             }}
           >
             🛒 أضف
