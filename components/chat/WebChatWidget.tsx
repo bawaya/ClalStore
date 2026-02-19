@@ -86,18 +86,31 @@ export function WebChatWidget() {
     }
   }, [loading, escalated, sessionId, open]);
 
-  // === Render formatted text (bold, links) ===
+  // === Render formatted text (bold, links, phone numbers) ===
   const renderText = (text: string) => {
-    const parts = text.split(/(\*[^*]+\*|https?:\/\/[^\s]+)/g);
+    const parts = text.split(/(\*[^*]+\*|https?:\/\/[^\s]+|0\d{1,2}[- ]?\d{3}[- ]?\d{4})/g);
     return parts.map((part, i) => {
       if (part.startsWith("*") && part.endsWith("*")) {
         return <strong key={i} className="font-bold">{part.slice(1, -1)}</strong>;
       }
+      // Phone numbers → clickable tel: and wa.me links
+      if (/^0\d{1,2}[- ]?\d{3}[- ]?\d{4}$/.test(part)) {
+        const clean = part.replace(/[-\s]/g, "");
+        const intl = "972" + clean.slice(1);
+        return (
+          <span key={i} className="inline-flex gap-1.5 flex-wrap">
+            <a href={`tel:${clean}`} className="text-brand underline" onClick={(e) => e.stopPropagation()}>📞 {part}</a>
+            <a href={`https://wa.me/${intl}`} target="_blank" rel="noopener noreferrer"
+              className="text-green-400 underline" onClick={(e) => e.stopPropagation()}>💬 واتساب</a>
+          </span>
+        );
+      }
       if (part.match(/^https?:\/\//)) {
+        const label = part.includes("wa.me") ? "💬 واتساب" : part.replace(/https?:\/\/(www\.)?/, "").slice(0, 35) + (part.length > 40 ? "..." : "");
         return (
           <a key={i} href={part} target="_blank" rel="noopener noreferrer"
             className="text-brand underline break-all" onClick={(e) => e.stopPropagation()}>
-            {part.replace(/https?:\/\/(www\.)?/, "").slice(0, 35)}...
+            {label}
           </a>
         );
       }
@@ -112,14 +125,15 @@ export function WebChatWidget() {
         onClick={() => setOpen(true)}
         className="fixed z-[9999] rounded-full shadow-2xl flex items-center justify-center cursor-pointer border-0 transition-transform hover:scale-110"
         style={{
-          bottom: scr.mobile ? 16 : 24,
-          left: scr.mobile ? 16 : 24,
-          width: scr.mobile ? 52 : 60,
-          height: scr.mobile ? 52 : 60,
+          bottom: scr.mobile ? 20 : 24,
+          left: scr.mobile ? 14 : 24,
+          width: scr.mobile ? 56 : 60,
+          height: scr.mobile ? 56 : 60,
           background: "linear-gradient(135deg, #c41040, #ff3366)",
+          marginBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
-        <span style={{ fontSize: scr.mobile ? 22 : 26 }}>💬</span>
+        <span style={{ fontSize: scr.mobile ? 24 : 26 }}>💬</span>
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
             {unread}
@@ -131,7 +145,6 @@ export function WebChatWidget() {
 
   // === Chat Window ===
   const w = scr.mobile ? "100vw" : 380;
-  const h = scr.mobile ? "100vh" : 560;
 
   return (
     <div
@@ -139,7 +152,7 @@ export function WebChatWidget() {
       dir="rtl"
       style={{
         width: w,
-        height: h,
+        height: scr.mobile ? "100dvh" : 560,
         bottom: scr.mobile ? 0 : 24,
         left: scr.mobile ? 0 : 24,
         borderRadius: scr.mobile ? 0 : 20,
@@ -240,7 +253,7 @@ export function WebChatWidget() {
       {/* Input */}
       <div
         className="flex items-center gap-2 border-t border-surface-border flex-shrink-0 bg-surface-card"
-        style={{ padding: scr.mobile ? "10px 12px" : "10px 14px" }}
+        style={{ padding: scr.mobile ? "10px 12px" : "10px 14px", paddingBottom: scr.mobile ? "calc(10px + env(safe-area-inset-bottom, 0px))" : "10px" }}
       >
         <button
           onClick={() => send(input)}

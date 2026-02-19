@@ -36,6 +36,11 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminSupabase();
 
+    if (!supabase) {
+      console.error("Order API: Supabase admin client is null — check SUPABASE_SERVICE_ROLE_KEY");
+      return NextResponse.json({ success: false, error: "خطأ في إعدادات السيرفر" }, { status: 500 });
+    }
+
     // === 1. Upsert Customer ===
     const cleanPhone = customer.phone.replace(/[-\s]/g, "");
 
@@ -174,18 +179,21 @@ export async function POST(req: NextRequest) {
     // === 8. Email Confirmation (Season 6) ===
     if (customer.email) {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "order_confirm",
-            orderId,
-            customerName: customer.name,
-            customerEmail: customer.email,
-            total,
-            items: items.map((i: any) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
-          }),
-        });
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "";
+        if (appUrl) {
+          await fetch(`${appUrl}/api/email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "order_confirm",
+              orderId,
+              customerName: customer.name,
+              customerEmail: customer.email,
+              total,
+              items: items.map((i: any) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
+            }),
+          });
+        }
       } catch (emailErr) {
         console.error("Email notification failed:", emailErr);
       }
