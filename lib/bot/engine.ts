@@ -665,8 +665,8 @@ async function handleContactInfo(session: SessionState): Promise<BotResponse> {
   const isAr = session.language !== "he";
   return {
     text: isAr
-      ? `📍 *عنوان المحل:* الناصرة\n📞 *هاتف:* 054-9414448\n📱 *واتساب:* wa.me/972549414448\n🌐 *الموقع:* clalmobile.com\n\nكيف ثاني بقدر أساعدك؟`
-      : `📍 *כתובת:* נצרת\n📞 *טלפון:* 054-9414448\n📱 *וואטסאפ:* wa.me/972549414448\n🌐 *אתר:* clalmobile.com\n\nאיך עוד אפשר לעזור?`,
+      ? `📍 *عنوان المحل:* الناصرة\n📞 *هاتف:* 054-9414448\n📱 *واتساب:* https://wa.me/972549414448\n🌐 *الموقع:* https://clalmobile.com\n\nكيف ثاني بقدر أساعدك؟`
+      : `📍 *כתובת:* נצרת\n📞 *טלפון:* 054-9414448\n📱 *וואטסאפ:* https://wa.me/972549414448\n🌐 *אתר:* https://clalmobile.com\n\nאיך עוד אפשר לעזור?`,
     quickReplies: isAr
       ? ["📱 المنتجات", "📡 الباقات", "👤 كلم موظف"]
       : ["📱 מוצרים", "📡 חבילות", "👤 נציג"],

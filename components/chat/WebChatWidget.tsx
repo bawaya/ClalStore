@@ -83,6 +83,7 @@ export function WebChatWidget() {
       }]);
     } finally {
       setLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [loading, escalated, sessionId, open]);
 
