@@ -132,9 +132,14 @@ export function ProductCard({ product: p }: { product: Product }) {
           </div>
           <button
             onClick={handleAddToCart}
-            className={`${scr.mobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity bg-brand text-white rounded-lg px-2 py-1 text-[10px] font-bold`}
+            className={`${scr.mobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all active:scale-95 text-white rounded-lg font-extrabold shadow-lg`}
+            style={{
+              background: 'linear-gradient(135deg, #c41040 0%, #ff4060 100%)',
+              padding: scr.mobile ? '6px 10px' : '6px 12px',
+              fontSize: scr.mobile ? 11 : 12,
+            }}
           >
-            + 🛒
+            🛒 أضف
           </button>
         </div>
       </div>

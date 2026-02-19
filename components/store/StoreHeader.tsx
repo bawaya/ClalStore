@@ -54,16 +54,19 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
         {/* Left: Cart */}
         <Link
           href="/store/cart"
-          className="relative flex items-center justify-center rounded-xl border border-surface-border bg-transparent cursor-pointer"
+          className="relative flex items-center justify-center rounded-xl cursor-pointer transition-transform active:scale-95"
           style={{
-            width: scr.mobile ? 36 : 44,
-            height: scr.mobile ? 36 : 44,
-            fontSize: scr.mobile ? 16 : 18,
+            width: scr.mobile ? 40 : 46,
+            height: scr.mobile ? 40 : 46,
+            fontSize: scr.mobile ? 18 : 20,
+            background: itemCount > 0 ? 'linear-gradient(135deg, #c41040 0%, #ff4060 100%)' : 'rgba(196,16,64,0.12)',
+            border: itemCount > 0 ? 'none' : '1px solid rgba(196,16,64,0.3)',
           }}
         >
           🛒
           {itemCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand text-white text-[8px] font-extrabold flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-white text-brand font-black flex items-center justify-center shadow-md"
+              style={{ width: scr.mobile ? 20 : 22, height: scr.mobile ? 20 : 22, fontSize: scr.mobile ? 10 : 11 }}>
               {itemCount}
             </span>
           )}
