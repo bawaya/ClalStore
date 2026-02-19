@@ -63,10 +63,10 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
   ];
 
   const gridCols = scr.mobile
-    ? "1fr 1fr"
+    ? "repeat(2, 1fr)"
     : scr.tablet
-      ? "1fr 1fr 1fr"
-      : "1fr 1fr 1fr 1fr";
+      ? "repeat(3, 1fr)"
+      : "repeat(4, 1fr)";
 
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
@@ -121,7 +121,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
             <div className="text-sm">لا توجد منتجات مطابقة</div>
           </div>
         ) : (
-          <div className="grid" style={{ gridTemplateColumns: gridCols, gap: scr.mobile ? 8 : 14 }}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3.5">
             {filtered.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
