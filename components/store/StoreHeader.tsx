@@ -1,13 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/lib/store/cart";
 import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
 
+const navLinks = [
+  { href: "/", label: "الرئيسية" },
+  { href: "/store", label: "المتجر" },
+  { href: "/#plans", label: "الباقات" },
+  { href: "/about", label: "من نحن" },
+  { href: "/faq", label: "أسئلة شائعة" },
+  { href: "/contact", label: "تواصل معنا" },
+];
+
 export function StoreHeader({ showBack }: { showBack?: boolean }) {
   const scr = useScreen();
   const itemCount = useCart((s) => s.getItemCount());
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="bg-surface-card border-b border-surface-border sticky top-0 z-50">
@@ -15,8 +26,11 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
         className="max-w-[1200px] mx-auto flex items-center justify-between"
         style={{ padding: scr.mobile ? "10px 14px" : "14px 28px" }}
       >
-        {/* Right: Back + Logo Icon */}
+        {/* Right: Menu + Back + Logo Icon */}
         <div className="flex items-center gap-2">
+          {scr.mobile && (
+            <button onClick={() => setMenuOpen(!menuOpen)} className="text-white bg-transparent border-0 cursor-pointer text-xl">☰</button>
+          )}
           {showBack && (
             <Link
               href="/store"
@@ -35,21 +49,32 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
           </Link>
         </div>
 
-        {/* Center: Name */}
-        <Link href="/store" className="text-center">
-          <div
-            className="font-black"
-            style={{ fontSize: scr.mobile ? 14 : 18 }}
-          >
-            <span className="text-brand">Clal</span>Mobile
+        {/* Desktop Nav Links */}
+        {scr.desktop && (
+          <div className="flex items-center gap-4">
+            {navLinks.map((l) => (
+              <Link key={l.href} href={l.href} className="text-white font-bold text-sm hover:text-brand transition-colors">{l.label}</Link>
+            ))}
           </div>
-          <div
-            className="text-muted"
-            style={{ fontSize: scr.mobile ? 7 : 9 }}
-          >
-            وكيل رسمي لـ HOT Mobile
-          </div>
-        </Link>
+        )}
+
+        {/* Center (mobile only): Name */}
+        {scr.mobile && (
+          <Link href="/store" className="text-center">
+            <div
+              className="font-black"
+              style={{ fontSize: scr.mobile ? 14 : 18 }}
+            >
+              <span className="text-brand">Clal</span>Mobile
+            </div>
+            <div
+              className="text-muted"
+              style={{ fontSize: scr.mobile ? 7 : 9 }}
+            >
+              وكيل رسمي لـ HOT Mobile
+            </div>
+          </Link>
+        )}
 
         {/* Left: Cart */}
         <Link
@@ -79,6 +104,16 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
           )}
         </Link>
       </div>
+
+      {/* Mobile dropdown nav */}
+      {scr.mobile && menuOpen && (
+        <div className="bg-surface-card border-t border-surface-border px-4 py-3 space-y-2">
+          {navLinks.map((l) => (
+            <Link key={l.href} href={l.href} onClick={() => setMenuOpen(false)}
+              className="block text-right text-white font-bold text-sm py-1.5 hover:text-brand">{l.label}</Link>
+          ))}
+        </div>
+      )}
     </header>
   );
 }
