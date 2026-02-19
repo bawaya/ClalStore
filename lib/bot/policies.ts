@@ -56,7 +56,7 @@ export function detectPolicyType(message: string): PolicyType | null {
   const lower = message.toLowerCase();
 
   if (/ضمان|אחריות|warranty/i.test(lower)) return "warranty";
-  if (/ارجاع|إرجاع|استرجاع|החזרה|return/i.test(lower)) return "return";
+  if (/ارجاع|إرجاع|استرجاع|استبدال|تبديل|الغاء|إلغاء|החזרה|ביטול|החלפה|return|refund|exchange|cancel/i.test(lower)) return "return";
   if (/شحن|توصيل|משלוח|shipping|delivery/i.test(lower)) return "shipping";
   if (/تقسيط|قسط|دفعات|תשלומים|installment/i.test(lower)) return "installments";
   if (/خصوصية|بيانات|פרטיות|privacy/i.test(lower)) return "privacy";
