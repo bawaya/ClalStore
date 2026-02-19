@@ -51,7 +51,7 @@ export function ProductCard({ product: p }: { product: Product }) {
       {/* Image — shows color-specific image if available */}
       <div
         className="bg-surface-elevated flex items-center justify-center"
-        style={{ height: scr.mobile ? 120 : 180 }}
+        style={{ height: scr.mobile ? 160 : 180 }}
       >
         {(() => {
           const colorImg = colors[selColor]?.image;
@@ -65,7 +65,7 @@ export function ProductCard({ product: p }: { product: Product }) {
           ) : (
             <span
               className="opacity-15"
-              style={{ fontSize: scr.mobile ? 40 : 56 }}
+              style={{ fontSize: scr.mobile ? 48 : 56 }}
             >
               {p.type === "device" ? "📱" : "🔌"}
             </span>
@@ -74,16 +74,16 @@ export function ProductCard({ product: p }: { product: Product }) {
       </div>
 
       {/* Info */}
-      <div style={{ padding: scr.mobile ? "10px 10px 12px" : "14px 16px 18px" }}>
+      <div style={{ padding: scr.mobile ? "10px 10px 14px" : "14px 16px 18px" }}>
         <div
           className="text-muted font-semibold mb-0.5"
-          style={{ fontSize: scr.mobile ? 8 : 10 }}
+          style={{ fontSize: scr.mobile ? 9 : 10 }}
         >
           {p.brand}
         </div>
         <div
           className="font-extrabold mb-1.5 leading-tight"
-          style={{ fontSize: scr.mobile ? 12 : 15 }}
+          style={{ fontSize: scr.mobile ? 13 : 15 }}
         >
           {p.name_ar}
         </div>
@@ -98,8 +98,8 @@ export function ProductCard({ product: p }: { product: Product }) {
                 title={c.name_ar}
                 className="rounded-full cursor-pointer transition-all flex-shrink-0"
                 style={{
-                  width: scr.mobile ? 14 : 18,
-                  height: scr.mobile ? 14 : 18,
+                  width: scr.mobile ? 16 : 18,
+                  height: scr.mobile ? 16 : 18,
                   background: c.hex,
                   border: selColor === i ? "2px solid #c41040" : "2px solid #333",
                   boxShadow: selColor === i ? "0 0 0 1px #c41040" : "none",
@@ -132,7 +132,7 @@ export function ProductCard({ product: p }: { product: Product }) {
           </div>
           <button
             onClick={handleAddToCart}
-            className="opacity-0 group-hover:opacity-100 transition-opacity bg-brand text-white rounded-lg px-2 py-1 text-[10px] font-bold"
+            className={`${scr.mobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity bg-brand text-white rounded-lg px-2 py-1 text-[10px] font-bold`}
           >
             + 🛒
           </button>
