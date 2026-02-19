@@ -163,9 +163,9 @@ export function FeaturedProducts({ products }: { products: any[] }) {
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
           {products.slice(0, scr.mobile ? 4 : 8).map((p) => (
             <Link key={p.id} href={`/store/product/${p.id}`} className="card hover:border-brand/30 transition-all group overflow-hidden" style={{ padding: 0 }}>
-              <div className="w-full aspect-square bg-surface-elevated flex items-center justify-center text-3xl">
+              <div className="w-full aspect-square bg-surface-elevated flex items-center justify-center text-3xl overflow-hidden">
                 {p.image_url ? (
-                  <img src={p.image_url} alt={p.name_ar} className="max-h-[90%] max-w-[90%] object-contain" />
+                  <img src={p.image_url} alt={p.name_ar} className="w-full h-full object-cover" />
                 ) : (
                   <span className="opacity-15" style={{ fontSize: scr.mobile ? 48 : 56 }}>{p.type === "device" ? "📱" : "🔌"}</span>
                 )}

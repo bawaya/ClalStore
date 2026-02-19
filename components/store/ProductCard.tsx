@@ -53,7 +53,7 @@ export function ProductCard({ product: p }: { product: Product }) {
 
       {/* Image — shows color-specific image if available */}
       <div
-        className="bg-surface-elevated flex items-center justify-center"
+        className="bg-surface-elevated flex items-center justify-center overflow-hidden"
         style={{ height: scr.mobile ? 200 : 230 }}
       >
         {(() => {
@@ -63,7 +63,7 @@ export function ProductCard({ product: p }: { product: Product }) {
             <img
               src={imgSrc}
               alt={p.name_ar}
-              className="max-h-[90%] max-w-[90%] object-contain"
+              className="w-full h-full object-cover"
             />
           ) : (
             <span
