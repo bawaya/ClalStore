@@ -32,6 +32,7 @@ export default function ProductsPage() {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const colorInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const [uploadingColor, setUploadingColor] = useState<number | null>(null);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -260,8 +261,9 @@ export default function ProductsPage() {
 
               {/* Main image preview */}
               {form.image_url && (
-                <div className="relative mb-2 bg-surface-elevated rounded-xl flex items-center justify-center" style={{ height: 120 }}>
+                <div className="relative mb-2 bg-surface-elevated rounded-xl flex items-center justify-center cursor-pointer" style={{ height: 120 }} onClick={() => setZoomImage(form.image_url!)}>
                   <img src={form.image_url} alt="صورة" className="max-h-[90%] max-w-[90%] object-contain rounded-lg" />
+                  <div className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/50 text-white text-xs flex items-center justify-center">🔍</div>
                   <button
                     onClick={() => setForm({ ...form, image_url: undefined })}
                     className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-state-error/80 text-white text-xs flex items-center justify-center cursor-pointer border-0"
@@ -288,7 +290,7 @@ export default function ProductsPage() {
               <div className="font-bold text-right mt-3 mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>🖼️ معرض صور إضافية</div>
               <div className="flex gap-1.5 flex-wrap mb-1.5">
                 {(form.gallery || []).map((url, i) => (
-                  <div key={i} className="relative w-16 h-16 bg-surface-elevated rounded-lg overflow-hidden flex items-center justify-center">
+                  <div key={i} className="relative w-16 h-16 bg-surface-elevated rounded-lg overflow-hidden flex items-center justify-center cursor-pointer" onClick={() => setZoomImage(url)}>
                     <img src={url} alt="" className="max-h-full max-w-full object-contain" />
                     <button
                       onClick={() => removeGalleryImage(i)}
@@ -330,7 +332,7 @@ export default function ProductsPage() {
                   {/* Color-specific image */}
                   <div className="flex items-center gap-1.5">
                     {c.image && (
-                      <div className="relative w-12 h-12 bg-surface-bg rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                      <div className="relative w-12 h-12 bg-surface-bg rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer" onClick={() => setZoomImage(c.image!)}>
                         <img src={c.image} alt="" className="max-h-full max-w-full object-contain" />
                         <button
                           onClick={() => { const updated = [...(form.colors || [])]; updated[i] = { ...updated[i], image: undefined }; setForm({ ...form, colors: updated }); }}
@@ -410,6 +412,25 @@ export default function ProductsPage() {
         open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete}
         title="حذف المنتج؟" message="هل أنت متأكد؟ هذا الإجراء لا يمكن التراجع عنه."
       />
+
+      {/* Image Zoom Lightbox */}
+      {zoomImage && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setZoomImage(null)}
+        >
+          <button
+            onClick={() => setZoomImage(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 text-white text-xl flex items-center justify-center cursor-pointer border-0 hover:bg-white/30 transition-colors"
+          >✕</button>
+          <img
+            src={zoomImage}
+            alt="تكبير"
+            className="max-h-[85vh] max-w-[90vw] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       {/* Toast */}
       {toasts.map((t) => (
