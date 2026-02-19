@@ -181,7 +181,7 @@ export function ProductDetailClient({
             )}
             {p.stock === 0 && (
               <div className="text-state-error mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                ❌ نفذ من المخزون
+                {t("store.outOfStock")}
               </div>
             )}
 
