@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useScreen } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 
 const COOKIE_KEY = "clal_cookie_consent";
 
 export function CookieConsent() {
   const scr = useScreen();
+  const { t } = useLang();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -42,18 +44,14 @@ export function CookieConsent() {
             className="text-muted leading-relaxed"
             style={{ fontSize: scr.mobile ? 11 : 13 }}
           >
-            🍪 هذا الموقع يستخدم ملفات تعريف الارتباط (Cookies) لتحسين تجربة
-            التصفح.
-            <br />
-            <span style={{ fontSize: scr.mobile ? 10 : 11 }}>
-              אתר זה משתמש בעוגיות (Cookies) לשיפור חוויית הגלישה.{" "}
-            </span>
+            {t("cookie.text")}
+            {" "}
             <Link
               href="/privacy"
               className="text-brand underline hover:text-white"
               style={{ fontSize: scr.mobile ? 10 : 11 }}
             >
-              سياسة الخصوصية / מדיניות פרטיות
+              {t("cookie.link")}
             </Link>
           </p>
         </div>
@@ -65,7 +63,7 @@ export function CookieConsent() {
             padding: scr.mobile ? "8px 20px" : "10px 28px",
           }}
         >
-          ✅ موافق / אישור
+          {t("cookie.accept")}
         </button>
       </div>
     </div>

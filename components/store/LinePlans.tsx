@@ -1,6 +1,7 @@
 "use client";
 
 import { useScreen, useToast } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 import type { LinePlan } from "@/types/database";
 
 const FALLBACK_PLANS: LinePlan[] = [
@@ -11,13 +12,14 @@ const FALLBACK_PLANS: LinePlan[] = [
 
 export function LinePlans({ plans }: { plans?: LinePlan[] }) {
   const scr = useScreen();
+  const { t } = useLang();
   const { toasts, show } = useToast();
   const items = plans && plans.length > 0 ? plans : FALLBACK_PLANS;
 
   return (
     <div style={{ marginTop: scr.mobile ? 20 : 32 }}>
       <h2 className="font-black text-center mb-4" style={{ fontSize: scr.mobile ? 16 : 22 }}>
-        📡 باقات HOT Mobile
+        {t("plans.title")}
       </h2>
       <div
         className="grid gap-3"
@@ -34,7 +36,7 @@ export function LinePlans({ plans }: { plans?: LinePlan[] }) {
           >
             {l.popular && (
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand text-white text-[8px] font-bold px-2.5 py-0.5 rounded-md">
-                ⭐ الأكثر شعبية
+                {t("plans.popular")}
               </div>
             )}
             <div className="font-black mb-1" style={{ fontSize: scr.mobile ? 14 : 18 }}>
@@ -44,7 +46,7 @@ export function LinePlans({ plans }: { plans?: LinePlan[] }) {
               {l.data_amount}
             </div>
             <div className="text-muted mb-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-              ₪{l.price}/شهر
+              ₪{l.price}{t("plans.perMonth")}
             </div>
             {l.features_ar.map((f, i) => (
               <div key={i} className="text-muted mb-0.5" style={{ fontSize: scr.mobile ? 8 : 10 }}>
@@ -56,7 +58,7 @@ export function LinePlans({ plans }: { plans?: LinePlan[] }) {
               className="btn-primary w-full mt-2.5"
               style={{ fontSize: scr.mobile ? 10 : 12, padding: "8px 16px" }}
             >
-              اختر الباقة
+              {t("plans.choose")}
             </button>
           </div>
         ))}

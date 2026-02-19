@@ -9,28 +9,34 @@ import Link from "next/link";
 import { useState } from "react";
 import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
+import { LangSwitcher } from "@/components/shared/LangSwitcher";
+import { useLang } from "@/lib/i18n";
 
 // ===== Navbar =====
 export function Navbar() {
   const scr = useScreen();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { t } = useLang();
 
   const links = [
-    { href: "/", label: "الرئيسية" },
-    { href: "/store", label: "المتجر" },
-    { href: "/#plans", label: "الباقات" },
-    { href: "/about", label: "من نحن" },
-    { href: "/faq", label: "أسئلة شائعة" },
-    { href: "/contact", label: "تواصل معنا" },
+    { href: "/", label: t("nav.home") },
+    { href: "/store", label: t("nav.store") },
+    { href: "/#plans", label: t("nav.plans") },
+    { href: "/about", label: t("nav.about") },
+    { href: "/faq", label: t("nav.faq") },
+    { href: "/contact", label: t("nav.contact") },
   ];
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-bg/90 backdrop-blur-xl border-b border-surface-border">
       <div className="max-w-6xl mx-auto flex items-center justify-between" style={{ padding: scr.mobile ? "10px 16px" : "12px 24px" }}>
-        {/* CTA */}
-        <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 12 : 14, padding: scr.mobile ? "6px 12px" : "8px 20px" }}>
-          🛒 تسوّق الآن
-        </Link>
+        {/* CTA + Lang */}
+        <div className="flex items-center gap-2">
+          <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 12 : 14, padding: scr.mobile ? "6px 12px" : "8px 20px" }}>
+            {t("nav.shopNow")}
+          </Link>
+          <LangSwitcher size={scr.mobile ? "sm" : "md"} />
+        </div>
 
         {/* Desktop links */}
         {scr.desktop && (
@@ -68,6 +74,7 @@ export function Navbar() {
 // ===== Hero Section =====
 export function HeroSection() {
   const scr = useScreen();
+  const { t } = useLang();
   return (
     <section className="relative overflow-hidden" style={{ paddingTop: scr.mobile ? 100 : 120, paddingBottom: scr.mobile ? 40 : 80 }}>
       {/* BG gradient */}
@@ -77,32 +84,31 @@ export function HeroSection() {
 
       <div className="max-w-6xl mx-auto px-4 text-center relative z-10">
         <div className="inline-block bg-brand/10 text-brand text-[10px] font-bold px-3 py-1 rounded-full mb-4">
-          🔴 وكيل رسمي لـ HOT Mobile
+          {t("hero.badge")}
         </div>
 
         <h1 className="font-black leading-tight mb-4" style={{ fontSize: scr.mobile ? 28 : 52 }}>
-          <span className="text-white">أجهزة ذكية.</span><br />
-          <span className="text-brand">باقات مميزة.</span><br />
-          <span className="text-white">توصيل لبابك.</span>
+          <span className="text-white">{t("hero.line1")}</span><br />
+          <span className="text-brand">{t("hero.line2")}</span><br />
+          <span className="text-white">{t("hero.line3")}</span>
         </h1>
 
         <p className="text-muted max-w-xl mx-auto mb-6" style={{ fontSize: scr.mobile ? 13 : 16 }}>
-          أحدث الأجهزة من Samsung و Apple و Xiaomi مع باقات HOT Mobile —
-          توصيل مجاني لكل أنحاء إسرائيل خلال 1-2 يوم عمل.
+          {t("hero.desc")}
         </p>
 
         <div className="flex items-center justify-center gap-3">
           <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            🛒 تصفّح المتجر
+            {t("hero.browseStore")}
           </Link>
           <Link href="/#plans" className="btn-outline" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            📡 الباقات
+            {t("hero.viewPlans")}
           </Link>
         </div>
 
         {/* Trust badges */}
         <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
-          {["🚚 توصيل مجاني", "✅ ضمان رسمي", "💳 تقسيط حتى 12 دفعة", "📱 وكيل HOT معتمد"].map((b) => (
+          {[t("hero.trust1"), t("hero.trust2"), t("hero.trust3"), t("hero.trust4")].map((b) => (
             <span key={b} className="text-dim text-[12px] bg-surface-elevated px-3 py-1.5 rounded-full">{b}</span>
           ))}
         </div>
@@ -114,11 +120,12 @@ export function HeroSection() {
 // ===== Stats Strip =====
 export function StatsStrip() {
   const scr = useScreen();
+  const { t } = useLang();
   const stats = [
-    { value: "500+", label: "زبون سعيد", icon: "👥" },
-    { value: "50+", label: "منتج متوفر", icon: "📱" },
-    { value: "24h", label: "توصيل سريع", icon: "🚚" },
-    { value: "100%", label: "ضمان رسمي", icon: "✅" },
+    { value: "500+", label: t("stats.customers"), icon: "👥" },
+    { value: "50+", label: t("stats.products"), icon: "📱" },
+    { value: "24h", label: t("stats.delivery"), icon: "🚚" },
+    { value: "100%", label: t("stats.guarantee"), icon: "✅" },
   ];
 
   return (
@@ -142,13 +149,14 @@ export function StatsStrip() {
 // ===== Featured Products =====
 export function FeaturedProducts({ products }: { products: any[] }) {
   const scr = useScreen();
+  const { t } = useLang();
 
   return (
     <section style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-6">
-          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>📱 منتجات مميزة</h2>
-          <p className="text-muted mt-1" style={{ fontSize: scr.mobile ? 11 : 14 }}>أحدث الأجهزة بأفضل الأسعار</p>
+          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("products.featured")}</h2>
+          <p className="text-muted mt-1" style={{ fontSize: scr.mobile ? 11 : 14 }}>{t("products.featuredDesc")}</p>
         </div>
 
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
@@ -163,13 +171,13 @@ export function FeaturedProducts({ products }: { products: any[] }) {
                 {p.old_price && <span className="text-dim line-through text-[12px]">₪{Number(p.old_price).toLocaleString()}</span>}
                 <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 14 : 16 }}>₪{Number(p.price).toLocaleString()}</span>
               </div>
-              {p.stock === 0 && <span className="text-state-error text-[12px]">نفذ من المخزون</span>}
+              {p.stock === 0 && <span className="text-state-error text-[12px]">{t("store.outOfStock")}</span>}
             </Link>
           ))}
         </div>
 
         <div className="text-center mt-6">
-          <Link href="/store" className="btn-outline">عرض كل المنتجات →</Link>
+          <Link href="/store" className="btn-outline">{t("products.viewAll")}</Link>
         </div>
       </div>
     </section>
@@ -179,13 +187,14 @@ export function FeaturedProducts({ products }: { products: any[] }) {
 // ===== Line Plans Section =====
 export function LinePlansSection({ plans }: { plans: any[] }) {
   const scr = useScreen();
+  const { t } = useLang();
 
   return (
     <section id="plans" className="bg-surface-card border-y border-surface-border" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-6">
-          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>📡 باقات HOT Mobile</h2>
-          <p className="text-muted mt-1" style={{ fontSize: scr.mobile ? 11 : 14 }}>اختر الباقة المناسبة لك</p>
+          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("plans.title")}</h2>
+          <p className="text-muted mt-1" style={{ fontSize: scr.mobile ? 11 : 14 }}>{t("plans.subtitle")}</p>
         </div>
 
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : plans.length >= 4 ? "1fr 1fr 1fr 1fr" : `repeat(${plans.length}, 1fr)` }}>
@@ -195,11 +204,11 @@ export function LinePlansSection({ plans }: { plans: any[] }) {
               borderColor: l.popular ? "rgba(196,16,64,0.4)" : undefined,
               background: l.popular ? "rgba(196,16,64,0.03)" : undefined,
             }}>
-              {l.popular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand text-white text-[11px] font-bold px-3 py-0.5 rounded-full">⭐ الأكثر شعبية</div>}
+              {l.popular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand text-white text-[11px] font-bold px-3 py-0.5 rounded-full">{t("plans.popular")}</div>}
               <div className="font-black" style={{ fontSize: scr.mobile ? 14 : 18 }}>{l.name_ar}</div>
               <div className="font-black text-brand my-2" style={{ fontSize: scr.mobile ? 28 : 36 }}>{l.data_amount}</div>
               <div className="text-muted mb-3" style={{ fontSize: scr.mobile ? 12 : 14 }}>
-                <span className="font-black text-white" style={{ fontSize: scr.mobile ? 18 : 24 }}>₪{l.price}</span>/شهر
+                <span className="font-black text-white" style={{ fontSize: scr.mobile ? 18 : 24 }}>₪{l.price}</span>{t("plans.perMonth")}
               </div>
               <div className="space-y-1 mb-4">
                 {(l.features_ar || []).slice(0, 4).map((f: string, i: number) => (
@@ -207,7 +216,7 @@ export function LinePlansSection({ plans }: { plans: any[] }) {
                 ))}
               </div>
               <Link href="/contact" className={l.popular ? "btn-primary w-full" : "btn-outline w-full"} style={{ fontSize: scr.mobile ? 12 : 14 }}>
-                اختر الباقة
+                {t("plans.choose")}
               </Link>
             </div>
           ))}
@@ -220,20 +229,21 @@ export function LinePlansSection({ plans }: { plans: any[] }) {
 // ===== Features Section =====
 export function FeaturesSection() {
   const scr = useScreen();
+  const { t } = useLang();
   const features = [
-    { icon: "🏪", title: "وكيل رسمي", desc: "وكيل معتمد لـ HOT Mobile — أجهزة أصلية بضمان كامل." },
-    { icon: "🚚", title: "توصيل مجاني", desc: "نوصل لكل أنحاء إسرائيل خلال 1-2 يوم عمل مجاناً." },
-    { icon: "💳", title: "تقسيط مريح", desc: "ادفع بأقساط مريحة حتى 12 دفعة بدون فوائد." },
-    { icon: "📱", title: "أحدث الأجهزة", desc: "Samsung, Apple, Xiaomi — أحدث الموديلات بأفضل الأسعار." },
-    { icon: "🔒", title: "دفع آمن", desc: "بوابة دفع مؤمنة — بياناتك محمية بالكامل." },
-    { icon: "💬", title: "دعم سريع", desc: "فريق دعم متجاوب عبر واتساب، هاتف، وشات." },
+    { icon: "🏪", title: t("features.agent"), desc: t("features.agentDesc") },
+    { icon: "🚚", title: t("features.delivery"), desc: t("features.deliveryDesc") },
+    { icon: "💳", title: t("features.installments"), desc: t("features.installmentsDesc") },
+    { icon: "📱", title: t("features.latest"), desc: t("features.latestDesc") },
+    { icon: "🔒", title: t("features.secure"), desc: t("features.secureDesc") },
+    { icon: "💬", title: t("features.support"), desc: t("features.supportDesc") },
   ];
 
   return (
     <section style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-6">
-          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>✨ ليش ClalMobile؟</h2>
+          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("features.title")}</h2>
         </div>
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr" }}>
           {features.map((f) => (
@@ -252,22 +262,23 @@ export function FeaturesSection() {
 // ===== FAQ Section =====
 export function FAQSection({ faqs }: { faqs?: { q: string; a: string }[] }) {
   const scr = useScreen();
+  const { t } = useLang();
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   const defaultFaqs = faqs || [
-    { q: "كيف أطلب من المتجر؟", a: "ادخل المتجر، اختر المنتج، عبّي بياناتك، وأكّد الطلب. الفريق يتواصل معك خلال ساعات." },
-    { q: "كم مدة التوصيل؟", a: "1-2 يوم عمل (أحد-خميس) لكل أنحاء إسرائيل. التوصيل مجاني!" },
-    { q: "هل يمكن الدفع بأقساط؟", a: "نعم! تقسيط حتى 12 دفعة لأصحاب الأجهزة. الإكسسوارات دفع مباشر." },
-    { q: "ماذا عن الضمان؟", a: "جميع الأجهزة بضمان رسمي كامل من الشركة المصنعة." },
-    { q: "هل يمكن إرجاع المنتج؟", a: "نعم، خلال 14 يوم من الاستلام حسب قانون حماية المستهلك الإسرائيلي." },
-    { q: "كيف أتابع طلبي؟", a: "أرسل رقم طلبك (CLM-XXXXX) على واتساب أو الشات وتحصل على الحالة فوراً." },
+    { q: t("faq.q1"), a: t("faq.a1") },
+    { q: t("faq.q2"), a: t("faq.a2") },
+    { q: t("faq.q3"), a: t("faq.a3") },
+    { q: t("faq.q4"), a: t("faq.a4") },
+    { q: t("faq.q5"), a: t("faq.a5") },
+    { q: t("faq.q6"), a: t("faq.a6") },
   ];
 
   return (
     <section id="faq" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-6">
-          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>❓ أسئلة شائعة</h2>
+          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("faq.title")}</h2>
         </div>
         <div className="space-y-1.5">
           {defaultFaqs.map((f, i) => (
@@ -291,22 +302,23 @@ export function FAQSection({ faqs }: { faqs?: { q: string; a: string }[] }) {
 // ===== CTA Section =====
 export function CTASection() {
   const scr = useScreen();
+  const { t } = useLang();
   return (
     <section className="relative overflow-hidden" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
       <div className="absolute inset-0 pointer-events-none" style={{
         background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(196,16,64,0.12) 0%, transparent 70%)",
       }} />
       <div className="max-w-3xl mx-auto text-center relative z-10">
-        <h2 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 32 }}>جاهز تبدأ؟ 🚀</h2>
+        <h2 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("cta.title")}</h2>
         <p className="text-muted mb-5" style={{ fontSize: scr.mobile ? 12 : 15 }}>
-          تصفّح أحدث الأجهزة والباقات — التوصيل مجاني لكل إسرائيل!
+          {t("cta.desc")}
         </p>
         <div className="flex items-center justify-center gap-3">
           <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            🛒 ادخل المتجر
+            {t("cta.store")}
           </Link>
           <Link href="/contact" className="btn-outline" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            💬 تواصل معنا
+            {t("cta.contact")}
           </Link>
         </div>
       </div>
@@ -317,33 +329,34 @@ export function CTASection() {
 // ===== Footer =====
 export function Footer() {
   const scr = useScreen();
+  const { t } = useLang();
   const year = new Date().getFullYear();
 
   const columns = [
     {
-      title: "المتجر",
+      title: t("nav.store"),
       links: [
-        { href: "/store", label: "كل المنتجات" },
-        { href: "/store?type=device", label: "أجهزة" },
-        { href: "/store?type=accessory", label: "إكسسوارات" },
-        { href: "/#plans", label: "باقات HOT" },
+        { href: "/store", label: t("products.viewAll") },
+        { href: "/store?type=device", label: t("store.devices") },
+        { href: "/store?type=accessory", label: t("store.accessories") },
+        { href: "/#plans", label: t("nav.plans") },
       ],
     },
     {
-      title: "الشركة",
+      title: t("footer.company"),
       links: [
-        { href: "/about", label: "من نحن" },
-        { href: "/faq", label: "أسئلة شائعة" },
-        { href: "/contact", label: "تواصل معنا" },
-        { href: "/legal", label: "الشروط والأحكام" },
-        { href: "/privacy", label: "سياسة الخصوصية" },
+        { href: "/about", label: t("nav.about") },
+        { href: "/faq", label: t("nav.faq") },
+        { href: "/contact", label: t("nav.contact") },
+        { href: "/legal", label: t("footer.legal") },
+        { href: "/privacy", label: t("footer.privacy") },
       ],
     },
     {
-      title: "تواصل",
+      title: t("footer.contactUs"),
       links: [
         { href: "tel:0549414448", label: "📞 054-9414448" },
-        { href: "https://wa.me/972549414448", label: "💬 واتساب" },
+        { href: "https://wa.me/972549414448", label: "💬 WhatsApp" },
         { href: "mailto:info@clalmobile.com", label: "📧 info@clalmobile.com" },
       ],
     },
@@ -359,7 +372,7 @@ export function Footer() {
               <Logo size={32} showText label="ClalMobile" />
             </div>
             <p className="text-muted text-xs leading-relaxed">
-              وكيل رسمي لـ HOT Mobile — أجهزة ذكية، باقات مميزة، توصيل مجاني لكل إسرائيل.
+              {t("footer.desc")}
             </p>
           </div>
 
@@ -378,8 +391,8 @@ export function Footer() {
 
         {/* Bottom */}
         <div className="border-t border-surface-border mt-6 pt-4 flex items-center justify-between">
-          <Link href="/privacy" className="text-dim text-[11px] hover:text-muted">سياسة الخصوصية | מדיניות פרטיות</Link>
-          <span className="text-dim text-[11px]">© {year} ClalMobile. جميع الحقوق محفوظة.</span>
+          <Link href="/privacy" className="text-dim text-[11px] hover:text-muted">{t("footer.privacy")}</Link>
+          <span className="text-dim text-[11px]">© {year} ClalMobile. {t("footer.rights")}.</span>
         </div>
       </div>
     </footer>

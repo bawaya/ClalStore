@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useScreen } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "./StoreHeader";
 import { HeroCarousel } from "./HeroCarousel";
 import { ProductCard } from "./ProductCard";
@@ -28,6 +29,7 @@ interface Props {
 
 export function StoreClient({ products, heroes, linePlans }: Props) {
   const scr = useScreen();
+  const { t } = useLang();
   const [typeCat, setTypeCat] = useState("all");
   const [brandCat, setBrandCat] = useState("all");
   const [search, setSearch] = useState("");
@@ -60,9 +62,9 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
   }, [items, typeCat, brandCat, search]);
 
   const typeCategories = [
-    { key: "all", label: "الكل" },
-    { key: "device", label: "📱 أجهزة" },
-    { key: "accessory", label: "🔌 إكسسوارات" },
+    { key: "all", label: t("store.all") },
+    { key: "device", label: t("store.devices") },
+    { key: "accessory", label: t("store.accessories") },
   ];
 
   const gridCols = scr.mobile
@@ -88,7 +90,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
             <input
               className="flex-1 bg-transparent border-none text-white outline-none"
               style={{ fontSize: scr.mobile ? 12 : 14 }}
-              placeholder="ابحث..."
+              placeholder={t("store.search")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -126,7 +128,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
             onClick={() => setBrandCat("all")}
             className={`chip whitespace-nowrap ${brandCat === "all" ? "chip-active" : ""}`}
           >
-            كل الشركات
+            {t("store.allBrands")}
           </button>
           {brands.map((b) => (
             <button
@@ -143,7 +145,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-dim">
             <div className="text-4xl mb-2">🔍</div>
-            <div className="text-sm">لا توجد منتجات مطابقة</div>
+            <div className="text-sm">{t("store.outOfStock")}</div>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3.5">

@@ -5,20 +5,23 @@ import Link from "next/link";
 import { useCart } from "@/lib/store/cart";
 import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
-
-const navLinks = [
-  { href: "/", label: "الرئيسية" },
-  { href: "/store", label: "المتجر" },
-  { href: "/#plans", label: "الباقات" },
-  { href: "/about", label: "من نحن" },
-  { href: "/faq", label: "أسئلة شائعة" },
-  { href: "/contact", label: "تواصل معنا" },
-];
+import { LangSwitcher } from "@/components/shared/LangSwitcher";
+import { useLang } from "@/lib/i18n";
 
 export function StoreHeader({ showBack }: { showBack?: boolean }) {
   const scr = useScreen();
+  const { t } = useLang();
   const itemCount = useCart((s) => s.getItemCount());
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const navLinks = [
+    { href: "/", label: t("nav.home") },
+    { href: "/store", label: t("nav.store") },
+    { href: "/#plans", label: t("nav.plans") },
+    { href: "/about", label: t("nav.about") },
+    { href: "/faq", label: t("nav.faq") },
+    { href: "/contact", label: t("nav.contact") },
+  ];
 
   return (
     <header className="bg-surface-card border-b border-surface-border sticky top-0 z-50">
@@ -55,6 +58,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
             {navLinks.map((l) => (
               <Link key={l.href} href={l.href} className="text-white font-bold text-sm hover:text-brand transition-colors">{l.label}</Link>
             ))}
+            <LangSwitcher size="sm" />
           </div>
         )}
 
@@ -76,33 +80,36 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
           </Link>
         )}
 
-        {/* Left: Cart */}
-        <Link
-          href="/store/cart"
-          className="relative flex items-center justify-center rounded-xl cursor-pointer transition-transform active:scale-95"
-          style={{
-            width: scr.mobile ? 40 : 46,
-            height: scr.mobile ? 40 : 46,
-            fontSize: scr.mobile ? 18 : 20,
-            background: itemCount > 0 ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' : 'rgba(5,150,105,0.12)',
-            border: itemCount > 0 ? 'none' : '1px solid rgba(16,185,129,0.35)',
-            boxShadow: itemCount > 0 ? '0 2px 10px rgba(16,185,129,0.4)' : 'none',
-          }}
-        >
-          🛒
-          {itemCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 rounded-full font-black flex items-center justify-center"
-              style={{
-                width: scr.mobile ? 20 : 22, height: scr.mobile ? 20 : 22,
-                fontSize: scr.mobile ? 10 : 11,
-                background: '#fff',
-                color: '#059669',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
-              }}>
-              {itemCount}
-            </span>
-          )}
-        </Link>
+        {/* Left: LangSwitcher (mobile) + Cart */}
+        <div className="flex items-center gap-2">
+          {scr.mobile && <LangSwitcher size="sm" />}
+          <Link
+            href="/store/cart"
+            className="relative flex items-center justify-center rounded-xl cursor-pointer transition-transform active:scale-95"
+            style={{
+              width: scr.mobile ? 40 : 46,
+              height: scr.mobile ? 40 : 46,
+              fontSize: scr.mobile ? 18 : 20,
+              background: itemCount > 0 ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' : 'rgba(5,150,105,0.12)',
+              border: itemCount > 0 ? 'none' : '1px solid rgba(16,185,129,0.35)',
+              boxShadow: itemCount > 0 ? '0 2px 10px rgba(16,185,129,0.4)' : 'none',
+            }}
+          >
+            🛒
+            {itemCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 rounded-full font-black flex items-center justify-center"
+                style={{
+                  width: scr.mobile ? 20 : 22, height: scr.mobile ? 20 : 22,
+                  fontSize: scr.mobile ? 10 : 11,
+                  background: '#fff',
+                  color: '#059669',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+                }}>
+                {itemCount}
+              </span>
+            )}
+          </Link>
+        </div>
       </div>
 
       {/* Mobile dropdown nav */}

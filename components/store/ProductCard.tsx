@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useScreen } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
 import { calcDiscount } from "@/lib/utils";
 import type { Product, ProductColor } from "@/types/database";
 
 export function ProductCard({ product: p }: { product: Product }) {
   const scr = useScreen();
+  const { t } = useLang();
   const addItem = useCart((s) => s.addItem);
   const disc = p.old_price ? calcDiscount(p.price, p.old_price) : 0;
   const colors = (p.colors || []) as ProductColor[];
@@ -39,7 +41,7 @@ export function ProductCard({ product: p }: { product: Product }) {
           className="absolute top-2 right-2 z-10 badge"
           style={{ background: "rgba(196,16,64,0.15)", color: "#c41040" }}
         >
-          🔥 الأكثر مبيعاً
+          🔥 {t("store.bestSeller").replace("🔥 ", "")}
         </span>
       )}
       {disc > 0 && (
@@ -140,7 +142,7 @@ export function ProductCard({ product: p }: { product: Product }) {
               boxShadow: '0 2px 8px rgba(16,185,129,0.35)',
             }}
           >
-            🛒 أضف
+            {t("store.addToCart")}
           </button>
         </div>
       </div>

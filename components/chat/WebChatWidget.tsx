@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 
 interface Message {
   id: string;
@@ -13,6 +14,7 @@ interface Message {
 
 export function WebChatWidget() {
   const scr = useScreen();
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -32,8 +34,8 @@ export function WebChatWidget() {
       setMsgs([{
         id: "welcome",
         role: "bot",
-        text: "أهلاً وسهلاً! 👋\nأنا مساعد ClalMobile — وكيل رسمي لـ HOT Mobile\n\nكيف أقدر أساعدك؟",
-        quickReplies: ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي", "👤 كلم موظف"],
+        text: t("chat.welcome"),
+        quickReplies: [t("chat.qr1"), t("chat.qr2"), t("chat.qr3"), t("chat.qr4")],
         time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
       }]);
     }
@@ -179,7 +181,7 @@ export function WebChatWidget() {
           <div>
             <div className="font-bold text-sm text-right">ClalMobile</div>
             <div className="text-[9px] opacity-80 text-right">
-              {escalated ? "تم تحويلك لموظف 👤" : "متصل الآن 🟢"}
+              {escalated ? t("chat.escalated") : t("chat.online")}
             </div>
           </div>
           <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center font-black text-sm">C</div>
@@ -247,7 +249,7 @@ export function WebChatWidget() {
       {/* Escalation Banner */}
       {escalated && (
         <div className="px-4 py-2 bg-yellow-600/20 border-t border-yellow-600/30 text-center text-[11px] text-yellow-300">
-          ⏳ تم تحويلك لموظف — سيتواصل معك قريباً
+          {t("chat.escalatedBanner")}
         </div>
       )}
 
@@ -267,7 +269,7 @@ export function WebChatWidget() {
           ref={inputRef}
           className="flex-1 bg-surface-elevated rounded-full border border-surface-border text-white outline-none text-right"
           style={{ padding: "8px 14px", fontSize: scr.mobile ? 12 : 13 }}
-          placeholder={escalated ? "بانتظار الموظف..." : "اكتب رسالتك..."}
+          placeholder={escalated ? t("chat.waitingAgent") : t("chat.placeholder")}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send(input)}
