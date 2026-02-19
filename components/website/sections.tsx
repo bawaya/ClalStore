@@ -165,7 +165,7 @@ export function FeaturedProducts({ products }: { products: any[] }) {
             <Link key={p.id} href={`/store/product/${p.id}`} className="card hover:border-brand/30 transition-all group overflow-hidden" style={{ padding: 0 }}>
               <div className="w-full aspect-square bg-surface-elevated flex items-center justify-center text-3xl">
                 {p.image_url ? (
-                  <img src={p.image_url} alt={p.name_ar} className="max-h-[80%] max-w-[80%] object-contain" />
+                  <img src={p.image_url} alt={p.name_ar} className="max-h-[90%] max-w-[90%] object-contain" />
                 ) : (
                   <span className="opacity-15" style={{ fontSize: scr.mobile ? 48 : 56 }}>{p.type === "device" ? "📱" : "🔌"}</span>
                 )}
