@@ -11,7 +11,7 @@ import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
-import { getBrandLogo } from "@/lib/brand-logos";
+import { ProductCard } from "@/components/store/ProductCard";
 
 // ===== Navbar =====
 export function Navbar() {
@@ -162,31 +162,7 @@ export function FeaturedProducts({ products }: { products: any[] }) {
 
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
           {products.slice(0, scr.mobile ? 4 : 8).map((p) => (
-            <Link key={p.id} href={`/store/product/${p.id}`} className="card hover:border-brand/30 transition-all group overflow-hidden" style={{ padding: 0 }}>
-              <div className="w-full aspect-square bg-surface-elevated flex items-center justify-center text-3xl overflow-hidden p-3">
-                {p.image_url ? (
-                  <img src={p.image_url} alt={p.name_ar} className="w-full h-full object-contain" />
-                ) : (
-                  <span className="opacity-15" style={{ fontSize: scr.mobile ? 48 : 56 }}>{p.type === "device" ? "📱" : "🔌"}</span>
-                )}
-              </div>
-              <div style={{ padding: scr.mobile ? "10px 10px 14px" : "14px 16px 18px" }}>
-                <div className="flex items-center gap-1.5 mb-1">
-                  {getBrandLogo(p.brand) && (
-                    <img src={getBrandLogo(p.brand)!} alt={p.brand} className="flex-shrink-0" style={{ width: scr.mobile ? 14 : 18, height: scr.mobile ? 14 : 18 }} />
-                  )}
-                  <span className="text-white font-extrabold uppercase tracking-wide" style={{ fontSize: scr.mobile ? 11 : 13 }}>{p.brand}</span>
-                </div>
-                <div className="font-extrabold leading-tight mb-1.5" style={{ fontSize: scr.mobile ? 13 : 15 }} dir="ltr">{p.name_ar}</div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 14 : 18 }}>₪{Number(p.price).toLocaleString()}</span>
-                    {p.old_price && <span className="text-dim line-through" style={{ fontSize: scr.mobile ? 10 : 12 }}>₪{Number(p.old_price).toLocaleString()}</span>}
-                  </div>
-                </div>
-                {p.stock === 0 && <span className="text-state-error text-[12px]">{t("store.outOfStock")}</span>}
-              </div>
-            </Link>
+            <ProductCard key={p.id} product={p} />
           ))}
         </div>
 
