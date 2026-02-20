@@ -24,6 +24,7 @@ import {
 } from "./analytics";
 import { createHandoff, generateConversationSummary } from "./handoff";
 import { createAdminSupabase } from "@/lib/supabase";
+import { getAIResponse } from "./ai";
 
 export { type BotIntent, type DetectedIntent } from "./intents";
 export { logBotInteraction } from "./analytics";
@@ -251,6 +252,21 @@ async function routeIntent(
   const lang = session.language;
   const isAr = lang !== "he";
 
+  // For very low confidence keyword matches, prefer AI
+  if (detected.intent !== "unknown" && detected.confidence < 0.5) {
+    const aiResponse = await getAIResponse(
+      session.conversationId,
+      text,
+      {
+        customerName: session.customerName,
+        lastProducts: session.lastProductIds,
+        language: session.language,
+      }
+    );
+    if (aiResponse) return aiResponse;
+    // If AI fails, continue with keyword-based handler
+  }
+
   switch (detected.intent) {
     case "greeting":
       return handleGreeting(session);
@@ -301,7 +317,7 @@ async function routeIntent(
       return handleThanks(session);
 
     default:
-      return handleUnknown(session);
+      return handleUnknown(session, text);
   }
 }
 
@@ -719,11 +735,30 @@ async function handleThanks(session: SessionState): Promise<BotResponse> {
   return { text };
 }
 
-async function handleUnknown(session: SessionState): Promise<BotResponse> {
-  const text = await getTemplate("unknown", session.language);
+async function handleUnknown(session: SessionState, text: string): Promise<BotResponse> {
+  // Try AI-powered contextual response first
+  const aiResponse = await getAIResponse(
+    session.conversationId,
+    text,
+    {
+      customerName: session.customerName,
+      lastProducts: session.lastProductIds,
+      language: session.language,
+    }
+  );
+
+  if (aiResponse) {
+    return {
+      text: aiResponse.text,
+      quickReplies: aiResponse.quickReplies,
+    };
+  }
+
+  // Fallback to template if AI is unavailable
+  const templateText = await getTemplate("unknown", session.language);
   const isAr = session.language !== "he";
   return {
-    text,
+    text: templateText,
     quickReplies: isAr
       ? ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي", "👤 كلم موظف"]
       : ["📱 מוצרים", "📡 חבילות", "📦 הזמנה", "👤 נציג"],

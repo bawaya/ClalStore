@@ -146,7 +146,7 @@ export function detectIntent(message: string): DetectedIntent {
   }
 
   // 3.5 Contact info request (address, phone, how to reach)
-  if (/عنوان|وين أنتم|فين أنتم|وين انتم|فين انتم|عنوانكم|كيف اوصل|כתובת|איפה אתם|مكانكم|فرع|فين المحل|وين المحل|رقم.*محل|رقم.*تلفون|رقم.*هاتف|رقمكم|اتصل بكم|تلفونكم|هاتفكم|وين مكانكم/i.test(lower)) {
+  if (/عنوان|وين أنتم|فين أنتم|وين انتم|فين انتم|عنوانكم|كيف اوصل|כתובת|איפה אתם|مكانكم|فرع|فين المحل|وين المحل|رقم.*محل|رقم.*تلفون|رقم.*هاتف|رقمكم|اتصل بكم|تلفونكم|هاتفكم|وين مكانكم|ساعات عمل|شغل|اوقات|ساعات الدوام|فتح|مفتوح|שעות פתיחה|מתי פתוח|كيف أتواصل|كيف اتواصل معكم/i.test(lower)) {
     return { intent: "contact_info", params: {}, confidence: 0.9, language: lang };
   }
 
@@ -209,7 +209,7 @@ export function detectIntent(message: string): DetectedIntent {
   }
 
   // 10. Availability
-  if (/متوفر|بالمخزون|عندكم|موجود|במלאי|יש לכם|in stock|available/i.test(lower)) {
+  if (/متوفر|بالمخزون|عندكم|موجود|במלאי|יש לכם|in stock|available|فيه|عندك|في عندكم|يوجد/i.test(lower)) {
     for (const [kw, brand] of Object.entries(BRAND_MAP)) {
       if (lower.includes(kw)) {
         return { intent: "availability", params: { brand }, confidence: 0.85, language: lang };
@@ -219,7 +219,7 @@ export function detectIntent(message: string): DetectedIntent {
   }
 
   // 11. Shipping
-  if (/توصيل|شحن|يوصل|كم يوم|مناطق|משלוח|שליחות|delivery|shipping/i.test(lower)) {
+  if (/توصيل|شحن|يوصل|كم يوم|مناطق|משלוח|שליחות|delivery|shipping|يوصلني|توصلوا|توصلو|وين يوصل|كم مدة|كم يوم يوصل|يوم التوصيل/i.test(lower)) {
     return { intent: "shipping_info", params: {}, confidence: 0.85, language: lang };
   }
 
@@ -253,19 +253,19 @@ export function detectIntent(message: string): DetectedIntent {
   }
 
   // 16. Generic buy intent — exclude communication verbs
-  if (/أبغى|أبي|بدي|أريد|اطلب|أشتري|شراء|اريد|ابغى|ابي|רוצה|לקנות|buy|want/i.test(lower)
+  if (/أبغى|أبي|بدي|أريد|اطلب|أشتري|شراء|اريد|ابغى|ابي|רוצה|לקנות|buy|want|عايز|اشتري|أطلب|أقدر أشتري|أقدر اشتري|ممكن اشتري|بدنا|نبي|أحتاج|احتاج/i.test(lower)
     && !/احكي|اتواصل|اكلم|اتكلم|موظف|شخص|contact|talk|speak/i.test(lower)) {
     const priceRange = extractPriceRange(text);
     return { intent: "buy_now", params: priceRange, confidence: 0.6, language: lang };
   }
 
   // 17. Greeting
-  if (/^(مرحبا|هلا|أهلا|اهلا|السلام عليكم|هاي|שלום|היי|hi|hello|hey|صباح|مساء)/i.test(lower)) {
+  if (/^(مرحبا|هلا|أهلا|اهلا|السلام عليكم|هاي|שלום|היי|hi|hello|hey|صباح|مساء|يا هلا|وعليكم|يا مرحبا|شلونك|كيفك|كيف حالك|אהלן|בוקר טוב|ערב טוב|מה נשמע|מה קורה)/i.test(lower)) {
     return { intent: "greeting", params: {}, confidence: 0.9, language: lang };
   }
 
   // 18. Thanks
-  if (/شكرا|مشكور|يعطيك|يسلمو|thanks|thank|תודה/i.test(lower)) {
+  if (/شكرا|مشكور|يعطيك|يسلمو|thanks|thank|תודה|الله يسلمك|ممنون|مقدر|תודה רבה/i.test(lower)) {
     return { intent: "thanks", params: {}, confidence: 0.9, language: lang };
   }
 

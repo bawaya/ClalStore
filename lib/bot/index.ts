@@ -28,6 +28,9 @@ export { getPolicy, invalidatePolicyCache } from "./policies";
 // Analytics
 export { getOrCreateConversation, getAnalyticsSummary } from "./analytics";
 
+// AI (Anthropic Claude)
+export { getAIResponse, getConversationHistory } from "./ai";
+
 // Handoff
 export { createHandoff, getPendingHandoffs, resolveHandoff } from "./handoff";
 
