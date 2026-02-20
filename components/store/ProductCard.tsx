@@ -10,18 +10,15 @@ import { getBrandLogo } from "@/lib/brand-logos";
 import type { Product, ProductColor } from "@/types/database";
 
 /* ── warranty ribbon helpers ── */
-function getWarrantyLabel(p: Product): string | null {
+function getWarrantyKey(p: Product): string | null {
   const w = p.specs?.warranty;
-  if (w) return w;
-  if (p.type === "device") return "שנתיים אחריות";
+  if (w) {
+    if (/3/.test(w)) return "store.warranty3";
+    if (/2|שנתיים|سنتين/.test(w)) return "store.warranty2";
+    return "store.warrantyYear";
+  }
+  if (p.type === "device") return "store.warranty2";
   return null;
-}
-
-function getWarrantyColor(p: Product): string {
-  const w = p.specs?.warranty ?? "";
-  if (/3|שלוש/i.test(w)) return "#c41040";
-  if (/שנתיים|2/i.test(w) || p.type === "device") return "#c41040";
-  return "#c41040";
 }
 
 export function ProductCard({ product: p }: { product: Product }) {
@@ -34,7 +31,7 @@ export function ProductCard({ product: p }: { product: Product }) {
   const [selColor, setSelColor] = useState(0);
   const [selStorage, setSelStorage] = useState(0);
 
-  const warrantyLabel = getWarrantyLabel(p);
+  const warrantyKey = getWarrantyKey(p);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -56,19 +53,19 @@ export function ProductCard({ product: p }: { product: Product }) {
       href={`/store/product/${p.id}`}
       className="card overflow-hidden cursor-pointer hover:border-[#c41040]/40 transition-all relative group flex flex-col"
     >
-      {/* ── Warranty / Promo Ribbon (top-right diagonal) ── */}
-      {warrantyLabel && (
+      {/* ── Warranty / Promo Ribbon (top-right) ── */}
+      {warrantyKey && (
         <div
           className="absolute top-0 z-10 font-extrabold text-white text-center leading-tight"
           style={{
             right: 0,
-            background: getWarrantyColor(p),
+            background: "#c41040",
             fontSize: scr.mobile ? 8 : 10,
             padding: scr.mobile ? "3px 8px" : "4px 12px",
             borderRadius: "0 0 0 8px",
           }}
         >
-          {warrantyLabel}
+          {t(warrantyKey)}
         </div>
       )}
 
@@ -124,7 +121,9 @@ export function ProductCard({ product: p }: { product: Product }) {
               boxShadow: "0 2px 8px rgba(196,16,64,0.5)",
             }}
           >
-            משלוח<br />חינם
+            {t("store.freeShipping").split("\n").map((line, i) => (
+              <span key={i}>{line}{i === 0 && <br />}</span>
+            ))}
           </div>
         )}
       </div>
