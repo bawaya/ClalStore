@@ -58,6 +58,8 @@ interface SessionState {
   // Muhammad handoff flow
   muhammadStep?: number; // 0=not active, 1=ask name, 2=ask phone, 3=ask id, 4=ask message
   muhammadData?: { name?: string; phone?: string; idNumber?: string; message?: string };
+  // Greeting variation counter
+  greetingCount?: number;
 }
 
 // In-memory cache (fast, per-instance). DB is source of truth.
@@ -82,17 +84,22 @@ async function getSession(visitorId: string, channel: "webchat" | "whatsapp"): P
       .single();
 
     if (data) {
+      const qual = (data.qualification as any) || {};
       const session: SessionState = {
         conversationId: data.id,
         visitorId,
         language: (data.language as "ar" | "he" | "en") || "ar",
-        qualification: (data.qualification as unknown as QualificationState) || { step: 0 },
+        qualification: { step: qual.step || 0, answers: qual.answers } as QualificationState,
         messageCount: data.message_count || 0,
         lastProductIds: (data.products_discussed as string[]) || [],
         customerPhone: data.customer_phone || undefined,
         customerName: data.customer_name || undefined,
         customerId: data.customer_id || undefined,
         csatAsked: !!data.csat_score,
+        // Restore Muhammad handoff state from qualification JSONB
+        muhammadStep: qual._muhammadStep || 0,
+        muhammadData: qual._muhammadData || undefined,
+        greetingCount: qual._greetingCount || 0,
       };
       sessionCache.set(visitorId, session);
       return session;
@@ -106,14 +113,20 @@ async function getSession(visitorId: string, channel: "webchat" | "whatsapp"): P
 
 async function setSession(state: SessionState): Promise<void> {
   sessionCache.set(state.visitorId, state);
-  // Persist session state to DB
+  // Persist session state to DB — include Muhammad handoff + greeting count in qualification JSONB
   try {
     const s = createAdminSupabase();
+    const qualData = {
+      ...state.qualification,
+      _muhammadStep: state.muhammadStep || 0,
+      _muhammadData: state.muhammadData || null,
+      _greetingCount: state.greetingCount || 0,
+    };
     await s
       .from("bot_conversations")
       .update({
         language: state.language,
-        qualification: state.qualification as any,
+        qualification: qualData as any,
         message_count: state.messageCount,
         products_discussed: state.lastProductIds,
         customer_phone: state.customerPhone || null,
@@ -340,24 +353,44 @@ async function routeIntent(
 
 async function handleGreeting(session: SessionState): Promise<BotResponse> {
   const lang = session.language;
+  const isAr = lang !== "he";
+  const quickReplies = isAr
+    ? ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي", "👤 كلم موظف"]
+    : ["📱 מוצרים", "📡 חבילות", "📦 מעקב הזמנה", "👤 נציג"];
+
+  // Track greeting count for variation
+  session.greetingCount = (session.greetingCount || 0) + 1;
+  const gc = session.greetingCount;
 
   if (session.customerName) {
-    const text = await getTemplate("welcome_returning", lang, { name: session.customerName });
-    return {
-      text,
-      quickReplies: lang === "he"
-        ? ["📱 מוצרים", "📡 חבילות", "📦 מעקב הזמנה", "👤 נציג"]
-        : ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي", "👤 كلم موظف"],
-    };
+    // First greeting — warm welcome
+    if (gc <= 1) {
+      const text = await getTemplate("welcome_returning", lang, { name: session.customerName });
+      return { text, quickReplies };
+    }
+
+    // Varied responses for repeated greetings
+    const arVariations = [
+      `هلا ${session.customerName}! 👋 كيف بقدر أساعدك؟`,
+      `أهلين ${session.customerName}! شو بتحتاج اليوم؟ 😊`,
+      `مرحبا ${session.customerName}! عندك سؤال أو بتدور على منتج معين؟ 📱`,
+      `هلا بيك ${session.customerName}! 🙌 احكيلي شو بدك وبساعدك فوراً`,
+      `تنورنا ${session.customerName}! 😊 بخدمتك — اختار من القائمة أو اسأل سؤالك`,
+    ];
+    const heVariations = [
+      `היי ${session.customerName}! 👋 איך אפשר לעזור?`,
+      `שלום ${session.customerName}! מה תרצה היום? 😊`,
+      `הי ${session.customerName}! מחפש מוצר מסוים? 📱`,
+      `${session.customerName}, אני כאן! 🙌 מה אפשר לעשות בשבילך?`,
+      `ברוך הבא ${session.customerName}! 😊 בחר מהתפריט או שאל שאלה`,
+    ];
+    const variations = isAr ? arVariations : heVariations;
+    const idx = (gc - 2) % variations.length;
+    return { text: variations[idx], quickReplies };
   }
 
   const text = await getTemplate("welcome", lang);
-  return {
-    text,
-    quickReplies: lang === "he"
-      ? ["📱 מוצרים", "📡 חבילות", "📦 מעקב הזמנה", "👤 נציג"]
-      : ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي", "👤 كلم موظف"],
-  };
+  return { text, quickReplies };
 }
 
 async function handleBuyNow(
