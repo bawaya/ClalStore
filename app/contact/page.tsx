@@ -11,6 +11,7 @@ export default function ContactPage() {
   const { toasts, show } = useToast();
   const [form, setForm] = useState({ name: "", phone: "", email: "", subject: "", message: "" });
   const [sending, setSending] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async () => {
     if (!form.name || !form.phone || !form.message) {
@@ -54,10 +55,10 @@ export default function ContactPage() {
         })
       }).catch(() => {}); // fire-and-forget
 
-      show(t("contact.success"));
+      setSubmitted(true);
       setForm({ name: "", phone: "", email: "", subject: "", message: "" });
     } catch {
-      show("❌ Error. 053-3337653", "error");
+      show("❌ حدث خطأ، يرجى المحاولة مرة أخرى", "error");
     } finally {
       setSending(false);
     }
@@ -97,6 +98,25 @@ export default function ContactPage() {
           ))}
         </div>
 
+        {/* Thank you state after submission */}
+        {submitted ? (
+          <div className="card text-center" style={{ padding: scr.mobile ? 32 : 48 }}>
+            <div className="text-5xl mb-4">✅</div>
+            <h2 className="font-black text-xl mb-2">{t("contact.thankYouTitle")}</h2>
+            <p className="text-muted mb-6" style={{ fontSize: scr.mobile ? 13 : 15 }}>
+              {t("contact.thankYouMsg")}
+            </p>
+            <div className="flex gap-3 justify-center flex-wrap">
+              <a href="/store" className="btn-primary px-6 py-3 text-sm font-bold">
+                🏪 {t("contact.backToStore")}
+              </a>
+              <button onClick={() => setSubmitted(false)} className="btn-outline px-6 py-3 text-sm font-bold">
+                📝 {t("contact.sendAnother")}
+              </button>
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Hours + Form */}
         <div style={{ display: scr.mobile ? "block" : "flex", gap: 16 }}>
           {/* Working hours */}
@@ -150,6 +170,8 @@ export default function ContactPage() {
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
       <Footer />
 

@@ -56,8 +56,8 @@ interface SessionState {
   customerId?: string;
   csatAsked: boolean;
   // Muhammad handoff flow
-  muhammadStep?: number; // 0=not active, 1=ask name, 2=ask phone, 3=ask id, 4=ask message
-  muhammadData?: { name?: string; phone?: string; idNumber?: string; message?: string };
+  muhammadStep?: number; // 0=not active, 1=ask name, 2=ask phone, 3=ask message
+  muhammadData?: { name?: string; phone?: string; message?: string };
   // Greeting variation counter
   greetingCount?: number;
 }
@@ -233,7 +233,7 @@ export async function processMessage(
   }
 
   // 7. Check if user is in Muhammad handoff data collection
-  if (session.muhammadStep && session.muhammadStep > 0 && session.muhammadStep <= 4) {
+  if (session.muhammadStep && session.muhammadStep > 0 && session.muhammadStep <= 3) {
     const response = await handleMuhammadCollect(session, text, channel);
     await saveMessage(session.conversationId, "bot", response.text, "muhammad_request");
     await setSession(session);
@@ -729,8 +729,8 @@ async function handleContactInfo(session: SessionState): Promise<BotResponse> {
   const isAr = session.language !== "he";
   return {
     text: isAr
-      ? `� *هاتف:* 053-3337653\n📱 *واتساب:* https://wa.me/972533337653\n🌐 *الموقع:* https://clalmobile.com\n🚚 *توصيل مجاني* لكل أنحاء إسرائيل\n\nنحن كول سنتر — نخدمك عن بعد ونوصل لباب بيتك! 🏠\n\nكيف ثاني بقدر أساعدك؟`
-      : `📞 *טלפון:* 053-3337653\n📱 *וואטסאפ:* https://wa.me/972533337653\n🌐 *אתר:* https://clalmobile.com\n🚚 *משלוח חינם* לכל הארץ\n\nאנחנו מרכז שירות — משרתים אותך מרחוק ומשלוחים עד הבית! 🏠\n\nאיך עוד אפשר לעזור?`,
+      ? `🌐 *الموقع:* https://clalmobile.com\n📝 *فورم التواصل:* https://clalmobile.com/contact\n🚚 *توصيل مجاني* لكل أنحاء إسرائيل\n\nنحن كول سنتر — نخدمك عن بعد ونوصل لباب بيتك! 🏠\nأو راسلنا هون مباشرة وبنساعدك 💬\n\nكيف بقدر أساعدك؟`
+      : `🌐 *אתר:* https://clalmobile.com\n📝 *טופס יצירת קשר:* https://clalmobile.com/contact\n🚚 *משלוח חינם* לכל הארץ\n\nאנחנו מרכז שירות — משרתים אותך מרחוק ומשלוחים עד הבית! 🏠\nאו כתבו לנו כאן ונעזור 💬\n\nאיך אפשר לעזור?`,
     quickReplies: isAr
       ? ["📱 المنتجات", "📡 الباقات", "👤 كلم موظف"]
       : ["📱 מוצרים", "📡 חבילות", "👤 נציג"],
@@ -851,31 +851,20 @@ async function handleMuhammadCollect(
       session.muhammadStep = 3;
       return {
         text: isAr
-          ? "🆔 ما هو رقم الهوية؟\n(9 أرقام)"
-          : "🆔 מה מספר תעודת הזהות?\n(9 ספרות)",
+          ? "💬 ما هو طلبك أو استفسارك لمحمد؟\n(اكتب ملخص قصير)"
+          : "💬 מה ההודעה שלך למוחמד?\n(כתוב בקצרה)",
       };
 
-    case 3: // Collecting ID number
-      data.idNumber = text.trim().replace(/[-\s]/g, "");
-      session.muhammadData = data;
-      session.muhammadStep = 4;
-      return {
-        text: isAr
-          ? "💬 اكتب رسالتك أو استفسارك لمحمد:"
-          : "💬 כתוב את ההודעה שלך למוחמד:",
-      };
-
-    case 4: // Collecting message — DONE
+    case 3: // Collecting message — DONE
       data.message = text.trim();
       session.muhammadData = data;
       session.muhammadStep = 0; // Reset
 
-      // Send notification to admin
+      // Send notification to admin (Muhammad)
       try {
         await notifyAdminMuhammadHandoff({
           name: data.name || "—",
           phone: data.phone || session.customerPhone || "—",
-          idNumber: data.idNumber || "—",
           message: data.message || "—",
           channel,
         });
@@ -885,11 +874,11 @@ async function handleMuhammadCollect(
 
       return {
         text: isAr
-          ? `✅ تم إرسال التفاصيل لمحمد!\n\n📋 ملخص:\n👤 الاسم: ${data.name}\n📞 الهاتف: ${data.phone}\n🆔 الهوية: ${data.idNumber}\n💬 الرسالة: ${data.message?.slice(0, 100)}\n\nمحمد سيعاود الاتصال بك قريباً إن شاء الله! 🙏`
-          : `✅ הפרטים נשלחו למוחמד!\n\nמוחמד יחזור אליך בהקדם! 🙏`,
+          ? `✅ شكراً ${data.name}! تم إرسال طلبك لمحمد بنجاح.\n\nمحمد سيتواصل معك قريباً إن شاء الله! 🙏\n\nهل بقدر أساعدك بشي ثاني؟`
+          : `✅ תודה ${data.name}! ההודעה נשלחה למוחמד.\n\nמוחמד יחזור אליך בהקדם! 🙏\n\nאפשר לעזור במשהו נוסף?`,
         quickReplies: isAr
-          ? ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي"]
-          : ["📱 מוצרים", "📡 חבילות", "📦 הזמנה"],
+          ? ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي", "🏪 المتجر"]
+          : ["📱 מוצרים", "📡 חבילות", "📦 הזמנה", "🏪 חנות"],
       };
 
     default:

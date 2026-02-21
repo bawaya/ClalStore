@@ -92,7 +92,6 @@ export async function notifyAdminContactForm(contact: {
 export async function notifyAdminMuhammadHandoff(details: {
   name: string;
   phone: string;
-  idNumber: string;
   message: string;
   channel: "webchat" | "whatsapp";
 }): Promise<void> {
@@ -100,12 +99,11 @@ export async function notifyAdminMuhammadHandoff(details: {
     `👤 *طلب تحدث مع محمد*\n\n` +
     `🏷️ الاسم: ${details.name}\n` +
     `📞 الهاتف: ${details.phone}\n` +
-    `🆔 رقم الهوية: ${details.idNumber}\n` +
     `📡 القناة: ${details.channel === "whatsapp" ? "واتساب" : "شات الموقع"}\n\n` +
     `💬 محتوى الطلب:\n${details.message.slice(0, 500)}\n\n` +
     `⏰ الوقت: ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}`;
 
-  // Send to both admin numbers
+  // Send to admin (Muhammad)
   await notifyAdmin(msg);
   await notifyAdminPersonal(msg);
 }

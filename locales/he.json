@@ -99,7 +99,11 @@
     "thu": "חמישי",
     "fri": "שישי",
     "sat": "שבת",
-    "closed": "סגור"
+    "closed": "סגור",
+    "thankYouTitle": "תודה שפנית! 🌟",
+    "thankYouMsg": "ההודעה נשלחה בהצלחה. הצוות שלנו יחזור אליך בהקדם.",
+    "backToStore": "חזרה לחנות",
+    "sendAnother": "שלח הודעה נוספת"
   },
   "about": {
     "title": "אודותינו 🏪",
