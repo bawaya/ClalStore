@@ -4,7 +4,7 @@
 // =====================================================
 
 import { createAdminSupabase } from "@/lib/supabase";
-import { notifyTeam } from "./whatsapp";
+import { notifyTeam, notifyAdmin } from "./admin-notify";
 
 const db = () => createAdminSupabase();
 
@@ -64,15 +64,17 @@ export async function createHandoff(req: HandoffRequest): Promise<string | null>
       } as any);
     }
 
-    // 5. Notify team via WhatsApp
+    // 5. Notify admin + team via WhatsApp (FROM report phone, NOT bot phone)
     try {
       const teamMsg = `🔔 *تصعيد بوت جديد*\n\n` +
         `📝 السبب: ${req.reason}\n` +
         `👤 ${req.customerName || "زائر"}\n` +
-        `📞 ${req.customerPhone || "غير معروف"}\n` +
         `\n📋 الملخص:\n${req.summary.slice(0, 200)}\n` +
         `\n🔗 https://clalmobile.com/crm`;
 
+      // Send to admin directly
+      await notifyAdmin(teamMsg);
+      // Send to team members
       await notifyTeam(teamMsg);
     } catch {
       // Silent — notification failure shouldn't break handoff

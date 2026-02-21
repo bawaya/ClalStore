@@ -4,7 +4,8 @@
 // Called from order API after create/status change
 // =====================================================
 
-import { sendWhatsAppText, notifyTeam } from "./whatsapp";
+import { sendWhatsAppText } from "./whatsapp";
+import { notifyAdmin, notifyTeam } from "./admin-notify";
 import { buildOrderNotification, buildStatusNotification } from "./engine";
 
 // ===== New Order: Notify Team =====
@@ -16,8 +17,9 @@ export async function notifyNewOrder(
   source: string
 ) {
   try {
-    // 1. Notify team
+    // 1. Notify admin + team (from report phone)
     const teamMsg = buildOrderNotification(orderId, customerName, total, source);
+    await notifyAdmin(teamMsg);
     await notifyTeam(teamMsg);
 
     // 2. Confirm to customer

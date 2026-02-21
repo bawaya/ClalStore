@@ -20,8 +20,22 @@ export default function ContactPage() {
     }
     setSending(true);
     try {
-      // Send email
-      const res = await fetch('/api/email', {
+      // Send WhatsApp notification to admin (primary notification)
+      const notifyRes = await fetch('/api/admin/contact-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          email: form.email,
+          subject: form.subject,
+          message: form.message,
+        })
+      });
+      if (!notifyRes.ok) throw new Error('Notify failed');
+
+      // Send email (non-blocking, best-effort)
+      fetch('/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -38,20 +52,6 @@ export default function ContactPage() {
               <p>${form.message}</p>
             </div>
           `
-        })
-      });
-      if (!res.ok) throw new Error('Send failed');
-
-      // Send WhatsApp notification to admin
-      fetch('/api/admin/contact-notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name,
-          phone: form.phone,
-          email: form.email,
-          subject: form.subject,
-          message: form.message,
         })
       }).catch(() => {}); // fire-and-forget
 

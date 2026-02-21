@@ -135,16 +135,12 @@ export async function sendWhatsAppTemplate(
   return res.json();
 }
 
-// ===== Notify Team =====
+// ===== Legacy Notify Team (DO NOT USE — use admin-notify.ts instead) =====
+// Kept for backward compat with index.ts export
 export async function notifyTeam(message: string) {
-  const teamNumbers = (process.env.TEAM_WHATSAPP_NUMBERS || "").split(",").filter(Boolean);
-  for (const num of teamNumbers) {
-    try {
-      await sendWhatsAppText(num.trim(), message);
-    } catch (err) {
-      console.error(`Failed to notify ${num}:`, err);
-    }
-  }
+  // Redirect to admin-notify to ensure report phone is used
+  const { notifyTeam: notifyFromReport } = await import("./admin-notify");
+  await notifyFromReport(message);
 }
 
 // ===== Parse Incoming Webhook =====
