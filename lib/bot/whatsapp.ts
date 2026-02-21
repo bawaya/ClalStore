@@ -42,10 +42,10 @@ export function normalizePhone(phone: string): string {
 }
 
 // ===== Send Text Message =====
-export async function sendWhatsAppText(to: string, text: string) {
+export async function sendWhatsAppText(to: string, text: string, fromOverride?: string) {
   const phone = normalizePhone(to);
   const headers = await getHeaders();
-  const from = await getFromPhone();
+  const from = fromOverride || await getFromPhone();
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
     method: "POST",
     headers,

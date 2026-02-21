@@ -5,25 +5,40 @@
 
 import { sendWhatsAppText } from "./whatsapp";
 
-const ADMIN_REPORT = () => process.env.ADMIN_REPORT_PHONE || "+972537777963";
-const ADMIN_PERSONAL = () => process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
+// ADMIN_REPORT_PHONE = رقم مُرسِل التقارير (FROM) — +972537777963
+// ADMIN_PERSONAL_PHONE = رقم الأدمن الشخصي (TO) — يستقبل التقارير والإشعارات
+const REPORT_FROM = () => process.env.ADMIN_REPORT_PHONE || "+972537777963";
+const ADMIN_TO = () => process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
+const TEAM_NUMBERS = () => (process.env.TEAM_WHATSAPP_NUMBERS || "").split(",").filter(Boolean);
 const BASE_URL = "https://clalmobile.com";
 
-// ===== Send to admin report number =====
+// ===== Send report/notification TO admin FROM report number =====
 export async function notifyAdmin(message: string): Promise<void> {
   try {
-    await sendWhatsAppText(ADMIN_REPORT(), message);
+    await sendWhatsAppText(ADMIN_TO(), message, REPORT_FROM());
   } catch (err) {
     console.error("Admin notify error:", err);
   }
 }
 
-// ===== Send to admin personal number =====
+// ===== Send to admin personal number FROM report number =====
 export async function notifyAdminPersonal(message: string): Promise<void> {
   try {
-    await sendWhatsAppText(ADMIN_PERSONAL(), message);
+    await sendWhatsAppText(ADMIN_TO(), message, REPORT_FROM());
   } catch (err) {
     console.error("Admin personal notify error:", err);
+  }
+}
+
+// ===== Send to all team members FROM report number =====
+export async function notifyTeam(message: string): Promise<void> {
+  const numbers = TEAM_NUMBERS();
+  for (const num of numbers) {
+    try {
+      await sendWhatsAppText(num.trim(), message, REPORT_FROM());
+    } catch (err) {
+      console.error(`Team notify error (${num}):`, err);
+    }
   }
 }
 
