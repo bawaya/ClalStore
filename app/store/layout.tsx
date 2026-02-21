@@ -1,4 +1,5 @@
 import { WebChatWidget } from "@/components/chat/WebChatWidget";
+import { CompareBar } from "@/components/store/CompareBar";
 
 export default function StoreLayout({
   children,
@@ -8,6 +9,7 @@ export default function StoreLayout({
   return (
     <>
       {children}
+      <CompareBar />
       <WebChatWidget />
     </>
   );

@@ -1,13 +1,13 @@
 // =====================================================
 // ClalMobile — AI Contextual Engine (Anthropic Claude)
 // Provides intelligent, context-aware responses
+// Uses shared callClaude() from lib/ai/claude.ts
 // =====================================================
 
 import { createAdminSupabase } from "@/lib/supabase";
-
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
-const MAX_TOKENS = 400;
+import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
+import { getProductByQuery } from "@/lib/ai/product-context";
+import { trackAIUsage } from "@/lib/ai/usage-tracker";
 
 // ===== System prompt (store knowledge) =====
 const SYSTEM_PROMPT = `أنت مساعد مبيعات ذكي لمتجر ClalMobile — وكيل رسمي لـ HOT Mobile في إسرائيل.
@@ -93,8 +93,16 @@ export async function getConversationHistory(
   }
 }
 
-// ===== Load recent products from DB for context =====
-async function getProductContext(productIds: string[]): Promise<string> {
+// ===== Load recent products from DB for context — now uses RAG =====
+async function getProductContextForBot(
+  productIds: string[],
+  currentMessage: string
+): Promise<string> {
+  // Try RAG query first (search by message content)
+  const ragContext = await getProductByQuery(currentMessage);
+  if (ragContext) return ragContext;
+
+  // Fallback to specific product IDs if available
   if (!productIds.length) return "";
   try {
     const s = createAdminSupabase();
@@ -129,10 +137,11 @@ export async function getAIResponse(
     // 1. Load conversation history
     const history = await getConversationHistory(conversationId);
 
-    // 2. Load product context if available
-    const productInfo = context.lastProducts?.length
-      ? await getProductContext(context.lastProducts)
-      : "";
+    // 2. Load product context via RAG
+    const productInfo = await getProductContextForBot(
+      context.lastProducts || [],
+      currentMessage
+    );
 
     // 3. Build system prompt with context
     let systemPrompt = SYSTEM_PROMPT;
@@ -140,7 +149,9 @@ export async function getAIResponse(
       systemPrompt += `\n\nاسم الزبون: ${context.customerName}`;
     }
     if (productInfo) {
-      systemPrompt += `\n\nالمنتجات التي تم مناقشتها مع الزبون:\n${productInfo}`;
+      systemPrompt += `\n\nكتالوج المنتجات المتعلقة بالمحادثة (أسعار حقيقية ودقيقة — استخدمها):\n${productInfo}`;
+      systemPrompt += `\n\nقاعدة مهمة: اذكر الأسعار الدقيقة من الكتالوج — لا تخمن أبداً.`;
+      systemPrompt += `\nإذا المنتج غير متوفر (كمية 0) أخبر الزبون.`;
     }
 
     // 4. Build Claude messages (last N messages + current)
@@ -157,71 +168,33 @@ export async function getAIResponse(
     // Ensure messages alternate correctly (Claude requirement)
     const cleaned = cleanAlternatingMessages(claudeMessages);
 
-    // 5. Call Anthropic API
-    const res = await fetch(ANTHROPIC_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: systemPrompt,
-        messages: cleaned,
-      }),
+    // 5. Call Claude via shared client
+    const result = await callClaude({
+      systemPrompt,
+      messages: cleaned,
+      maxTokens: 400,
+      temperature: 0.7,
     });
 
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      console.error("Anthropic API error:", res.status, errorText);
-      return null;
-    }
+    if (!result) return null;
 
-    const data = await res.json();
-    const text = data.content?.[0]?.text;
-    if (!text) return null;
+    // 6. Track usage
+    trackAIUsage({
+      feature: "bot_reply",
+      inputTokens: result.tokens.input,
+      outputTokens: result.tokens.output,
+      durationMs: result.duration,
+      conversationId,
+    });
 
-    // 6. Generate contextual quick replies
-    const quickReplies = generateQuickReplies(text, context.language);
+    // 7. Generate contextual quick replies
+    const quickReplies = generateQuickReplies(result.text, context.language);
 
-    return { text, quickReplies };
+    return { text: result.text, quickReplies };
   } catch (err) {
     console.error("AI response error:", err);
     return null;
   }
-}
-
-// ===== Ensure messages alternate user/assistant =====
-function cleanAlternatingMessages(
-  messages: { role: "user" | "assistant"; content: string }[]
-): { role: "user" | "assistant"; content: string }[] {
-  if (messages.length === 0) return [{ role: "user", content: "مرحبا" }];
-
-  const cleaned: { role: "user" | "assistant"; content: string }[] = [];
-
-  for (const msg of messages) {
-    const last = cleaned[cleaned.length - 1];
-    if (last && last.role === msg.role) {
-      // Merge consecutive same-role messages
-      last.content += "\n" + msg.content;
-    } else {
-      cleaned.push({ ...msg });
-    }
-  }
-
-  // Ensure first message is from user
-  if (cleaned[0]?.role === "assistant") {
-    cleaned.unshift({ role: "user", content: "مرحبا" });
-  }
-
-  // Ensure last message is from user
-  if (cleaned[cleaned.length - 1]?.role === "assistant") {
-    cleaned.push({ role: "user", content: "..." });
-  }
-
-  return cleaned;
 }
 
 // ===== Generate quick replies based on context =====

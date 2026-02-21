@@ -30,6 +30,22 @@ export async function PUT(req: NextRequest) {
           await notifyStatusChange(body.orderId, body.customerPhone, body.status);
         } catch { /* silent */ }
       }
+      // Email notification for status change
+      if (body.customerEmail && ["confirmed", "processing", "shipped", "delivered", "cancelled"].includes(body.status)) {
+        try {
+          const { orderStatusEmail } = await import("@/lib/email-templates");
+          const { getProvider } = await import("@/lib/integrations/hub");
+          const emailProvider = await getProvider<any>("email");
+          if (emailProvider) {
+            const tmpl = orderStatusEmail(body.orderId, body.customerName || "زبون", body.status);
+            await emailProvider.send({
+              to: body.customerEmail,
+              subject: tmpl.subject,
+              html: tmpl.html,
+            });
+          }
+        } catch { /* silent — email failure shouldn't block status update */ }
+      }
       // No-reply reminder
       if (body.status?.startsWith("no_reply") && body.customerPhone) {
         try {

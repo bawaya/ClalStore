@@ -168,6 +168,12 @@ export type Database = {
         Update: Partial<Omit<BotAnalytics, "id">>;
         Relationships: [];
       };
+      customer_otps: {
+        Row: CustomerOTP;
+        Insert: Omit<CustomerOTP, "id" | "created_at">;
+        Update: Partial<Omit<CustomerOTP, "id">>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -268,6 +274,8 @@ export type Customer = {
   segment: string;         // CustomerSegment
   birthday?: string;
   tags: string[];
+  auth_token?: string;
+  last_login?: string;
   created_at: string;
   updated_at: string;
 }
@@ -571,4 +579,13 @@ export type PushNotification = {
   target: "all" | "segment" | "individual";
   target_filter: Record<string, any>;
   sent_at: string;
+}
+
+export type CustomerOTP = {
+  id: string;
+  phone: string;
+  otp: string;
+  expires_at: string;
+  verified: boolean;
+  created_at: string;
 }

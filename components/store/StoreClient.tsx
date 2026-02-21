@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "./StoreHeader";
@@ -34,6 +34,9 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
   const [typeCat, setTypeCat] = useState("all");
   const [brandCat, setBrandCat] = useState("all");
   const [search, setSearch] = useState("");
+  const [smartSearching, setSmartSearching] = useState(false);
+  const [smartResults, setSmartResults] = useState<Product[] | null>(null);
+  const [smartSuggestion, setSmartSuggestion] = useState("");
 
   const items = products.length > 0 ? products : FALLBACK_PRODUCTS;
 
@@ -42,15 +45,61 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
     [items]
   );
 
+  // Check if query is "smart" (3+ words or has smart keywords)
+  const isSmartQuery = useCallback((q: string): boolean => {
+    const words = q.trim().split(/\s+/);
+    if (words.length >= 3) return true;
+    const smartWords = [
+      "تحت", "فوق", "أحسن", "أرخص", "أفضل", "أغلى", "أقوى",
+      "كاميرا", "بطارية", "شاشة", "مقاوم",
+      "under", "over", "best", "cheap", "camera", "battery",
+    ];
+    return smartWords.some((w) => q.toLowerCase().includes(w));
+  }, []);
+
+  // Smart search handler
+  const handleSmartSearch = useCallback(async () => {
+    if (!search.trim() || smartSearching) return;
+    setSmartSearching(true);
+    setSmartSuggestion("");
+    try {
+      const res = await fetch(`/api/store/smart-search?q=${encodeURIComponent(search.trim())}`);
+      const data = await res.json();
+      if (data.success) {
+        setSmartResults(data.products || []);
+        setSmartSuggestion(data.suggestion || "");
+      }
+    } catch {}
+    setSmartSearching(false);
+  }, [search, smartSearching]);
+
+  // Handle search input keydown
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && isSmartQuery(search)) {
+      e.preventDefault();
+      handleSmartSearch();
+    }
+  };
+
+  // Clear smart search
+  const clearSmartSearch = () => {
+    setSmartResults(null);
+    setSmartSuggestion("");
+    setSearch("");
+  };
+
   const filtered = useMemo(() => {
+    // If smart search results exist, show them
+    if (smartResults !== null) return smartResults;
+
     let list = items;
     // Type filter
     if (typeCat === "device") list = list.filter((p) => p.type === "device");
     else if (typeCat === "accessory") list = list.filter((p) => p.type === "accessory");
     // Brand filter
     if (brandCat !== "all") list = list.filter((p) => p.brand === brandCat);
-    // Search
-    if (search.trim()) {
+    // Search (local — for short queries)
+    if (search.trim() && !isSmartQuery(search)) {
       const q = search.toLowerCase();
       list = list.filter(
         (p) =>
@@ -60,7 +109,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
       );
     }
     return list;
-  }, [items, typeCat, brandCat, search]);
+  }, [items, typeCat, brandCat, search, smartResults, isSmartQuery]);
 
   const typeCategories = [
     { key: "all", label: t("store.all") },
@@ -84,21 +133,65 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
         style={{ padding: scr.mobile ? "12px 14px 30px" : "20px 28px 40px" }}
       >
         {/* Search */}
-        <div className="flex gap-1.5 mb-3" style={{ marginBottom: scr.mobile ? 12 : 20 }}>
-          <div className="flex-1 flex items-center gap-1.5 bg-surface-elevated rounded-xl border border-surface-border"
-            style={{ padding: scr.mobile ? "8px 12px" : "10px 16px" }}>
-            <span className="text-sm opacity-30">⌕</span>
-            <input
-              className="flex-1 bg-transparent border-none text-white outline-none"
-              style={{ fontSize: scr.mobile ? 12 : 14 }}
-              placeholder={t("store.search")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="text-muted text-xs cursor-pointer">✕</button>
+        <div className="mb-3" style={{ marginBottom: scr.mobile ? 12 : 20 }}>
+          <div className="flex gap-1.5">
+            <div className={`flex-1 flex items-center gap-1.5 rounded-xl border ${
+              isSmartQuery(search) ? "border-purple-500/50 bg-purple-500/5" : "border-surface-border bg-surface-elevated"
+            }`}
+              style={{ padding: scr.mobile ? "8px 12px" : "10px 16px" }}>
+              <span className="text-sm opacity-30">{isSmartQuery(search) ? "✨" : "⌕"}</span>
+              <input
+                className="flex-1 bg-transparent border-none text-white outline-none"
+                style={{ fontSize: scr.mobile ? 12 : 14 }}
+                placeholder="ابحث... أو اكتب مثلاً: أحسن هاتف تحت 3000"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); if (smartResults) setSmartResults(null); }}
+                onKeyDown={handleSearchKeyDown}
+              />
+              {smartSearching && (
+                <span className="text-purple-400 text-xs animate-pulse">🧠</span>
+              )}
+              {search && (
+                <button onClick={smartResults ? clearSmartSearch : () => setSearch("")} className="text-muted text-xs cursor-pointer">✕</button>
+              )}
+            </div>
+            {isSmartQuery(search) && !smartSearching && (
+              <button
+                onClick={handleSmartSearch}
+                className="px-3 rounded-xl text-xs font-medium text-white"
+                style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)" }}
+              >
+                ✨ بحث ذكي
+              </button>
             )}
           </div>
+
+          {/* Smart search suggestion hints */}
+          {!search && !smartResults && (
+            <div className="flex gap-1.5 mt-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+              {["أحسن هاتف سامسونج", "هاتف تحت 2000", "إكسسوارات iPhone", "هاتف بطارية قوية"].map((hint) => (
+                <button
+                  key={hint}
+                  onClick={() => { setSearch(hint); }}
+                  className="whitespace-nowrap text-[11px] px-2.5 py-1 rounded-lg border border-purple-500/20 text-purple-300/70 hover:bg-purple-500/10 transition-colors cursor-pointer"
+                >
+                  ✨ {hint}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Smart search results banner */}
+          {smartResults !== null && (
+            <div className="flex items-center justify-between mt-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+              <span className="text-xs text-purple-300">
+                ✨ {smartSuggestion || `وجدنا ${smartResults.length} منتج`}
+              </span>
+              <button onClick={clearSmartSearch} className="text-[10px] text-purple-400 hover:text-white cursor-pointer">
+                ✕ مسح
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Type filter */}

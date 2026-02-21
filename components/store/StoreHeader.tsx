@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCart } from "@/lib/store/cart";
+import { useWishlist } from "@/lib/store/wishlist";
 import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
@@ -12,7 +13,21 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
   const scr = useScreen();
   const { t } = useLang();
   const itemCount = useCart((s) => s.getItemCount());
+  const wishlistCount = useWishlist((s) => s.getCount());
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Customer auth state
+  const [custName, setCustName] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("clal_customer");
+      if (raw) {
+        const c = JSON.parse(raw);
+        if (c?.name) setCustName(c.name);
+      }
+    } catch {}
+  }, []);
 
   const navLinks = [
     { href: "/", label: t("nav.home") },
@@ -80,9 +95,54 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
           </Link>
         )}
 
-        {/* Left: LangSwitcher (mobile) + Cart */}
-        <div className="flex items-center gap-2">
+        {/* Left: LangSwitcher (mobile) + Account + Wishlist + Cart */}
+        <div className="flex items-center gap-1.5">
           {scr.mobile && <LangSwitcher size="sm" />}
+
+          {/* Account icon */}
+          <Link
+            href={custName ? "/store/account" : "/store/auth"}
+            className="relative flex items-center justify-center rounded-xl cursor-pointer transition-transform active:scale-95"
+            title={custName || t("nav.login")}
+            style={{
+              width: scr.mobile ? 36 : 42,
+              height: scr.mobile ? 36 : 42,
+              fontSize: scr.mobile ? 16 : 18,
+              background: custName ? "rgba(196,16,64,0.12)" : "rgba(161,161,170,0.1)",
+              border: custName ? "1px solid rgba(196,16,64,0.35)" : "1px solid rgba(161,161,170,0.2)",
+            }}
+          >
+            👤
+          </Link>
+
+          {/* Wishlist icon */}
+          <Link
+            href="/store/wishlist"
+            className="relative flex items-center justify-center rounded-xl cursor-pointer transition-transform active:scale-95"
+            style={{
+              width: scr.mobile ? 36 : 42,
+              height: scr.mobile ? 36 : 42,
+              fontSize: scr.mobile ? 16 : 18,
+              background: wishlistCount > 0 ? "rgba(196,16,64,0.12)" : "rgba(161,161,170,0.1)",
+              border: wishlistCount > 0 ? "1px solid rgba(196,16,64,0.35)" : "1px solid rgba(161,161,170,0.2)",
+            }}
+          >
+            {wishlistCount > 0 ? "❤️" : "🤍"}
+            {wishlistCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 rounded-full font-black flex items-center justify-center"
+                style={{
+                  width: scr.mobile ? 18 : 20, height: scr.mobile ? 18 : 20,
+                  fontSize: scr.mobile ? 9 : 10,
+                  background: '#c41040',
+                  color: '#fff',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+                }}>
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
+
+          {/* Cart icon */}
           <Link
             href="/store/cart"
             className="relative flex items-center justify-center rounded-xl cursor-pointer transition-transform active:scale-95"

@@ -2,13 +2,14 @@ export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — WhatsApp Webhook (Season 5)
-// POST: Receive from yCloud → new engine
+// POST: Receive from yCloud → new engine → save to inbox
 // GET: Webhook verification
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { parseWebhook, handleWhatsAppMessage, sendBotResponse } from "@/lib/bot/whatsapp";
 import { logBotInteraction } from "@/lib/bot/engine";
+import { createAdminSupabase } from "@/lib/supabase";
 
 // Webhook verification (yCloud sends GET to verify)
 export async function GET(req: NextRequest) {
@@ -21,6 +22,105 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ error: "Invalid token" }, { status: 403 });
+}
+
+/* ── Save incoming + bot reply to inbox tables ── */
+async function saveToInbox(
+  phone: string,
+  customerName: string | undefined,
+  inboundText: string,
+  inboundMsgId: string | undefined,
+  botReplyText: string | null,
+) {
+  try {
+    const sb = createAdminSupabase();
+
+    // Find or create conversation
+    const { data: existing } = await sb
+      .from("inbox_conversations")
+      .select("id")
+      .eq("customer_phone", phone)
+      .neq("status", "archived")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    let convId: string;
+
+    if (existing) {
+      convId = existing.id;
+      // Update conversation
+      await sb
+        .from("inbox_conversations")
+        .update({
+          last_message_at: new Date().toISOString(),
+          last_message_text: inboundText.substring(0, 200),
+          last_message_direction: "inbound",
+          unread_count: (sb.rpc as any)("increment_unread", { row_id: convId }) || 1,
+        } as any)
+        .eq("id", convId);
+
+      // Increment unread separately (safer)
+      await sb.rpc("increment_unread" as any, { row_id: convId }).catch(() => {
+        // Fallback: just update with raw SQL-style
+        sb.from("inbox_conversations")
+          .update({ unread_count: 1 } as any)
+          .eq("id", convId);
+      });
+    } else {
+      // Create new conversation
+      const { data: newConv } = await sb
+        .from("inbox_conversations")
+        .insert({
+          customer_phone: phone,
+          customer_name: customerName || null,
+          status: "bot",
+          last_message_at: new Date().toISOString(),
+          last_message_text: inboundText.substring(0, 200),
+          last_message_direction: "inbound",
+          unread_count: 1,
+        } as any)
+        .select("id")
+        .single();
+
+      convId = newConv?.id;
+      if (!convId) return;
+    }
+
+    // Save inbound message
+    await sb.from("inbox_messages").insert({
+      conversation_id: convId,
+      direction: "inbound",
+      sender_type: "customer",
+      message_type: "text",
+      content: inboundText,
+      whatsapp_message_id: inboundMsgId || null,
+      status: "delivered",
+    } as any);
+
+    // Save bot reply
+    if (botReplyText) {
+      await sb.from("inbox_messages").insert({
+        conversation_id: convId,
+        direction: "outbound",
+        sender_type: "bot",
+        message_type: "text",
+        content: botReplyText,
+        status: "sent",
+      } as any);
+
+      // Update last message to bot reply
+      await sb
+        .from("inbox_conversations")
+        .update({
+          last_message_text: botReplyText.substring(0, 200),
+          last_message_direction: "outbound",
+        } as any)
+        .eq("id", convId);
+    }
+  } catch (err) {
+    console.error("saveToInbox error:", err);
+  }
 }
 
 // Receive messages
@@ -36,15 +136,25 @@ export async function POST(req: NextRequest) {
 
     // Process through new engine
     const response = await handleWhatsAppMessage(msg);
-    if (!response.text) {
-      return NextResponse.json({ received: true });
+
+    // Send reply via WhatsApp (if there's a response)
+    if (response.text) {
+      await sendBotResponse(msg.from, response);
     }
 
-    // Send reply via WhatsApp
-    await sendBotResponse(msg.from, response);
+    // Save to inbox tables (customer message + bot reply)
+    await saveToInbox(
+      msg.from,
+      msg.name,
+      msg.text,
+      msg.messageId,
+      response.text || null,
+    );
 
     // Legacy log
-    await logBotInteraction("whatsapp", msg.from, msg.text, response.text, "processed");
+    if (response.text) {
+      await logBotInteraction("whatsapp", msg.from, msg.text, response.text, "processed");
+    }
 
     return NextResponse.json({ received: true });
   } catch (err: unknown) {

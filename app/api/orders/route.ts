@@ -193,22 +193,26 @@ export async function POST(req: NextRequest) {
       console.error("Admin notification failed:", adminErr);
     }
 
-    // === 8. Email Confirmation (Season 6) ===
+    // === 8. Email Confirmation (enhanced templates) ===
     if (customer.email) {
       try {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "";
-        if (appUrl) {
-          await fetch(`${appUrl}/api/email`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              type: "order_confirm",
-              orderId,
-              customerName: customer.name,
-              customerEmail: customer.email,
-              total,
-              items: items.map((i: any) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
-            }),
+        const { orderConfirmationEmail } = await import("@/lib/email-templates");
+        const { getProvider } = await import("@/lib/integrations/hub");
+        const emailProvider = await getProvider<any>("email");
+        if (emailProvider) {
+          const tmpl = orderConfirmationEmail(
+            orderId,
+            customer.name,
+            total,
+            items.map((i: any) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
+            hasDevice ? "bank" : "credit",
+            customer.city,
+            customer.address,
+          );
+          await emailProvider.send({
+            to: customer.email,
+            subject: tmpl.subject,
+            html: tmpl.html,
           });
         }
       } catch (emailErr) {
