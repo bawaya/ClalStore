@@ -31,8 +31,8 @@ export const BRAND_OPTIONS = [
 ] as const;
 
 export const PAYMENT_OPTIONS = [
-  { key: "cash", label_ar: "💵 كاش", label_he: "💵 מזומן" },
-  { key: "installments", label_ar: "🏦 تقسيط حتى 18 شهر", label_he: "🏦 תשלומים עד 18 חודשים" },
+  { key: "single", label_ar: "💳 دفعة واحدة (تحويل بنكي)", label_he: "💳 תשלום אחד (העברה בנקאית)" },
+  { key: "installments", label_ar: "🏦 تقسيط 2-18 دفعة (تحويل بنكي)", label_he: "🏦 2-18 תשלומים (העברה בנקאית)" },
 ] as const;
 
 // ===== Qualification State =====
@@ -74,7 +74,7 @@ export function getNextQualificationQuestion(state: QualificationState, lang: "a
   }
   if (!state.payment) {
     return {
-      question: isAr ? "كاش ولا تقسيط؟ 🏦" : "מזומן או תשלומים? 🏦",
+      question: isAr ? "دفعة واحدة ولا تقسيط؟ 🏦" : "תשלום אחד או תשלומים? 🏦",
       options: PAYMENT_OPTIONS.map(p => isAr ? p.label_ar : p.label_he),
       field: "payment",
     };
@@ -119,7 +119,7 @@ export function parseQualificationAnswer(field: string, answer: string): string 
 
   if (field === "payment") {
     if (/تقسيط|دفعات|شهر|תשלומים|installment/i.test(clean)) return "installments";
-    return "cash";
+    return "single";
   }
 
   return clean;

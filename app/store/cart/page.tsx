@@ -434,7 +434,7 @@ export default function CartPage() {
             <Field label="📅 عدد الدفعات">
               <select className={inp} value={pay.installments} onChange={(e) => setPay({ ...pay, installments: Number(e.target.value) })}>
                 {[1, 2, 3, 6, 9, 12, 15, 18].map((n) => (
-                  <option key={n} value={n}>{n === 1 ? "دفعة واحدة (كاش)" : `${n} دفعات`}</option>
+                  <option key={n} value={n}>{n === 1 ? "دفعة واحدة (تحويل بنكي)" : `${n} دفعات`}</option>
                 ))}
               </select>
             </Field>
@@ -447,7 +447,7 @@ export default function CartPage() {
                   ₪{Math.ceil(total / pay.installments).toLocaleString()} × {pay.installments} شهر
                 </div>
                 <div className="text-muted mt-1" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-                  المبلغ الإجمالي: ₪{total.toLocaleString()} — بنفس سعر الكاش
+                  المبلغ الإجمالي: ₪{total.toLocaleString()} — بدون فوائد
                 </div>
               </div>
             )}
