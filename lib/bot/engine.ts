@@ -25,6 +25,7 @@ import {
 import { createHandoff, generateConversationSummary } from "./handoff";
 import { createAdminSupabase } from "@/lib/supabase";
 import { getAIResponse } from "./ai";
+import { notifyAdminMuhammadHandoff } from "./admin-notify";
 
 export { type BotIntent, type DetectedIntent } from "./intents";
 export { logBotInteraction } from "./analytics";
@@ -54,6 +55,9 @@ interface SessionState {
   customerName?: string;
   customerId?: string;
   csatAsked: boolean;
+  // Muhammad handoff flow
+  muhammadStep?: number; // 0=not active, 1=ask name, 2=ask phone, 3=ask id, 4=ask message
+  muhammadData?: { name?: string; phone?: string; idNumber?: string; message?: string };
 }
 
 // In-memory cache (fast, per-instance). DB is source of truth.
@@ -215,10 +219,18 @@ export async function processMessage(
     return { ...response, conversationId: session.conversationId };
   }
 
-  // 7. Check if user is answering a qualification question
+  // 7. Check if user is in Muhammad handoff data collection
+  if (session.muhammadStep && session.muhammadStep > 0 && session.muhammadStep <= 4) {
+    const response = await handleMuhammadCollect(session, text, channel);
+    await saveMessage(session.conversationId, "bot", response.text, "muhammad_request");
+    await setSession(session);
+    return { ...response, conversationId: session.conversationId };
+  }
+
+  // 8. Check if user is answering a qualification question
   // BUT: if the user explicitly asks for human/complaint/tracking/contact — break out of qualification
   if (session.qualification.step > 0 && session.qualification.step < 5) {
-    const escapeIntents: BotIntent[] = ["human_request", "complaint", "greeting", "order_tracking", "contact_info", "thanks"];
+    const escapeIntents: BotIntent[] = ["human_request", "muhammad_request", "complaint", "greeting", "order_tracking", "contact_info", "thanks"];
     if (escapeIntents.includes(detected.intent)) {
       // User wants to leave qualification — reset and route normally
       session.qualification = { step: 0 };
@@ -306,6 +318,9 @@ async function routeIntent(
 
     case "human_request":
       return handleEscalation(session, "human_request", lang);
+
+    case "muhammad_request":
+      return handleMuhammadRequest(session);
 
     case "contact_info":
       return handleContactInfo(session);
@@ -763,6 +778,91 @@ async function handleUnknown(session: SessionState, text: string): Promise<BotRe
       ? ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي", "👤 كلم موظف"]
       : ["📱 מוצרים", "📡 חבילות", "📦 הזמנה", "👤 נציג"],
   };
+}
+
+// ===== Muhammad Request Handler =====
+async function handleMuhammadRequest(session: SessionState): Promise<BotResponse> {
+  const isAr = session.language !== "he";
+  session.muhammadStep = 1;
+  session.muhammadData = {};
+
+  return {
+    text: isAr
+      ? "بالتأكيد! سأوصل رسالتك لمحمد 📲\n\nأحتاج منك بعض البيانات أولاً:\n\n👤 ما هو اسمك الكامل؟"
+      : "בטח! אעביר את ההודעה למוחמד 📲\n\nאני צריך כמה פרטים:\n\n👤 מה השם המלא שלך?",
+  };
+}
+
+async function handleMuhammadCollect(
+  session: SessionState,
+  text: string,
+  channel: "webchat" | "whatsapp"
+): Promise<BotResponse> {
+  const isAr = session.language !== "he";
+  const data = session.muhammadData || {};
+
+  switch (session.muhammadStep) {
+    case 1: // Collecting name
+      data.name = text.trim();
+      session.muhammadData = data;
+      session.muhammadStep = 2;
+      return {
+        text: isAr
+          ? `شكراً ${data.name}! 👍\n\n📞 ما هو رقم هاتفك؟`
+          : `תודה ${data.name}! 👍\n\n📞 מה מספר הטלפון שלך?`,
+      };
+
+    case 2: // Collecting phone
+      data.phone = text.trim().replace(/[-\s]/g, "");
+      session.muhammadData = data;
+      session.muhammadStep = 3;
+      return {
+        text: isAr
+          ? "🆔 ما هو رقم الهوية؟\n(9 أرقام)"
+          : "🆔 מה מספר תעודת הזהות?\n(9 ספרות)",
+      };
+
+    case 3: // Collecting ID number
+      data.idNumber = text.trim().replace(/[-\s]/g, "");
+      session.muhammadData = data;
+      session.muhammadStep = 4;
+      return {
+        text: isAr
+          ? "💬 اكتب رسالتك أو استفسارك لمحمد:"
+          : "💬 כתוב את ההודעה שלך למוחמד:",
+      };
+
+    case 4: // Collecting message — DONE
+      data.message = text.trim();
+      session.muhammadData = data;
+      session.muhammadStep = 0; // Reset
+
+      // Send notification to admin
+      try {
+        await notifyAdminMuhammadHandoff({
+          name: data.name || "—",
+          phone: data.phone || session.customerPhone || "—",
+          idNumber: data.idNumber || "—",
+          message: data.message || "—",
+          channel,
+        });
+      } catch (err) {
+        console.error("Muhammad handoff notify error:", err);
+      }
+
+      return {
+        text: isAr
+          ? `✅ تم إرسال التفاصيل لمحمد!\n\n📋 ملخص:\n👤 الاسم: ${data.name}\n📞 الهاتف: ${data.phone}\n🆔 الهوية: ${data.idNumber}\n💬 الرسالة: ${data.message?.slice(0, 100)}\n\nمحمد سيعاود الاتصال بك قريباً إن شاء الله! 🙏`
+          : `✅ הפרטים נשלחו למוחמד!\n\nמוחמד יחזור אליך בהקדם! 🙏`,
+        quickReplies: isAr
+          ? ["📱 المنتجات", "📡 الباقات", "📦 حالة طلبي"]
+          : ["📱 מוצרים", "📡 חבילות", "📦 הזמנה"],
+      };
+
+    default:
+      session.muhammadStep = 0;
+      return { text: isAr ? "كيف بقدر أساعدك؟" : "איך אפשר לעזור?" };
+  }
 }
 
 // ===== Notification Templates (kept for backward compat) =====

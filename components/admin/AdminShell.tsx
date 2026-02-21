@@ -11,8 +11,12 @@ const NAV_ITEMS = [
   { key: "products", href: "/admin/products", icon: "📱", label: "المنتجات" },
   { key: "coupons", href: "/admin/coupons", icon: "🏷️", label: "كوبونات" },
   { key: "heroes", href: "/admin/heroes", icon: "🖼️", label: "بنرات" },
+  { key: "deals", href: "/admin/deals", icon: "🔥", label: "العروض" },
+  { key: "reviews", href: "/admin/reviews", icon: "⭐", label: "التقييمات" },
   { key: "lines", href: "/admin/lines", icon: "📡", label: "باقات" },
+  { key: "push", href: "/admin/push", icon: "🔔", label: "إشعارات" },
   { key: "bot", href: "/admin/bot", icon: "🤖", label: "البوت" },
+  { key: "features", href: "/admin/features", icon: "🎛️", label: "الميزات" },
   { key: "settings", href: "/admin/settings", icon: "⚙️", label: "إعدادات" },
 ];
 

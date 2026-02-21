@@ -126,6 +126,36 @@ export type Database = {
         Update: Partial<Omit<BotPolicy, "id">>;
         Relationships: [];
       };
+      abandoned_carts: {
+        Row: AbandonedCart;
+        Insert: Omit<AbandonedCart, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<AbandonedCart, "id">>;
+        Relationships: [];
+      };
+      product_reviews: {
+        Row: ProductReview;
+        Insert: Omit<ProductReview, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<ProductReview, "id">>;
+        Relationships: [];
+      };
+      deals: {
+        Row: Deal;
+        Insert: Omit<Deal, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<Deal, "id">>;
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: PushSubscription;
+        Insert: Omit<PushSubscription, "id" | "created_at">;
+        Update: Partial<Omit<PushSubscription, "id">>;
+        Relationships: [];
+      };
+      push_notifications: {
+        Row: PushNotification;
+        Insert: Omit<PushNotification, "id" | "sent_at">;
+        Update: Partial<Omit<PushNotification, "id">>;
+        Relationships: [];
+      };
       bot_templates: {
         Row: BotTemplate;
         Insert: Omit<BotTemplate, "id" | "created_at" | "updated_at">;
@@ -461,4 +491,84 @@ export type BotAnalytics = {
   top_products: Record<string, number>;
   created_at: string;
   updated_at: string;
+}
+
+// ===== Feature Tables (Season 6) =====
+
+export type AbandonedCart = {
+  id: string;
+  visitor_id: string;
+  customer_phone?: string;
+  customer_name?: string;
+  items: any[];
+  total: number;
+  reminder_sent: boolean;
+  reminder_count: number;
+  recovered: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ProductReview = {
+  id: string;
+  product_id: string;
+  customer_id?: string;
+  customer_name: string;
+  customer_phone?: string;
+  rating: number;
+  title?: string;
+  body?: string;
+  verified_purchase: boolean;
+  status: "pending" | "approved" | "rejected";
+  admin_reply?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type Deal = {
+  id: string;
+  title_ar: string;
+  title_he: string;
+  description_ar?: string;
+  description_he?: string;
+  product_id?: string;
+  deal_type: "discount" | "flash_sale" | "bundle" | "clearance";
+  discount_percent: number;
+  discount_amount: number;
+  original_price?: number;
+  deal_price?: number;
+  image_url?: string;
+  badge_text_ar?: string;
+  badge_text_he?: string;
+  starts_at: string;
+  ends_at?: string;
+  max_quantity: number;
+  sold_count: number;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PushSubscription = {
+  id: string;
+  endpoint: string;
+  keys: Record<string, any>;
+  visitor_id?: string;
+  customer_phone?: string;
+  user_agent?: string;
+  active: boolean;
+  created_at: string;
+}
+
+export type PushNotification = {
+  id: string;
+  title: string;
+  body: string;
+  url?: string;
+  icon?: string;
+  sent_count: number;
+  target: "all" | "segment" | "individual";
+  target_filter: Record<string, any>;
+  sent_at: string;
 }

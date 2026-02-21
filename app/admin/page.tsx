@@ -7,6 +7,7 @@ import { useScreen } from "@/lib/hooks";
 import { StatCard } from "@/components/admin/shared";
 import { ORDER_STATUS, ORDER_SOURCE } from "@/lib/constants";
 import { formatCurrency, timeAgo } from "@/lib/utils";
+import { exportStatsPDF } from "@/lib/pdf-export";
 
 interface Stats {
   totalRevenue: number; totalOrders: number; newOrders: number; noReply: number;
@@ -79,7 +80,31 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="font-black mb-4" style={{ fontSize: scr.mobile ? 16 : 22 }}>📊 داشبورد</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="font-black" style={{ fontSize: scr.mobile ? 16 : 22 }}>📊 داشبورد</h1>
+        <button
+          onClick={() => exportStatsPDF(
+            [
+              { label: "الإيرادات", value: formatCurrency(stats.totalRevenue) },
+              { label: "الطلبات", value: stats.totalOrders },
+              { label: "الزبائن", value: stats.totalCustomers },
+              { label: "VIP", value: stats.vipCustomers },
+              { label: "المنتجات", value: stats.totalProducts },
+              { label: "مخزون منخفض", value: stats.lowStock },
+              { label: "طلبات جديدة", value: stats.newOrders },
+              { label: "بدون رد", value: stats.noReply },
+            ],
+            "تقرير الداشبورد",
+            `<h3 style="margin-top:20px;font-weight:700">🏆 أكثر المنتجات مبيعاً</h3>
+            <table><thead><tr><th>المنتج</th><th>المبيعات</th><th>السعر</th></tr></thead><tbody>
+            ${stats.topProducts.map((p: any) => `<tr><td>${p.name_ar}</td><td>${p.sold || 0}</td><td>₪${p.price}</td></tr>`).join("")}
+            </tbody></table>`
+          )}
+          className="text-xs font-bold text-brand bg-surface-elevated px-3 py-1.5 rounded-lg hover:bg-brand/10 transition-colors"
+        >
+          📄 تصدير PDF
+        </button>
+      </div>
 
       {/* Stats grid */}
       <div className="grid gap-2 mb-4" style={{ gridTemplateColumns: gridCols }}>

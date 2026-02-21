@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { CookieConsent } from "@/components/shared/CookieConsent";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
+import { Analytics } from "@/components/shared/Analytics";
 import { Providers } from "@/components/shared/Providers";
 
 export const metadata: Metadata = {
@@ -68,6 +69,7 @@ export default function RootLayout({
           {children}
           <CookieConsent />
           <PWAInstallPrompt />
+          <Analytics />
         </Providers>
       </body>
     </html>

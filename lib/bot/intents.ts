@@ -17,6 +17,7 @@ export type BotIntent =
   | "contact_info"
   | "complaint"
   | "human_request"
+  | "muhammad_request"
   | "greeting"
   | "thanks"
   | "csat_response"
@@ -138,6 +139,15 @@ export function detectIntent(message: string): DetectedIntent {
   const orderMatch = lower.match(/clm-\d{4,6}/i);
   if (orderMatch) {
     return { intent: "order_tracking", params: { orderId: orderMatch[0].toUpperCase() }, confidence: 0.95, language: lang };
+  }
+
+  // 2.5. Muhammad request — detect before human_request
+  if (/محمد|mohammed|muhammad|מוחמד/i.test(lower) && /بدي|ابغى|ابي|عايز|اريد|أريد|احكي|اتكلم|اتواصل|كلم|تحدث|רוצה|talk|speak|call|اتصل|بدي اكلم|ابغى اكلم/i.test(lower)) {
+    return { intent: "muhammad_request", params: {}, confidence: 0.95, language: lang };
+  }
+  // Also catch just "محمد" alone or "وين محمد" / "محمد موجود"
+  if (/^محمد$|وين محمد|محمد موجود|فين محمد|ابغى محمد|بدي محمد|عايز محمد|אני רוצה את מוחמד/i.test(lower)) {
+    return { intent: "muhammad_request", params: {}, confidence: 0.95, language: lang };
   }
 
   // 3. Explicit human request — MUST be before buy_now since "بدي" can overlap

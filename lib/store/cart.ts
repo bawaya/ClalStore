@@ -46,9 +46,12 @@ export const useCart = create<CartStore>((set, get) => ({
 
   addItem: (item) => {
     const cartId = `cart_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    set((state) => ({
-      items: [...state.items, { ...item, cartId, quantity: 1 }],
-    }));
+    set((state) => {
+      const newItems = [...state.items, { ...item, cartId, quantity: 1 }];
+      // Fire-and-forget: save abandoned cart to API
+      _trackAbandonedCart(newItems);
+      return { items: newItems };
+    });
   },
 
   removeItem: (cartId) => {
@@ -70,6 +73,8 @@ export const useCart = create<CartStore>((set, get) => ({
   },
 
   clearCart: () => {
+    // Mark cart as recovered when user clears (checkout complete)
+    _markCartRecovered();
     set({ items: [], couponCode: "", discountAmount: 0 });
   },
 
@@ -95,3 +100,45 @@ export const useCart = create<CartStore>((set, get) => ({
     return items.length > 0 && items.every((i) => i.type === "accessory");
   },
 }));
+
+// ===== Abandoned Cart Tracking (fire-and-forget) =====
+function _getVisitorId(): string {
+  if (typeof window === "undefined") return "server";
+  let id = localStorage.getItem("clal_visitor_id");
+  if (!id) {
+    id = `v_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    localStorage.setItem("clal_visitor_id", id);
+  }
+  return id;
+}
+
+function _trackAbandonedCart(items: CartItem[]) {
+  if (typeof window === "undefined" || items.length === 0) return;
+  try {
+    const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    fetch("/api/cart/abandoned", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        visitor_id: _getVisitorId(),
+        items: items.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          brand: i.brand,
+          price: i.price,
+          quantity: i.quantity,
+          color: i.color,
+          storage: i.storage,
+        })),
+        total,
+      }),
+    }).catch(() => {});
+  } catch {}
+}
+
+function _markCartRecovered() {
+  if (typeof window === "undefined") return;
+  try {
+    fetch(`/api/cart/abandoned?visitor_id=${_getVisitorId()}`, { method: "DELETE" }).catch(() => {});
+  } catch {}
+}

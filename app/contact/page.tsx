@@ -19,6 +19,7 @@ export default function ContactPage() {
     }
     setSending(true);
     try {
+      // Send email
       const res = await fetch('/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,6 +40,20 @@ export default function ContactPage() {
         })
       });
       if (!res.ok) throw new Error('Send failed');
+
+      // Send WhatsApp notification to admin
+      fetch('/api/admin/contact-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          email: form.email,
+          subject: form.subject,
+          message: form.message,
+        })
+      }).catch(() => {}); // fire-and-forget
+
       show(t("contact.success"));
       setForm({ name: "", phone: "", email: "", subject: "", message: "" });
     } catch {

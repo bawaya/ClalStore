@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
 import { calcDiscount } from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
+import { trackAddToCart, trackViewProduct } from "@/components/shared/Analytics";
 import { StoreHeader } from "./StoreHeader";
 import { ProductCard } from "./ProductCard";
+import { ProductReviews } from "./ProductReviews";
 import { Footer } from "@/components/website/sections";
 import type { Product, ProductColor } from "@/types/database";
 
@@ -51,8 +53,14 @@ export function ProductDetailClient({
       color: colorName,
       storage: storage[selStorage],
     });
+    trackAddToCart(productName, p.price);
     show(t("detail.addedToCart"));
   };
+
+  // Track product view
+  useEffect(() => {
+    trackViewProduct(productName, p.price);
+  }, [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
@@ -233,6 +241,9 @@ export function ProductDetailClient({
             </p>
           </div>
         )}
+
+        {/* Reviews */}
+        <ProductReviews productId={p.id} />
 
         {/* Related */}
         {related.length > 0 && (

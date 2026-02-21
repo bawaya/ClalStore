@@ -178,6 +178,21 @@ export async function POST(req: NextRequest) {
       console.error("WhatsApp notification failed:", notifErr);
     }
 
+    // === 7b. Admin Report Notification ===
+    try {
+      const { notifyAdminNewOrder } = await import("@/lib/bot/admin-notify");
+      await notifyAdminNewOrder({
+        orderId,
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        total,
+        source: source || "store",
+        items: items.map((i: any) => ({ name: i.name || i.productName, qty: i.quantity || 1, price: i.price })),
+      });
+    } catch (adminErr) {
+      console.error("Admin notification failed:", adminErr);
+    }
+
     // === 8. Email Confirmation (Season 6) ===
     if (customer.email) {
       try {
