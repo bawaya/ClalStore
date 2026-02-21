@@ -12,6 +12,7 @@ import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
 import { ProductCard } from "@/components/store/ProductCard";
+import type { WebsiteContent } from "@/types/database";
 
 // ===== Navbar =====
 export function Navbar() {
@@ -73,37 +74,46 @@ export function Navbar() {
 }
 
 // ===== Hero Section =====
-export function HeroSection() {
+export function HeroSection({ cms }: { cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const c = cms?.content || {};
+  const badge = lang === "he" ? (c.badge_he || t("hero.badge")) : (c.badge_ar || t("hero.badge"));
+  const desc = lang === "he" ? (c.description_he || t("hero.desc")) : (c.description_ar || t("hero.desc"));
+  const ctaStore = lang === "he" ? (c.cta_store_he || t("hero.browseStore")) : (c.cta_store_ar || t("hero.browseStore"));
+  const ctaPlans = lang === "he" ? (c.cta_plans_he || t("hero.viewPlans")) : (c.cta_plans_ar || t("hero.viewPlans"));
+  const title = cms ? (lang === "he" ? (cms.title_he || cms.title_ar || "ClalMobile") : (cms.title_ar || "ClalMobile")) : null;
+
   return (
     <section className="relative overflow-hidden" style={{ paddingTop: scr.mobile ? 100 : 120, paddingBottom: scr.mobile ? 40 : 80 }}>
       {/* BG gradient */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(196,16,64,0.15) 0%, transparent 70%)",
+        background: c.bg_image
+          ? `url(${c.bg_image}) center/cover no-repeat`
+          : "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(196,16,64,0.15) 0%, transparent 70%)",
       }} />
 
       <div className="max-w-6xl mx-auto px-4 text-center relative z-10">
         <div className="inline-block bg-brand/10 text-brand text-[10px] font-bold px-3 py-1 rounded-full mb-4">
-          {t("hero.badge")}
+          {badge}
         </div>
 
         <h1 className="font-black leading-tight mb-4" style={{ fontSize: scr.mobile ? 28 : 52 }}>
-          <span className="text-white">{t("hero.line1")}</span><br />
+          <span className="text-white">{title || t("hero.line1")}</span><br />
           <span className="text-brand">{t("hero.line2")}</span><br />
           <span className="text-white">{t("hero.line3")}</span>
         </h1>
 
         <p className="text-muted max-w-xl mx-auto mb-6" style={{ fontSize: scr.mobile ? 13 : 16 }}>
-          {t("hero.desc")}
+          {desc}
         </p>
 
         <div className="flex items-center justify-center gap-3">
           <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            {t("hero.browseStore")}
+            {ctaStore}
           </Link>
           <Link href="/#plans" className="btn-outline" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            {t("hero.viewPlans")}
+            {ctaPlans}
           </Link>
         </div>
 
@@ -119,10 +129,15 @@ export function HeroSection() {
 }
 
 // ===== Stats Strip =====
-export function StatsStrip() {
+export function StatsStrip({ cms }: { cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t } = useLang();
-  const stats = [
+  const { t, lang } = useLang();
+  const cmsItems = cms?.content?.items;
+  const stats = cmsItems?.length ? cmsItems.map((item: any) => ({
+    value: item.value,
+    label: lang === "he" ? (item.label_he || item.label_ar) : (item.label_ar || item.label_he),
+    icon: item.icon,
+  })) : [
     { value: "500+", label: t("stats.customers"), icon: "👥" },
     { value: "50+", label: t("stats.products"), icon: "📱" },
     { value: "24h", label: t("stats.delivery"), icon: "🚚" },
@@ -135,7 +150,7 @@ export function StatsStrip() {
         gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr",
         padding: scr.mobile ? "16px" : "24px",
       }}>
-        {stats.map((s) => (
+        {stats.map((s: { value: string; label: string; icon: string }) => (
           <div key={s.label} className="text-center" style={{ padding: scr.mobile ? 8 : 16 }}>
             <div className="text-xl mb-1">{s.icon}</div>
             <div className="font-black text-brand" style={{ fontSize: scr.mobile ? 20 : 28 }}>{s.value}</div>
@@ -217,10 +232,15 @@ export function LinePlansSection({ plans }: { plans: any[] }) {
 }
 
 // ===== Features Section =====
-export function FeaturesSection() {
+export function FeaturesSection({ cms }: { cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t } = useLang();
-  const features = [
+  const { t, lang } = useLang();
+  const cmsItems = cms?.content?.items;
+  const features = cmsItems?.length ? cmsItems.map((item: any) => ({
+    icon: item.icon,
+    title: lang === "he" ? (item.title_he || item.title_ar) : (item.title_ar || item.title_he),
+    desc: lang === "he" ? (item.desc_he || item.desc_ar) : (item.desc_ar || item.desc_he),
+  })) : [
     { icon: "🏪", title: t("features.agent"), desc: t("features.agentDesc") },
     { icon: "🚚", title: t("features.delivery"), desc: t("features.deliveryDesc") },
     { icon: "💳", title: t("features.installments"), desc: t("features.installmentsDesc") },
@@ -236,7 +256,7 @@ export function FeaturesSection() {
           <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("features.title")}</h2>
         </div>
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr" }}>
-          {features.map((f) => (
+          {features.map((f: { icon: string; title: string; desc: string }) => (
             <div key={f.title} className="card text-center" style={{ padding: scr.mobile ? 16 : 24 }}>
               <div className="text-3xl mb-2">{f.icon}</div>
               <div className="font-bold mb-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>{f.title}</div>
@@ -250,19 +270,23 @@ export function FeaturesSection() {
 }
 
 // ===== FAQ Section =====
-export function FAQSection({ faqs }: { faqs?: { q: string; a: string }[] }) {
+export function FAQSection({ faqs, cms }: { faqs?: { q: string; a: string }[]; cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
-  const defaultFaqs = faqs || [
+  const cmsItems = cms?.content?.items;
+  const defaultFaqs = cmsItems?.length ? cmsItems.map((item: any) => ({
+    q: lang === "he" ? (item.q_he || item.q_ar) : (item.q_ar || item.q_he),
+    a: lang === "he" ? (item.a_he || item.a_ar) : (item.a_ar || item.a_he),
+  })) : (faqs || [
     { q: t("faq.q1"), a: t("faq.a1") },
     { q: t("faq.q2"), a: t("faq.a2") },
     { q: t("faq.q3"), a: t("faq.a3") },
     { q: t("faq.q4"), a: t("faq.a4") },
     { q: t("faq.q5"), a: t("faq.a5") },
     { q: t("faq.q6"), a: t("faq.a6") },
-  ];
+  ]);
 
   return (
     <section id="faq" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
@@ -271,7 +295,7 @@ export function FAQSection({ faqs }: { faqs?: { q: string; a: string }[] }) {
           <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("faq.title")}</h2>
         </div>
         <div className="space-y-1.5">
-          {defaultFaqs.map((f, i) => (
+          {defaultFaqs.map((f: { q: string; a: string }, i: number) => (
             <div key={i} className="card cursor-pointer" onClick={() => setOpenIdx(openIdx === i ? null : i)}
               style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}>
               <div className="flex items-center justify-between">
@@ -290,25 +314,33 @@ export function FAQSection({ faqs }: { faqs?: { q: string; a: string }[] }) {
 }
 
 // ===== CTA Section =====
-export function CTASection() {
+export function CTASection({ cms }: { cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const c = cms?.content || {};
+  const title = lang === "he" ? (c.title_he || t("cta.title")) : (c.title_ar || t("cta.title"));
+  const desc = lang === "he" ? (c.desc_he || t("cta.desc")) : (c.desc_ar || t("cta.desc"));
+  const btn1 = lang === "he" ? (c.btn1_he || t("cta.store")) : (c.btn1_ar || t("cta.store"));
+  const btn2 = lang === "he" ? (c.btn2_he || t("cta.contact")) : (c.btn2_ar || t("cta.contact"));
+  const btn1Link = c.btn1_link || "/store";
+  const btn2Link = c.btn2_link || "/contact";
+
   return (
     <section className="relative overflow-hidden" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
       <div className="absolute inset-0 pointer-events-none" style={{
         background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(196,16,64,0.12) 0%, transparent 70%)",
       }} />
       <div className="max-w-3xl mx-auto text-center relative z-10">
-        <h2 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("cta.title")}</h2>
+        <h2 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 32 }}>{title}</h2>
         <p className="text-muted mb-5" style={{ fontSize: scr.mobile ? 12 : 15 }}>
-          {t("cta.desc")}
+          {desc}
         </p>
         <div className="flex items-center justify-center gap-3">
-          <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            {t("cta.store")}
+          <Link href={btn1Link} className="btn-primary" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
+            {btn1}
           </Link>
-          <Link href="/contact" className="btn-outline" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            {t("cta.contact")}
+          <Link href={btn2Link} className="btn-outline" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
+            {btn2}
           </Link>
         </div>
       </div>
@@ -317,10 +349,11 @@ export function CTASection() {
 }
 
 // ===== Footer =====
-export function Footer() {
+export function Footer({ cms }: { cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const year = new Date().getFullYear();
+  const fc = cms?.content || {};
 
   const columns = [
     {
@@ -345,9 +378,9 @@ export function Footer() {
     {
       title: t("footer.contactUs"),
       links: [
-        { href: "tel:0533337653", label: "📞 053-3337653" },
-        { href: "https://wa.me/972533337653", label: "💬 WhatsApp" },
-        { href: "mailto:info@clalmobile.com", label: "📧 info@clalmobile.com" },
+        { href: `tel:${fc.phone || "0533337653"}`, label: `📞 ${fc.phone || "053-3337653"}` },
+        { href: `https://wa.me/${fc.whatsapp || "972533337653"}`, label: "💬 WhatsApp" },
+        { href: `mailto:${fc.email || "info@clalmobile.com"}`, label: `📧 ${fc.email || "info@clalmobile.com"}` },
       ],
     },
   ];

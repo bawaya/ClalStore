@@ -9,7 +9,27 @@ import { useCompare } from "@/lib/store/compare";
 import { useWishlist } from "@/lib/store/wishlist";
 import { calcDiscount } from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
-import type { Product, ProductColor } from "@/types/database";
+import type { Product, ProductColor, ProductVariant } from "@/types/database";
+
+/* ── variant helpers ── */
+function getActiveVariant(p: Product, storageIdx: number): ProductVariant | null {
+  const variants = p.variants || [];
+  if (variants.length === 0) return null;
+  const storage = p.storage_options || [];
+  const selLabel = storage[storageIdx];
+  return variants.find((v) => v.storage === selLabel) || variants[0] || null;
+}
+
+function getDisplayPrice(p: Product, variant: ProductVariant | null): { price: number; old_price?: number } {
+  if (variant) return { price: variant.price, old_price: variant.old_price };
+  return { price: p.price, old_price: p.old_price };
+}
+
+function getTotalStock(p: Product): number {
+  const variants = p.variants || [];
+  if (variants.length === 0) return p.stock;
+  return variants.reduce((sum, v) => sum + (v.stock ?? p.stock), 0);
+}
 
 /* ── warranty ribbon helpers ── */
 function getWarrantyKey(p: Product): string | null {
@@ -29,13 +49,17 @@ export function ProductCard({ product: p }: { product: Product }) {
   const addItem = useCart((s) => s.addItem);
   const { addItem: addToCompare, removeItem: removeFromCompare, isInCompare } = useCompare();
   const { addItem: addToWishlist, removeItem: removeFromWishlist, isInWishlist } = useWishlist();
-  const disc = p.old_price ? calcDiscount(p.price, p.old_price) : 0;
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
   const [selColor, setSelColor] = useState(0);
   const [selStorage, setSelStorage] = useState(0);
   const [wishAnim, setWishAnim] = useState(false);
   const [compareToast, setCompareToast] = useState("");
+
+  // Variant-aware pricing
+  const activeVariant = getActiveVariant(p, selStorage);
+  const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
+  const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
 
   const inCompare = isInCompare(p.id);
   const inWishlist = isInWishlist(p.id);
@@ -50,8 +74,8 @@ export function ProductCard({ product: p }: { product: Product }) {
       name: p.name_ar,
       brand: p.brand,
       type: p.type as "device" | "accessory",
-      price: p.price,
-      image: p.image_url || undefined,
+      price: displayPrice,
+      image: colors[selColor]?.image || p.image_url || undefined,
       color: colors[selColor]?.name_ar,
       storage: storage[selStorage],
     });
@@ -262,14 +286,14 @@ export function ProductCard({ product: p }: { product: Product }) {
               fontSize: scr.mobile ? 18 : 22,
             }}
           >
-            ₪{p.price.toLocaleString()}
+            ₪{displayPrice.toLocaleString()}
           </span>
-          {p.old_price && (
+          {displayOldPrice && (
             <span
               className="line-through text-[#52525b]"
               style={{ fontSize: scr.mobile ? 10 : 13 }}
             >
-              ₪{p.old_price.toLocaleString()}
+              ₪{displayOldPrice.toLocaleString()}
             </span>
           )}
         </div>

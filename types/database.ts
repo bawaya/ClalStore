@@ -174,6 +174,12 @@ export type Database = {
         Update: Partial<Omit<CustomerOTP, "id">>;
         Relationships: [];
       };
+      website_content: {
+        Row: WebsiteContent;
+        Insert: Omit<WebsiteContent, "id" | "updated_at">;
+        Update: Partial<Omit<WebsiteContent, "id">>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -201,6 +207,7 @@ export type Product = {
   gallery: string[];       // array of image URLs
   colors: ProductColor[];
   storage_options: string[];
+  variants: ProductVariant[];  // per-storage pricing
   specs: Record<string, string>;
   category_id?: string;
   active: boolean;
@@ -214,6 +221,27 @@ export type ProductColor = {
   name_ar: string;
   name_he: string;
   image?: string;           // صورة الجهاز بهذا اللون
+}
+
+export type ProductVariant = {
+  storage: string;          // e.g. "256GB"
+  price: number;
+  old_price?: number;
+  cost?: number;
+  stock?: number;
+}
+
+export type WebsiteContent = {
+  id: string;
+  section: string;
+  title_ar?: string;
+  title_he?: string;
+  subtitle_ar?: string;
+  subtitle_he?: string;
+  content: Record<string, any>;
+  is_visible: boolean;
+  sort_order: number;
+  updated_at: string;
 }
 
 export type Order = {

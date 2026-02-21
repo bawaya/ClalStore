@@ -5,8 +5,9 @@ export const runtime = 'edge';
 // Server Component: fetches products + plans from DB
 // =====================================================
 
-import { getProducts, getLinePlans } from "@/lib/store/queries";
+import { getProducts, getLinePlans, getWebsiteContent } from "@/lib/store/queries";
 import { HomeClient } from "@/components/website/HomeClient";
+import type { WebsiteContent } from "@/types/database";
 
 export const dynamic = 'force-dynamic';
 
@@ -26,13 +27,15 @@ export const metadata = {
 export default async function HomePage() {
   let products: any[] = [];
   let plans: any[] = [];
+  let cms: Record<string, WebsiteContent> = {};
 
   try {
-    [products, plans] = await Promise.all([
+    [products, plans, cms] = await Promise.all([
       getProducts({ featured: true }),
       getLinePlans(),
+      getWebsiteContent(),
     ]);
   } catch {}
 
-  return <HomeClient products={products} plans={plans} />;
+  return <HomeClient products={products} plans={plans} cms={cms} />;
 }

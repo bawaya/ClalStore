@@ -12,7 +12,26 @@ import { StoreHeader } from "./StoreHeader";
 import { ProductCard } from "./ProductCard";
 import { ProductReviews } from "./ProductReviews";
 import { Footer } from "@/components/website/sections";
-import type { Product, ProductColor } from "@/types/database";
+import type { Product, ProductColor, ProductVariant } from "@/types/database";
+
+/* ── variant helpers ── */
+function getActiveVariant(p: Product, storageIdx: number): ProductVariant | null {
+  const variants = p.variants || [];
+  if (variants.length === 0) return null;
+  const storage = p.storage_options || [];
+  const selLabel = storage[storageIdx];
+  return variants.find((v) => v.storage === selLabel) || variants[0] || null;
+}
+
+function getDisplayPrice(p: Product, variant: ProductVariant | null): { price: number; old_price?: number } {
+  if (variant) return { price: variant.price, old_price: variant.old_price };
+  return { price: p.price, old_price: p.old_price };
+}
+
+function getVariantStock(p: Product, variant: ProductVariant | null): number {
+  if (variant && variant.stock !== undefined) return variant.stock;
+  return p.stock;
+}
 
 export function ProductDetailClient({
   product: p,
@@ -31,7 +50,12 @@ export function ProductDetailClient({
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
   const specs = (p.specs || {}) as Record<string, string>;
-  const disc = p.old_price ? calcDiscount(p.price, p.old_price) : 0;
+
+  // Variant-aware pricing
+  const activeVariant = getActiveVariant(p, selStorage);
+  const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
+  const variantStock = getVariantStock(p, activeVariant);
+  const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
 
   /* Device names always English (name_ar holds English names like "Galaxy S25 Ultra") */
   const productName = p.name_ar;
@@ -48,12 +72,12 @@ export function ProductDetailClient({
       name: productName,
       brand: p.brand,
       type: p.type as "device" | "accessory",
-      price: p.price,
-      image: p.image_url || undefined,
+      price: displayPrice,
+      image: colors[selColor]?.image || p.image_url || undefined,
       color: colorName,
       storage: storage[selStorage],
     });
-    trackAddToCart(productName, p.price);
+    trackAddToCart(productName, displayPrice);
     show(t("detail.addedToCart"));
   };
 
@@ -116,12 +140,12 @@ export function ProductDetailClient({
             {/* Price */}
             <div className="flex items-baseline gap-2 mb-4">
               <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 24 : 32 }}>
-                ₪{p.price.toLocaleString()}
+                ₪{displayPrice.toLocaleString()}
               </span>
-              {p.old_price && (
+              {displayOldPrice && (
                 <>
                   <span className="text-dim line-through" style={{ fontSize: scr.mobile ? 14 : 16 }}>
-                    ₪{p.old_price.toLocaleString()}
+                    ₪{displayOldPrice.toLocaleString()}
                   </span>
                   <span className="badge bg-state-error/15 text-state-error">-{disc}%</span>
                 </>
@@ -183,12 +207,12 @@ export function ProductDetailClient({
             )}
 
             {/* Stock */}
-            {p.stock > 0 && p.stock <= 5 && (
+            {variantStock > 0 && variantStock <= 5 && (
               <div className="text-state-warning mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                {t("detail.lowStock").replace("{n}", String(p.stock))}
+                {t("detail.lowStock").replace("{n}", String(variantStock))}
               </div>
             )}
-            {p.stock === 0 && (
+            {variantStock === 0 && (
               <div className="text-state-error mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
                 {t("store.outOfStock")}
               </div>
@@ -197,11 +221,11 @@ export function ProductDetailClient({
             {/* Add to cart */}
             <button
               onClick={handleAdd}
-              disabled={p.stock === 0}
+              disabled={variantStock === 0}
               className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ fontSize: scr.mobile ? 14 : 16, padding: "14px 20px" }}
             >
-              {p.stock === 0 ? t("detail.unavailable") : `🛒 ${t("store.addToCart")}`}
+              {variantStock === 0 ? t("detail.unavailable") : `🛒 ${t("store.addToCart")}`}
             </button>
           </div>
         </div>

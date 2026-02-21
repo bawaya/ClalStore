@@ -8,11 +8,11 @@ import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
 import { PRODUCT_TYPES } from "@/lib/constants";
 import { calcMargin, formatCurrency } from "@/lib/utils";
-import type { Product, ProductColor } from "@/types/database";
+import type { Product, ProductColor, ProductVariant } from "@/types/database";
 
 const EMPTY: Partial<Product> = {
   type: "device", brand: "", name_ar: "", name_he: "", price: 0, old_price: undefined,
-  cost: 0, stock: 0, description_ar: "", colors: [], storage_options: [], specs: {},
+  cost: 0, stock: 0, description_ar: "", colors: [], storage_options: [], variants: [], specs: {},
   active: true, featured: false,
 };
 
@@ -111,6 +111,30 @@ export default function ProductsPage() {
     e.target.value = "";
   };
 
+  // === Variant Management ===
+  const addVariant = () => {
+    setForm({ ...form, variants: [...(form.variants || []), { storage: "", price: 0, old_price: undefined, cost: 0, stock: 0 }] });
+  };
+
+  const updateVariant = (idx: number, field: keyof ProductVariant, value: string | number | undefined) => {
+    const updated = [...(form.variants || [])];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setForm({ ...form, variants: updated });
+  };
+
+  const removeVariant = (idx: number) => {
+    setForm({ ...form, variants: (form.variants || []).filter((_, i) => i !== idx) });
+  };
+
+  // Sync storage_options from variants
+  const syncStorageFromVariants = () => {
+    const variants = form.variants || [];
+    if (variants.length > 0) {
+      const storageLabels = variants.map((v) => v.storage).filter(Boolean);
+      setForm((prev) => ({ ...prev, storage_options: storageLabels }));
+    }
+  };
+
   const adminBrands = useMemo(
     () => [...new Set(products.map((p) => p.brand))].sort(),
     [products]
@@ -134,11 +158,20 @@ export default function ProductsPage() {
       if (!form.name_ar || !form.brand || !form.price) {
         show("❌ عبّي الحقول المطلوبة", "error"); return;
       }
+      // Auto-sync storage_options from variants
+      const variants = form.variants || [];
+      const saveForm = { ...form };
+      if (variants.length > 0) {
+        saveForm.storage_options = variants.map((v) => v.storage).filter(Boolean);
+        // Set base price to minimum variant price
+        const minPrice = Math.min(...variants.map((v) => v.price).filter((p) => p > 0));
+        if (minPrice > 0 && minPrice < Infinity) saveForm.price = minPrice;
+      }
       if (editId) {
-        await update(editId, form);
+        await update(editId, saveForm);
         show("✅ تم التعديل");
       } else {
-        await create(form);
+        await create(saveForm);
         show("✅ تم الإضافة");
       }
       setModal(false);
@@ -383,6 +416,49 @@ export default function ProductsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* ===== Variants Section (per-storage pricing) ===== */}
+            <div className="card mb-3" style={{ padding: scr.mobile ? 10 : 14, background: "rgba(34,197,94,0.04)", borderColor: "rgba(34,197,94,0.15)" }}>
+              <div className="flex justify-between items-center mb-2">
+                <button onClick={addVariant} className="text-[10px] px-2 py-1 rounded-lg bg-state-success/10 text-state-success border border-state-success/30 cursor-pointer font-bold">+ سعة</button>
+                <div className="font-bold text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>💾 تسعير حسب السعة</div>
+              </div>
+              {(form.variants || []).length === 0 ? (
+                <div className="text-center text-dim text-[10px] py-2">
+                  لا يوجد — سيتم استخدام السعر الأساسي لجميع الخيارات
+                </div>
+              ) : (
+                <>
+                  <div className="text-muted text-[9px] text-right mb-2">كل سعة بسعر ومخزون مختلف. الخيارات ستظهر في كرت المنتج.</div>
+                  {(form.variants || []).map((v, i) => (
+                    <div key={i} className="bg-surface-elevated rounded-lg p-2 mb-2">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <button onClick={() => removeVariant(i)} className="w-5 h-5 rounded-md border border-state-error/30 bg-transparent text-state-error text-[8px] cursor-pointer flex items-center justify-center flex-shrink-0">✕</button>
+                        <input className="input text-xs flex-1" value={v.storage} onChange={(e) => { updateVariant(i, "storage", e.target.value); }} placeholder="256GB" dir="ltr" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                          <div className="text-muted text-[8px] text-right mb-0.5">سعر البيع ₪</div>
+                          <input className="input text-xs" type="number" value={v.price || ""} onChange={(e) => updateVariant(i, "price", Number(e.target.value))} dir="ltr" />
+                        </div>
+                        <div>
+                          <div className="text-muted text-[8px] text-right mb-0.5">سعر قبل الخصم ₪</div>
+                          <input className="input text-xs" type="number" value={v.old_price || ""} onChange={(e) => updateVariant(i, "old_price", Number(e.target.value) || undefined)} dir="ltr" />
+                        </div>
+                        <div>
+                          <div className="text-muted text-[8px] text-right mb-0.5">التكلفة ₪</div>
+                          <input className="input text-xs" type="number" value={v.cost || ""} onChange={(e) => updateVariant(i, "cost", Number(e.target.value))} dir="ltr" />
+                        </div>
+                        <div>
+                          <div className="text-muted text-[8px] text-right mb-0.5">المخزون</div>
+                          <input className="input text-xs" type="number" value={v.stock ?? ""} onChange={(e) => updateVariant(i, "stock", Number(e.target.value))} dir="ltr" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </div>
 

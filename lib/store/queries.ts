@@ -4,7 +4,7 @@
 // =====================================================
 
 import { createServerSupabase } from "@/lib/supabase";
-import type { Product, Hero, LinePlan, Coupon, Category } from "@/types/database";
+import type { Product, Hero, LinePlan, Coupon, Category, WebsiteContent } from "@/types/database";
 
 // ===== Products =====
 export async function getProducts(options?: {
@@ -148,4 +148,21 @@ export async function getSettings(): Promise<Record<string, string>> {
     settings[row.key] = row.value;
   });
   return settings;
+}
+
+// ===== Website Content (CMS) =====
+export async function getWebsiteContent(): Promise<Record<string, WebsiteContent>> {
+  const supabase = createServerSupabase();
+  if (!supabase) return {};
+  const { data } = await supabase
+    .from("website_content")
+    .select("*")
+    .eq("is_visible", true)
+    .order("sort_order");
+
+  const sections: Record<string, WebsiteContent> = {};
+  (data || []).forEach((row: any) => {
+    sections[row.section] = row;
+  });
+  return sections;
 }
