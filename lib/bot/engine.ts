@@ -25,7 +25,8 @@ import {
 import { createHandoff, generateConversationSummary } from "./handoff";
 import { createAdminSupabase } from "@/lib/supabase";
 import { getAIResponse } from "./ai";
-import { notifyAdminMuhammadHandoff } from "./admin-notify";
+import { notifyAdminMuhammadHandoff, notifyAdminAngryCustomer } from "./admin-notify";
+import { analyzeSentiment, type Sentiment } from "@/lib/crm/sentiment";
 
 export { type BotIntent, type DetectedIntent } from "./intents";
 export { logBotInteraction } from "./analytics";
@@ -224,6 +225,38 @@ export async function processMessage(
   await saveMessage(session.conversationId, "user", text, detected.intent, detected.confidence);
   await trackAnalytics(channel, { newMessage: true, intent: detected.intent });
 
+  // 5.5. Anger/sentiment detection — notify admin if customer is angry
+  const messageSentiment = analyzeSentiment(text);
+  if (messageSentiment.sentiment === "angry") {
+    // Fire-and-forget admin notification for angry customer
+    notifyAdminAngryCustomer({
+      phone: session.customerPhone || "—",
+      name: session.customerName || "زبون",
+      message: text,
+      sentiment: messageSentiment.sentiment,
+      channel,
+    }).catch(() => {});
+    
+    // Update sentiment on inbox conversation
+    try {
+      const sb = createAdminSupabase();
+      const normalizedPhone = (session.customerPhone || "").replace(/[-\s+]/g, "");
+      if (normalizedPhone) {
+        await sb
+          .from("inbox_conversations")
+          .update({ sentiment: "angry" } as any)
+          .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.+${normalizedPhone}`)
+          .neq("status", "archived");
+      }
+    } catch {}
+
+    // If not already going to complaint handler, redirect to complaint
+    if (detected.intent !== "complaint" && detected.intent !== "human_request" && detected.intent !== "muhammad_request") {
+      detected.intent = "complaint" as BotIntent;
+      detected.confidence = 0.9;
+    }
+  }
+
   // 6. Check escalation threshold
   if (shouldEscalate(session.messageCount) && !session.csatAsked) {
     const response = await handleEscalation(session, "message_limit", lang);
@@ -233,11 +266,40 @@ export async function processMessage(
   }
 
   // 7. Check if user is in Muhammad handoff data collection
+  // BUT: if user sends anger/complaint/request — escape Muhammad flow and handle properly
   if (session.muhammadStep && session.muhammadStep > 0 && session.muhammadStep <= 3) {
-    const response = await handleMuhammadCollect(session, text, channel);
-    await saveMessage(session.conversationId, "bot", response.text, "muhammad_request");
-    await setSession(session);
-    return { ...response, conversationId: session.conversationId };
+    // Allow escape from Muhammad flow if user expresses anger or complaint or a clear intent
+    const escapeFromMuhammad: BotIntent[] = ["complaint", "greeting", "order_tracking", "thanks"];
+    const sentimentCheck = analyzeSentiment(text);
+    const isAngryDuringMuhammad = sentimentCheck.sentiment === "angry" || sentimentCheck.sentiment === "negative";
+    
+    if (escapeFromMuhammad.includes(detected.intent) || isAngryDuringMuhammad) {
+      // Reset Muhammad flow
+      session.muhammadStep = 0;
+      session.muhammadData = undefined;
+      // If angry — handle as complaint + notify admin
+      if (isAngryDuringMuhammad || detected.intent === "complaint") {
+        // Notify admin about angry customer
+        notifyAdminAngryCustomer({
+          phone: session.customerPhone || "—",
+          name: session.customerName || "زبون",
+          message: text,
+          sentiment: sentimentCheck.sentiment,
+          channel: channel,
+        }).catch(() => {});
+        // Route to complaint handler
+        const response = await handleEscalation(session, "complaint", lang);
+        await saveMessage(session.conversationId, "bot", response.text, "complaint");
+        await setSession(session);
+        return { ...response, conversationId: session.conversationId };
+      }
+      // Otherwise route normally (fall through to intent routing)
+    } else {
+      const response = await handleMuhammadCollect(session, text, channel);
+      await saveMessage(session.conversationId, "bot", response.text, "muhammad_request");
+      await setSession(session);
+      return { ...response, conversationId: session.conversationId };
+    }
   }
 
   // 8. Check if user is answering a qualification question
@@ -737,7 +799,7 @@ async function handleContactInfo(session: SessionState): Promise<BotResponse> {
   };
 }
 
-async function handleEscalation(session: SessionState, reason: string, lang: "ar" | "he" | "en"): Promise<BotResponse> {
+async function handleEscalation(session: SessionState, reason: string, lang: "ar" | "he" | "en", channel?: string): Promise<BotResponse> {
   const summary = await generateConversationSummary(session.conversationId);
 
   await createHandoff({
@@ -750,9 +812,27 @@ async function handleEscalation(session: SessionState, reason: string, lang: "ar
     customerName: session.customerName,
   });
 
-  await trackAnalytics("webchat", { handoff: true });
+  await trackAnalytics((channel ?? "whatsapp") as "webchat" | "whatsapp", { handoff: true });
 
-  const text = await getTemplate("handoff", lang);
+  // If complaint — also update inbox conversation status to "waiting" for agent attention
+  if (reason === "complaint") {
+    try {
+      const sb = createAdminSupabase();
+      const normalizedPhone = (session.customerPhone || "").replace(/[-\s+]/g, "");
+      if (normalizedPhone) {
+        await sb
+          .from("inbox_conversations")
+          .update({ status: "waiting", priority: "high" } as any)
+          .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.+${normalizedPhone}`)
+          .neq("status", "archived");
+      }
+    } catch {}
+  }
+
+  const isAr = lang !== "he";
+  const text = isAr
+    ? "أفهم تماماً وأعتذر عن أي إزعاج 🙏\n\nسأوصل طلبك فوراً لفريقنا وسيتواصل معك أحد الموظفين بأسرع وقت.\n\nهل هناك شيء آخر أقدر أساعدك فيه الآن؟"
+    : "אני מבין לגמרי ומתנצל על אי הנוחות 🙏\n\nאעביר את הפנייה שלך לצוות ונציג יחזור אליך בהקדם.\n\nיש משהו נוסף שאפשר לעזור?";
   return { text, escalate: true };
 }
 
@@ -835,8 +915,41 @@ async function handleMuhammadCollect(
   const data = session.muhammadData || {};
 
   switch (session.muhammadStep) {
-    case 1: // Collecting name
-      data.name = text.trim();
+    case 1: { // Collecting name — validate it looks like a name, not a request
+      const nameText = text.trim();
+      // Check if this looks like a product request or question rather than a name
+      const nameIntent = detectIntentRaw(nameText);
+      const looksLikeRequest = nameIntent.intent !== "unknown" && nameIntent.intent !== "greeting" 
+        && nameIntent.confidence >= 0.6;
+      const tooLong = nameText.split(/\s+/).length > 5; // names are usually ≤ 4 words
+      const hasDigitsOrLinks = /\d{4,}|http|www\.|\.com/i.test(nameText);
+      
+      if (looksLikeRequest || tooLong || hasDigitsOrLinks) {
+        // This doesn't look like a name — ask again more clearly
+        // If it was a phone (for WebChat), store as phone instead
+        if (/^[\d\s\-+()+]{7,15}$/.test(nameText.replace(/\s/g, ""))) {
+          data.phone = nameText.replace(/[-\s]/g, "");
+          session.muhammadData = data;
+          session.muhammadStep = 3; // skip to message
+          return {
+            text: isAr
+              ? `شكراً! 👍\n\n💬 ما هو طلبك أو استفسارك لمحمد؟\n(اكتب ملخص قصير)`
+              : `תודה! 👍\n\n💬 מה ההודעה שלך למוחמד?\n(כתוב בקצרה)`,
+          };
+        }
+        return {
+          text: isAr
+            ? `أحتاج اسمك الشخصي فقط (مثل: أحمد محمد) عشان أوصله لمحمد 😊\nما هو اسمك؟`
+            : `אני צריך רק את השם שלך (לדוגמה: אחמד) כדי להעביר למוחמד 😊\nמה השם?`,
+        };
+      }
+      
+      // Use WhatsApp profile name if available and input seems empty or too short
+      if (nameText.length <= 1 && session.customerName) {
+        data.name = session.customerName;
+      } else {
+        data.name = nameText;
+      }
       session.muhammadData = data;
       session.muhammadStep = 2;
       return {
@@ -844,6 +957,7 @@ async function handleMuhammadCollect(
           ? `شكراً ${data.name}! 👍\n\n📞 ما هو رقم هاتفك؟`
           : `תודה ${data.name}! 👍\n\n📞 מה מספר הטלפון שלך?`,
       };
+    }
 
     case 2: // Collecting phone
       data.phone = text.trim().replace(/[-\s]/g, "");

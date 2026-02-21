@@ -160,9 +160,14 @@ export function detectIntent(message: string): DetectedIntent {
     return { intent: "contact_info", params: {}, confidence: 0.9, language: lang };
   }
 
-  // 4. Complaint / anger
-  if (/مشكلة|شكوى|شكاوى|غضب|مش راضي|غلط|خرب|خربان|نصب|תלונה|בעיה|لا يشتغل|ما يشتغل|ما اشتغل/i.test(lower)) {
+  // 4. Complaint / anger — expanded detection
+  if (/مشكلة|شكوى|شكاوى|غضب|مش راضي|غلط|خرب|خربان|نصب|תלונה|בעיה|لا يشتغل|ما يشتغل|ما اشتغل|حرامي|نصاب|احتيال|غش|سرقة|كذاب|حسبي الله|أسوأ|محامي|شرطة|بلاغ|قلة أدب|وقح|زفت|حقير|scam|fraud|worst/i.test(lower)) {
     return { intent: "complaint", params: {}, confidence: 0.85, language: lang };
+  }
+
+  // 4.5 Detect anger from exclamation marks/patterns
+  if (/!!!|؟؟؟/.test(text) || (text.match(/!/g) || []).length >= 3) {
+    return { intent: "complaint", params: {}, confidence: 0.7, language: lang };
   }
 
   // 5. Model-specific search (buy_now)

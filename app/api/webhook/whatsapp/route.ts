@@ -7,7 +7,7 @@ export const runtime = 'edge';
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { parseWebhook, handleWhatsAppMessage, sendBotResponse } from "@/lib/bot/whatsapp";
+import { parseWebhook, handleWhatsAppMessage, sendBotResponse, normalizePhone } from "@/lib/bot/whatsapp";
 import { logBotInteraction } from "@/lib/bot/engine";
 import { createAdminSupabase } from "@/lib/supabase";
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
 /* ── Save incoming + bot reply to inbox tables ── */
 async function saveToInbox(
-  phone: string,
+  rawPhone: string,
   customerName: string | undefined,
   inboundText: string,
   inboundMsgId: string | undefined,
@@ -35,45 +35,52 @@ async function saveToInbox(
   try {
     const sb = createAdminSupabase();
 
-    // Find or create conversation
-    const { data: existing } = await sb
-      .from("inbox_conversations")
-      .select("id")
-      .eq("customer_phone", phone)
-      .neq("status", "archived")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+    // Normalize phone for consistent matching
+    const phone = normalizePhone(rawPhone).replace(/^\+/, "");
+    // Also try with + prefix for older records
+    const phoneWithPlus = "+" + phone;
+
+    // Find or create conversation — try both phone formats
+    let existing: { id: string; unread_count?: number } | null = null;
+    for (const ph of [phone, phoneWithPlus, rawPhone]) {
+      const { data } = await sb
+        .from("inbox_conversations")
+        .select("id, unread_count")
+        .eq("customer_phone", ph)
+        .neq("status", "archived")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (data) { existing = data as any; break; }
+    }
 
     let convId: string;
 
     if (existing) {
       convId = existing.id;
-      // Update conversation
+      const currentUnread = (existing as any).unread_count || 0;
+      // Update conversation — increment unread manually (no RPC needed)
+      const updateData: Record<string, unknown> = {
+        last_message_at: new Date().toISOString(),
+        last_message_text: inboundText.substring(0, 200),
+        last_message_direction: "inbound",
+        unread_count: currentUnread + 1,
+      };
+      // Update customer name if we have one from WhatsApp and it's real
+      if (customerName && customerName.trim().length > 1) {
+        updateData.customer_name = customerName.trim();
+      }
       await sb
         .from("inbox_conversations")
-        .update({
-          last_message_at: new Date().toISOString(),
-          last_message_text: inboundText.substring(0, 200),
-          last_message_direction: "inbound",
-          unread_count: (sb.rpc as any)("increment_unread", { row_id: convId }) || 1,
-        } as any)
+        .update(updateData as any)
         .eq("id", convId);
-
-      // Increment unread separately (safer)
-      await sb.rpc("increment_unread" as any, { row_id: convId }).catch(() => {
-        // Fallback: just update with raw SQL-style
-        sb.from("inbox_conversations")
-          .update({ unread_count: 1 } as any)
-          .eq("id", convId);
-      });
     } else {
       // Create new conversation
       const { data: newConv } = await sb
         .from("inbox_conversations")
         .insert({
           customer_phone: phone,
-          customer_name: customerName || null,
+          customer_name: customerName?.trim() || null,
           status: "bot",
           last_message_at: new Date().toISOString(),
           last_message_text: inboundText.substring(0, 200),

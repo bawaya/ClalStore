@@ -108,6 +108,27 @@ export async function notifyAdminMuhammadHandoff(details: {
   await notifyAdminPersonal(msg);
 }
 
+// ===== Angry Customer Alert =====
+export async function notifyAdminAngryCustomer(details: {
+  phone: string;
+  name: string;
+  message: string;
+  sentiment: string;
+  channel: "webchat" | "whatsapp";
+}): Promise<void> {
+  const sentimentEmoji = details.sentiment === "angry" ? "😡🔴" : "😟🟡";
+  const msg =
+    `${sentimentEmoji} *تنبيه: زبون غاضب!*\n\n` +
+    `👤 الاسم: ${details.name}\n` +
+    `📞 الهاتف: ${details.phone}\n` +
+    `📡 القناة: ${details.channel === "whatsapp" ? "واتساب" : "شات الموقع"}\n\n` +
+    `💬 رسالة الزبون:\n"${details.message.slice(0, 500)}"\n\n` +
+    `⚠️ يُنصح بالتواصل الفوري مع الزبون!\n` +
+    `⏰ الوقت: ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}`;
+
+  await notifyAdmin(msg);
+}
+
 // ===== Daily Report Link =====
 export async function sendDailyReportLink(): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
