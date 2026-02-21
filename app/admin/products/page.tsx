@@ -195,15 +195,25 @@ export default function ProductsPage() {
       ) : (
         <div className="space-y-1.5">
           {filtered.map((p) => (
-            <div key={p.id} className="card flex items-center justify-between cursor-pointer hover:border-brand/30 transition-all"
+            <div key={p.id} className="card flex items-center gap-2 cursor-pointer hover:border-brand/30 transition-all"
               style={{ padding: scr.mobile ? "10px 12px" : "14px 18px" }}
               onClick={() => openEdit(p)}>
-              <div className="flex gap-2">
+
+              {/* Actions — left side (RTL) */}
+              <div className="flex gap-2 flex-shrink-0">
                 <button onClick={(e) => { e.stopPropagation(); setConfirm(p.id); }}
                   className="w-7 h-7 rounded-lg border border-state-error/30 bg-transparent text-state-error text-xs cursor-pointer flex items-center justify-center flex-shrink-0">🗑</button>
                 <Toggle value={p.active} onChange={async (v) => { await update(p.id, { active: v }); show(v ? "✅ مفعّل" : "⏸️ معطّل"); }} />
               </div>
-              <div className="flex-1 text-right mr-2">
+
+              {/* Price */}
+              <div className="text-left flex-shrink-0">
+                <div className="font-black text-brand" style={{ fontSize: scr.mobile ? 14 : 18 }}>₪{Number(p.price).toLocaleString()}</div>
+                {p.old_price && <div className="text-dim line-through text-[10px]">₪{Number(p.old_price).toLocaleString()}</div>}
+              </div>
+
+              {/* Info — center */}
+              <div className="flex-1 text-right">
                 <div className="font-bold flex items-center gap-1.5 justify-end" style={{ fontSize: scr.mobile ? 12 : 14 }}>
                   {p.name_ar}
                   {p.featured && <span className="badge bg-brand/15 text-brand">🔥</span>}
@@ -219,9 +229,25 @@ export default function ProductsPage() {
                   <span>هامش: {calcMargin(Number(p.price), Number(p.cost))}%</span>
                 </div>
               </div>
-              <div className="text-left flex-shrink-0 mr-3">
-                <div className="font-black text-brand" style={{ fontSize: scr.mobile ? 14 : 18 }}>₪{Number(p.price).toLocaleString()}</div>
-                {p.old_price && <div className="text-dim line-through text-[10px]">₪{Number(p.old_price).toLocaleString()}</div>}
+
+              {/* Product thumbnail — right side (RTL), first thing user sees */}
+              <div className="flex-shrink-0">
+                {p.image_url ? (
+                  <img
+                    src={p.image_url}
+                    alt={p.name_ar}
+                    className="object-contain rounded-lg bg-surface-elevated"
+                    style={{ width: scr.mobile ? 44 : 52, height: scr.mobile ? 44 : 52 }}
+                  />
+                ) : (
+                  <div
+                    className="rounded-lg border-2 border-dashed border-state-warning/40 bg-state-warning/5 flex items-center justify-center"
+                    style={{ width: scr.mobile ? 44 : 52, height: scr.mobile ? 44 : 52, fontSize: scr.mobile ? 16 : 20 }}
+                    title="بحاجة لصورة"
+                  >
+                    📷
+                  </div>
+                )}
               </div>
             </div>
           ))}
