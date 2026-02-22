@@ -278,7 +278,15 @@ export function ProductCard({ product: p }: { product: Product }) {
         )}
 
         {/* ── Price ── */}
-        <div className="flex items-baseline gap-1.5 mb-2">
+        <div className="flex items-baseline gap-1.5 mb-2 flex-wrap">
+          {storage.length > 1 && (
+            <span
+              className="text-[#a1a1aa] font-bold"
+              style={{ fontSize: scr.mobile ? 9 : 11 }}
+            >
+              يبدأ من
+            </span>
+          )}
           <span
             className="font-black"
             style={{
