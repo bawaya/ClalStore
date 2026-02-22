@@ -1,5 +1,5 @@
 // =====================================================
-// ClalMobile — Customer Login Page (OTP via WhatsApp)
+// ClalMobile — Customer Login Page (OTP via SMS / WhatsApp)
 // Step 1: Enter phone → Step 2: Enter 4-digit OTP
 // =====================================================
 
@@ -22,6 +22,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(0);
+  const [otpChannel, setOtpChannel] = useState<"sms" | "whatsapp" | "none">("none");
 
   const otpRefs = [
     useRef<HTMLInputElement>(null),
@@ -57,6 +58,7 @@ export default function AuthPage() {
       if (data.success) {
         setStep("otp");
         setCountdown(60);
+        setOtpChannel(data.channel || "none");
         setTimeout(() => otpRefs[0]?.current?.focus(), 200);
       } else {
         setError(data.error || t("auth.sendError"));
@@ -159,7 +161,11 @@ export default function AuthPage() {
             {t("auth.title")}
           </h1>
           <p className="text-muted" style={{ fontSize: scr.mobile ? 12 : 14 }}>
-            {step === "phone" ? t("auth.phoneDesc") : t("auth.otpDesc")}
+            {step === "phone"
+              ? t("auth.phoneDesc")
+              : otpChannel === "sms"
+                ? t("auth.otpDescSms")
+                : t("auth.otpDesc")}
           </p>
         </div>
 
@@ -221,6 +227,21 @@ export default function AuthPage() {
         {/* Step 2: OTP */}
         {step === "otp" && (
           <div className="space-y-4">
+            {/* OTP channel indicator */}
+            <div className="flex justify-center mb-1">
+              <span
+                className="inline-flex items-center gap-1 rounded-full font-bold"
+                style={{
+                  background: otpChannel === "sms" ? "rgba(34,197,94,0.12)" : "rgba(37,211,102,0.12)",
+                  color: otpChannel === "sms" ? "#22c55e" : "#25d366",
+                  padding: "4px 14px",
+                  fontSize: scr.mobile ? 11 : 12,
+                }}
+              >
+                {otpChannel === "sms" ? "📱 SMS" : "💬 WhatsApp"}
+              </span>
+            </div>
+
             {/* Phone display */}
             <div className="text-center mb-2">
               <span className="text-muted" style={{ fontSize: scr.mobile ? 11 : 13 }}>

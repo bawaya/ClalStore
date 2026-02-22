@@ -1,9 +1,10 @@
 export const runtime = 'edge';
 
 // =====================================================
-// ClalMobile — Customer Auth API (OTP via WhatsApp)
+// ClalMobile — Customer Auth API (OTP via SMS + WhatsApp)
 // POST /api/auth/customer
 // Actions: send_otp, verify_otp
+// SMS (Twilio) = primary channel, WhatsApp = fallback
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -66,19 +67,45 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: "فشل حفظ رمز التحقق" }, { status: 500 });
       }
 
-      // Send via WhatsApp (using bot phone)
+      // ===== Send OTP via SMS (Twilio) — primary channel =====
+      let sentVia: "sms" | "whatsapp" | "none" = "none";
+
       try {
-        const { sendWhatsAppText } = await import("@/lib/bot/whatsapp");
-        await sendWhatsAppText(
-          cleanPhone.startsWith("972") ? cleanPhone : "972" + cleanPhone.slice(1),
-          `🔐 رمز التحقق الخاص بك: *${otpCode}*\n\nصالح لمدة 5 دقائق.\nClalMobile`
-        );
-      } catch (waErr) {
-        console.error("WhatsApp OTP send failed:", waErr);
-        // Fallback: still return success so user can see OTP in DB (dev mode)
+        const { sendSMSOtp, isTwilioConfigured } = await import("@/lib/integrations/twilio-sms");
+        if (await isTwilioConfigured()) {
+          const smsResult = await sendSMSOtp(cleanPhone, otpCode);
+          if (smsResult.success) {
+            sentVia = "sms";
+          } else {
+            console.error("SMS OTP failed:", smsResult.error);
+          }
+        }
+      } catch (smsErr) {
+        console.error("SMS OTP exception:", smsErr);
       }
 
-      return NextResponse.json({ success: true, message: "تم إرسال رمز التحقق عبر واتساب" });
+      // ===== Fallback: Send via WhatsApp if SMS failed/unconfigured =====
+      if (sentVia === "none") {
+        try {
+          const { sendWhatsAppText } = await import("@/lib/bot/whatsapp");
+          await sendWhatsAppText(
+            cleanPhone.startsWith("972") ? cleanPhone : "972" + cleanPhone.slice(1),
+            `🔐 رمز التحقق الخاص بك: *${otpCode}*\n\nصالح لمدة 5 دقائق.\nClalMobile`
+          );
+          sentVia = "whatsapp";
+        } catch (waErr) {
+          console.error("WhatsApp OTP send failed:", waErr);
+        }
+      }
+
+      const channelLabel = sentVia === "sms" ? "SMS" : sentVia === "whatsapp" ? "واتساب" : "";
+      return NextResponse.json({
+        success: true,
+        channel: sentVia,
+        message: sentVia !== "none"
+          ? `تم إرسال رمز التحقق عبر ${channelLabel}`
+          : "تم حفظ الرمز (تحقق من الإعدادات)",
+      });
     }
 
     // ===== VERIFY OTP =====

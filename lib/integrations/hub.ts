@@ -179,6 +179,13 @@ export async function initializeProviders() {
     registerProvider("email", new SendGridProvider());
   }
 
+  // SMS — Twilio (check DB config first, then env)
+  const smsCfg = await getIntegrationConfig("sms");
+  if (smsCfg.account_sid || process.env.TWILIO_ACCOUNT_SID) {
+    const { TwilioSMSProvider } = await import("./twilio-sms");
+    registerProvider("sms", new TwilioSMSProvider());
+  }
+
   // WhatsApp — yCloud (check DB config first, then env)
   const whatsappCfg = await getIntegrationConfig("whatsapp");
   if (whatsappCfg.api_key || process.env.YCLOUD_API_KEY) {

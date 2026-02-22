@@ -2,4 +2,5 @@ export { registerProvider, getProvider, initializeProviders, getIntegrationConfi
 export type { PaymentProvider, EmailProvider, SMSProvider, WhatsAppProvider, ShippingProvider, ChargeParams, ChargeResult, EmailParams, EmailResult } from "./hub";
 export { RivhitProvider } from "./rivhit";
 export { SendGridProvider, buildOrderConfirmEmail, buildStatusUpdateEmail } from "./sendgrid";
+export { TwilioSMSProvider, sendSMSOtp, isTwilioConfigured } from "./twilio-sms";
 export { YCloudWhatsAppProvider } from "./ycloud-wa";
