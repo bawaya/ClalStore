@@ -33,6 +33,7 @@ export default function ProductsPage() {
   const colorInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const [uploadingColor, setUploadingColor] = useState<number | null>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [autoFilling, setAutoFilling] = useState(false);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -109,6 +110,39 @@ export default function ProductsPage() {
     }
     setUploadingColor(null);
     e.target.value = "";
+  };
+
+  // === GSMArena Auto-Fill ===
+  const handleAutoFill = async () => {
+    if (!form.brand || !form.name_ar) {
+      show("❌ أدخل اسم المنتج والشركة أولاً", "error");
+      return;
+    }
+    setAutoFilling(true);
+    try {
+      const res = await fetch("/api/admin/products/autofill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: form.name_ar, brand: form.brand }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      const d = json.data;
+      setForm((prev) => ({
+        ...prev,
+        description_ar: d.description_ar || prev.description_ar,
+        description_he: d.description_he || prev.description_he,
+        specs: d.specs && Object.keys(d.specs).some((k: string) => d.specs[k]) ? d.specs : prev.specs,
+        colors: d.colors?.length ? d.colors : prev.colors,
+        storage_options: d.storage_options?.length ? d.storage_options : prev.storage_options,
+        image_url: d.image_url || prev.image_url,
+        gallery: d.gallery?.length ? [...new Set([...(prev.gallery || []), ...d.gallery])] : prev.gallery,
+      }));
+      show(`✅ تم جلب بيانات ${d.phone_name || form.name_ar} — ${d.colors?.length || 0} ألوان، ${d.storage_options?.length || 0} سعات`);
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setAutoFilling(false);
   };
 
   // === Variant Management ===
@@ -313,6 +347,32 @@ export default function ProductsPage() {
             <FormField label="الوصف">
               <textarea className="input min-h-[60px] resize-y" value={form.description_ar || ""} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} />
             </FormField>
+
+            {/* ===== Auto-Fill from GSMArena ===== */}
+            {form.type === "device" && (
+              <button
+                onClick={handleAutoFill}
+                disabled={autoFilling || !form.brand || !form.name_ar}
+                className="w-full mb-3 py-2.5 rounded-xl font-extrabold cursor-pointer transition-all active:scale-[0.97] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                  color: "white",
+                  border: "none",
+                  fontSize: scr.mobile ? 12 : 14,
+                }}
+              >
+                {autoFilling ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    جاري الجلب من GSMArena...
+                  </>
+                ) : (
+                  <>
+                    🤖 جلب المواصفات والألوان والصور تلقائياً
+                  </>
+                )}
+              </button>
+            )}
 
             {/* ===== Image Upload Section ===== */}
             <div className="card mb-3" style={{ padding: scr.mobile ? 10 : 14, background: "rgba(6,182,212,0.04)", borderColor: "rgba(6,182,212,0.15)" }}>
