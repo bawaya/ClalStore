@@ -77,10 +77,42 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
     }
   },
 
-  // ===== SMS =====
+  // ===== SMS — Twilio =====
   sms: async (cfg) => {
-    if (!cfg.api_key) return { ok: false, message: "مفتاح API مفقود" };
-    return { ok: true, message: "✅ بيانات SMS محفوظة (لم يتم اختبار الاتصال)" };
+    const accountSid = cfg.account_sid;
+    const authToken = cfg.auth_token;
+    const fromNumber = cfg.phone_number;
+
+    if (!accountSid || !authToken) {
+      return { ok: false, message: "Account SID و Auth Token مطلوبان" };
+    }
+    if (!fromNumber) {
+      return { ok: false, message: "رقم الإرسال (From Number) مطلوب" };
+    }
+
+    try {
+      // Validate credentials by fetching account info
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
+        headers: {
+          Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const status = data.status; // active, suspended, closed
+        if (status === "active") {
+          return { ok: true, message: `✅ Twilio SMS متصل بنجاح — الحساب: ${data.friendly_name || accountSid}` };
+        }
+        return { ok: false, message: `حساب Twilio غير نشط (${status})` };
+      }
+      if (res.status === 401) {
+        return { ok: false, message: "❌ Account SID أو Auth Token غير صحيح" };
+      }
+      return { ok: false, message: `Twilio responded with ${res.status}` };
+    } catch (err: any) {
+      return { ok: false, message: `خطأ في الاتصال: ${err.message}` };
+    }
   },
 
   // ===== Shipping =====
