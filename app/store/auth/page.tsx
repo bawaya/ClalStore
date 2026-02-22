@@ -57,7 +57,7 @@ export default function AuthPage() {
       if (data.success) {
         setStep("otp");
         setCountdown(60);
-        setTimeout(() => otpRefs[3]?.current?.focus(), 200);
+        setTimeout(() => otpRefs[0]?.current?.focus(), 200);
       } else {
         setError(data.error || t("auth.sendError"));
       }
@@ -109,9 +109,9 @@ export default function AuthPage() {
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
 
-    // Move to previous on input (RTL: right to left entry)
-    if (value && index > 0) {
-      otpRefs[index - 1]?.current?.focus();
+    // Move to next box (LTR number entry)
+    if (value && index < 3) {
+      otpRefs[index + 1]?.current?.focus();
     }
 
     // Auto-submit when all 4 filled
@@ -121,8 +121,20 @@ export default function AuthPage() {
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !otp[index] && index < 3) {
-      otpRefs[index + 1]?.current?.focus();
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      otpRefs[index - 1]?.current?.focus();
+    }
+  };
+
+  // ===== Paste handler for OTP auto-fill =====
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    if (pasted.length === 4) {
+      const digits = pasted.split("") as [string, string, string, string];
+      setOtp(digits);
+      otpRefs[3]?.current?.focus();
+      setTimeout(() => handleVerifyOtp(), 200);
     }
   };
 
@@ -224,14 +236,15 @@ export default function AuthPage() {
               </button>
             </div>
 
-            {/* OTP Inputs (RTL: 4 boxes right to left) */}
-            <div className="flex justify-center gap-3" dir="ltr">
-              {[3, 2, 1, 0].map((i) => (
+            {/* OTP Inputs (LTR number entry) */}
+            <div className="flex justify-center gap-3" dir="ltr" onPaste={handleOtpPaste}>
+              {[0, 1, 2, 3].map((i) => (
                 <input
                   key={i}
                   ref={otpRefs[i]}
                   type="text"
                   inputMode="numeric"
+                  autoComplete={i === 0 ? "one-time-code" : "off"}
                   maxLength={1}
                   value={otp[i]}
                   onChange={(e) => handleOtpChange(i, e.target.value)}

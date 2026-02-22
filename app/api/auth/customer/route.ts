@@ -55,11 +55,16 @@ export async function POST(req: NextRequest) {
       const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString(); // 5 minutes
 
       // Store OTP
-      await supabase.from("customer_otps").insert({
+      const { error: insertErr } = await supabase.from("customer_otps").insert({
         phone: cleanPhone,
         otp: otpCode,
         expires_at: expiresAt,
       } as any);
+
+      if (insertErr) {
+        console.error("OTP insert failed:", insertErr);
+        return NextResponse.json({ success: false, error: "فشل حفظ رمز التحقق" }, { status: 500 });
+      }
 
       // Send via WhatsApp (using bot phone)
       try {
