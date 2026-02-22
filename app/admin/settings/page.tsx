@@ -74,7 +74,8 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
   "Twilio SMS": [
     { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
     { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
-    { key: "phone_number", label: "From Number", type: "text", placeholder: "+1..." },
+    { key: "phone_number", label: "From Number (اختياري)", type: "text", placeholder: "+1..." },
+    { key: "messaging_service_sid", label: "Messaging Service SID (اختياري)", type: "text", placeholder: "MG..." },
   ],
   HubSpot: [
     { key: "api_key", label: "API Key", type: "password", placeholder: "HubSpot Private App Token" },

@@ -2,6 +2,7 @@
 // ClalMobile — Twilio SMS Provider
 // SMS sending for OTP, notifications, alerts
 // Uses Twilio REST API directly (Edge-compatible, no SDK)
+// Supports both From Number and Messaging Service SID
 // =====================================================
 
 import type { SMSProvider } from "./hub";
@@ -15,10 +16,15 @@ async function getTwilioConfig() {
   const accountSid = dbCfg.account_sid || process.env.TWILIO_ACCOUNT_SID || "";
   const authToken = dbCfg.auth_token || process.env.TWILIO_AUTH_TOKEN || "";
   const fromNumber = dbCfg.phone_number || process.env.TWILIO_FROM_NUMBER || "";
-  if (!accountSid || !authToken || !fromNumber) {
-    throw new Error("Twilio SMS config incomplete — need account_sid, auth_token, phone_number");
+  const messagingServiceSid = dbCfg.messaging_service_sid || process.env.TWILIO_MESSAGING_SERVICE_SID || "";
+
+  if (!accountSid || !authToken) {
+    throw new Error("Twilio SMS config incomplete — need account_sid + auth_token");
   }
-  return { accountSid, authToken, fromNumber };
+  if (!fromNumber && !messagingServiceSid) {
+    throw new Error("Twilio SMS config incomplete — need phone_number or messaging_service_sid");
+  }
+  return { accountSid, authToken, fromNumber, messagingServiceSid };
 }
 
 /** Format Israeli phone for international format: 05X → +9725X */
@@ -36,15 +42,23 @@ export class TwilioSMSProvider implements SMSProvider {
 
   async send(to: string, message: string): Promise<{ success: boolean; sid?: string; error?: string }> {
     try {
-      const { accountSid, authToken, fromNumber } = await getTwilioConfig();
+      const { accountSid, authToken, fromNumber, messagingServiceSid } = await getTwilioConfig();
       const toFormatted = formatPhoneE164(to);
 
       // Twilio Messages API — form-urlencoded
-      const body = new URLSearchParams({
+      // Use MessagingServiceSid if available, otherwise From number
+      const params: Record<string, string> = {
         To: toFormatted,
-        From: fromNumber,
         Body: message,
-      });
+      };
+
+      if (messagingServiceSid) {
+        params.MessagingServiceSid = messagingServiceSid;
+      } else {
+        params.From = fromNumber;
+      }
+
+      const body = new URLSearchParams(params);
 
       const res = await fetch(`${TWILIO_API}/Accounts/${accountSid}/Messages.json`, {
         method: "POST",
@@ -83,7 +97,8 @@ export async function isTwilioConfigured(): Promise<boolean> {
     const sid = dbCfg.account_sid || process.env.TWILIO_ACCOUNT_SID;
     const token = dbCfg.auth_token || process.env.TWILIO_AUTH_TOKEN;
     const from = dbCfg.phone_number || process.env.TWILIO_FROM_NUMBER;
-    return !!(sid && token && from);
+    const msgSvc = dbCfg.messaging_service_sid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+    return !!(sid && token && (from || msgSvc));
   } catch {
     return false;
   }

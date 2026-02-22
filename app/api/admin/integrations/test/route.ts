@@ -105,12 +105,13 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
     const accountSid = cfg.account_sid;
     const authToken = cfg.auth_token;
     const fromNumber = cfg.phone_number;
+    const msgSvcSid = cfg.messaging_service_sid;
 
     if (!accountSid || !authToken) {
       return { ok: false, message: "Account SID و Auth Token مطلوبان" };
     }
-    if (!fromNumber) {
-      return { ok: false, message: "رقم الإرسال (From Number) مطلوب" };
+    if (!fromNumber && !msgSvcSid) {
+      return { ok: false, message: "From Number أو Messaging Service SID مطلوب" };
     }
 
     try {
