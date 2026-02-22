@@ -74,6 +74,7 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
   "Twilio SMS": [
     { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
     { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
+    { key: "verify_service_sid", label: "Verify Service SID (OTP)", type: "text", placeholder: "VA..." },
     { key: "phone_number", label: "From Number (اختياري)", type: "text", placeholder: "+1..." },
     { key: "messaging_service_sid", label: "Messaging Service SID (اختياري)", type: "text", placeholder: "MG..." },
   ],

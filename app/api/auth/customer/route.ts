@@ -52,53 +52,77 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: "انتظر دقيقة قبل طلب رمز جديد" }, { status: 429 });
       }
 
-      const otpCode = generateOTP();
-      const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString(); // 5 minutes
-
-      // Store OTP
-      const { error: insertErr } = await supabase.from("customer_otps").insert({
-        phone: cleanPhone,
-        otp: otpCode,
-        expires_at: expiresAt,
-      } as any);
-
-      if (insertErr) {
-        console.error("OTP insert failed:", insertErr);
-        return NextResponse.json({
-          success: false,
-          error: `فشل حفظ رمز التحقق: ${insertErr.message || insertErr.code || "unknown"}`,
-        }, { status: 500 });
-      }
-
-      // ===== Send OTP via SMS (Twilio) — primary channel =====
       let sentVia: "sms" | "whatsapp" | "none" = "none";
+      let usedVerify = false;
 
+      // ===== Priority 1: Twilio Verify API (auto-generates + sends OTP) =====
       try {
-        const { sendSMSOtp, isTwilioConfigured } = await import("@/lib/integrations/twilio-sms");
-        if (await isTwilioConfigured()) {
-          const smsResult = await sendSMSOtp(cleanPhone, otpCode);
-          if (smsResult.success) {
+        const { startTwilioVerification, isTwilioVerifyConfigured } = await import("@/lib/integrations/twilio-sms");
+        if (await isTwilioVerifyConfigured()) {
+          const verifyResult = await startTwilioVerification(cleanPhone, "sms");
+          if (verifyResult.success) {
             sentVia = "sms";
+            usedVerify = true;
           } else {
-            console.error("SMS OTP failed:", smsResult.error);
+            console.error("Twilio Verify failed:", verifyResult.error);
           }
         }
-      } catch (smsErr) {
-        console.error("SMS OTP exception:", smsErr);
+      } catch (verifyErr) {
+        console.error("Twilio Verify exception:", verifyErr);
       }
 
-      // ===== Fallback: Send via WhatsApp if SMS failed/unconfigured =====
+      // ===== Priority 2: Raw SMS via Twilio Messages API =====
       if (sentVia === "none") {
-        try {
-          const { sendWhatsAppText } = await import("@/lib/bot/whatsapp");
-          await sendWhatsAppText(
-            cleanPhone.startsWith("972") ? cleanPhone : "972" + cleanPhone.slice(1),
-            `🔐 رمز التحقق الخاص بك: *${otpCode}*\n\nصالح لمدة 5 دقائق.\nClalMobile`
-          );
-          sentVia = "whatsapp";
-        } catch (waErr) {
-          console.error("WhatsApp OTP send failed:", waErr);
+        const otpCode = generateOTP();
+        const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+
+        const { error: insertErr } = await supabase.from("customer_otps").insert({
+          phone: cleanPhone,
+          otp: otpCode,
+          expires_at: expiresAt,
+        } as any);
+
+        if (insertErr) {
+          console.error("OTP insert failed:", insertErr);
+          return NextResponse.json({
+            success: false,
+            error: `فشل حفظ رمز التحقق: ${insertErr.message || insertErr.code || "unknown"}`,
+          }, { status: 500 });
         }
+
+        try {
+          const { sendSMSOtp, isTwilioConfigured } = await import("@/lib/integrations/twilio-sms");
+          if (await isTwilioConfigured()) {
+            const smsResult = await sendSMSOtp(cleanPhone, otpCode);
+            if (smsResult.success) sentVia = "sms";
+            else console.error("SMS OTP failed:", smsResult.error);
+          }
+        } catch (smsErr) {
+          console.error("SMS OTP exception:", smsErr);
+        }
+
+        // ===== Priority 3: WhatsApp fallback =====
+        if (sentVia === "none") {
+          try {
+            const { sendWhatsAppText } = await import("@/lib/bot/whatsapp");
+            await sendWhatsAppText(
+              cleanPhone.startsWith("972") ? cleanPhone : "972" + cleanPhone.slice(1),
+              `🔐 رمز التحقق الخاص بك: *${otpCode}*\n\nصالح لمدة 5 دقائق.\nClalMobile`
+            );
+            sentVia = "whatsapp";
+          } catch (waErr) {
+            console.error("WhatsApp OTP send failed:", waErr);
+          }
+        }
+      }
+
+      // If Verify was used, store a marker so verify_otp knows to use Verify API
+      if (usedVerify) {
+        await supabase.from("customer_otps").insert({
+          phone: cleanPhone,
+          otp: "VERIFY",
+          expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
+        } as any);
       }
 
       const channelLabel = sentVia === "sms" ? "SMS" : sentVia === "whatsapp" ? "واتساب" : "";
@@ -120,24 +144,40 @@ export async function POST(req: NextRequest) {
       // Cleanup expired
       await supabase.from("customer_otps").delete().lt("expires_at", new Date().toISOString());
 
-      // Find matching OTP
-      const { data: otpRecord } = await supabase
+      let otpValid = false;
+
+      // Check if latest OTP was sent via Twilio Verify
+      const { data: latestOtp } = await supabase
         .from("customer_otps")
         .select("*")
         .eq("phone", cleanPhone)
-        .eq("otp", otp)
         .eq("verified", false)
         .gte("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
-      if (!otpRecord) {
-        return NextResponse.json({ success: false, error: "رمز التحقق خاطئ أو منتهي الصلاحية" }, { status: 400 });
+      if (latestOtp && (latestOtp as any).otp === "VERIFY") {
+        // Verify via Twilio Verify API
+        try {
+          const { checkTwilioVerification } = await import("@/lib/integrations/twilio-sms");
+          const result = await checkTwilioVerification(cleanPhone, otp);
+          if (result.success) {
+            otpValid = true;
+            await supabase.from("customer_otps").update({ verified: true }).eq("id", latestOtp.id);
+          }
+        } catch (err) {
+          console.error("Twilio Verify check error:", err);
+        }
+      } else if (latestOtp && (latestOtp as any).otp === otp) {
+        // Verify via DB match
+        otpValid = true;
+        await supabase.from("customer_otps").update({ verified: true }).eq("id", latestOtp.id);
       }
 
-      // Mark OTP as verified
-      await supabase.from("customer_otps").update({ verified: true }).eq("id", otpRecord.id);
+      if (!otpValid) {
+        return NextResponse.json({ success: false, error: "رمز التحقق خاطئ أو منتهي الصلاحية" }, { status: 400 });
+      }
 
       // Generate auth token
       const token = generateToken();
