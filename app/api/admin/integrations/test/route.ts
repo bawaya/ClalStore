@@ -7,6 +7,29 @@ export const runtime = 'edge';
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { getIntegrations } from "@/lib/admin/queries";
+
+const MASK = "••••••••";
+
+/** Resolve masked config values by merging with DB-stored values */
+async function resolveConfig(type: string, config: Record<string, any>): Promise<Record<string, any>> {
+  const needsResolve = Object.values(config).some(
+    (v) => typeof v === "string" && v.includes(MASK)
+  );
+  if (!needsResolve) return config;
+
+  const integrations = await getIntegrations();
+  const existing = integrations.find((i: any) => i.type === type);
+  const oldConfig = existing?.config || {};
+  const resolved = { ...config };
+
+  for (const [key, val] of Object.entries(resolved)) {
+    if (typeof val === "string" && val.includes(MASK)) {
+      resolved[key] = oldConfig[key] || "";
+    }
+  }
+  return resolved;
+}
 
 const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boolean; message: string }>> = {
   // ===== Payment — Rivhit =====
@@ -141,7 +164,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, message: `لا يوجد اختبار لنوع التكامل: ${type}` }, { status: 400 });
     }
 
-    const result = await testFn(config);
+    // Resolve any masked values from DB before testing
+    const resolvedConfig = await resolveConfig(type, config);
+    const result = await testFn(resolvedConfig);
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ ok: false, message: err.message }, { status: 500 });

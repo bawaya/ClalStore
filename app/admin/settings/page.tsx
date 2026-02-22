@@ -53,6 +53,8 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
     { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
     { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "رقم الهاتف" },
     { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
+    { key: "admin_phone", label: "📱 رقم الأدمن", type: "text", placeholder: "05X-XXXXXXX — يستقبل إشعارات الطلبات" },
+    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },
   ],
   "Meta API": [
     { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
@@ -110,6 +112,10 @@ function IntegrationCard({
   const selectedProvider = integ?.provider || "";
   const fields = PROVIDER_FIELDS[selectedProvider] || [];
 
+  // Check which sensitive fields are already saved (from _has_ flags)
+  const hasSavedKey = (key: string) => !!configDraft[`_has_${key}`];
+  const MASK = "••••••••";
+
   const handleSelectProvider = async (provider: string) => {
     const newConfig = provider === selectedProvider ? configDraft : {};
     setConfigDraft(newConfig);
@@ -121,7 +127,13 @@ function IntegrationCard({
   const handleSaveConfig = async () => {
     setSaving(true);
     try {
-      await onUpdate(type, { config: configDraft, status: integ?.status || "inactive" });
+      // Send config — API will handle masked values by keeping old ones
+      const configToSend = { ...configDraft };
+      // Remove _has_ metadata before sending
+      for (const key of Object.keys(configToSend)) {
+        if (key.startsWith("_has_")) delete configToSend[key];
+      }
+      await onUpdate(type, { config: configToSend, status: integ?.status || "inactive" });
       show("✅ تم حفظ الإعدادات");
     } catch { show("❌ خطأ في الحفظ"); }
     setSaving(false);
@@ -136,10 +148,15 @@ function IntegrationCard({
     setTesting(true);
     setTestResult(null);
     try {
+      // For test, send actual values — masked values will be resolved by API
+      const configToTest = { ...configDraft };
+      for (const key of Object.keys(configToTest)) {
+        if (key.startsWith("_has_")) delete configToTest[key];
+      }
       const res = await fetch("/api/admin/integrations/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, config: configDraft }),
+        body: JSON.stringify({ type, config: configToTest }),
       });
       const data = await res.json();
       setTestResult({ ok: data.ok, message: data.message || data.error || "" });
@@ -149,7 +166,12 @@ function IntegrationCard({
     setTesting(false);
   };
 
-  const hasRequiredFields = fields.length > 0 && fields.some((f) => configDraft[f.key]);
+  // Count how many required fields have values (either entered or saved)
+  const configuredCount = fields.filter((f) => {
+    const val = configDraft[f.key];
+    return val && val.length > 0;
+  }).length;
+  const hasRequiredFields = configuredCount > 0;
 
   return (
     <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
@@ -189,31 +211,62 @@ function IntegrationCard({
       {/* Config fields */}
       {selectedProvider && fields.length > 0 && (
         <div className="mt-3 bg-surface-elevated rounded-xl p-3 space-y-2.5">
-          <div className="font-bold text-right text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-            🔑 إعدادات {selectedProvider}
-          </div>
-          {fields.map((f) => (
-            <div key={f.key}>
-              <label className="block text-muted text-right mb-1" style={{ fontSize: scr.mobile ? 9 : 10 }}>{f.label}</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type={f.type === "password" && !showSecrets[f.key] ? "password" : "text"}
-                  className="input flex-1" style={{ fontSize: scr.mobile ? 11 : 13 }}
-                  placeholder={f.placeholder}
-                  value={configDraft[f.key] || ""}
-                  onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                  dir="ltr"
-                />
-                {f.type === "password" && (
-                  <button onClick={() => setShowSecrets((p) => ({ ...p, [f.key]: !p[f.key] }))}
-                    className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-xs"
-                    title={showSecrets[f.key] ? "إخفاء" : "إظهار"}>
-                    {showSecrets[f.key] ? "🙈" : "👁️"}
-                  </button>
-                )}
-              </div>
+          <div className="flex items-center justify-between">
+            <div className="font-bold text-right text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+              🔑 إعدادات {selectedProvider}
             </div>
-          ))}
+            {configuredCount > 0 && (
+              <span className="text-[9px] px-2 py-0.5 rounded-md font-bold"
+                style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
+                ✅ {configuredCount}/{fields.length} مُعد
+              </span>
+            )}
+          </div>
+          {fields.map((f) => {
+            const isSensitive = f.type === "password";
+            const isSaved = hasSavedKey(f.key);
+            const currentVal = configDraft[f.key] || "";
+            const isStillMasked = isSensitive && currentVal.includes(MASK);
+
+            return (
+              <div key={f.key}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1">
+                    {isSaved && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded font-bold"
+                        style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                        ✅ محفوظ
+                      </span>
+                    )}
+                  </div>
+                  <label className="text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 10 }}>{f.label}</label>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type={isSensitive && !showSecrets[f.key] ? "password" : "text"}
+                    className="input flex-1" style={{ fontSize: scr.mobile ? 11 : 13 }}
+                    placeholder={isSaved ? "اضغط لتحديث القيمة..." : f.placeholder}
+                    value={currentVal}
+                    onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                    onFocus={() => {
+                      // Clear masked value on focus so user can enter new one
+                      if (isStillMasked) {
+                        setConfigDraft((prev) => ({ ...prev, [f.key]: "" }));
+                      }
+                    }}
+                    dir="ltr"
+                  />
+                  {isSensitive && (
+                    <button onClick={() => setShowSecrets((p) => ({ ...p, [f.key]: !p[f.key] }))}
+                      className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-xs"
+                      title={showSecrets[f.key] ? "إخفاء" : "إظهار"}>
+                      {showSecrets[f.key] ? "🙈" : "👁️"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
           {/* Actions */}
           <div className="flex items-center gap-2 mt-3 pt-2 border-t border-surface-border">
             <button onClick={handleSaveConfig} disabled={saving} className="btn-primary flex-1"
@@ -273,6 +326,8 @@ export default function SettingsPage() {
     { key: "phone", label: "📞 رقم الهاتف", type: "text" },
     { key: "whatsapp_number", label: "💬 رقم الواتساب", type: "text" },
     { key: "email", label: "📧 البريد الإلكتروني", type: "text" },
+    { key: "admin_phone", label: "👨‍💼 رقم الأدمن (الإشعارات)", type: "text", hint: "يستقبل تنبيهات الطلبات الجديدة والمشاكل" },
+    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", hint: "يستقبل التقارير اليومية والأسبوعية عبر واتساب" },
     { key: "delivery_note_ar", label: "ملاحظة التوصيل (عربي)", type: "text" },
     { key: "delivery_note_he", label: "הערת משלוח (עברית)", type: "text" },
     { key: "accent_color", label: "🎨 اللون الرئيسي", type: "color" },
@@ -409,10 +464,17 @@ export default function SettingsPage() {
                   <span className="text-muted text-xs font-mono">{settings[f.key] || "#c41040"}</span>
                 </div>
               ) : (
-                <input className="input" value={settings[f.key] || ""}
-                  onChange={(e) => updateSetting(f.key, e.target.value)}
-                  onBlur={() => show("✅ تم الحفظ")}
-                  dir={f.key.endsWith("_he") ? "rtl" : "auto"} />
+                <>
+                  <input className="input" value={settings[f.key] || ""}
+                    onChange={(e) => updateSetting(f.key, e.target.value)}
+                    onBlur={() => show("✅ تم الحفظ")}
+                    dir={f.key.endsWith("_he") ? "rtl" : "auto"}
+                    placeholder={f.key === "admin_phone" || f.key === "reports_phone" ? "05X-XXXXXXX" : undefined}
+                  />
+                  {"hint" in f && f.hint && (
+                    <p className="text-dim mt-0.5" style={{ fontSize: 9, lineHeight: 1.4 }}>{f.hint}</p>
+                  )}
+                </>
               )}
             </FormField>
           ))}
