@@ -64,7 +64,10 @@ export async function POST(req: NextRequest) {
 
       if (insertErr) {
         console.error("OTP insert failed:", insertErr);
-        return NextResponse.json({ success: false, error: "فشل حفظ رمز التحقق" }, { status: 500 });
+        return NextResponse.json({
+          success: false,
+          error: `فشل حفظ رمز التحقق: ${insertErr.message || insertErr.code || "unknown"}`,
+        }, { status: 500 });
       }
 
       // ===== Send OTP via SMS (Twilio) — primary channel =====
