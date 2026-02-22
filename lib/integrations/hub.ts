@@ -16,11 +16,12 @@ export async function getIntegrationConfig(type: string): Promise<Record<string,
       .select("config, status")
       .eq("type", type)
       .single();
+    console.log(`[IntegrationConfig] type=${type} status=${data?.status} hasConfig=${!!data?.config} keys=${data?.config ? Object.keys(data.config).join(",") : "none"}`);
     if (data && data.status === "active" && data.config) {
       return data.config as Record<string, any>;
     }
-  } catch {
-    // DB unavailable — fall through to env vars
+  } catch (err) {
+    console.error(`[IntegrationConfig] Error fetching ${type}:`, err);
   }
   return {};
 }

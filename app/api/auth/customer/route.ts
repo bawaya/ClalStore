@@ -58,17 +58,20 @@ export async function POST(req: NextRequest) {
       // ===== Priority 1: Twilio Verify API (auto-generates + sends OTP) =====
       try {
         const { startTwilioVerification, isTwilioVerifyConfigured } = await import("@/lib/integrations/twilio-sms");
-        if (await isTwilioVerifyConfigured()) {
+        const verifyReady = await isTwilioVerifyConfigured();
+        console.log("[OTP] Twilio Verify configured:", verifyReady);
+        if (verifyReady) {
           const verifyResult = await startTwilioVerification(cleanPhone, "sms");
+          console.log("[OTP] Twilio Verify result:", verifyResult);
           if (verifyResult.success) {
             sentVia = "sms";
             usedVerify = true;
           } else {
-            console.error("Twilio Verify failed:", verifyResult.error);
+            console.error("[OTP] Twilio Verify failed:", verifyResult.error);
           }
         }
       } catch (verifyErr) {
-        console.error("Twilio Verify exception:", verifyErr);
+        console.error("[OTP] Twilio Verify exception:", verifyErr);
       }
 
       // ===== Priority 2: Raw SMS via Twilio Messages API =====

@@ -135,8 +135,11 @@ function IntegrationCard({
       for (const key of Object.keys(configToSend)) {
         if (key.startsWith("_has_")) delete configToSend[key];
       }
-      await onUpdate(type, { config: configToSend, status: integ?.status || "inactive" });
-      show("✅ تم حفظ الإعدادات");
+      // Auto-activate: if config has meaningful values, set status to active
+      const hasValues = Object.entries(configToSend).some(([, v]) => v && !v.includes(MASK));
+      const newStatus = hasValues ? "active" : (integ?.status || "inactive");
+      await onUpdate(type, { config: configToSend, status: newStatus });
+      show("✅ تم حفظ الإعدادات" + (newStatus === "active" ? " وتفعيلها" : ""));
     } catch { show("❌ خطأ في الحفظ"); }
     setSaving(false);
   };
