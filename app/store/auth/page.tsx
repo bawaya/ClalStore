@@ -85,8 +85,8 @@ export default function AuthPage() {
   }, [channel, phone, t]);
 
   // ===== Verify OTP =====
-  const handleVerifyOtp = useCallback(async () => {
-    const code = otp.join("");
+  const handleVerifyOtp = useCallback(async (codeOverride?: string) => {
+    const code = codeOverride || otp.join("");
     if (code.length !== 4) {
       setError(t("auth.invalidOtp"));
       return;
@@ -127,7 +127,8 @@ export default function AuthPage() {
     setOtp(newOtp);
     if (value && index < 3) otpRefs[index + 1]?.current?.focus();
     if (newOtp.every((d) => d !== "") && newOtp.join("").length === 4) {
-      setTimeout(() => handleVerifyOtp(), 150);
+      const code = newOtp.join("");
+      setTimeout(() => handleVerifyOtp(code), 150);
     }
   };
 
@@ -143,7 +144,7 @@ export default function AuthPage() {
     if (pasted.length === 4) {
       setOtp(pasted.split("") as [string, string, string, string]);
       otpRefs[3]?.current?.focus();
-      setTimeout(() => handleVerifyOtp(), 200);
+      setTimeout(() => handleVerifyOtp(pasted), 200);
     }
   };
 
@@ -397,7 +398,7 @@ export default function AuthPage() {
 
             {/* Verify button */}
             <button
-              onClick={handleVerifyOtp}
+              onClick={() => handleVerifyOtp()}
               disabled={loading || otp.some((d) => d === "")}
               className="w-full rounded-2xl font-extrabold cursor-pointer transition-all active:scale-[0.98] disabled:opacity-50 hover:brightness-110"
               style={{
