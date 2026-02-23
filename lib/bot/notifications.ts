@@ -4,9 +4,25 @@
 // Called from order API after create/status change
 // =====================================================
 
-import { sendWhatsAppText } from "./whatsapp";
+import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
 import { notifyAdmin, notifyTeam } from "./admin-notify";
 import { buildOrderNotification, buildStatusNotification } from "./engine";
+
+/** Send text to customer — fall back to template if 24h window expired */
+async function sendToCustomer(phone: string, text: string, templateName?: string, templateParams?: string[]): Promise<void> {
+  try {
+    await sendWhatsAppText(phone, text);
+  } catch {
+    // 24h window expired — try template
+    if (templateName && templateParams) {
+      try {
+        await sendWhatsAppTemplate(phone, templateName, templateParams);
+      } catch (tmplErr) {
+        console.error(`[Notification] Template ${templateName} also failed for ${phone}`);
+      }
+    }
+  }
+}
 
 // ===== New Order: Notify Team =====
 export async function notifyNewOrder(
@@ -22,9 +38,9 @@ export async function notifyNewOrder(
     await notifyAdmin(teamMsg);
     await notifyTeam(teamMsg);
 
-    // 2. Confirm to customer
+    // 2. Confirm to customer (with template fallback)
     const custMsg = `✅ *تم استلام طلبك!*\n\n📦 رقم الطلب: ${orderId}\n💰 المبلغ: ₪${total.toLocaleString()}\n\nالفريق سيتواصل معك قريباً.\nللاستفسار أرسل رقم طلبك في أي وقت.`;
-    await sendWhatsAppText(customerPhone, custMsg);
+    await sendToCustomer(customerPhone, custMsg, "clal_order_confirmation", [orderId, `₪${total.toLocaleString()}`]);
   } catch (err) {
     console.error("Notification error (new order):", err);
     // Don't throw — notification failure shouldn't block order
@@ -43,7 +59,7 @@ export async function notifyStatusChange(
 
   try {
     const msg = buildStatusNotification(orderId, newStatus);
-    await sendWhatsAppText(customerPhone, msg);
+    await sendToCustomer(customerPhone, msg, "clal_order_status", [orderId, newStatus]);
   } catch (err) {
     console.error("Notification error (status):", err);
   }
@@ -63,7 +79,7 @@ export async function sendNoReplyReminder(
     ];
 
     const msg = msgs[Math.min(attempt - 1, 2)];
-    await sendWhatsAppText(customerPhone, msg);
+    await sendToCustomer(customerPhone, msg, "clal_reminder", [orderId]);
   } catch (err) {
     console.error("Notification error (no reply):", err);
   }

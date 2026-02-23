@@ -35,6 +35,23 @@ export async function GET() {
   // 5. WhatsApp provider
   checks.whatsapp = { ok: !!process.env.YCLOUD_API_KEY, error: !process.env.YCLOUD_API_KEY ? "Not configured" : undefined };
 
+  // 6. SMS integration (DB)
+  try {
+    const { data: smsInteg } = await createAdminSupabase()
+      .from("integrations")
+      .select("config, status, provider")
+      .eq("type", "sms")
+      .single();
+    const cfg = smsInteg?.config as Record<string, any> || {};
+    const configKeys = Object.keys(cfg).filter(k => cfg[k]);
+    checks.sms = {
+      ok: !!(smsInteg?.status === "active" && cfg.account_sid && cfg.verify_service_sid),
+      error: `status=${smsInteg?.status} provider=${smsInteg?.provider} keys=[${configKeys.join(",")}]`,
+    };
+  } catch (err: any) {
+    checks.sms = { ok: false, error: err.message };
+  }
+
   const allOk = Object.values(checks).every((c) => c.ok);
   const criticalOk = checks.database?.ok && checks.env?.ok;
 

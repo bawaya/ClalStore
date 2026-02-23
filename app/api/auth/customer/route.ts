@@ -62,12 +62,59 @@ export async function POST(req: NextRequest) {
         console.log("[OTP] Twilio Verify configured:", verifyReady);
         if (verifyReady) {
           const verifyResult = await startTwilioVerification(cleanPhone, "sms");
-          console.log("[OTP] Twilio Verify result:", verifyResult);
+          console.log("[OTP] Twilio Verify result:", JSON.stringify(verifyResult));
           if (verifyResult.success) {
             sentVia = "sms";
             usedVerify = true;
           } else {
             console.error("[OTP] Twilio Verify failed:", verifyResult.error);
+          }
+        } else {
+          // Direct config check — bypass hub status check
+          const { createAdminSupabase: createAdmin } = await import("@/lib/supabase");
+          const directDb = createAdmin();
+          if (directDb) {
+            const { data: smsInteg } = await directDb
+              .from("integrations")
+              .select("config, status")
+              .eq("type", "sms")
+              .single();
+            console.log("[OTP] Direct SMS config check:", JSON.stringify({
+              status: smsInteg?.status,
+              hasConfig: !!smsInteg?.config,
+              keys: smsInteg?.config ? Object.keys(smsInteg.config) : [],
+              hasVerifySid: !!smsInteg?.config?.verify_service_sid,
+              hasAccountSid: !!smsInteg?.config?.account_sid,
+            }));
+            // If config exists but status is not active, try anyway
+            if (smsInteg?.config?.account_sid && smsInteg?.config?.auth_token && smsInteg?.config?.verify_service_sid) {
+              console.log("[OTP] Bypassing status check — config exists, attempting Verify...");
+              const cfg = smsInteg.config;
+              // Direct Twilio Verify call
+              const verifyBody = new URLSearchParams({
+                To: cleanPhone.startsWith("+") ? cleanPhone : (cleanPhone.startsWith("05") ? `+972${cleanPhone.slice(1)}` : `+${cleanPhone}`),
+                Channel: "sms",
+              });
+              const verifyRes = await fetch(
+                `https://verify.twilio.com/v2/Services/${cfg.verify_service_sid}/Verifications`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    Authorization: `Basic ${btoa(`${cfg.account_sid}:${cfg.auth_token}`)}`,
+                  },
+                  body: verifyBody.toString(),
+                }
+              );
+              const verifyData = await verifyRes.json();
+              console.log("[OTP] Direct Verify response:", JSON.stringify(verifyData));
+              if (verifyRes.ok && verifyData.status === "pending") {
+                sentVia = "sms";
+                usedVerify = true;
+              } else {
+                console.error("[OTP] Direct Verify failed:", verifyData.message || verifyData);
+              }
+            }
           }
         }
       } catch (verifyErr) {
@@ -107,12 +154,23 @@ export async function POST(req: NextRequest) {
         // ===== Priority 3: WhatsApp fallback =====
         if (sentVia === "none") {
           try {
-            const { sendWhatsAppText } = await import("@/lib/bot/whatsapp");
-            await sendWhatsAppText(
-              cleanPhone.startsWith("972") ? cleanPhone : "972" + cleanPhone.slice(1),
-              `🔐 رمز التحقق الخاص بك: *${otpCode}*\n\nصالح لمدة 5 دقائق.\nClalMobile`
-            );
-            sentVia = "whatsapp";
+            const { sendWhatsAppText, sendWhatsAppTemplate } = await import("@/lib/bot/whatsapp");
+            const waPhone = cleanPhone.startsWith("972") ? cleanPhone : "972" + cleanPhone.slice(1);
+            try {
+              await sendWhatsAppText(
+                waPhone,
+                `🔐 رمز التحقق الخاص بك: *${otpCode}*\n\nصالح لمدة 5 دقائق.\nClalMobile`
+              );
+              sentVia = "whatsapp";
+            } catch {
+              // 24h window expired — try template
+              try {
+                await sendWhatsAppTemplate(waPhone, "clal_otp_code", [otpCode]);
+                sentVia = "whatsapp";
+              } catch (tmplErr) {
+                console.error("WhatsApp template OTP also failed:", tmplErr);
+              }
+            }
           } catch (waErr) {
             console.error("WhatsApp OTP send failed:", waErr);
           }
@@ -168,6 +226,34 @@ export async function POST(req: NextRequest) {
           if (result.success) {
             otpValid = true;
             await supabase.from("customer_otps").update({ verified: true }).eq("id", latestOtp.id);
+          } else {
+            // Try direct DB config if hub returned empty
+            const { data: smsInteg } = await supabase
+              .from("integrations")
+              .select("config")
+              .eq("type", "sms")
+              .single();
+            const cfg = smsInteg?.config as any;
+            if (cfg?.account_sid && cfg?.auth_token && cfg?.verify_service_sid) {
+              const phone = cleanPhone.startsWith("+") ? cleanPhone : (cleanPhone.startsWith("05") ? `+972${cleanPhone.slice(1)}` : `+${cleanPhone}`);
+              const checkBody = new URLSearchParams({ To: phone, Code: otp });
+              const checkRes = await fetch(
+                `https://verify.twilio.com/v2/Services/${cfg.verify_service_sid}/VerificationCheck`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    Authorization: `Basic ${btoa(`${cfg.account_sid}:${cfg.auth_token}`)}`,
+                  },
+                  body: checkBody.toString(),
+                }
+              );
+              const checkData = await checkRes.json();
+              if (checkRes.ok && checkData.status === "approved") {
+                otpValid = true;
+                await supabase.from("customer_otps").update({ verified: true }).eq("id", latestOtp.id);
+              }
+            }
           }
         } catch (err) {
           console.error("Twilio Verify check error:", err);
