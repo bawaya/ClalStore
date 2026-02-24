@@ -46,6 +46,7 @@ export function ProductDetailClient({
   const { toasts, show } = useToast();
   const [selColor, setSelColor] = useState(-1); // -1 = no color selected → show main image
   const [selStorage, setSelStorage] = useState((p.storage_options || []).length > 1 ? -1 : 0);
+  const [selImage, setSelImage] = useState(0); // index in allImages array
 
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
@@ -66,6 +67,22 @@ export function ProductDetailClient({
   const needsColor = colors.length > 0 && selColor < 0;
   const needsStorage = storage.length > 1 && selStorage < 0;
   const selectionIncomplete = needsColor || needsStorage;
+
+  // Build all images array: main → gallery → color images
+  const allImages: string[] = [];
+  if (p.image_url) allImages.push(p.image_url);
+  if (p.gallery?.length) allImages.push(...p.gallery.filter(Boolean));
+  colors.forEach((c) => { if (c.image && !allImages.includes(c.image)) allImages.push(c.image); });
+
+  // When user selects a color, jump to its image
+  const handleColorSelect = (i: number) => {
+    setSelColor(i);
+    const cImg = colors[i]?.image;
+    if (cImg) {
+      const idx = allImages.indexOf(cImg);
+      if (idx >= 0) setSelImage(idx);
+    }
+  };
 
   const specLabels: Record<string, string> = {
     screen: t("detail.screen"), camera: t("detail.camera"), front_camera: t("detail.frontCamera"), battery: t("detail.battery"),
@@ -108,27 +125,46 @@ export function ProductDetailClient({
         style={{ padding: scr.mobile ? "12px 14px 30px" : "20px 28px 40px" }}
       >
         <div style={{ display: scr.mobile ? "block" : "flex", gap: 28 }}>
-          {/* Image */}
-          <div
-            className="bg-surface-elevated rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{
-              width: scr.mobile ? "100%" : 380,
-              height: scr.mobile ? 260 : 380,
-              padding: scr.mobile ? 20 : 32,
-              marginBottom: scr.mobile ? 12 : 0,
-            }}
-          >
-            {(() => {
-              const colorImg = selColor >= 0 ? colors[selColor]?.image : undefined;
-              const imgSrc = colorImg || p.image_url;
-              return imgSrc ? (
-                <img src={imgSrc} alt={productName} className="w-full h-full object-contain drop-shadow-lg" />
+          {/* Image Gallery */}
+          <div className="flex-shrink-0" style={{ width: scr.mobile ? "100%" : 380, marginBottom: scr.mobile ? 12 : 0 }}>
+            {/* Main Image */}
+            <div
+              className="bg-surface-elevated rounded-2xl flex items-center justify-center"
+              style={{
+                width: "100%",
+                height: scr.mobile ? 260 : 380,
+                padding: scr.mobile ? 20 : 32,
+              }}
+            >
+              {allImages.length > 0 ? (
+                <img src={allImages[selImage] || allImages[0]} alt={productName} className="w-full h-full object-contain drop-shadow-lg" />
               ) : (
                 <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
                   {p.type === "device" ? "📱" : "🔌"}
                 </span>
-              );
-            })()}
+              )}
+            </div>
+
+            {/* Thumbnails */}
+            {allImages.length > 1 && (
+              <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "thin" }}>
+                {allImages.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSelImage(i)}
+                    className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-all border-0 bg-surface-elevated flex items-center justify-center p-1"
+                    style={{
+                      width: scr.mobile ? 48 : 60,
+                      height: scr.mobile ? 48 : 60,
+                      outline: selImage === i ? "2px solid #c41040" : "1px solid #333",
+                      opacity: selImage === i ? 1 : 0.6,
+                    }}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-contain" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Info */}
@@ -188,7 +224,7 @@ export function ProductDetailClient({
                   {colors.map((c, i) => (
                     <button
                       key={i}
-                      onClick={() => setSelColor(i)}
+                      onClick={() => handleColorSelect(i)}
                       className="rounded-full cursor-pointer transition-all"
                       style={{
                         width: scr.mobile ? 28 : 36,
