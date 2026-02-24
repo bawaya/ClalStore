@@ -31,7 +31,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "image_url is required" }, { status: 400 });
       }
 
-      const result = await removeBackground(image_url);
+      // Download image first, then send as buffer to Remove.bg
+      // This avoids "invalid_image_url" errors when Remove.bg can't
+      // reach our R2/Supabase URLs directly
+      const imgRes = await fetch(image_url, {
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!imgRes.ok) {
+        return NextResponse.json(
+          { error: `فشل تحميل الصورة: ${imgRes.status}`, success: false },
+          { status: 400 }
+        );
+      }
+      const imgBuffer = await imgRes.arrayBuffer();
+      const imgType = imgRes.headers.get("content-type") || "image/png";
+
+      const result = await removeBackgroundFromBuffer(imgBuffer, imgType);
       resultBuffer = result.imageBuffer;
       width = result.width;
       height = result.height;
