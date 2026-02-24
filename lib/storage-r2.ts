@@ -45,13 +45,17 @@ export async function uploadToR2(
       const region = "auto";
       const service = "s3";
 
+      // Ensure we have a proper Uint8Array for hashing and body
+      const bodyBytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+
       // Build canonical request for AWS Sig V4
-      const payloadHash = await sha256Hex(new Uint8Array(data instanceof ArrayBuffer ? data : data.buffer) as unknown as Uint8Array<ArrayBuffer>);
+      const payloadHash = await sha256Hex(bodyBytes);
       const headers: Record<string, string> = {
         host: `${accountId}.r2.cloudflarestorage.com`,
         "x-amz-date": amzDate,
         "x-amz-content-sha256": payloadHash,
         "content-type": contentType,
+        "content-length": bodyBytes.byteLength.toString(),
         "cache-control": "public, max-age=31536000",
       };
 
@@ -71,11 +75,12 @@ export async function uploadToR2(
       ].join("\n");
 
       const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+      const canonReqHash = await sha256Hex(new TextEncoder().encode(canonicalRequest));
       const stringToSign = [
         "AWS4-HMAC-SHA256",
         amzDate,
         credentialScope,
-        await sha256Hex(new TextEncoder().encode(canonicalRequest)),
+        canonReqHash,
       ].join("\n");
 
       // Derive signing key
@@ -93,7 +98,7 @@ export async function uploadToR2(
           ...headers,
           Authorization: authHeader,
         },
-        body: data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer as ArrayBuffer,
+        body: bodyBytes.buffer as ArrayBuffer,
         signal: AbortSignal.timeout(30000),
       });
 
@@ -118,27 +123,30 @@ export async function uploadToR2(
 
 // ── AWS Sig V4 Helpers (crypto.subtle on Edge) ──
 
-async function sha256Hex(data: Uint8Array<ArrayBuffer>): Promise<string> {
-  const hash = await crypto.subtle.digest("SHA-256", data);
+async function sha256Hex(data: Uint8Array): Promise<string> {
+  const ab = data.buffer instanceof ArrayBuffer ? data.buffer : new ArrayBuffer(data.byteLength);
+  if (!(data.buffer instanceof ArrayBuffer)) new Uint8Array(ab).set(data);
+  const hash = await crypto.subtle.digest("SHA-256", ab);
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-async function hmacSha256(key: Uint8Array<ArrayBuffer> | ArrayBuffer, message: string): Promise<Uint8Array<ArrayBuffer>> {
-  const keyData = key instanceof ArrayBuffer ? new Uint8Array(key) as Uint8Array<ArrayBuffer> : key;
+async function hmacSha256(key: Uint8Array | ArrayBuffer, message: string): Promise<Uint8Array> {
+  const keyBuf = key instanceof ArrayBuffer ? key : (key.buffer instanceof ArrayBuffer ? key.buffer : (() => { const b = new ArrayBuffer(key.byteLength); new Uint8Array(b).set(key); return b; })());
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    keyData as ArrayBufferView & { buffer: ArrayBuffer },
+    keyBuf,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(message));
-  return new Uint8Array(sig) as Uint8Array<ArrayBuffer>;
+  const msgBuf = new TextEncoder().encode(message);
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, msgBuf.buffer as ArrayBuffer);
+  return new Uint8Array(sig);
 }
 
-async function hmacSha256Hex(key: Uint8Array<ArrayBuffer> | ArrayBuffer, message: string): Promise<string> {
+async function hmacSha256Hex(key: Uint8Array | ArrayBuffer, message: string): Promise<string> {
   const sig = await hmacSha256(key, message);
   return Array.from(sig)
     .map((b) => b.toString(16).padStart(2, "0"))
