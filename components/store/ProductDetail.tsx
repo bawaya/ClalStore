@@ -117,7 +117,7 @@ export function ProductDetailClient({
               const colorImg = selColor >= 0 ? colors[selColor]?.image : undefined;
               const imgSrc = colorImg || p.image_url;
               return imgSrc ? (
-                <img src={imgSrc} alt={productName} className="max-h-[90%] max-w-[90%] object-contain" />
+                <img src={imgSrc} alt={productName} className="w-[85%] h-[85%] object-contain drop-shadow-lg" />
               ) : (
                 <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
                   {p.type === "device" ? "📱" : "🔌"}

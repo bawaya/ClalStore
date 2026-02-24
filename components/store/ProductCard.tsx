@@ -193,7 +193,7 @@ export function ProductCard({ product: p }: { product: Product }) {
             <img
               src={imgSrc}
               alt={getProductName(p, lang)}
-              className="max-h-full max-w-full object-contain drop-shadow-lg"
+              className="w-[75%] h-[75%] object-contain drop-shadow-lg"
             />
           ) : (
             <span
