@@ -8,6 +8,7 @@ import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
 import { PRODUCT_TYPES } from "@/lib/constants";
 import { calcMargin, formatCurrency } from "@/lib/utils";
+import { aiEnhanceProduct, translateProductName, detectProductType, findDuplicates } from "@/lib/admin/ai-tools";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
 
 const EMPTY: Partial<Product> = {
@@ -34,6 +35,9 @@ export default function ProductsPage() {
   const [uploadingColor, setUploadingColor] = useState<number | null>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [nameEn, setNameEn] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<{ name: string; confidence: string }[]>([]);
+  const [aiProcessing, setAiProcessing] = useState(false);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -114,16 +118,17 @@ export default function ProductsPage() {
 
   // === GSMArena Auto-Fill ===
   const handleAutoFill = async () => {
-    if (!form.brand || !form.name_ar) {
+    if (!form.brand || (!form.name_ar && !nameEn)) {
       show("❌ أدخل اسم المنتج والشركة أولاً", "error");
       return;
     }
     setAutoFilling(true);
     try {
+      const searchName = nameEn || form.name_ar;
       const res = await fetch("/api/admin/products/autofill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name_ar, brand: form.brand }),
+        body: JSON.stringify({ name: searchName, brand: form.brand }),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -193,23 +198,58 @@ export default function ProductsPage() {
     return list;
   }, [products, filter, brandFilter]);
 
-  const openCreate = () => { setForm(EMPTY); setEditId(null); setModal(true); };
-  const openEdit = (p: Product) => { setForm({ ...p }); setEditId(p.id); setModal(true); };
+  const openCreate = () => { setForm(EMPTY); setEditId(null); setNameEn(""); setDuplicateWarning([]); setModal(true); };
+  const openEdit = (p: Product) => { setForm({ ...p }); setEditId(p.id); setNameEn(""); setDuplicateWarning([]); setModal(true); };
+
+  // === AI: Handle English name change → live translate + detect type + check duplicates ===
+  const handleNameEnChange = (value: string) => {
+    setNameEn(value);
+    if (!value.trim()) {
+      setDuplicateWarning([]);
+      return;
+    }
+    // Live translate name
+    const { name_ar, name_he } = translateProductName(value);
+    setForm((prev) => ({ ...prev, name_ar, name_he }));
+    // Auto-detect type
+    const detectedType = detectProductType(value);
+    setForm((prev) => ({ ...prev, type: detectedType }));
+    // Check duplicates
+    const dups = findDuplicates(value, form.brand || "", products, editId);
+    setDuplicateWarning(dups.map((d) => ({ name: d.product.name_ar, confidence: d.confidence })));
+  };
 
   const handleSave = async () => {
     try {
       if (!form.name_ar || !form.brand || !form.price) {
         show("❌ عبّي الحقول المطلوبة", "error"); return;
       }
-      // Auto-sync storage_options from variants
-      const variants = form.variants || [];
+
+      setAiProcessing(true);
       const saveForm = { ...form };
+
+      // AI Enhancement: If English name provided, run full AI pipeline
+      if (nameEn.trim()) {
+        const ai = aiEnhanceProduct(nameEn, form.brand || "", form.specs || {}, products, editId);
+        saveForm.name_ar = ai.name_ar;
+        saveForm.name_he = ai.name_he;
+        // Only generate descriptions if user hasn't manually written them
+        if (!form.description_ar || form.description_ar === saveForm.description_ar) {
+          saveForm.description_ar = ai.description_ar;
+          saveForm.description_he = ai.description_he;
+        }
+        saveForm.type = ai.type;
+      }
+
+      // Auto-sync storage_options from variants
+      const variants = saveForm.variants || [];
       if (variants.length > 0) {
         saveForm.storage_options = variants.map((v) => v.storage).filter(Boolean);
         // Set base price to minimum variant price
         const minPrice = Math.min(...variants.map((v) => v.price).filter((p) => p > 0));
         if (minPrice > 0 && minPrice < Infinity) saveForm.price = minPrice;
       }
+
       if (editId) {
         await update(editId, saveForm);
         show("✅ تم التعديل");
@@ -217,8 +257,10 @@ export default function ProductsPage() {
         await create(saveForm);
         show("✅ تم الإضافة");
       }
+      setAiProcessing(false);
       setModal(false);
     } catch (err: any) {
+      setAiProcessing(false);
       show(`❌ ${err.message}`, "error");
     }
   };
@@ -332,7 +374,7 @@ export default function ProductsPage() {
 
       {/* Product Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل منتج" : "منتج جديد"} wide
-        footer={<button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ التعديلات" : "✅ إضافة المنتج"}</button>}>
+        footer={<button onClick={handleSave} disabled={aiProcessing} className="btn-primary w-full disabled:opacity-60">{aiProcessing ? "🤖 جاري المعالجة الذكية..." : editId ? "💾 حفظ التعديلات" : "✅ إضافة المنتج"}</button>}>
         <div style={{ display: scr.mobile ? "block" : "flex", gap: 14 }}>
           <div className="flex-1">
             <FormField label="النوع" required>
@@ -346,23 +388,52 @@ export default function ProductsPage() {
               </div>
             </FormField>
             <FormField label="الماركة" required>
-              <input className="input" value={form.brand || ""} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Samsung, Apple..." />
+              <input className="input" value={form.brand || ""} onChange={(e) => { setForm({ ...form, brand: e.target.value }); if (nameEn) handleNameEnChange(nameEn); }} placeholder="Samsung, Apple..." />
             </FormField>
+
+            {/* === AI: English name input (primary) === */}
+            <FormField label="🤖 اسم المنتج (بالإنجليزية)">
+              <input
+                className="input font-bold"
+                value={nameEn}
+                onChange={(e) => handleNameEnChange(e.target.value)}
+                placeholder="iPhone 17 Pro Max"
+                dir="ltr"
+                style={{ borderColor: nameEn ? "rgba(16,185,129,0.4)" : undefined, background: nameEn ? "rgba(16,185,129,0.04)" : undefined }}
+              />
+              <div className="text-[9px] text-muted mt-0.5 text-right">اكتب الاسم بالإنجليزية — يُترجم تلقائياً عند الحفظ 🔄</div>
+            </FormField>
+
+            {/* Duplicate Warning */}
+            {duplicateWarning.length > 0 && (
+              <div className="rounded-xl p-2.5 mb-2" style={{ background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)" }}>
+                <div className="font-bold text-[11px] text-state-warning mb-1">⚠️ منتج مشابه موجود:</div>
+                {duplicateWarning.map((d, i) => (
+                  <div key={i} className="text-[10px] text-muted">
+                    • {d.name} {d.confidence === "exact" ? "(مطابق تماماً ❌)" : "(مشابه ⚠️)"}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <FormField label="الاسم (عربي)" required>
-              <input className="input" value={form.name_ar || ""} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} placeholder="Galaxy S25 Ultra" />
+              <input className="input" value={form.name_ar || ""} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} placeholder="آيفون 17 برو ماكس" />
             </FormField>
             <FormField label="الاسم (عبري)">
-              <input className="input" value={form.name_he || ""} onChange={(e) => setForm({ ...form, name_he: e.target.value })} dir="rtl" />
+              <input className="input" value={form.name_he || ""} onChange={(e) => setForm({ ...form, name_he: e.target.value })} dir="rtl" placeholder="אייפון 17 פרו מקס" />
             </FormField>
-            <FormField label="الوصف">
-              <textarea className="input min-h-[60px] resize-y" value={form.description_ar || ""} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} />
+            <FormField label="الوصف (عربي)">
+              <textarea className="input min-h-[60px] resize-y" value={form.description_ar || ""} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} placeholder="يُولّد تلقائياً من المواصفات عند الحفظ..." />
+            </FormField>
+            <FormField label="الوصف (عبري)">
+              <textarea className="input min-h-[60px] resize-y" value={form.description_he || ""} onChange={(e) => setForm({ ...form, description_he: e.target.value })} dir="rtl" placeholder="נוצר אוטומטית מהמפרט בעת השמירה..." />
             </FormField>
 
             {/* ===== Auto-Fill from GSMArena ===== */}
             {form.type === "device" && (
               <button
                 onClick={handleAutoFill}
-                disabled={autoFilling || !form.brand || !form.name_ar}
+                disabled={autoFilling || !form.brand || (!form.name_ar && !nameEn)}
                 className="w-full mb-3 py-2.5 rounded-xl font-extrabold cursor-pointer transition-all active:scale-[0.97] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
                   background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
