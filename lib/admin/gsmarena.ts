@@ -191,12 +191,20 @@ function stripHTML(html: string): string {
 }
 
 // ===== Exported types =====
+export interface AutoFillColor {
+  hex: string;
+  name_ar: string;
+  name_he: string;
+  name_en: string;
+  image?: string;            // صورة الجهاز بهذا اللون
+}
+
 export interface AutoFillResult {
   phone_name: string;
   description_ar: string;
   description_he: string;
   specs: Record<string, string>;
-  colors: Array<{ hex: string; name_ar: string; name_he: string }>;
+  colors: AutoFillColor[];
   storage_options: string[];
   image_url: string;
   gallery: string[];
@@ -359,10 +367,15 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
 
   // ── Colors ──
   const colorsSpec = html.match(/data-spec="colors"[^>]*>([^<]+)/);
-  let colors: Array<{ hex: string; name_ar: string; name_he: string }> = [];
+  let colors: AutoFillColor[] = [];
+  const colorNamesEn: string[] = [];
   if (colorsSpec) {
     const colorNames = colorsSpec[1].split(/,\s*/);
-    colors = colorNames.map((c) => matchColor(c));
+    colors = colorNames.map((c) => {
+      const matched = matchColor(c);
+      colorNamesEn.push(c.trim().toLowerCase());
+      return { ...matched, name_en: c.trim() };
+    });
   }
 
   // ── Main image (bigpic URL) ──
@@ -372,8 +385,9 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
     image_url = bigpicMatch[1];
   }
 
-  // ── Gallery link & images ──
+  // ── Gallery link & images + color-specific images ──
   let gallery: string[] = [];
+  const colorImages: Map<number, string> = new Map(); // colorIndex → image URL
   const galleryLinkMatch = html.match(/href=([^\s>"]+pictures[^\s>"]+\.php)/);
   if (galleryLinkMatch) {
     const galleryUrl = `${BASE}/${galleryLinkMatch[1].replace(/^"/, "")}`;
@@ -384,6 +398,62 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
         const picMatches = galleryHtml.matchAll(/(https?:\/\/fdn2?\.gsmarena\.com\/vv\/pics\/[^"'\s>]+\.(?:jpg|png|webp))/g);
         for (const pm of picMatches) {
           if (!gallery.includes(pm[1])) gallery.push(pm[1]);
+        }
+
+        // ── Map gallery images to colors ──
+        // GSMArena gallery pages have sections/labels per color.
+        // Strategy 1: Look for color name in image URL or nearby text
+        // Strategy 2: Look for labeled groups <a title="Color Name"> near images
+        if (colors.length > 0 && gallery.length > 0) {
+          // Method A: Match by image URL containing color keywords
+          // e.g. "samsung-galaxy-s25-ultra-titanium-black-1.jpg"
+          for (let ci = 0; ci < colors.length; ci++) {
+            if (colorImages.has(ci)) continue;
+            const colorWords = colorNamesEn[ci].split(/\s+/);
+            // Find first gallery image whose URL contains color keywords
+            for (const imgUrl of gallery) {
+              const urlLower = imgUrl.toLowerCase();
+              const matched = colorWords.every(w => w.length > 2 ? urlLower.includes(w) : true);
+              // At least one substantial color word must match
+              const hasSubstantial = colorWords.some(w => w.length > 2 && urlLower.includes(w));
+              if (matched && hasSubstantial && !Array.from(colorImages.values()).includes(imgUrl)) {
+                colorImages.set(ci, imgUrl);
+                break;
+              }
+            }
+          }
+
+          // Method B: Parse labeled color groups from gallery HTML
+          // GSMArena uses <a id="..." title="Color Name"> sections
+          const colorGroupPattern = /title="([^"]+)"[^>]*>[\s\S]*?<img[^>]+src="([^"]+\.(?:jpg|png|webp))"/gi;
+          let groupMatch;
+          while ((groupMatch = colorGroupPattern.exec(galleryHtml)) !== null) {
+            const label = groupMatch[1].toLowerCase().trim();
+            const imgSrc = groupMatch[2];
+            // Find which color this label matches
+            for (let ci = 0; ci < colors.length; ci++) {
+              if (colorImages.has(ci)) continue;
+              const colorWords = colorNamesEn[ci].split(/\s+/).filter(w => w.length > 2);
+              if (colorWords.length > 0 && colorWords.every(w => label.includes(w))) {
+                // Upgrade to full-size image if it's a thumbnail
+                const fullImg = imgSrc.replace(/\/thumb\//, "/").replace(/-s\d+\./, ".");
+                colorImages.set(ci, fullImg);
+              }
+            }
+          }
+
+          // Method C: If fewer gallery images than colors, distribute evenly
+          // This handles pages that show one image per color in order
+          if (colorImages.size === 0 && gallery.length >= colors.length) {
+            for (let ci = 0; ci < colors.length; ci++) {
+              colorImages.set(ci, gallery[ci]);
+            }
+          }
+
+          // Assign matched images to colors
+          for (const [ci, imgUrl] of colorImages) {
+            colors[ci].image = imgUrl;
+          }
         }
       }
     } catch {

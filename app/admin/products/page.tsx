@@ -39,6 +39,7 @@ export default function ProductsPage() {
   const [nameEn, setNameEn] = useState("");
   const [duplicateWarning, setDuplicateWarning] = useState<{ name: string; confidence: string }[]>([]);
   const [aiProcessing, setAiProcessing] = useState(false);
+  const [suggestedColorImages, setSuggestedColorImages] = useState<Record<number, string>>({}); // index → url from auto-fill
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -139,7 +140,7 @@ export default function ProductsPage() {
         description_ar: d.description_ar || prev.description_ar,
         description_he: d.description_he || prev.description_he,
         specs: d.specs && Object.keys(d.specs).some((k: string) => d.specs[k]) ? d.specs : prev.specs,
-        colors: d.colors?.length ? d.colors : prev.colors,
+        colors: d.colors?.length ? d.colors.map((c: any) => ({ hex: c.hex, name_ar: c.name_ar, name_he: c.name_he, image: c.image || undefined })) : prev.colors,
         storage_options: d.storage_options?.length ? d.storage_options : prev.storage_options,
         variants: d.storage_options?.length
           ? d.storage_options.map((s: string) => ({
@@ -153,7 +154,14 @@ export default function ProductsPage() {
         image_url: d.image_url || prev.image_url,
         gallery: d.gallery?.length ? [...new Set([...(prev.gallery || []), ...d.gallery])] : prev.gallery,
       }));
-      show(`✅ تم جلب بيانات ${d.phone_name || form.name_ar} — ${d.colors?.length || 0} ألوان، ${d.storage_options?.length || 0} سعات`);
+      // Track suggested color images for "use suggested" buttons
+      if (d.colors?.length) {
+        const suggested: Record<number, string> = {};
+        d.colors.forEach((c: any, i: number) => { if (c.image) suggested[i] = c.image; });
+        setSuggestedColorImages(suggested);
+      }
+      const colorImgCount = d.colors?.filter((c: any) => c.image).length || 0;
+      show(`✅ تم جلب بيانات ${d.phone_name || form.name_ar} — ${d.colors?.length || 0} ألوان${colorImgCount ? ` (${colorImgCount} بصور)` : ""}، ${d.storage_options?.length || 0} سعات`);
     } catch (err: any) {
       show(`❌ ${err.message}`, "error");
     }
@@ -540,6 +548,25 @@ export default function ProductsPage() {
                 <button onClick={addColor} className="text-[10px] px-2 py-1 rounded-lg bg-state-purple/10 text-state-purple border border-state-purple/30 cursor-pointer font-bold">+ لون</button>
                 <div className="font-bold text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>🎨 الألوان</div>
               </div>
+              {/* Apply all suggested color images */}
+              {Object.keys(suggestedColorImages).length > 0 && (form.colors || []).some((c, i) => !c.image && suggestedColorImages[i]) && (
+                <button
+                  onClick={() => {
+                    const updated = [...(form.colors || [])];
+                    for (const [idx, url] of Object.entries(suggestedColorImages)) {
+                      const i = Number(idx);
+                      if (updated[i] && !updated[i].image) {
+                        updated[i] = { ...updated[i], image: url };
+                      }
+                    }
+                    setForm({ ...form, colors: updated });
+                    show("✅ تم تطبيق جميع صور الألوان المقترحة");
+                  }}
+                  className="w-full py-1.5 rounded-lg bg-brand/10 text-brand text-[10px] cursor-pointer border border-brand/30 font-bold mb-2"
+                >
+                  ✨ تطبيق جميع صور الألوان المقترحة ({Object.keys(suggestedColorImages).filter(i => !(form.colors || [])[Number(i)]?.image).length})
+                </button>
+              )}
               {(form.colors || []).length === 0 && (
                 <div className="text-center text-dim text-[10px] py-2">لم تتم إضافة ألوان</div>
               )}
@@ -560,9 +587,25 @@ export default function ProductsPage() {
                       <div className="relative w-12 h-12 bg-surface-bg rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer" onClick={() => setZoomImage(c.image!)}>
                         <img src={c.image} alt="" className="max-h-full max-w-full object-contain" />
                         <button
-                          onClick={() => { const updated = [...(form.colors || [])]; updated[i] = { ...updated[i], image: undefined }; setForm({ ...form, colors: updated }); }}
+                          onClick={(e) => { e.stopPropagation(); const updated = [...(form.colors || [])]; updated[i] = { ...updated[i], image: undefined }; setForm({ ...form, colors: updated }); }}
                           className="absolute top-0 left-0 w-3.5 h-3.5 rounded-full bg-state-error/80 text-white text-[7px] flex items-center justify-center cursor-pointer border-0"
                         >✕</button>
+                      </div>
+                    )}
+                    {/* Show suggested image from GSMArena if available and not already set */}
+                    {!c.image && suggestedColorImages[i] && (
+                      <div
+                        className="relative w-12 h-12 bg-surface-bg rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer border-2 border-dashed border-brand/40 hover:border-brand"
+                        title="اضغط لاستخدام هذه الصورة"
+                        onClick={() => {
+                          const updated = [...(form.colors || [])];
+                          updated[i] = { ...updated[i], image: suggestedColorImages[i] };
+                          setForm({ ...form, colors: updated });
+                          show("✅ تم تطبيق صورة اللون");
+                        }}
+                      >
+                        <img src={suggestedColorImages[i]} alt="" className="max-h-full max-w-full object-contain opacity-70" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-[8px] font-bold">✨ اقتراح</div>
                       </div>
                     )}
                     <input
@@ -580,6 +623,12 @@ export default function ProductsPage() {
                       {uploadingColor === i ? "⏳ جاري..." : c.image ? "📷 تغيير صورة اللون" : "📷 رفع صورة لهذا اللون"}
                     </button>
                   </div>
+                  {/* Apply all suggested images button */}
+                  {!c.image && suggestedColorImages[i] && (
+                    <div className="text-[8px] text-brand text-right mt-0.5 opacity-70">
+                      ✨ صورة مقترحة من GSMArena — اضغط عليها لتطبيقها
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
