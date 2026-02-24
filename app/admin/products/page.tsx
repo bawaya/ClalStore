@@ -13,7 +13,7 @@ import { aiEnhanceProduct, translateProductName, detectProductType, findDuplicat
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
 
 const EMPTY: Partial<Product> = {
-  type: "device", brand: "", name_ar: "", name_he: "", price: 0, old_price: undefined,
+  type: "device", brand: "", name_ar: "", name_en: "", name_he: "", price: 0, old_price: undefined,
   cost: 0, stock: 0, description_ar: "", colors: [], storage_options: [], variants: [], specs: {},
   active: true, featured: false,
 };
@@ -65,7 +65,7 @@ export default function ProductsPage() {
     if (!file) return;
     setUploading(true);
     const url = await uploadImage(file);
-    if (url) { setForm({ ...form, image_url: url }); show("✅ تم رفع الصورة"); }
+    if (url) { setForm(prev => ({ ...prev, image_url: url })); show("✅ تم رفع الصورة"); }
     setUploading(false);
     e.target.value = "";
   };
@@ -223,22 +223,24 @@ export default function ProductsPage() {
   };
 
   const removeGalleryImage = (idx: number) => {
-    setForm({ ...form, gallery: (form.gallery || []).filter((_, i) => i !== idx) });
+    setForm(prev => ({ ...prev, gallery: (prev.gallery || []).filter((_, i) => i !== idx) }));
   };
 
   // === Color Management ===
   const addColor = () => {
-    setForm({ ...form, colors: [...(form.colors || []), { hex: "#000000", name_ar: "", name_he: "", image: undefined }] });
+    setForm(prev => ({ ...prev, colors: [...(prev.colors || []), { hex: "#000000", name_ar: "", name_he: "", image: undefined }] }));
   };
 
   const updateColor = (idx: number, field: keyof ProductColor, value: string) => {
-    const updated = [...(form.colors || [])];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setForm({ ...form, colors: updated });
+    setForm(prev => {
+      const updated = [...(prev.colors || [])];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return { ...prev, colors: updated };
+    });
   };
 
   const removeColor = (idx: number) => {
-    setForm({ ...form, colors: (form.colors || []).filter((_, i) => i !== idx) });
+    setForm(prev => ({ ...prev, colors: (prev.colors || []).filter((_, i) => i !== idx) }));
   };
 
   const handleColorImage = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
@@ -247,9 +249,11 @@ export default function ProductsPage() {
     setUploadingColor(idx);
     const url = await uploadImage(file);
     if (url) {
-      const updated = [...(form.colors || [])];
-      updated[idx] = { ...updated[idx], image: url };
-      setForm({ ...form, colors: updated });
+      setForm(prev => {
+        const updated = [...(prev.colors || [])];
+        updated[idx] = { ...updated[idx], image: url };
+        return { ...prev, colors: updated };
+      });
       show("✅ تم رفع صورة اللون");
     }
     setUploadingColor(null);
@@ -308,17 +312,19 @@ export default function ProductsPage() {
 
   // === Variant Management ===
   const addVariant = () => {
-    setForm({ ...form, variants: [...(form.variants || []), { storage: "", price: 0, old_price: undefined, cost: 0, stock: 0 }] });
+    setForm(prev => ({ ...prev, variants: [...(prev.variants || []), { storage: "", price: 0, old_price: undefined, cost: 0, stock: 0 }] }));
   };
 
   const updateVariant = (idx: number, field: keyof ProductVariant, value: string | number | undefined) => {
-    const updated = [...(form.variants || [])];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setForm({ ...form, variants: updated });
+    setForm(prev => {
+      const updated = [...(prev.variants || [])];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return { ...prev, variants: updated };
+    });
   };
 
   const removeVariant = (idx: number) => {
-    setForm({ ...form, variants: (form.variants || []).filter((_, i) => i !== idx) });
+    setForm(prev => ({ ...prev, variants: (prev.variants || []).filter((_, i) => i !== idx) }));
   };
 
   // Sync storage_options from variants
@@ -346,7 +352,7 @@ export default function ProductsPage() {
   }, [products, filter, brandFilter]);
 
   const openCreate = () => { setForm(EMPTY); setEditId(null); setNameEn(""); setDuplicateWarning([]); setModal(true); };
-  const openEdit = (p: Product) => { setForm({ ...p }); setEditId(p.id); setNameEn(""); setDuplicateWarning([]); setModal(true); };
+  const openEdit = (p: Product) => { setForm({ ...p }); setEditId(p.id); setNameEn(p.name_en || ""); setDuplicateWarning([]); setModal(true); };
 
   // === AI: Handle English name change → live translate + detect type + check duplicates ===
   const handleNameEnChange = (value: string) => {
@@ -373,7 +379,7 @@ export default function ProductsPage() {
       }
 
       setAiProcessing(true);
-      const saveForm = { ...form };
+      const saveForm = { ...form, name_en: nameEn.trim() || undefined };
 
       // AI Enhancement: If English name provided, call OpenAI for professional translation
       if (nameEn.trim()) {
@@ -550,7 +556,7 @@ export default function ProductsPage() {
             <FormField label="النوع" required>
               <div className="flex gap-1.5">
                 {(["device", "accessory"] as const).map((t) => (
-                  <button key={t} onClick={() => setForm({ ...form, type: t })}
+                  <button key={t} onClick={() => setForm(prev => ({ ...prev, type: t }))}
                     className={`chip flex-1 ${form.type === t ? "chip-active" : ""}`}>
                     {PRODUCT_TYPES[t].icon} {PRODUCT_TYPES[t].label}
                   </button>
@@ -558,7 +564,7 @@ export default function ProductsPage() {
               </div>
             </FormField>
             <FormField label="الماركة" required>
-              <input className="input" value={form.brand || ""} onChange={(e) => { setForm({ ...form, brand: e.target.value }); if (nameEn) handleNameEnChange(nameEn); }} placeholder="Samsung, Apple..." />
+              <input className="input" value={form.brand || ""} onChange={(e) => { setForm(prev => ({ ...prev, brand: e.target.value })); if (nameEn) handleNameEnChange(nameEn); }} placeholder="Samsung, Apple..." />
             </FormField>
 
             {/* === AI: English name input (primary) === */}
@@ -587,16 +593,16 @@ export default function ProductsPage() {
             )}
 
             <FormField label="الاسم (عربي)" required>
-              <input className="input" value={form.name_ar || ""} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} placeholder="آيفون 17 برو ماكس" />
+              <input className="input" value={form.name_ar || ""} onChange={(e) => setForm(prev => ({ ...prev, name_ar: e.target.value }))} placeholder="آيفون 17 برو ماكس" />
             </FormField>
             <FormField label="الاسم (عبري)">
-              <input className="input" value={form.name_he || ""} onChange={(e) => setForm({ ...form, name_he: e.target.value })} dir="rtl" placeholder="אייפון 17 פרו מקס" />
+              <input className="input" value={form.name_he || ""} onChange={(e) => setForm(prev => ({ ...prev, name_he: e.target.value }))} dir="rtl" placeholder="אייפון 17 פרו מקס" />
             </FormField>
             <FormField label="الوصف (عربي)">
-              <textarea className="input min-h-[60px] resize-y" value={form.description_ar || ""} onChange={(e) => setForm({ ...form, description_ar: e.target.value })} placeholder="يُولّد تلقائياً من المواصفات عند الحفظ..." />
+              <textarea className="input min-h-[60px] resize-y" value={form.description_ar || ""} onChange={(e) => setForm(prev => ({ ...prev, description_ar: e.target.value }))} placeholder="يُولّد تلقائياً من المواصفات عند الحفظ..." />
             </FormField>
             <FormField label="الوصف (عبري)">
-              <textarea className="input min-h-[60px] resize-y" value={form.description_he || ""} onChange={(e) => setForm({ ...form, description_he: e.target.value })} dir="rtl" placeholder="נוצר אוטומטית מהמפרט בעת השמירה..." />
+              <textarea className="input min-h-[60px] resize-y" value={form.description_he || ""} onChange={(e) => setForm(prev => ({ ...prev, description_he: e.target.value }))} dir="rtl" placeholder="נוצר אוטומטית מהמפרט בעת השמירה..." />
             </FormField>
 
             {/* ===== Auto-Fill from GSMArena ===== */}
@@ -635,7 +641,7 @@ export default function ProductsPage() {
                   <img src={form.image_url} alt="صورة" className="max-h-[90%] max-w-[90%] object-contain rounded-lg" />
                   <div className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/50 text-white text-xs flex items-center justify-center">🔍</div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setForm({ ...form, image_url: undefined }); }}
+                    onClick={(e) => { e.stopPropagation(); setForm(prev => ({ ...prev, image_url: undefined })); }}
                     className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-state-error/80 text-white text-xs flex items-center justify-center cursor-pointer border-0"
                   >✕</button>
                   {enhancingImage && (
@@ -687,7 +693,7 @@ export default function ProductsPage() {
                 )}
               </div>
               <FormField label="أو رابط صورة مباشر">
-                <input className="input text-xs" dir="ltr" value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value || undefined })} placeholder="https://..." />
+                <input className="input text-xs" dir="ltr" value={form.image_url || ""} onChange={(e) => setForm(prev => ({ ...prev, image_url: e.target.value || undefined }))} placeholder="https://..." />
               </FormField>
               <div className="text-[9px] text-muted text-right mt-0.5">📐 المقاس المفضّل: {IMAGE_DIMS.product}</div>
 
@@ -731,7 +737,7 @@ export default function ProductsPage() {
                         updated[i] = { ...updated[i], image: url };
                       }
                     }
-                    setForm({ ...form, colors: updated });
+                    setForm(prev => ({ ...prev, colors: updated }));
                     show("✅ تم تطبيق جميع صور الألوان المقترحة");
                   }}
                   className="w-full py-1.5 rounded-lg bg-brand/10 text-brand text-[10px] cursor-pointer border border-brand/30 font-bold mb-2"
@@ -759,7 +765,7 @@ export default function ProductsPage() {
                       <div className="relative w-12 h-12 bg-surface-bg rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer" onClick={() => setZoomImage(c.image!)}>
                         <img src={c.image} alt="" className="max-h-full max-w-full object-contain" />
                         <button
-                          onClick={(e) => { e.stopPropagation(); const updated = [...(form.colors || [])]; updated[i] = { ...updated[i], image: undefined }; setForm({ ...form, colors: updated }); }}
+                          onClick={(e) => { e.stopPropagation(); setForm(prev => { const updated = [...(prev.colors || [])]; updated[i] = { ...updated[i], image: undefined }; return { ...prev, colors: updated }; }); }}
                           className="absolute top-0 left-0 w-3.5 h-3.5 rounded-full bg-state-error/80 text-white text-[7px] flex items-center justify-center cursor-pointer border-0"
                         >✕</button>
                       </div>
@@ -770,9 +776,7 @@ export default function ProductsPage() {
                         className="relative w-12 h-12 bg-surface-bg rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer border-2 border-dashed border-brand/40 hover:border-brand"
                         title="اضغط لاستخدام هذه الصورة"
                         onClick={() => {
-                          const updated = [...(form.colors || [])];
-                          updated[i] = { ...updated[i], image: suggestedColorImages[i] };
-                          setForm({ ...form, colors: updated });
+                          setForm(prev => { const updated = [...(prev.colors || [])]; updated[i] = { ...updated[i], image: suggestedColorImages[i] }; return { ...prev, colors: updated }; });
                           show("✅ تم تطبيق صورة اللون");
                         }}
                       >
@@ -855,14 +859,14 @@ export default function ProductsPage() {
               <div className="font-bold text-right mb-2" style={{ fontSize: scr.mobile ? 10 : 12 }}>💰 حاسبة الهامش</div>
               <div className="flex gap-2 mb-1.5">
                 <FormField label="سعر البيع ₪" required>
-                  <input className="input" type="number" value={form.price || ""} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} dir="ltr" />
+                  <input className="input" type="number" value={form.price || ""} onChange={(e) => setForm(prev => ({ ...prev, price: Number(e.target.value) }))} dir="ltr" />
                 </FormField>
                 <FormField label="التكلفة ₪" required>
-                  <input className="input" type="number" value={form.cost || ""} onChange={(e) => setForm({ ...form, cost: Number(e.target.value) })} dir="ltr" />
+                  <input className="input" type="number" value={form.cost || ""} onChange={(e) => setForm(prev => ({ ...prev, cost: Number(e.target.value) }))} dir="ltr" />
                 </FormField>
               </div>
               <FormField label="سعر قبل الخصم ₪ (اختياري)">
-                <input className="input" type="number" value={form.old_price || ""} onChange={(e) => setForm({ ...form, old_price: Number(e.target.value) || undefined })} dir="ltr" />
+                <input className="input" type="number" value={form.old_price || ""} onChange={(e) => setForm(prev => ({ ...prev, old_price: Number(e.target.value) || undefined }))} dir="ltr" />
               </FormField>
               <div className="flex justify-between mt-1">
                 <span style={{ fontSize: 11, color: margin >= 30 ? "#22c55e" : margin >= 15 ? "#eab308" : "#ef4444" }}>
@@ -875,16 +879,16 @@ export default function ProductsPage() {
             </div>
 
             <FormField label="المخزون">
-              <input className="input" type="number" value={form.stock || 0} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} dir="ltr" />
+              <input className="input" type="number" value={form.stock || 0} onChange={(e) => setForm(prev => ({ ...prev, stock: Number(e.target.value) }))} dir="ltr" />
             </FormField>
 
             <div className="flex gap-3 mt-2">
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <Toggle value={form.active !== false} onChange={(v) => setForm({ ...form, active: v })} />
+                <Toggle value={form.active !== false} onChange={(v) => setForm(prev => ({ ...prev, active: v }))} />
                 <span className="text-xs text-muted">مفعّل</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <Toggle value={!!form.featured} onChange={(v) => setForm({ ...form, featured: v })} />
+                <Toggle value={!!form.featured} onChange={(v) => setForm(prev => ({ ...prev, featured: v }))} />
                 <span className="text-xs text-muted">🔥 مميز</span>
               </label>
             </div>

@@ -195,6 +195,7 @@ export type Product = {
   type: "device" | "accessory";
   brand: string;
   name_ar: string;
+  name_en?: string;
   name_he: string;
   description_ar?: string;
   description_he?: string;
