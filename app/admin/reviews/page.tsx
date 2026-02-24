@@ -3,13 +3,15 @@
 export const dynamic = 'force-dynamic';
 
 // =====================================================
-// ClalMobile — Admin Reviews Moderation
+// ClalMobile — Admin Reviews Moderation + AI Generator
 // Approve, reject, reply to product reviews
+// Generate realistic AI reviews with Arab Israeli names
 // =====================================================
 
 import { useState, useEffect } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PageHeader, Modal, FormField, EmptyState, ConfirmDialog } from "@/components/admin/shared";
+import type { Product } from "@/types/database";
 
 interface Review {
   id: string;
@@ -41,7 +43,22 @@ export default function AdminReviewsPage() {
   const [replyText, setReplyText] = useState("");
   const [deleteReview, setDeleteReview] = useState<Review | null>(null);
 
-  useEffect(() => { load(); }, []);
+  // AI Generator state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [genProduct, setGenProduct] = useState("");
+  const [genCount, setGenCount] = useState(10);
+  const [generating, setGenerating] = useState(false);
+  const [showGenerator, setShowGenerator] = useState(false);
+
+  useEffect(() => { load(); loadProducts(); }, []);
+
+  const loadProducts = async () => {
+    try {
+      const res = await fetch("/api/admin/products");
+      const json = await res.json();
+      setProducts(json.products || json.data || []);
+    } catch {}
+  };
 
   const load = async () => {
     setLoading(true);
@@ -98,6 +115,39 @@ export default function AdminReviewsPage() {
     }
   };
 
+  const handleGenerate = async () => {
+    if (!genProduct || genCount < 1) return;
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/admin/reviews/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: genProduct, count: genCount }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      show(`✅ تم توليد ${json.count} تقييم بنجاح!`);
+      setShowGenerator(false);
+      load();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setGenerating(false);
+  };
+
+  const handleDeleteProductReviews = async (productId: string) => {
+    try {
+      const productReviews = reviews.filter(r => r.product_id === productId);
+      for (const r of productReviews) {
+        await fetch(`/api/reviews?id=${r.id}`, { method: "DELETE" });
+      }
+      show(`🗑️ تم حذف ${productReviews.length} تقييم`);
+      load();
+    } catch {
+      show("❌ خطأ", "error");
+    }
+  };
+
   const filtered = filter === "all" ? reviews : reviews.filter((r) => r.status === filter);
   const pendingCount = reviews.filter((r) => r.status === "pending").length;
 
@@ -109,6 +159,114 @@ export default function AdminReviewsPage() {
         title={`⭐ إدارة التقييمات${pendingCount > 0 ? ` (${pendingCount} بانتظار)` : ""}`}
         count={reviews.length}
       />
+
+      {/* AI Review Generator Toggle */}
+      <button
+        onClick={() => setShowGenerator(!showGenerator)}
+        className="w-full mb-3 py-2.5 rounded-xl font-extrabold cursor-pointer transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+        style={{
+          background: showGenerator ? "rgba(196,16,64,0.15)" : "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+          color: showGenerator ? "#c41040" : "white",
+          border: showGenerator ? "1.5px solid rgba(196,16,64,0.3)" : "none",
+          fontSize: scr.mobile ? 12 : 14,
+        }}
+      >
+        {showGenerator ? "✕ إغلاق المولّد" : "🤖 توليد تقييمات ذكية"}
+      </button>
+
+      {/* Generator Panel */}
+      {showGenerator && (
+        <div className="card mb-3" style={{ padding: scr.mobile ? 12 : 16 }}>
+          <div className="flex items-center gap-2 mb-3">
+            <span style={{ fontSize: 20 }}>🤖</span>
+            <div>
+              <h3 className="font-extrabold text-sm">مولّد التقييمات الذكي</h3>
+              <p className="text-muted text-[10px]">الذكاء يكتب تقييمات واقعية بأسماء عرب 48 — تتكلم عن المنتج والخدمة والتوصيل</p>
+            </div>
+          </div>
+
+          <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "2fr 1fr" }}>
+            <FormField label="اختر المنتج">
+              <select
+                className="input text-xs"
+                value={genProduct}
+                onChange={(e) => setGenProduct(e.target.value)}
+              >
+                <option value="">— اختر منتج —</option>
+                {products.filter(p => p.active).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.brand} — {p.name_ar} {(() => {
+                      const rc = reviews.filter(r => r.product_id === p.id).length;
+                      return rc > 0 ? `(${rc} تقييم)` : "";
+                    })()}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="عدد التقييمات">
+              <input
+                type="number"
+                className="input text-xs"
+                value={genCount}
+                onChange={(e) => setGenCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+                min={1}
+                max={50}
+              />
+            </FormField>
+          </div>
+
+          {/* Preview distribution */}
+          {genProduct && (
+            <div className="mt-2 bg-surface-elevated rounded-lg p-2.5 text-[10px]">
+              <div className="font-bold mb-1">📊 التوزيع التقريبي:</div>
+              <div className="flex gap-3 flex-wrap text-muted">
+                <span>⭐⭐⭐⭐⭐ ~{Math.round(genCount * 0.45)}</span>
+                <span>⭐⭐⭐⭐ ~{Math.round(genCount * 0.30)}</span>
+                <span>⭐⭐⭐ ~{Math.round(genCount * 0.15)}</span>
+                <span>⭐⭐ ~{Math.round(genCount * 0.08)}</span>
+                <span>⭐ ~{Math.max(0, genCount - Math.round(genCount * 0.45) - Math.round(genCount * 0.30) - Math.round(genCount * 0.15) - Math.round(genCount * 0.08))}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !genProduct || genCount < 1}
+              className="flex-1 py-2.5 rounded-xl font-extrabold cursor-pointer transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              style={{
+                background: "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+                color: "white",
+                border: "none",
+                fontSize: scr.mobile ? 12 : 13,
+              }}
+            >
+              {generating ? (
+                <>
+                  <span className="animate-spin">⏳</span>
+                  جاري التوليد...
+                </>
+              ) : (
+                <>🤖 ولّد {genCount} تقييم</>
+              )}
+            </button>
+
+            {/* Delete all reviews for selected product */}
+            {genProduct && reviews.filter(r => r.product_id === genProduct).length > 0 && (
+              <button
+                onClick={() => {
+                  if (confirm(`حذف جميع تقييمات هذا المنتج (${reviews.filter(r => r.product_id === genProduct).length} تقييم)؟`)) {
+                    handleDeleteProductReviews(genProduct);
+                  }
+                }}
+                className="px-3 py-2.5 rounded-xl font-bold cursor-pointer text-state-error bg-surface-elevated text-[11px]"
+              >
+                🗑️ حذف الكل ({reviews.filter(r => r.product_id === genProduct).length})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-1.5 mb-3 flex-wrap">
@@ -139,6 +297,7 @@ export default function AdminReviewsPage() {
         <div className="space-y-2">
           {filtered.map((r) => {
             const st = STATUS_MAP[r.status] || STATUS_MAP.pending;
+            const prod = products.find(p => p.id === r.product_id);
             return (
               <div key={r.id} className="card" style={{ padding: scr.mobile ? 10 : 14 }}>
                 <div className="flex items-start gap-3">
@@ -152,6 +311,7 @@ export default function AdminReviewsPage() {
                   <div className="flex-1 text-right min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="font-bold text-xs">{r.customer_name}</span>
+                      {prod && <span className="text-[9px] text-muted">📱 {prod.brand} {prod.name_ar}</span>}
                       {r.verified_purchase && <span className="text-state-success text-[9px]">✅ مشترٍ</span>}
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: st.color + "22", color: st.color }}>
                         {st.icon} {st.label}
