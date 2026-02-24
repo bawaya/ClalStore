@@ -142,6 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       maxTokens: 500,
       temperature: 0.3,
       jsonMode: true,
+      apiKey: process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY,
     });
 
     if (!result) {

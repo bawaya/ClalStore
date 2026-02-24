@@ -118,6 +118,7 @@ export async function GET(req: NextRequest) {
         maxTokens: 200,
         temperature: 0.2,
         jsonMode: true,
+        apiKey: process.env.ANTHROPIC_API_KEY_STORE || process.env.ANTHROPIC_API_KEY,
       });
 
       if (result?.json) {

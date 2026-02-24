@@ -132,6 +132,7 @@ ${agentContext ? `ملاحظة من الموظف: ${agentContext}` : ""}
       messages: cleaned,
       maxTokens: 500,
       temperature: 0.7,
+      apiKey: process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY,
     });
 
     if (!result) {

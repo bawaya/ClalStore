@@ -127,9 +127,9 @@ export async function getAIResponse(
   currentMessage: string,
   context: AIContext
 ): Promise<{ text: string; quickReplies?: string[] } | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.warn("ANTHROPIC_API_KEY not set — AI responses disabled");
+    console.warn("ANTHROPIC_API_KEY_BOT not set — AI responses disabled");
     return null;
   }
 
@@ -174,6 +174,7 @@ export async function getAIResponse(
       messages: cleaned,
       maxTokens: 400,
       temperature: 0.7,
+      apiKey,
     });
 
     if (!result) return null;

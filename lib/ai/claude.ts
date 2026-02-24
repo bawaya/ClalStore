@@ -10,6 +10,7 @@ export interface ClaudeRequest {
   temperature?: number; // default: 0.7
   jsonMode?: boolean; // if true → appends "أجب بـ JSON فقط" to system prompt
   timeout?: number; // ms, default: 15000
+  apiKey?: string; // override — pass specific key per feature
 }
 
 export interface ClaudeResponse {
@@ -23,9 +24,9 @@ const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-20250514";
 
 export async function callClaude(req: ClaudeRequest): Promise<ClaudeResponse | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = req.apiKey || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.error("[AI] ANTHROPIC_API_KEY not set");
+    console.error("[AI] No Anthropic API key provided");
     return null;
   }
 

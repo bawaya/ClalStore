@@ -7,7 +7,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {

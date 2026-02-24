@@ -35,14 +35,20 @@ export async function GET() {
   // 5. WhatsApp provider
   checks.whatsapp = { ok: !!process.env.YCLOUD_API_KEY, error: !process.env.YCLOUD_API_KEY ? "Not configured" : undefined };
 
-  // 5b. AI providers
-  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  // 5b. AI providers — separate keys per feature
+  const aiKeys = {
+    bot:   process.env.ANTHROPIC_API_KEY_BOT   || process.env.ANTHROPIC_API_KEY || "",
+    admin: process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || "",
+    store: process.env.ANTHROPIC_API_KEY_STORE || process.env.ANTHROPIC_API_KEY || "",
+    openai: process.env.OPENAI_API_KEY_ADMIN   || process.env.OPENAI_API_KEY   || "",
+  };
   checks.ai = {
-    ok: hasAnthropic,
+    ok: !!(aiKeys.bot && aiKeys.admin),
     error: [
-      !hasAnthropic ? "ANTHROPIC_API_KEY missing" : `ANTHROPIC ✓ (${process.env.ANTHROPIC_API_KEY?.substring(0, 8)}...)`,
-      !hasOpenAI ? "OPENAI_API_KEY missing" : "OPENAI ✓",
+      aiKeys.bot   ? `BOT ✓ (${aiKeys.bot.substring(0, 8)}...)`     : "BOT ✗",
+      aiKeys.admin ? `ADMIN ✓ (${aiKeys.admin.substring(0, 8)}...)` : "ADMIN ✗",
+      aiKeys.store ? `STORE ✓ (${aiKeys.store.substring(0, 8)}...)` : "STORE ✗",
+      aiKeys.openai ? "OPENAI ✓" : "OPENAI ✗",
     ].join(" | "),
   };
 

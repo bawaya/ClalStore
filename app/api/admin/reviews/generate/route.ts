@@ -65,9 +65,10 @@ function randomDate(): string {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "Anthropic API key not configured" }, { status: 500 });
+    if (!process.env.ANTHROPIC_API_KEY_ADMIN && !process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ error: "Anthropic Admin API key not configured" }, { status: 500 });
     }
+    const aiKey = process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || "";
 
     const db = createAdminSupabase();
     if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
@@ -194,10 +195,11 @@ ${reviewRequests}`;
         messages: [{ role: "user", content: userPrompt }],
         maxTokens: 4000,
         temperature: 0.95,
-        timeout: 60000, // 60s for review generation
+        timeout: 60000,
+        apiKey: aiKey,
       });
 
-      if (!result) throw new Error("Claude API call failed — تأكد من ANTHROPIC_API_KEY");
+      if (!result) throw new Error("Claude API call failed — تأكد من ANTHROPIC_API_KEY_ADMIN");
       const raw = result.text;
 
       // Parse JSON
