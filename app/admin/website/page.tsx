@@ -139,7 +139,10 @@ export default function WebsiteContentPage() {
       )}
 
       {/* Edit Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title={`تعديل: ${editSection ? (SECTION_META[editSection.section]?.label || editSection.section) : ""}`}>
+      <Modal open={modal} onClose={() => setModal(false)} title={`تعديل: ${editSection ? (SECTION_META[editSection.section]?.label || editSection.section) : ""}`}
+        footer={editSection ? <button onClick={handleSave} disabled={saving} className="btn-primary w-full">
+              {saving ? "⏳ جاري الحفظ..." : "💾 حفظ التعديلات"}
+            </button> : undefined}>
         {editSection && (
           <div className="space-y-3">
             {/* Common fields */}
@@ -175,9 +178,6 @@ export default function WebsiteContentPage() {
               </div>
             </div>
 
-            <button onClick={handleSave} disabled={saving} className="btn-primary w-full">
-              {saving ? "⏳ جاري الحفظ..." : "💾 حفظ التعديلات"}
-            </button>
           </div>
         )}
       </Modal>

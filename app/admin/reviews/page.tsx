@@ -193,7 +193,10 @@ export default function AdminReviewsPage() {
       )}
 
       {/* Reply Modal */}
-        <Modal open={!!replyReview} onClose={() => setReplyReview(null)} title="💬 رد على التقييم">
+        <Modal open={!!replyReview} onClose={() => setReplyReview(null)} title="💬 رد على التقييم"
+          footer={<button onClick={submitReply} className="btn-primary w-full text-sm py-2.5 rounded-xl font-bold">
+            📤 إرسال الرد
+          </button>}>
           {replyReview && <>
           <div className="mb-3 bg-surface-elevated rounded-lg p-3">
             <div className="font-bold text-xs text-right">{replyReview.customer_name} — {"⭐".repeat(replyReview.rating)}</div>
@@ -208,9 +211,6 @@ export default function AdminReviewsPage() {
               dir="auto"
             />
           </FormField>
-          <button onClick={submitReply} className="btn-primary w-full text-sm py-2.5 rounded-xl font-bold mt-3">
-            📤 إرسال الرد
-          </button>
           </>}
         </Modal>
 

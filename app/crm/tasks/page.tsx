@@ -142,7 +142,12 @@ export default function TasksPage() {
         )}
 
       {/* Task Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل مهمة" : "مهمة جديدة"}>
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل مهمة" : "مهمة جديدة"}
+        footer={<div className="flex gap-2">
+          {editId && <button onClick={() => { setModal(false); setConfirm(editId); }}
+            className="px-4 py-2.5 rounded-xl bg-state-error/10 text-state-error font-bold cursor-pointer border border-state-error/30">🗑️</button>}
+          <button onClick={handleSave} className="btn-primary flex-1">{editId ? "💾 حفظ" : "✅ إضافة"}</button>
+        </div>}>
         <FormField label="العنوان" required><input className="input" value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="متابعة طلب / اتصال..." /></FormField>
         <FormField label="الوصف"><textarea className="input min-h-[60px] resize-y" value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></FormField>
         <FormField label="الأولوية">
@@ -163,11 +168,6 @@ export default function TasksPage() {
         </FormField>
         <FormField label="تاريخ الاستحقاق"><input className="input" type="date" value={form.due_date || ""} onChange={(e) => setForm({ ...form, due_date: e.target.value })} dir="ltr" /></FormField>
 
-        <div className="flex gap-2 mt-3">
-          {editId && <button onClick={() => { setModal(false); setConfirm(editId); }}
-            className="px-4 py-2.5 rounded-xl bg-state-error/10 text-state-error font-bold cursor-pointer border border-state-error/30">🗑️</button>}
-          <button onClick={handleSave} className="btn-primary flex-1">{editId ? "💾 حفظ" : "✅ إضافة"}</button>
-        </div>
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف المهمة؟" message="لا يمكن التراجع" />

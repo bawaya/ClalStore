@@ -178,8 +178,11 @@ export default function AdminDealsPage() {
       )}
 
       {/* Edit Modal */}
-        <Modal open={!!editDeal} onClose={() => setEditDeal(null)} title={editDeal?.id ? "✏️ تعديل العرض" : "➕ عرض جديد"}>
-          {editDeal && <div className="space-y-3 max-h-[70vh] overflow-y-auto p-1">
+        <Modal open={!!editDeal} onClose={() => setEditDeal(null)} title={editDeal?.id ? "✏️ تعديل العرض" : "➕ عرض جديد"}
+          footer={editDeal ? <button onClick={saveDeal} disabled={saving} className="btn-primary w-full text-sm py-2.5 rounded-xl font-bold disabled:opacity-50">
+              {saving ? "⏳ جاري الحفظ..." : editDeal.id ? "💾 حفظ التعديلات" : "✅ إنشاء العرض"}
+            </button> : undefined}>
+          {editDeal && <div className="space-y-3 p-1">
             <FormField label="عنوان العرض (عربي) *">
               <input className="input text-xs" value={editDeal.title_ar || ""} onChange={(e) => setEditDeal({ ...editDeal, title_ar: e.target.value })} dir="auto" />
             </FormField>
@@ -243,9 +246,6 @@ export default function AdminDealsPage() {
               </FormField>
             </div>
 
-            <button onClick={saveDeal} disabled={saving} className="btn-primary w-full text-sm py-2.5 rounded-xl font-bold disabled:opacity-50">
-              {saving ? "⏳ جاري الحفظ..." : editDeal.id ? "💾 حفظ التعديلات" : "✅ إنشاء العرض"}
-            </button>
           </div>}
         </Modal>
 

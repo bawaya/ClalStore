@@ -78,7 +78,8 @@ export default function LinesPage() {
         </div>
       )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل باقة" : "باقة جديدة"}>
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل باقة" : "باقة جديدة"}
+        footer={<button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ" : "✅ إضافة"}</button>}>
         <FormField label="الاسم (عربي)" required><input className="input" value={form.name_ar || ""} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} placeholder="بريميوم" /></FormField>
         <FormField label="الاسم (עברית)"><input className="input" value={form.name_he || ""} onChange={(e) => setForm({ ...form, name_he: e.target.value })} dir="rtl" /></FormField>
         <div className="flex gap-2">
@@ -107,7 +108,6 @@ export default function LinesPage() {
           <label className="flex items-center gap-1.5 cursor-pointer"><Toggle value={!!form.popular} onChange={(v) => setForm({ ...form, popular: v })} /><span className="text-xs text-muted">⭐ شعبية</span></label>
           <label className="flex items-center gap-1.5 cursor-pointer"><Toggle value={form.active !== false} onChange={(v) => setForm({ ...form, active: v })} /><span className="text-xs text-muted">مفعّل</span></label>
         </div>
-        <button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ" : "✅ إضافة"}</button>
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف الباقة؟" message="لا يمكن التراجع" />

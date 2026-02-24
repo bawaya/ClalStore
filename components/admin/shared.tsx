@@ -4,9 +4,9 @@ import { useScreen } from "@/lib/hooks";
 
 // ===== Modal =====
 export function Modal({
-  open, onClose, title, children, wide,
+  open, onClose, title, children, wide, footer,
 }: {
-  open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean;
+  open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean; footer?: React.ReactNode;
 }) {
   const scr = useScreen();
   if (!open) return null;
@@ -14,18 +14,24 @@ export function Modal({
     <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative bg-surface-card border border-surface-border rounded-2xl overflow-y-auto max-h-[90vh]"
+        className="relative bg-surface-card border border-surface-border rounded-2xl flex flex-col max-h-[90vh]"
         style={{
           width: scr.mobile ? "95%" : wide ? 700 : 500,
-          padding: scr.mobile ? 16 : 24,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between shrink-0" style={{ padding: scr.mobile ? "12px 16px" : "16px 24px" }}>
           <button onClick={onClose} className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-sm">✕</button>
           <h2 className="font-black" style={{ fontSize: scr.mobile ? 14 : 18 }}>{title}</h2>
         </div>
-        {children}
+        <div className="overflow-y-auto flex-1 min-h-0" style={{ padding: scr.mobile ? "0 16px 16px" : "0 24px 24px" }}>
+          {children}
+        </div>
+        {footer && (
+          <div className="shrink-0 border-t border-surface-border" style={{ padding: scr.mobile ? "12px 16px" : "16px 24px" }}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

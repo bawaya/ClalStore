@@ -69,7 +69,8 @@ export default function CouponsPage() {
         </div>
       )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل كوبون" : "كوبون جديد"}>
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل كوبون" : "كوبون جديد"}
+        footer={<button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ" : "✅ إضافة"}</button>}>
         <FormField label="الكود" required>
           <input className="input font-mono" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="WELCOME10" dir="ltr" />
         </FormField>
@@ -90,7 +91,6 @@ export default function CouponsPage() {
           <input className="input" type="date" value={form.expires_at?.slice(0, 10) || ""} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} dir="ltr" />
         </FormField>
         <label className="flex items-center gap-1.5 mb-3"><Toggle value={form.active !== false} onChange={(v) => setForm({ ...form, active: v })} /><span className="text-xs text-muted">مفعّل</span></label>
-        <button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ" : "✅ إضافة"}</button>
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف الكوبون؟" message="لا يمكن التراجع عن هذا الإجراء" />

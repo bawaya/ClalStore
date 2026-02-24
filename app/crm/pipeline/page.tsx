@@ -154,7 +154,12 @@ export default function PipelinePage() {
       )}
 
       {/* Deal Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل صفقة" : "صفقة جديدة"}>
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل صفقة" : "صفقة جديدة"}
+        footer={<div className="flex gap-2">
+          {editId && <button onClick={() => { setModal(false); setConfirm(editId); }}
+            className="px-4 py-2.5 rounded-xl bg-state-error/10 text-state-error font-bold cursor-pointer border border-state-error/30">🗑️ حذف</button>}
+          <button onClick={handleSave} className="btn-primary flex-1">{editId ? "💾 حفظ" : "✅ إضافة"}</button>
+        </div>}>
         <FormField label="اسم الزبون" required><input className="input" value={form.customer_name || ""} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} /></FormField>
         <FormField label="ملخص المنتج"><input className="input" value={form.product_summary || ""} onChange={(e) => setForm({ ...form, product_summary: e.target.value })} placeholder="iPhone 17 + كفر" /></FormField>
         <FormField label="القيمة ₪" required><input className="input" type="number" value={form.value || ""} onChange={(e) => setForm({ ...form, value: Number(e.target.value) })} dir="ltr" /></FormField>
@@ -168,11 +173,6 @@ export default function PipelinePage() {
         </FormField>
         <FormField label="ملاحظات"><textarea className="input min-h-[60px] resize-y" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></FormField>
 
-        <div className="flex gap-2 mt-3">
-          {editId && <button onClick={() => { setModal(false); setConfirm(editId); }}
-            className="px-4 py-2.5 rounded-xl bg-state-error/10 text-state-error font-bold cursor-pointer border border-state-error/30">🗑️ حذف</button>}
-          <button onClick={handleSave} className="btn-primary flex-1">{editId ? "💾 حفظ" : "✅ إضافة"}</button>
-        </div>
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف الصفقة؟" message="لا يمكن التراجع" />

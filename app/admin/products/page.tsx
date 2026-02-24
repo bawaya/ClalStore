@@ -322,7 +322,8 @@ export default function ProductsPage() {
       )}
 
       {/* Product Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل منتج" : "منتج جديد"} wide>
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل منتج" : "منتج جديد"} wide
+        footer={<button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ التعديلات" : "✅ إضافة المنتج"}</button>}>
         <div style={{ display: scr.mobile ? "block" : "flex", gap: 14 }}>
           <div className="flex-1">
             <FormField label="النوع" required>
@@ -564,9 +565,6 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        <button onClick={handleSave} className="btn-primary w-full mt-3">
-          {editId ? "💾 حفظ التعديلات" : "✅ إضافة المنتج"}
-        </button>
       </Modal>
 
       {/* Delete confirm */}

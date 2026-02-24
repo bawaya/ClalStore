@@ -65,7 +65,8 @@ export default function HeroesPage() {
         </div>
       )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل بنر" : "بنر جديد"}>
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل بنر" : "بنر جديد"}
+        footer={<button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ" : "✅ إضافة"}</button>}>
         <FormField label="العنوان (عربي)" required><input className="input" value={form.title_ar || ""} onChange={(e) => setForm({ ...form, title_ar: e.target.value })} /></FormField>
         <FormField label="العنوان (עברית)"><input className="input" value={form.title_he || ""} onChange={(e) => setForm({ ...form, title_he: e.target.value })} dir="rtl" /></FormField>
         <FormField label="النص الفرعي (عربي)"><input className="input" value={form.subtitle_ar || ""} onChange={(e) => setForm({ ...form, subtitle_ar: e.target.value })} /></FormField>
@@ -77,7 +78,6 @@ export default function HeroesPage() {
           <div className="flex-1"><FormField label="ترتيب"><input className="input" type="number" value={form.sort_order || 0} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} dir="ltr" /></FormField></div>
         </div>
         <label className="flex items-center gap-1.5 mb-3"><Toggle value={form.active !== false} onChange={(v) => setForm({ ...form, active: v })} /><span className="text-xs text-muted">مفعّل</span></label>
-        <button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ" : "✅ إضافة"}</button>
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف البنر؟" message="لا يمكن التراجع" />
