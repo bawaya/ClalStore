@@ -1,10 +1,57 @@
 import { ImageResponse } from "next/og";
+import { createAdminSupabase } from "@/lib/supabase";
 
 export const runtime = "edge";
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-export default function AppleIcon() {
+export const revalidate = 300;
+
+async function getLogoUrl(): Promise<string | null> {
+  try {
+    const s = createAdminSupabase();
+    if (!s) return null;
+    const { data } = await s
+      .from("settings")
+      .select("value")
+      .eq("key", "logo_url")
+      .single();
+    return data?.value || null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function AppleIcon() {
+  const logoUrl = await getLogoUrl();
+
+  if (logoUrl) {
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: 180,
+            height: 180,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#09090b",
+            borderRadius: 36,
+          }}
+        >
+          <img
+            src={logoUrl}
+            width={140}
+            height={140}
+            style={{ objectFit: "contain" }}
+          />
+        </div>
+      ),
+      { ...size }
+    );
+  }
+
+  // Fallback
   return new ImageResponse(
     (
       <div
