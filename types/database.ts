@@ -336,6 +336,20 @@ export type Hero = {
   created_at: string;
 }
 
+export type SubPage = {
+  id: string;
+  slug: string;
+  title_ar: string;
+  title_he: string;
+  content_ar: string;
+  content_he: string;
+  image_url?: string;
+  is_visible: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type LinePlan = {
   id: string;
   name_ar: string;

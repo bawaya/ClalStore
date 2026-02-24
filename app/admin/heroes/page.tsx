@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
+import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import type { Hero } from "@/types/database";
 
 const EMPTY: Partial<Hero> = { title_ar: "", title_he: "", subtitle_ar: "", subtitle_he: "", image_url: "", link_url: "", cta_text_ar: "تسوّق الآن", cta_text_he: "קנה עכשיו", sort_order: 0, active: true };
@@ -71,7 +72,13 @@ export default function HeroesPage() {
         <FormField label="العنوان (עברית)"><input className="input" value={form.title_he || ""} onChange={(e) => setForm({ ...form, title_he: e.target.value })} dir="rtl" /></FormField>
         <FormField label="النص الفرعي (عربي)"><input className="input" value={form.subtitle_ar || ""} onChange={(e) => setForm({ ...form, subtitle_ar: e.target.value })} /></FormField>
         <FormField label="النص الفرعي (עברית)"><input className="input" value={form.subtitle_he || ""} onChange={(e) => setForm({ ...form, subtitle_he: e.target.value })} dir="rtl" /></FormField>
-        <FormField label="رابط الصورة"><input className="input" value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." dir="ltr" /></FormField>
+        <ImageUpload
+          value={form.image_url || ""}
+          onChange={(url) => setForm({ ...form, image_url: url })}
+          label="صورة البنر"
+          dimensions={IMAGE_DIMS.banner}
+          previewHeight={120}
+        />
         <FormField label="رابط الزر"><input className="input" value={form.link_url || ""} onChange={(e) => setForm({ ...form, link_url: e.target.value })} placeholder="/store" dir="ltr" /></FormField>
         <div className="flex gap-2">
           <div className="flex-1"><FormField label="نص الزر (عربي)"><input className="input" value={form.cta_text_ar || ""} onChange={(e) => setForm({ ...form, cta_text_ar: e.target.value })} /></FormField></div>

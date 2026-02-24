@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { Modal, PageHeader, FormField, Toggle, EmptyState, ConfirmDialog } from "@/components/admin/shared";
+import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 
 interface Deal {
   id: string;
@@ -220,9 +221,15 @@ export default function AdminDealsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <FormField label="رابط الصورة">
-                <input className="input text-xs" value={editDeal.image_url || ""} onChange={(e) => setEditDeal({ ...editDeal, image_url: e.target.value })} dir="ltr" placeholder="https://..." />
-              </FormField>
+              <div>
+                <ImageUpload
+                  value={editDeal.image_url || ""}
+                  onChange={(url) => setEditDeal({ ...editDeal, image_url: url })}
+                  label="صورة العرض"
+                  dimensions={IMAGE_DIMS.deal}
+                  previewHeight={100}
+                />
+              </div>
               <FormField label="الكمية المحدودة (0 = بلا حد)">
                 <input className="input text-xs" type="number" value={editDeal.max_quantity || 0} onChange={(e) => setEditDeal({ ...editDeal, max_quantity: +e.target.value })} dir="ltr" />
               </FormField>

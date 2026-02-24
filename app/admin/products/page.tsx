@@ -6,6 +6,7 @@ import { useState, useRef, useMemo } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
+import { IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import { PRODUCT_TYPES } from "@/lib/constants";
 import { calcMargin, formatCurrency } from "@/lib/utils";
 import { aiEnhanceProduct, translateProductName, detectProductType, findDuplicates } from "@/lib/admin/ai-tools";
@@ -508,6 +509,7 @@ export default function ProductsPage() {
               <FormField label="أو رابط صورة مباشر">
                 <input className="input text-xs" dir="ltr" value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value || undefined })} placeholder="https://..." />
               </FormField>
+              <div className="text-[9px] text-muted text-right mt-0.5">📐 المقاس المفضّل: {IMAGE_DIMS.product}</div>
 
               {/* Gallery */}
               <div className="font-bold text-right mt-3 mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>🖼️ معرض صور إضافية</div>

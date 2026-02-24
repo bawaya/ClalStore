@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PageHeader, Modal, FormField, Toggle, EmptyState } from "@/components/admin/shared";
+import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import type { WebsiteContent } from "@/types/database";
 
 // Section display names
@@ -214,7 +215,13 @@ function HeroEditor({ content, onChange }: { content: Record<string, any>; onCha
         <FormField label="زر الباقات (عربي)"><input className="input" value={content.cta_plans_ar || ""} onChange={(e) => onChange("cta_plans_ar", e.target.value)} /></FormField>
         <FormField label="כפתור חבילות (עברית)"><input className="input" value={content.cta_plans_he || ""} onChange={(e) => onChange("cta_plans_he", e.target.value)} dir="rtl" /></FormField>
       </div>
-      <FormField label="صورة خلفية (URL)"><input className="input" value={content.bg_image || ""} onChange={(e) => onChange("bg_image", e.target.value)} placeholder="https://..." dir="ltr" /></FormField>
+      <ImageUpload
+        value={content.bg_image || ""}
+        onChange={(url) => onChange("bg_image", url)}
+        label="صورة خلفية الهيرو"
+        dimensions={IMAGE_DIMS.heroBg}
+        previewHeight={120}
+      />
     </div>
   );
 }
