@@ -35,6 +35,17 @@ export async function GET() {
   // 5. WhatsApp provider
   checks.whatsapp = { ok: !!process.env.YCLOUD_API_KEY, error: !process.env.YCLOUD_API_KEY ? "Not configured" : undefined };
 
+  // 5b. AI providers
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  checks.ai = {
+    ok: hasAnthropic,
+    error: [
+      !hasAnthropic ? "ANTHROPIC_API_KEY missing" : `ANTHROPIC ✓ (${process.env.ANTHROPIC_API_KEY?.substring(0, 8)}...)`,
+      !hasOpenAI ? "OPENAI_API_KEY missing" : "OPENAI ✓",
+    ].join(" | "),
+  };
+
   // 6. SMS integration (DB)
   try {
     const { data: smsInteg } = await createAdminSupabase()
