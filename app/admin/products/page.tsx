@@ -228,17 +228,40 @@ export default function ProductsPage() {
       setAiProcessing(true);
       const saveForm = { ...form };
 
-      // AI Enhancement: If English name provided, run full AI pipeline
+      // AI Enhancement: If English name provided, call OpenAI for professional translation
       if (nameEn.trim()) {
-        const ai = aiEnhanceProduct(nameEn, form.brand || "", form.specs || {}, products, editId);
-        saveForm.name_ar = ai.name_ar;
-        saveForm.name_he = ai.name_he;
-        // Only generate descriptions if user hasn't manually written them
-        if (!form.description_ar || form.description_ar === saveForm.description_ar) {
-          saveForm.description_ar = ai.description_ar;
-          saveForm.description_he = ai.description_he;
+        try {
+          const aiRes = await fetch("/api/admin/ai-enhance", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name_en: nameEn, brand: form.brand || "", specs: form.specs || {}, type: form.type || "device" }),
+          });
+          if (aiRes.ok) {
+            const { data: ai } = await aiRes.json();
+            if (ai.name_ar) saveForm.name_ar = ai.name_ar;
+            if (ai.name_he) saveForm.name_he = ai.name_he;
+            if (ai.type) saveForm.type = ai.type;
+            // Only override descriptions if user hasn't manually written them
+            if (!form.description_ar?.trim() && ai.description_ar) saveForm.description_ar = ai.description_ar;
+            if (!form.description_he?.trim() && ai.description_he) saveForm.description_he = ai.description_he;
+          } else {
+            // Fallback to local dictionary if OpenAI fails
+            const ai = aiEnhanceProduct(nameEn, form.brand || "", form.specs || {}, products, editId);
+            saveForm.name_ar = ai.name_ar;
+            saveForm.name_he = ai.name_he;
+            if (!form.description_ar?.trim()) saveForm.description_ar = ai.description_ar;
+            if (!form.description_he?.trim()) saveForm.description_he = ai.description_he;
+            saveForm.type = ai.type;
+          }
+        } catch {
+          // Fallback to local dictionary on network error
+          const ai = aiEnhanceProduct(nameEn, form.brand || "", form.specs || {}, products, editId);
+          saveForm.name_ar = ai.name_ar;
+          saveForm.name_he = ai.name_he;
+          if (!form.description_ar?.trim()) saveForm.description_ar = ai.description_ar;
+          if (!form.description_he?.trim()) saveForm.description_he = ai.description_he;
+          saveForm.type = ai.type;
         }
-        saveForm.type = ai.type;
       }
 
       // Auto-sync storage_options from variants
