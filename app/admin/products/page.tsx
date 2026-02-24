@@ -135,6 +135,15 @@ export default function ProductsPage() {
         specs: d.specs && Object.keys(d.specs).some((k: string) => d.specs[k]) ? d.specs : prev.specs,
         colors: d.colors?.length ? d.colors : prev.colors,
         storage_options: d.storage_options?.length ? d.storage_options : prev.storage_options,
+        variants: d.storage_options?.length
+          ? d.storage_options.map((s: string) => ({
+              storage: s,
+              price: prev.price || 0,
+              old_price: undefined,
+              cost: prev.cost || 0,
+              stock: 0,
+            }))
+          : prev.variants,
         image_url: d.image_url || prev.image_url,
         gallery: d.gallery?.length ? [...new Set([...(prev.gallery || []), ...d.gallery])] : prev.gallery,
       }));

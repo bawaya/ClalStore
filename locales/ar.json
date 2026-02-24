@@ -221,9 +221,15 @@
     "accessoryNote": "⚡ إكسسوارات — دفع مباشر + شحن فوري",
     "screen": "الشاشة",
     "camera": "الكاميرا",
+    "frontCamera": "الكاميرا الأمامية",
     "battery": "البطارية",
     "cpu": "المعالج",
-    "weight": "الوزن"
+    "weight": "الوزن",
+    "os": "نظام التشغيل",
+    "waterproof": "مقاومة الماء",
+    "network": "الشبكة",
+    "charging": "الشحن",
+    "dimensions": "الأبعاد"
   },
   "errors": {
     "pageNotFound": "الصفحة غير موجودة",

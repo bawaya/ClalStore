@@ -221,9 +221,15 @@
     "accessoryNote": "⚡ אביזרים — תשלום מיידי + משלוח מיידי",
     "screen": "מסך",
     "camera": "מצלמה",
+    "frontCamera": "מצלמה קדמית",
     "battery": "סוללה",
     "cpu": "מעבד",
-    "weight": "משקל"
+    "weight": "משקל",
+    "os": "מערכת הפעלה",
+    "waterproof": "עמידות במים",
+    "network": "רשת",
+    "charging": "טעינה",
+    "dimensions": "מידות"
   },
   "errors": {
     "pageNotFound": "הדף לא נמצא",

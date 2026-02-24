@@ -278,11 +278,22 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
     displaysize: "screen",
     displaytype: "screen_type",
     camerapixels: "camera",
+    cam2pixels: "front_camera",
     batsize: "battery",
     chipset: "cpu",
     internalmemory: "memory",
     weight: "weight",
     os: "os",
+    nfc: "nfc",
+    gps: "gps",
+    usb: "usb",
+    sensors: "sensors",
+    bodyother: "waterproof_raw",
+    sim: "sim",
+    nettech: "network",
+    charging: "charging",
+    bluetooth: "bluetooth",
+    dimensions: "dimensions",
   };
 
   for (const [dataSpec, key] of Object.entries(specMap)) {
@@ -306,6 +317,25 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
     const ramMatch = specs.memory.match(/(\d+)\s*GB\s*RAM/i);
     if (ramMatch) specs.ram = `${ramMatch[1]}GB`;
     delete specs.memory;
+  }
+
+  // Extract water resistance from bodyother
+  if (specs.waterproof_raw) {
+    const ipMatch = specs.waterproof_raw.match(/(IP\d+)/i);
+    if (ipMatch) specs.waterproof = ipMatch[1];
+    delete specs.waterproof_raw;
+  }
+
+  // Clean up charging spec — try to extract watt info
+  if (specs.charging) {
+    const wattMatch = specs.charging.match(/(\d+W)/i);
+    if (wattMatch) specs.charging = specs.charging;
+  }
+
+  // Clean up bluetooth — just version
+  if (specs.bluetooth) {
+    const btMatch = specs.bluetooth.match(/(\d+\.\d+)/i);
+    if (btMatch) specs.bluetooth = `Bluetooth ${btMatch[1]}`;
   }
 
   // ── Storage options ──
@@ -388,18 +418,21 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
     descParts_he.push(specs.cpu.split("(")[0].trim());
   }
 
+  // Build specs object, filtering out empty values
+  const allSpecs: Record<string, string> = {};
+  const specKeys = [
+    "screen", "camera", "front_camera", "battery", "cpu", "ram", "weight",
+    "os", "waterproof", "sim", "network", "charging", "bluetooth", "usb", "nfc", "dimensions",
+  ];
+  for (const k of specKeys) {
+    if (specs[k]) allSpecs[k] = specs[k];
+  }
+
   return {
     phone_name,
     description_ar: descParts_ar.join(" - "),
     description_he: descParts_he.join(" - "),
-    specs: {
-      screen: specs.screen || "",
-      camera: specs.camera || "",
-      battery: specs.battery || "",
-      cpu: specs.cpu || "",
-      ram: specs.ram || "",
-      weight: specs.weight || "",
-    },
+    specs: allSpecs,
     colors,
     storage_options,
     image_url,

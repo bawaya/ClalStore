@@ -68,8 +68,11 @@ export function ProductDetailClient({
   const selectionIncomplete = needsColor || needsStorage;
 
   const specLabels: Record<string, string> = {
-    screen: t("detail.screen"), camera: t("detail.camera"), battery: t("detail.battery"),
+    screen: t("detail.screen"), camera: t("detail.camera"), front_camera: t("detail.frontCamera"), battery: t("detail.battery"),
     cpu: t("detail.cpu"), ram: "RAM", weight: t("detail.weight"),
+    os: t("detail.os"), waterproof: t("detail.waterproof"), sim: "SIM",
+    network: t("detail.network"), charging: t("detail.charging"),
+    bluetooth: "Bluetooth", usb: "USB", nfc: "NFC", dimensions: t("detail.dimensions"),
   };
 
   const handleAdd = () => {
