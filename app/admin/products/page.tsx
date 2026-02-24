@@ -31,6 +31,8 @@ export default function ProductsPage() {
   const [brandFilter, setBrandFilter] = useState("all");
   const [uploading, setUploading] = useState(false);
   const [enhancingImage, setEnhancingImage] = useState(false);
+  const [enhanceMenu, setEnhanceMenu] = useState(false);
+  const [enhanceLabel, setEnhanceLabel] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const colorInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
@@ -68,26 +70,89 @@ export default function ProductsPage() {
     e.target.value = "";
   };
 
-  const handleEnhanceImage = async () => {
+  // Resize + compress image using Canvas (client-side)
+  const resizeAndCompress = (imageUrl: string, maxW = 800, maxH = 800, quality = 0.85): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error("فشل ضغط الصورة"));
+            resolve(new File([blob], `optimized-${Date.now()}.webp`, { type: "image/webp" }));
+          },
+          "image/webp",
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+      img.src = imageUrl;
+    });
+  };
+
+  const handleEnhanceImage = async (mode: "removebg" | "optimize" | "both") => {
     if (!form.image_url || enhancingImage) return;
     setEnhancingImage(true);
+    setEnhanceMenu(false);
+    let currentUrl = form.image_url;
     try {
-      const res = await fetch("/api/admin/image-enhance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_url: form.image_url }),
-      });
-      const data = await res.json();
-      if (data.success && data.url) {
-        setForm({ ...form, image_url: data.url });
-        show("✅ تمت إزالة الخلفية وتحسين الصورة!");
-      } else {
-        show(`❌ ${data.error || "فشل تحسين الصورة"}`, "error");
+      // Step 1: Remove background (if requested)
+      if (mode === "removebg" || mode === "both") {
+        setEnhanceLabel("جاري إزالة الخلفية...");
+        const res = await fetch("/api/admin/image-enhance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_url: currentUrl }),
+        });
+        const data = await res.json();
+        if (data.success && data.url) {
+          currentUrl = data.url;
+        } else {
+          show(`❌ ${data.error || "فشل إزالة الخلفية"}`, "error");
+          setEnhancingImage(false);
+          setEnhanceLabel("");
+          return;
+        }
       }
-    } catch {
-      show("❌ فشل الاتصال", "error");
+
+      // Step 2: Resize + compress (if requested)
+      if (mode === "optimize" || mode === "both") {
+        setEnhanceLabel("جاري تحسين الحجم والجودة...");
+        const optimizedFile = await resizeAndCompress(currentUrl, 800, 800, 0.85);
+        const uploaded = await uploadImage(optimizedFile);
+        if (uploaded) {
+          currentUrl = uploaded;
+        } else {
+          show("❌ فشل رفع الصورة المحسّنة", "error");
+          setEnhancingImage(false);
+          setEnhanceLabel("");
+          return;
+        }
+      }
+
+      setForm((prev) => ({ ...prev, image_url: currentUrl }));
+      const msg = mode === "removebg" ? "✅ تمت إزالة الخلفية!"
+        : mode === "optimize" ? "✅ تم تحسين الحجم والجودة!"
+        : "✅ تمت إزالة الخلفية + تحسين الحجم والجودة!";
+      show(msg);
+    } catch (err: any) {
+      show(`❌ ${err.message || "فشل التحسين"}`, "error");
     }
     setEnhancingImage(false);
+    setEnhanceLabel("");
   };
 
   const handleGalleryImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -526,8 +591,8 @@ export default function ProductsPage() {
                   {enhancingImage && (
                     <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center rounded-xl z-10">
                       <div className="text-2xl animate-pulse mb-1">✨</div>
-                      <div className="text-white text-[11px] font-bold">جاري إزالة الخلفية...</div>
-                      <div className="text-white/50 text-[9px] mt-0.5">Remove.bg AI</div>
+                      <div className="text-white text-[11px] font-bold">{enhanceLabel || "جاري التحسين..."}</div>
+                      <div className="text-white/50 text-[9px] mt-0.5">AI Enhancement</div>
                     </div>
                   )}
                 </div>
@@ -544,13 +609,28 @@ export default function ProductsPage() {
                   {uploading ? "⏳ جاري الرفع..." : "📷 رفع من الجهاز"}
                 </button>
                 {form.image_url && (
-                  <button
-                    onClick={handleEnhanceImage}
-                    disabled={enhancingImage}
-                    className="py-2 px-3 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 disabled:opacity-40"
-                  >
-                    {enhancingImage ? "⏳ جاري..." : "✨ إزالة الخلفية"}
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => !enhancingImage && setEnhanceMenu(!enhanceMenu)}
+                      disabled={enhancingImage}
+                      className="py-2 px-3 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 disabled:opacity-40"
+                    >
+                      {enhancingImage ? "⏳ جاري..." : "✨ تحسين"}
+                    </button>
+                    {enhanceMenu && (
+                      <div className="absolute top-full left-0 mt-1 z-50 bg-surface-bg border border-surface-border rounded-xl shadow-xl overflow-hidden" style={{ minWidth: 180 }}>
+                        <button onClick={() => handleEnhanceImage("removebg")} className="w-full px-3 py-2.5 text-right text-xs font-semibold text-purple-400 hover:bg-purple-500/10 border-0 cursor-pointer flex items-center gap-2 bg-transparent">
+                          🔲 إزالة الخلفية
+                        </button>
+                        <button onClick={() => handleEnhanceImage("optimize")} className="w-full px-3 py-2.5 text-right text-xs font-semibold text-cyan-400 hover:bg-cyan-500/10 border-0 cursor-pointer flex items-center gap-2 bg-transparent">
+                          📐 تحسين الحجم والجودة
+                        </button>
+                        <button onClick={() => handleEnhanceImage("both")} className="w-full px-3 py-2.5 text-right text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 border-0 cursor-pointer flex items-center gap-2 bg-transparent">
+                          ✨ الكل (إزالة + تحسين)
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
               <FormField label="أو رابط صورة مباشر">
