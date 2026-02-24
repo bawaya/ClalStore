@@ -7,8 +7,32 @@ export const runtime = "edge";
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { removeBackground, removeBackgroundFromBuffer } from "@/lib/integrations/removebg";
+import { removeBackgroundFromBuffer } from "@/lib/integrations/removebg";
 import { uploadToR2 } from "@/lib/storage-r2";
+
+/** Detect image MIME type from magic bytes in the buffer */
+function detectImageType(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer).slice(0, 12);
+  // PNG: 89 50 4E 47
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return "image/png";
+  }
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  // WebP: RIFF....WEBP
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+    return "image/webp";
+  }
+  // GIF: GIF8
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return "image/gif";
+  }
+  // Default to PNG (safest for Remove.bg)
+  return "image/png";
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,17 +68,9 @@ export async function POST(req: NextRequest) {
         );
       }
       const imgBuffer = await imgRes.arrayBuffer();
-      // Detect content type from URL extension (R2 sometimes returns wrong content-type)
-      const urlLower = image_url.toLowerCase();
-      let imgType = "image/png";
-      if (urlLower.includes(".jpg") || urlLower.includes(".jpeg")) imgType = "image/jpeg";
-      else if (urlLower.includes(".webp")) imgType = "image/webp";
-      else if (urlLower.includes(".png")) imgType = "image/png";
-      else {
-        // Fallback: check response header, but only if it's an image type
-        const hdr = imgRes.headers.get("content-type") || "";
-        if (hdr.startsWith("image/")) imgType = hdr;
-      }
+      // Detect actual image type from magic bytes (R2 returns wrong content-type
+      // and URLs often have no file extension)
+      const imgType = detectImageType(imgBuffer);
 
       const result = await removeBackgroundFromBuffer(imgBuffer, imgType);
       resultBuffer = result.imageBuffer;
