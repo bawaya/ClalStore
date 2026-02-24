@@ -44,7 +44,17 @@ export async function POST(req: NextRequest) {
         );
       }
       const imgBuffer = await imgRes.arrayBuffer();
-      const imgType = imgRes.headers.get("content-type") || "image/png";
+      // Detect content type from URL extension (R2 sometimes returns wrong content-type)
+      const urlLower = image_url.toLowerCase();
+      let imgType = "image/png";
+      if (urlLower.includes(".jpg") || urlLower.includes(".jpeg")) imgType = "image/jpeg";
+      else if (urlLower.includes(".webp")) imgType = "image/webp";
+      else if (urlLower.includes(".png")) imgType = "image/png";
+      else {
+        // Fallback: check response header, but only if it's an image type
+        const hdr = imgRes.headers.get("content-type") || "";
+        if (hdr.startsWith("image/")) imgType = hdr;
+      }
 
       const result = await removeBackgroundFromBuffer(imgBuffer, imgType);
       resultBuffer = result.imageBuffer;
