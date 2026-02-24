@@ -49,6 +49,8 @@ export default function AdminReviewsPage() {
   const [genCount, setGenCount] = useState(10);
   const [generating, setGenerating] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
+  const [manualDist, setManualDist] = useState(false);
+  const [dist, setDist] = useState({ star5: 5, star4: 3, star3: 1, star2: 1, star1: 0 });
 
   useEffect(() => { load(); loadProducts(); }, []);
 
@@ -116,13 +118,16 @@ export default function AdminReviewsPage() {
   };
 
   const handleGenerate = async () => {
-    if (!genProduct || genCount < 1) return;
+    const total = manualDist ? dist.star5 + dist.star4 + dist.star3 + dist.star2 + dist.star1 : genCount;
+    if (!genProduct || total < 1) return;
     setGenerating(true);
     try {
+      const payload: any = { product_id: genProduct, count: total };
+      if (manualDist) payload.distribution = dist;
       const res = await fetch("/api/admin/reviews/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: genProduct, count: genCount }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed");
@@ -203,36 +208,95 @@ export default function AdminReviewsPage() {
                 ))}
               </select>
             </FormField>
-            <FormField label="عدد التقييمات">
-              <input
-                type="number"
-                className="input text-xs"
-                value={genCount}
-                onChange={(e) => setGenCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
-                min={1}
-                max={50}
-              />
-            </FormField>
+            {!manualDist && (
+              <FormField label="عدد التقييمات">
+                <input
+                  type="number"
+                  className="input text-xs"
+                  value={genCount}
+                  onChange={(e) => setGenCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+                  min={1}
+                  max={50}
+                />
+              </FormField>
+            )}
           </div>
 
-          {/* Preview distribution */}
+          {/* Distribution: Auto vs Manual toggle */}
           {genProduct && (
-            <div className="mt-2 bg-surface-elevated rounded-lg p-2.5 text-[10px]">
-              <div className="font-bold mb-1">📊 التوزيع التقريبي:</div>
-              <div className="flex gap-3 flex-wrap text-muted">
-                <span>⭐⭐⭐⭐⭐ ~{Math.round(genCount * 0.45)}</span>
-                <span>⭐⭐⭐⭐ ~{Math.round(genCount * 0.30)}</span>
-                <span>⭐⭐⭐ ~{Math.round(genCount * 0.15)}</span>
-                <span>⭐⭐ ~{Math.round(genCount * 0.08)}</span>
-                <span>⭐ ~{Math.max(0, genCount - Math.round(genCount * 0.45) - Math.round(genCount * 0.30) - Math.round(genCount * 0.15) - Math.round(genCount * 0.08))}</span>
+            <div className="mt-2">
+              <div className="flex items-center gap-2 mb-2">
+                <button
+                  onClick={() => setManualDist(false)}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors"
+                  style={{
+                    background: !manualDist ? "rgba(196,16,64,0.15)" : "transparent",
+                    color: !manualDist ? "#c41040" : "#71717a",
+                    border: `1px solid ${!manualDist ? "rgba(196,16,64,0.3)" : "rgba(255,255,255,0.06)"}`,
+                  }}
+                >
+                  🎲 توزيع تلقائي
+                </button>
+                <button
+                  onClick={() => setManualDist(true)}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors"
+                  style={{
+                    background: manualDist ? "rgba(196,16,64,0.15)" : "transparent",
+                    color: manualDist ? "#c41040" : "#71717a",
+                    border: `1px solid ${manualDist ? "rgba(196,16,64,0.3)" : "rgba(255,255,255,0.06)"}`,
+                  }}
+                >
+                  ✏️ توزيع يدوي
+                </button>
               </div>
+
+              {manualDist ? (
+                <div className="bg-surface-elevated rounded-lg p-2.5">
+                  <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+                    {([
+                      { key: "star5" as const, label: "5 ⭐", clr: "#22c55e" },
+                      { key: "star4" as const, label: "4 ⭐", clr: "#84cc16" },
+                      { key: "star3" as const, label: "3 ⭐", clr: "#f59e0b" },
+                      { key: "star2" as const, label: "2 ⭐", clr: "#f97316" },
+                      { key: "star1" as const, label: "1 ⭐", clr: "#ef4444" },
+                    ]).map(s => (
+                      <div key={s.key} className="text-center">
+                        <div className="text-[10px] font-bold mb-0.5" style={{ color: s.clr }}>{s.label}</div>
+                        <input
+                          type="number"
+                          className="input text-xs text-center w-full"
+                          value={dist[s.key]}
+                          onChange={(e) => setDist(prev => ({ ...prev, [s.key]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                          min={0}
+                          max={50}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-center mt-1.5 text-[10px] font-bold" style={{ color: (dist.star5 + dist.star4 + dist.star3 + dist.star2 + dist.star1) > 50 ? "#ef4444" : "#71717a" }}>
+                    المجموع: {dist.star5 + dist.star4 + dist.star3 + dist.star2 + dist.star1} تقييم
+                    {(dist.star5 + dist.star4 + dist.star3 + dist.star2 + dist.star1) > 50 && " ⚠️ الحد الأقصى 50"}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-surface-elevated rounded-lg p-2.5 text-[10px]">
+                  <div className="font-bold mb-1">📊 التوزيع التقريبي:</div>
+                  <div className="flex gap-3 flex-wrap text-muted">
+                    <span>⭐⭐⭐⭐⭐ ~{Math.round(genCount * 0.45)}</span>
+                    <span>⭐⭐⭐⭐ ~{Math.round(genCount * 0.30)}</span>
+                    <span>⭐⭐⭐ ~{Math.round(genCount * 0.15)}</span>
+                    <span>⭐⭐ ~{Math.round(genCount * 0.08)}</span>
+                    <span>⭐ ~{Math.max(0, genCount - Math.round(genCount * 0.45) - Math.round(genCount * 0.30) - Math.round(genCount * 0.15) - Math.round(genCount * 0.08))}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           <div className="flex gap-2 mt-3">
             <button
               onClick={handleGenerate}
-              disabled={generating || !genProduct || genCount < 1}
+              disabled={generating || !genProduct || (manualDist ? (dist.star5 + dist.star4 + dist.star3 + dist.star2 + dist.star1) < 1 || (dist.star5 + dist.star4 + dist.star3 + dist.star2 + dist.star1) > 50 : genCount < 1)}
               className="flex-1 py-2.5 rounded-xl font-extrabold cursor-pointer transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               style={{
                 background: "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
@@ -247,7 +311,7 @@ export default function AdminReviewsPage() {
                   جاري التوليد...
                 </>
               ) : (
-                <>🤖 ولّد {genCount} تقييم</>
+                <>🤖 ولّد {manualDist ? dist.star5 + dist.star4 + dist.star3 + dist.star2 + dist.star1 : genCount} تقييم</>
               )}
             </button>
 

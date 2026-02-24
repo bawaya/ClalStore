@@ -73,7 +73,11 @@ export async function POST(req: NextRequest) {
     if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 
     const body = await req.json();
-    const { product_id, count } = body;
+    const { product_id, count, distribution } = body as {
+      product_id: string;
+      count: number;
+      distribution?: { star5: number; star4: number; star3: number; star2: number; star1: number };
+    };
 
     if (!product_id || !count || count < 1 || count > 50) {
       return NextResponse.json({ error: "product_id and count (1-50) required" }, { status: 400 });
@@ -106,8 +110,23 @@ export async function POST(req: NextRequest) {
           .join(", ")
       : "";
 
-    // Distribute ratings
-    const ratings = distributeRatings(count);
+    // Distribute ratings — manual or auto
+    let ratings: number[];
+    if (distribution) {
+      ratings = [];
+      for (let s = 0; s < (distribution.star5 || 0); s++) ratings.push(5);
+      for (let s = 0; s < (distribution.star4 || 0); s++) ratings.push(4);
+      for (let s = 0; s < (distribution.star3 || 0); s++) ratings.push(3);
+      for (let s = 0; s < (distribution.star2 || 0); s++) ratings.push(2);
+      for (let s = 0; s < (distribution.star1 || 0); s++) ratings.push(1);
+      // Shuffle
+      for (let i = ratings.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ratings[i], ratings[j]] = [ratings[j], ratings[i]];
+      }
+    } else {
+      ratings = distributeRatings(count);
+    }
 
     // Generate reviews in batches of 10
     const batchSize = 10;
@@ -175,9 +194,10 @@ ${reviewRequests}`;
         messages: [{ role: "user", content: userPrompt }],
         maxTokens: 4000,
         temperature: 0.95,
+        timeout: 60000, // 60s for review generation
       });
 
-      if (!result) throw new Error("Claude API call failed");
+      if (!result) throw new Error("Claude API call failed — تأكد من ANTHROPIC_API_KEY");
       const raw = result.text;
 
       // Parse JSON

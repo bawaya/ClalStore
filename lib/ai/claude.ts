@@ -9,6 +9,7 @@ export interface ClaudeRequest {
   maxTokens?: number; // default: 500
   temperature?: number; // default: 0.7
   jsonMode?: boolean; // if true → appends "أجب بـ JSON فقط" to system prompt
+  timeout?: number; // ms, default: 15000
 }
 
 export interface ClaudeResponse {
@@ -50,7 +51,7 @@ export async function callClaude(req: ClaudeRequest): Promise<ClaudeResponse | n
         system: systemPrompt,
         messages: req.messages,
       }),
-      signal: AbortSignal.timeout(15000), // 15s timeout
+      signal: AbortSignal.timeout(req.timeout || 15000),
     });
 
     if (!response.ok) {
