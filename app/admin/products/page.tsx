@@ -104,53 +104,99 @@ export default function ProductsPage() {
   };
 
   const handleEnhanceImage = async (mode: "removebg" | "optimize" | "both") => {
-    if (!form.image_url || enhancingImage) return;
+    if (enhancingImage) return;
     setEnhancingImage(true);
     setEnhanceMenu(false);
-    let currentUrl = form.image_url;
-    try {
-      // Step 1: Remove background (if requested)
-      if (mode === "removebg" || mode === "both") {
-        setEnhanceLabel("جاري إزالة الخلفية...");
-        const res = await fetch("/api/admin/image-enhance", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_url: currentUrl }),
-        });
-        const data = await res.json();
-        if (data.success && data.url) {
-          currentUrl = data.url;
-        } else {
-          show(`❌ ${data.error || "فشل إزالة الخلفية"}`, "error");
-          setEnhancingImage(false);
-          setEnhanceLabel("");
-          return;
-        }
-      }
 
-      // Step 2: Resize + compress (if requested)
-      if (mode === "optimize" || mode === "both") {
-        setEnhanceLabel("جاري تحسين الحجم والجودة...");
-        const optimizedFile = await resizeAndCompress(currentUrl, 800, 800, 0.85);
-        const uploaded = await uploadImage(optimizedFile);
-        if (uploaded) {
-          currentUrl = uploaded;
-        } else {
-          show("❌ فشل رفع الصورة المحسّنة", "error");
-          setEnhancingImage(false);
-          setEnhanceLabel("");
-          return;
-        }
-      }
+    // Collect all images: main + gallery + color images
+    const allImages: { type: "main" | "gallery" | "color"; index: number; url: string }[] = [];
+    if (form.image_url) allImages.push({ type: "main", index: 0, url: form.image_url });
+    (form.gallery || []).forEach((url, i) => { if (url) allImages.push({ type: "gallery", index: i, url }); });
+    (form.colors || []).forEach((c, i) => { if (c.image) allImages.push({ type: "color", index: i, url: c.image }); });
 
-      setForm((prev) => ({ ...prev, image_url: currentUrl }));
-      const msg = mode === "removebg" ? "✅ تمت إزالة الخلفية!"
-        : mode === "optimize" ? "✅ تم تحسين الحجم والجودة!"
-        : "✅ تمت إزالة الخلفية + تحسين الحجم والجودة!";
-      show(msg);
-    } catch (err: any) {
-      show(`❌ ${err.message || "فشل التحسين"}`, "error");
+    if (allImages.length === 0) {
+      show("❌ لا توجد صور لتحسينها", "error");
+      setEnhancingImage(false);
+      return;
     }
+
+    // Process each image
+    const enhanceSingle = async (url: string): Promise<string | null> => {
+      let currentUrl = url;
+      try {
+        // Step 1: Remove background
+        if (mode === "removebg" || mode === "both") {
+          const res = await fetch("/api/admin/image-enhance", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image_url: currentUrl }),
+          });
+          const data = await res.json();
+          if (data.success && data.url) {
+            currentUrl = data.url;
+          } else {
+            return null;
+          }
+        }
+        // Step 2: Resize + compress
+        if (mode === "optimize" || mode === "both") {
+          const optimizedFile = await resizeAndCompress(currentUrl, 800, 800, 0.85);
+          const uploaded = await uploadImage(optimizedFile);
+          if (uploaded) {
+            currentUrl = uploaded;
+          } else {
+            return null;
+          }
+        }
+        return currentUrl;
+      } catch {
+        return null;
+      }
+    };
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < allImages.length; i++) {
+      const item = allImages[i];
+      const label = item.type === "main" ? "الصورة الرئيسية"
+        : item.type === "gallery" ? `صورة المعرض ${item.index + 1}`
+        : `صورة اللون ${(form.colors || [])[item.index]?.name_ar || item.index + 1}`;
+      setEnhanceLabel(`${label} (${i + 1}/${allImages.length})...`);
+
+      const result = await enhanceSingle(item.url);
+      if (result) {
+        successCount++;
+        // Update the correct image in form
+        if (item.type === "main") {
+          setForm((prev) => ({ ...prev, image_url: result }));
+        } else if (item.type === "gallery") {
+          setForm((prev) => {
+            const gallery = [...(prev.gallery || [])];
+            gallery[item.index] = result;
+            return { ...prev, gallery };
+          });
+        } else if (item.type === "color") {
+          setForm((prev) => {
+            const colors = [...(prev.colors || [])];
+            colors[item.index] = { ...colors[item.index], image: result };
+            return { ...prev, colors };
+          });
+        }
+      } else {
+        failCount++;
+      }
+    }
+
+    const modeLabel = mode === "removebg" ? "إزالة الخلفية"
+      : mode === "optimize" ? "تحسين الحجم والجودة"
+      : "إزالة الخلفية + تحسين";
+    if (failCount === 0) {
+      show(`✅ تم ${modeLabel} لـ ${successCount} صورة بنجاح!`);
+    } else {
+      show(`⚠️ ${modeLabel}: ${successCount} نجحت، ${failCount} فشلت`, failCount === allImages.length ? "error" : "success");
+    }
+
     setEnhancingImage(false);
     setEnhanceLabel("");
   };
@@ -615,10 +661,13 @@ export default function ProductsPage() {
                       disabled={enhancingImage}
                       className="py-2 px-3 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 disabled:opacity-40"
                     >
-                      {enhancingImage ? "⏳ جاري..." : "✨ تحسين"}
+                      {enhancingImage ? "⏳ جاري..." : `✨ تحسين (${[form.image_url ? 1 : 0, ...(form.gallery || []).map(() => 1), ...(form.colors || []).filter(c => c.image).map(() => 1)].reduce((a, b) => a + b, 0)} صورة)`}
                     </button>
                     {enhanceMenu && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-surface-bg border border-surface-border rounded-xl shadow-xl overflow-hidden" style={{ minWidth: 180 }}>
+                      <div className="absolute top-full left-0 mt-1 z-50 bg-surface-bg border border-surface-border rounded-xl shadow-xl overflow-hidden" style={{ minWidth: 200 }}>
+                        <div className="px-3 py-1.5 text-[9px] text-muted border-b border-surface-border bg-surface-elevated/50">
+                          سيتم تطبيقه على جميع الصور (الرئيسية + المعرض + الألوان)
+                        </div>
                         <button onClick={() => handleEnhanceImage("removebg")} className="w-full px-3 py-2.5 text-right text-xs font-semibold text-purple-400 hover:bg-purple-500/10 border-0 cursor-pointer flex items-center gap-2 bg-transparent">
                           🔲 إزالة الخلفية
                         </button>
