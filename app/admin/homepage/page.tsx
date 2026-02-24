@@ -1,0 +1,621 @@
+"use client";
+
+export const dynamic = 'force-dynamic';
+
+// =====================================================
+// ClalMobile — Admin Homepage Manager
+// Complete control over every section of the homepage
+// =====================================================
+
+import { useState, useEffect, useCallback } from "react";
+import { useScreen, useToast } from "@/lib/hooks";
+import { useAdminApi } from "@/lib/admin/hooks";
+import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
+import type { WebsiteContent, Hero } from "@/types/database";
+
+// ===== Section Meta =====
+const SECTIONS: { key: string; icon: string; label: string; desc: string }[] = [
+  { key: "hero", icon: "🏠", label: "الهيرو الرئيسي", desc: "العنوان والوصف وأزرار الصفحة الرئيسية" },
+  { key: "banners", icon: "🖼️", label: "البنرات (الكاروسيل)", desc: "بنرات العروض المتحركة في صفحة المتجر" },
+  { key: "stats", icon: "📊", label: "شريط الإحصائيات", desc: "الأرقام المعروضة (عملاء، منتجات، توصيل...)" },
+  { key: "features", icon: "⭐", label: "المميزات", desc: "مميزات المتجر (وكيل رسمي، توصيل مجاني...)" },
+  { key: "faq", icon: "❓", label: "الأسئلة الشائعة", desc: "أسئلة وأجوبة الزبائن" },
+  { key: "cta", icon: "📣", label: "الدعوة للعمل (CTA)", desc: "القسم التحفيزي قبل الفوتر" },
+  { key: "footer", icon: "📋", label: "الفوتر", desc: "معلومات التواصل والروابط الاجتماعية" },
+];
+
+export default function HomepageAdminPage() {
+  const scr = useScreen();
+  const { toasts, show } = useToast();
+
+  // Website content (CMS sections)
+  const [sections, setSections] = useState<WebsiteContent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>("hero");
+
+  // Heroes (Banners)
+  const { data: heroes, loading: heroesLoading, create: createHero, update: updateHero, remove: removeHero } = useAdminApi<Hero>({ endpoint: "/api/admin/heroes" });
+  const [heroModal, setHeroModal] = useState(false);
+  const [heroForm, setHeroForm] = useState<Partial<Hero>>({});
+  const [heroEditId, setHeroEditId] = useState<string | null>(null);
+  const [heroConfirm, setHeroConfirm] = useState<string | null>(null);
+
+  // ---- Fetch website content ----
+  const fetchSections = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/website");
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setSections(json.data || []);
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSections(); }, [fetchSections]);
+
+  // ---- Get section data ----
+  const getSection = (key: string): WebsiteContent | undefined => sections.find((s) => s.section === key);
+
+  // ---- Save section ----
+  const saveSection = async (sectionKey: string, updates: Partial<WebsiteContent>) => {
+    const section = getSection(sectionKey);
+    if (!section) return;
+    setSaving(sectionKey);
+    try {
+      const res = await fetch("/api/admin/website", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: section.id, ...updates }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      show("✅ تم الحفظ بنجاح");
+      await fetchSections();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  // ---- Toggle visibility ----
+  const toggleVisibility = async (sectionKey: string) => {
+    const section = getSection(sectionKey);
+    if (!section) return;
+    await saveSection(sectionKey, { is_visible: !section.is_visible });
+  };
+
+  // ---- Heroes CRUD ----
+  const openHeroCreate = () => {
+    setHeroForm({ title_ar: "", title_he: "", subtitle_ar: "", subtitle_he: "", image_url: "", link_url: "", cta_text_ar: "تسوّق الآن", cta_text_he: "קנה עכשיו", sort_order: 0, active: true });
+    setHeroEditId(null);
+    setHeroModal(true);
+  };
+
+  const openHeroEdit = (h: Hero) => { setHeroForm({ ...h }); setHeroEditId(h.id); setHeroModal(true); };
+
+  const handleHeroSave = async () => {
+    if (!heroForm.title_ar) { show("❌ العنوان مطلوب", "error"); return; }
+    try {
+      if (heroEditId) { await updateHero(heroEditId, heroForm); show("✅ تم التعديل"); }
+      else { await createHero(heroForm); show("✅ تم الإضافة"); }
+      setHeroModal(false);
+    } catch (err: any) { show(`❌ ${err.message}`, "error"); }
+  };
+
+  const handleHeroDelete = async () => {
+    if (heroConfirm) { await removeHero(heroConfirm); show("🗑️ تم الحذف"); setHeroConfirm(null); }
+  };
+
+  // ---- Expand/Collapse ----
+  const toggle = (key: string) => setExpanded(expanded === key ? null : key);
+
+  if (loading) return <div className="text-center py-20 text-muted">⏳ جاري التحميل...</div>;
+
+  return (
+    <div>
+      <PageHeader title="🏠 الصفحة الرئيسية" count={sections.length} />
+
+      <p className="text-muted text-right mb-4" style={{ fontSize: scr.mobile ? 11 : 13 }}>
+        تحكم كامل بكل أقسام الصفحة الرئيسية — اضغط على أي قسم لتعديله
+      </p>
+
+      <div className="space-y-2">
+        {SECTIONS.map(({ key, icon, label, desc }) => {
+          const section = getSection(key);
+          const isExpanded = expanded === key;
+          const isBanners = key === "banners";
+
+          return (
+            <div key={key} className="card overflow-hidden transition-all" style={{ borderColor: isExpanded ? "rgba(196,16,64,0.3)" : undefined }}>
+              {/* Section Header */}
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}
+                onClick={() => toggle(key)}
+              >
+                <div className="flex items-center gap-2">
+                  {!isBanners && section && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Toggle value={section.is_visible} onChange={() => toggleVisibility(key)} />
+                    </div>
+                  )}
+                  <span className="transition-transform" style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0)", fontSize: 14, color: "#71717a" }}>
+                    ◀
+                  </span>
+                </div>
+                <div className="flex-1 text-right mr-3">
+                  <div className="font-bold" style={{ fontSize: scr.mobile ? 14 : 16 }}>
+                    {icon} {label}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                    {desc}
+                    {!isBanners && section && (
+                      <span className="mr-2">
+                        {section.is_visible ? <span className="text-state-success">● مرئي</span> : <span className="text-state-error">● مخفي</span>}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section Body */}
+              {isExpanded && (
+                <div className="border-t border-surface-border" style={{ padding: scr.mobile ? "14px" : "20px" }}>
+                  {key === "hero" && <HeroSectionEditor section={section} onSave={(u) => saveSection("hero", u)} saving={saving === "hero"} scr={scr} />}
+                  {key === "banners" && <BannersSectionEditor heroes={heroes} loading={heroesLoading} onAdd={openHeroCreate} onEdit={openHeroEdit} onToggle={async (id, v) => { await updateHero(id, { active: v }); show(v ? "✅" : "⏸️"); }} onDelete={(id) => setHeroConfirm(id)} scr={scr} />}
+                  {key === "stats" && <StatsSectionEditor section={section} onSave={(u) => saveSection("stats", u)} saving={saving === "stats"} scr={scr} />}
+                  {key === "features" && <FeaturesSectionEditor section={section} onSave={(u) => saveSection("features", u)} saving={saving === "features"} scr={scr} />}
+                  {key === "faq" && <FAQSectionEditor section={section} onSave={(u) => saveSection("faq", u)} saving={saving === "faq"} scr={scr} />}
+                  {key === "cta" && <CTASectionEditor section={section} onSave={(u) => saveSection("cta", u)} saving={saving === "cta"} scr={scr} />}
+                  {key === "footer" && <FooterSectionEditor section={section} onSave={(u) => saveSection("footer", u)} saving={saving === "footer"} scr={scr} />}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Hero/Banner Modal */}
+      <Modal open={heroModal} onClose={() => setHeroModal(false)} title={heroEditId ? "✏️ تعديل بنر" : "➕ بنر جديد"}
+        footer={<button onClick={handleHeroSave} className="btn-primary w-full">{heroEditId ? "💾 حفظ" : "✅ إضافة"}</button>}>
+        <FormField label="العنوان (عربي)" required><input className="input" value={heroForm.title_ar || ""} onChange={(e) => setHeroForm({ ...heroForm, title_ar: e.target.value })} /></FormField>
+        <FormField label="הכותרת (עברית)"><input className="input" value={heroForm.title_he || ""} onChange={(e) => setHeroForm({ ...heroForm, title_he: e.target.value })} dir="rtl" /></FormField>
+        <FormField label="النص الفرعي (عربي)"><input className="input" value={heroForm.subtitle_ar || ""} onChange={(e) => setHeroForm({ ...heroForm, subtitle_ar: e.target.value })} /></FormField>
+        <FormField label="הטקסט המשני (עברית)"><input className="input" value={heroForm.subtitle_he || ""} onChange={(e) => setHeroForm({ ...heroForm, subtitle_he: e.target.value })} dir="rtl" /></FormField>
+        <FormField label="رابط الصورة"><input className="input" value={heroForm.image_url || ""} onChange={(e) => setHeroForm({ ...heroForm, image_url: e.target.value })} placeholder="https://..." dir="ltr" /></FormField>
+        {heroForm.image_url && (
+          <div className="w-full h-28 bg-surface-elevated rounded-xl overflow-hidden mb-2">
+            <img src={heroForm.image_url} alt="" className="w-full h-full object-cover" />
+          </div>
+        )}
+        <FormField label="رابط الزر (عند الضغط)"><input className="input" value={heroForm.link_url || ""} onChange={(e) => setHeroForm({ ...heroForm, link_url: e.target.value })} placeholder="/store" dir="ltr" /></FormField>
+        <div className="grid grid-cols-2 gap-2">
+          <FormField label="نص الزر (عربي)"><input className="input" value={heroForm.cta_text_ar || ""} onChange={(e) => setHeroForm({ ...heroForm, cta_text_ar: e.target.value })} /></FormField>
+          <FormField label="כפתור (עברית)"><input className="input" value={heroForm.cta_text_he || ""} onChange={(e) => setHeroForm({ ...heroForm, cta_text_he: e.target.value })} dir="rtl" /></FormField>
+        </div>
+        <div className="flex gap-3 items-center">
+          <div className="flex-1"><FormField label="ترتيب"><input className="input" type="number" value={heroForm.sort_order || 0} onChange={(e) => setHeroForm({ ...heroForm, sort_order: Number(e.target.value) })} dir="ltr" /></FormField></div>
+          <label className="flex items-center gap-1.5 mt-4"><Toggle value={heroForm.active !== false} onChange={(v) => setHeroForm({ ...heroForm, active: v })} /><span className="text-xs text-muted">مفعّل</span></label>
+        </div>
+      </Modal>
+
+      <ConfirmDialog open={!!heroConfirm} onClose={() => setHeroConfirm(null)} onConfirm={handleHeroDelete} title="🗑️ حذف البنر؟" message="سيتم حذف البنر نهائياً ولا يمكن التراجع" />
+
+      {/* Toasts */}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-4 left-4 z-50 space-y-2">
+          {toasts.map((t) => (
+            <div key={t.id} className={`card font-bold shadow-2xl px-5 py-2.5 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>
+              {t.message}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =====================================================
+// Section Editors — Each one manages its own local state
+// =====================================================
+
+type EditorProps = {
+  section?: WebsiteContent;
+  onSave: (updates: Partial<WebsiteContent>) => Promise<void>;
+  saving: boolean;
+  scr: ReturnType<typeof useScreen>;
+};
+
+function SaveButton({ saving, onClick }: { saving: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} disabled={saving} className="btn-primary disabled:opacity-60" style={{ fontSize: 13, padding: "10px 28px" }}>
+      {saving ? "⏳ جاري الحفظ..." : "💾 حفظ التعديلات"}
+    </button>
+  );
+}
+
+// ===== 1. Hero Section Editor =====
+function HeroSectionEditor({ section, onSave, saving, scr }: EditorProps) {
+  const [titleAr, setTitleAr] = useState(section?.title_ar || "");
+  const [titleHe, setTitleHe] = useState(section?.title_he || "");
+  const [c, setC] = useState<Record<string, any>>(section?.content || {});
+
+  const updateC = (key: string, val: any) => setC((prev) => ({ ...prev, [key]: val }));
+
+  const handleSave = () => {
+    onSave({ title_ar: titleAr, title_he: titleHe, content: c });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs font-bold text-brand mb-1">🏠 القسم الرئيسي — العنوان والوصف وأزرار الصفحة</div>
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+        <FormField label="العنوان الرئيسي (عربي)">
+          <input className="input" value={titleAr} onChange={(e) => setTitleAr(e.target.value)} placeholder="ClalMobile" />
+        </FormField>
+        <FormField label="הכותרת הראשית (עברית)">
+          <input className="input" value={titleHe} onChange={(e) => setTitleHe(e.target.value)} dir="rtl" placeholder="ClalMobile" />
+        </FormField>
+      </div>
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+        <FormField label="🏷️ شارة (عربي)">
+          <input className="input" value={c.badge_ar || ""} onChange={(e) => updateC("badge_ar", e.target.value)} placeholder="🔥 عروض حصرية" />
+        </FormField>
+        <FormField label="🏷️ תג (עברית)">
+          <input className="input" value={c.badge_he || ""} onChange={(e) => updateC("badge_he", e.target.value)} dir="rtl" />
+        </FormField>
+      </div>
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+        <FormField label="الوصف (عربي)">
+          <textarea className="input" rows={2} value={c.description_ar || ""} onChange={(e) => updateC("description_ar", e.target.value)} placeholder="أفضل الأسعار على الأجهزة الذكية والإكسسوارات" />
+        </FormField>
+        <FormField label="התיאור (עברית)">
+          <textarea className="input" rows={2} value={c.description_he || ""} onChange={(e) => updateC("description_he", e.target.value)} dir="rtl" />
+        </FormField>
+      </div>
+
+      <div className="bg-surface-elevated/50 p-3 rounded-xl border border-surface-border space-y-2">
+        <div className="text-[11px] font-bold text-muted mb-1">🔘 أزرار الهيرو</div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+          <FormField label="زر المتجر (عربي)"><input className="input" value={c.cta_store_ar || ""} onChange={(e) => updateC("cta_store_ar", e.target.value)} placeholder="تسوّق الآن" /></FormField>
+          <FormField label="כפתור חנות (עברית)"><input className="input" value={c.cta_store_he || ""} onChange={(e) => updateC("cta_store_he", e.target.value)} dir="rtl" /></FormField>
+        </div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+          <FormField label="زر الباقات (عربي)"><input className="input" value={c.cta_plans_ar || ""} onChange={(e) => updateC("cta_plans_ar", e.target.value)} placeholder="باقات الخطوط" /></FormField>
+          <FormField label="כפתור חבילות (עברית)"><input className="input" value={c.cta_plans_he || ""} onChange={(e) => updateC("cta_plans_he", e.target.value)} dir="rtl" /></FormField>
+        </div>
+      </div>
+
+      <FormField label="🖼️ صورة خلفية (URL)">
+        <input className="input" value={c.bg_image || ""} onChange={(e) => updateC("bg_image", e.target.value)} placeholder="https://..." dir="ltr" />
+      </FormField>
+      {c.bg_image && (
+        <div className="w-full h-32 bg-surface-elevated rounded-xl overflow-hidden">
+          <img src={c.bg_image} alt="" className="w-full h-full object-cover opacity-60" />
+        </div>
+      )}
+
+      <div className="flex justify-start pt-2"><SaveButton saving={saving} onClick={handleSave} /></div>
+    </div>
+  );
+}
+
+// ===== 2. Banners Section Editor =====
+function BannersSectionEditor({ heroes, loading, onAdd, onEdit, onToggle, onDelete, scr }: {
+  heroes: Hero[];
+  loading: boolean;
+  onAdd: () => void;
+  onEdit: (h: Hero) => void;
+  onToggle: (id: string, active: boolean) => void;
+  onDelete: (id: string) => void;
+  scr: ReturnType<typeof useScreen>;
+}) {
+  if (loading) return <div className="text-center py-8 text-muted">⏳</div>;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-muted" style={{ fontSize: 11 }}>{heroes.length} بنر</span>
+        <button onClick={onAdd} className="btn-primary" style={{ fontSize: 12, padding: "8px 16px" }}>
+          ➕ بنر جديد
+        </button>
+      </div>
+
+      {heroes.length === 0 ? (
+        <EmptyState icon="🖼️" title="لا يوجد بنرات" sub="أضف بنر أول لعرضه في الكاروسيل" />
+      ) : (
+        <div className="space-y-1.5">
+          {heroes.map((h) => (
+            <div key={h.id} className="bg-surface-elevated/50 border border-surface-border rounded-xl flex items-center gap-3 cursor-pointer hover:border-brand/30 transition-all"
+              style={{ padding: scr.mobile ? "10px 12px" : "12px 16px" }}
+              onClick={() => onEdit(h)}>
+
+              {/* Image preview */}
+              {h.image_url ? (
+                <div className="w-16 h-10 bg-surface-bg rounded-lg overflow-hidden flex-shrink-0">
+                  <img src={h.image_url} alt="" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-16 h-10 bg-surface-bg rounded-lg flex items-center justify-center flex-shrink-0 text-xl">🖼️</div>
+              )}
+
+              {/* Info */}
+              <div className="flex-1 text-right min-w-0">
+                <div className="font-bold truncate" style={{ fontSize: scr.mobile ? 12 : 14 }}>{h.title_ar}</div>
+                <div className="text-muted truncate" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                  {h.subtitle_ar || "—"} • ترتيب: {h.sort_order}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <Toggle value={h.active} onChange={(v) => onToggle(h.id, v)} />
+                <button onClick={() => onDelete(h.id)}
+                  className="w-7 h-7 rounded-lg border border-state-error/30 bg-transparent text-state-error text-xs cursor-pointer flex items-center justify-center hover:bg-state-error/10">
+                  🗑
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== 3. Stats Section Editor =====
+function StatsSectionEditor({ section, onSave, saving, scr }: EditorProps) {
+  const [items, setItems] = useState<any[]>(section?.content?.items || []);
+
+  const updateItem = (i: number, field: string, value: string) => {
+    const next = [...items];
+    next[i] = { ...next[i], [field]: value };
+    setItems(next);
+  };
+
+  const addItem = () => setItems([...items, { value: "", label_ar: "", label_he: "", icon: "📌" }]);
+  const removeItem = (i: number) => { const next = [...items]; next.splice(i, 1); setItems(next); };
+
+  const handleSave = () => onSave({ content: { ...section?.content, items } });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-muted" style={{ fontSize: 11 }}>{items.length} إحصائيات</span>
+        <button onClick={addItem} className="text-xs text-brand bg-transparent border-0 cursor-pointer font-bold">➕ إضافة إحصاء</button>
+      </div>
+
+      {items.map((item, i) => (
+        <div key={i} className="bg-surface-elevated/50 border border-surface-border rounded-xl space-y-2" style={{ padding: scr.mobile ? "12px" : "16px" }}>
+          <div className="flex items-center justify-between">
+            <button onClick={() => removeItem(i)} className="text-[11px] text-state-error cursor-pointer bg-transparent border-0 hover:underline">✕ حذف</button>
+            <span className="text-[11px] text-muted font-bold">إحصاء #{i + 1}</span>
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "80px 1fr 1fr 1fr" }}>
+            <FormField label="أيقونة"><input className="input text-center" value={item.icon || ""} onChange={(e) => updateItem(i, "icon", e.target.value)} /></FormField>
+            <FormField label="القيمة"><input className="input" value={item.value || ""} onChange={(e) => updateItem(i, "value", e.target.value)} dir="ltr" placeholder="500+" /></FormField>
+            <FormField label="النص (عربي)"><input className="input" value={item.label_ar || ""} onChange={(e) => updateItem(i, "label_ar", e.target.value)} placeholder="عميل سعيد" /></FormField>
+            <FormField label="הטקסט (עברית)"><input className="input" value={item.label_he || ""} onChange={(e) => updateItem(i, "label_he", e.target.value)} dir="rtl" /></FormField>
+          </div>
+        </div>
+      ))}
+
+      <div className="flex justify-start pt-2"><SaveButton saving={saving} onClick={handleSave} /></div>
+    </div>
+  );
+}
+
+// ===== 4. Features Section Editor =====
+function FeaturesSectionEditor({ section, onSave, saving, scr }: EditorProps) {
+  const [items, setItems] = useState<any[]>(section?.content?.items || []);
+
+  const updateItem = (i: number, field: string, value: string) => {
+    const next = [...items];
+    next[i] = { ...next[i], [field]: value };
+    setItems(next);
+  };
+
+  const addItem = () => setItems([...items, { icon: "⭐", title_ar: "", title_he: "", desc_ar: "", desc_he: "" }]);
+  const removeItem = (i: number) => { const next = [...items]; next.splice(i, 1); setItems(next); };
+  const moveItem = (i: number, dir: -1 | 1) => {
+    const next = [...items];
+    const j = i + dir;
+    if (j < 0 || j >= next.length) return;
+    [next[i], next[j]] = [next[j], next[i]];
+    setItems(next);
+  };
+
+  const handleSave = () => onSave({ content: { ...section?.content, items } });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-muted" style={{ fontSize: 11 }}>{items.length} مميزات</span>
+        <button onClick={addItem} className="text-xs text-brand bg-transparent border-0 cursor-pointer font-bold">➕ إضافة ميزة</button>
+      </div>
+
+      {items.map((item, i) => (
+        <div key={i} className="bg-surface-elevated/50 border border-surface-border rounded-xl space-y-2" style={{ padding: scr.mobile ? "12px" : "16px" }}>
+          <div className="flex items-center justify-between">
+            <div className="flex gap-1">
+              <button onClick={() => removeItem(i)} className="text-[11px] text-state-error cursor-pointer bg-transparent border-0 hover:underline">✕ حذف</button>
+              <button onClick={() => moveItem(i, -1)} disabled={i === 0} className="text-[11px] text-muted cursor-pointer bg-transparent border-0 disabled:opacity-30">▲</button>
+              <button onClick={() => moveItem(i, 1)} disabled={i === items.length - 1} className="text-[11px] text-muted cursor-pointer bg-transparent border-0 disabled:opacity-30">▼</button>
+            </div>
+            <span className="text-[11px] text-muted font-bold">ميزة #{i + 1}</span>
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "80px 1fr 1fr" }}>
+            <FormField label="أيقونة"><input className="input text-center" value={item.icon || ""} onChange={(e) => updateItem(i, "icon", e.target.value)} /></FormField>
+            <FormField label="العنوان (عربي)"><input className="input" value={item.title_ar || ""} onChange={(e) => updateItem(i, "title_ar", e.target.value)} /></FormField>
+            <FormField label="הכותרת (עברית)"><input className="input" value={item.title_he || ""} onChange={(e) => updateItem(i, "title_he", e.target.value)} dir="rtl" /></FormField>
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+            <FormField label="الوصف (عربي)"><textarea className="input" rows={2} value={item.desc_ar || ""} onChange={(e) => updateItem(i, "desc_ar", e.target.value)} /></FormField>
+            <FormField label="התיאור (עברית)"><textarea className="input" rows={2} value={item.desc_he || ""} onChange={(e) => updateItem(i, "desc_he", e.target.value)} dir="rtl" /></FormField>
+          </div>
+        </div>
+      ))}
+
+      <div className="flex justify-start pt-2"><SaveButton saving={saving} onClick={handleSave} /></div>
+    </div>
+  );
+}
+
+// ===== 5. FAQ Section Editor =====
+function FAQSectionEditor({ section, onSave, saving, scr }: EditorProps) {
+  const [items, setItems] = useState<any[]>(section?.content?.items || []);
+
+  const updateItem = (i: number, field: string, value: string) => {
+    const next = [...items];
+    next[i] = { ...next[i], [field]: value };
+    setItems(next);
+  };
+
+  const addItem = () => setItems([...items, { q_ar: "", q_he: "", a_ar: "", a_he: "" }]);
+  const removeItem = (i: number) => { const next = [...items]; next.splice(i, 1); setItems(next); };
+  const moveItem = (i: number, dir: -1 | 1) => {
+    const next = [...items];
+    const j = i + dir;
+    if (j < 0 || j >= next.length) return;
+    [next[i], next[j]] = [next[j], next[i]];
+    setItems(next);
+  };
+
+  const handleSave = () => onSave({ content: { ...section?.content, items } });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-muted" style={{ fontSize: 11 }}>{items.length} أسئلة</span>
+        <button onClick={addItem} className="text-xs text-brand bg-transparent border-0 cursor-pointer font-bold">➕ إضافة سؤال</button>
+      </div>
+
+      {items.map((item, i) => (
+        <div key={i} className="bg-surface-elevated/50 border border-surface-border rounded-xl space-y-2" style={{ padding: scr.mobile ? "12px" : "16px" }}>
+          <div className="flex items-center justify-between">
+            <div className="flex gap-1">
+              <button onClick={() => removeItem(i)} className="text-[11px] text-state-error cursor-pointer bg-transparent border-0 hover:underline">✕ حذف</button>
+              <button onClick={() => moveItem(i, -1)} disabled={i === 0} className="text-[11px] text-muted cursor-pointer bg-transparent border-0 disabled:opacity-30">▲</button>
+              <button onClick={() => moveItem(i, 1)} disabled={i === items.length - 1} className="text-[11px] text-muted cursor-pointer bg-transparent border-0 disabled:opacity-30">▼</button>
+            </div>
+            <span className="text-[11px] text-muted font-bold">سؤال #{i + 1}</span>
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+            <FormField label="السؤال (عربي)"><input className="input" value={item.q_ar || ""} onChange={(e) => updateItem(i, "q_ar", e.target.value)} /></FormField>
+            <FormField label="השאלה (עברית)"><input className="input" value={item.q_he || ""} onChange={(e) => updateItem(i, "q_he", e.target.value)} dir="rtl" /></FormField>
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+            <FormField label="الإجابة (عربي)"><textarea className="input" rows={2} value={item.a_ar || ""} onChange={(e) => updateItem(i, "a_ar", e.target.value)} /></FormField>
+            <FormField label="התשובה (עברית)"><textarea className="input" rows={2} value={item.a_he || ""} onChange={(e) => updateItem(i, "a_he", e.target.value)} dir="rtl" /></FormField>
+          </div>
+        </div>
+      ))}
+
+      <div className="flex justify-start pt-2"><SaveButton saving={saving} onClick={handleSave} /></div>
+    </div>
+  );
+}
+
+// ===== 6. CTA Section Editor =====
+function CTASectionEditor({ section, onSave, saving, scr }: EditorProps) {
+  const [titleAr, setTitleAr] = useState(section?.title_ar || "");
+  const [titleHe, setTitleHe] = useState(section?.title_he || "");
+  const [c, setC] = useState<Record<string, any>>(section?.content || {});
+
+  const updateC = (key: string, val: any) => setC((prev) => ({ ...prev, [key]: val }));
+
+  const handleSave = () => onSave({ title_ar: titleAr, title_he: titleHe, content: c });
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs font-bold text-brand mb-1">📣 القسم التحفيزي — يظهر قبل الفوتر</div>
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+        <FormField label="العنوان (عربي)"><input className="input" value={c.title_ar || ""} onChange={(e) => updateC("title_ar", e.target.value)} /></FormField>
+        <FormField label="הכותרת (עברית)"><input className="input" value={c.title_he || ""} onChange={(e) => updateC("title_he", e.target.value)} dir="rtl" /></FormField>
+      </div>
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+        <FormField label="الوصف (عربي)"><textarea className="input" rows={2} value={c.desc_ar || ""} onChange={(e) => updateC("desc_ar", e.target.value)} /></FormField>
+        <FormField label="התיאור (עברית)"><textarea className="input" rows={2} value={c.desc_he || ""} onChange={(e) => updateC("desc_he", e.target.value)} dir="rtl" /></FormField>
+      </div>
+
+      <div className="bg-surface-elevated/50 p-3 rounded-xl border border-surface-border space-y-2">
+        <div className="text-[11px] font-bold text-muted mb-1">🔘 الأزرار</div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr 1fr" }}>
+          <FormField label="زر 1 (عربي)"><input className="input" value={c.btn1_ar || ""} onChange={(e) => updateC("btn1_ar", e.target.value)} /></FormField>
+          <FormField label="כפתור 1 (עברית)"><input className="input" value={c.btn1_he || ""} onChange={(e) => updateC("btn1_he", e.target.value)} dir="rtl" /></FormField>
+          <FormField label="رابط زر 1"><input className="input" value={c.btn1_link || ""} onChange={(e) => updateC("btn1_link", e.target.value)} dir="ltr" placeholder="/store" /></FormField>
+        </div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr 1fr" }}>
+          <FormField label="زر 2 (عربي)"><input className="input" value={c.btn2_ar || ""} onChange={(e) => updateC("btn2_ar", e.target.value)} /></FormField>
+          <FormField label="כפתור 2 (עברית)"><input className="input" value={c.btn2_he || ""} onChange={(e) => updateC("btn2_he", e.target.value)} dir="rtl" /></FormField>
+          <FormField label="رابط زر 2"><input className="input" value={c.btn2_link || ""} onChange={(e) => updateC("btn2_link", e.target.value)} dir="ltr" placeholder="/contact" /></FormField>
+        </div>
+      </div>
+
+      <div className="flex justify-start pt-2"><SaveButton saving={saving} onClick={handleSave} /></div>
+    </div>
+  );
+}
+
+// ===== 7. Footer Section Editor =====
+function FooterSectionEditor({ section, onSave, saving, scr }: EditorProps) {
+  const [titleAr, setTitleAr] = useState(section?.title_ar || "");
+  const [titleHe, setTitleHe] = useState(section?.title_he || "");
+  const [c, setC] = useState<Record<string, any>>(section?.content || {});
+
+  const updateC = (key: string, val: any) => setC((prev) => ({ ...prev, [key]: val }));
+  const social = c.social || {};
+  const updateSocial = (key: string, val: string) => updateC("social", { ...social, [key]: val });
+
+  const handleSave = () => onSave({ title_ar: titleAr, title_he: titleHe, content: c });
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs font-bold text-brand mb-1">📋 الفوتر — معلومات التواصل والروابط</div>
+
+      {/* Contact info */}
+      <div className="bg-surface-elevated/50 p-3 rounded-xl border border-surface-border space-y-2">
+        <div className="text-[11px] font-bold text-muted mb-1">📞 معلومات التواصل</div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr 1fr" }}>
+          <FormField label="📞 الهاتف"><input className="input" value={c.phone || ""} onChange={(e) => updateC("phone", e.target.value)} dir="ltr" placeholder="053-3337653" /></FormField>
+          <FormField label="💬 واتساب"><input className="input" value={c.whatsapp || ""} onChange={(e) => updateC("whatsapp", e.target.value)} dir="ltr" placeholder="972533337653" /></FormField>
+          <FormField label="📧 البريد"><input className="input" value={c.email || ""} onChange={(e) => updateC("email", e.target.value)} dir="ltr" placeholder="info@clalmobile.com" /></FormField>
+        </div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+          <FormField label="العنوان (عربي)"><input className="input" value={c.address_ar || ""} onChange={(e) => updateC("address_ar", e.target.value)} placeholder="إسرائيل — المثلث" /></FormField>
+          <FormField label="הכתובת (עברית)"><input className="input" value={c.address_he || ""} onChange={(e) => updateC("address_he", e.target.value)} dir="rtl" /></FormField>
+        </div>
+      </div>
+
+      {/* Copyright */}
+      <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+        <FormField label="حقوق النسخ (عربي)"><input className="input" value={c.copyright_ar || ""} onChange={(e) => updateC("copyright_ar", e.target.value)} /></FormField>
+        <FormField label="זכויות יוצרים (עברית)"><input className="input" value={c.copyright_he || ""} onChange={(e) => updateC("copyright_he", e.target.value)} dir="rtl" /></FormField>
+      </div>
+
+      {/* Social Media */}
+      <div className="bg-surface-elevated/50 p-3 rounded-xl border border-surface-border space-y-2">
+        <div className="text-[11px] font-bold text-muted mb-1">🔗 روابط التواصل الاجتماعي</div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
+          <FormField label="📘 Facebook"><input className="input" value={social.facebook || ""} onChange={(e) => updateSocial("facebook", e.target.value)} dir="ltr" placeholder="https://facebook.com/..." /></FormField>
+          <FormField label="📸 Instagram"><input className="input" value={social.instagram || ""} onChange={(e) => updateSocial("instagram", e.target.value)} dir="ltr" placeholder="https://instagram.com/..." /></FormField>
+          <FormField label="🎵 TikTok"><input className="input" value={social.tiktok || ""} onChange={(e) => updateSocial("tiktok", e.target.value)} dir="ltr" placeholder="https://tiktok.com/@..." /></FormField>
+          <FormField label="🐦 Twitter/X"><input className="input" value={social.twitter || ""} onChange={(e) => updateSocial("twitter", e.target.value)} dir="ltr" placeholder="https://x.com/..." /></FormField>
+        </div>
+      </div>
+
+      <div className="flex justify-start pt-2"><SaveButton saving={saving} onClick={handleSave} /></div>
+    </div>
+  );
+}
