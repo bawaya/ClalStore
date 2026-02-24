@@ -30,6 +30,7 @@ export default function ProductsPage() {
   const [filter, setFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("all");
   const [uploading, setUploading] = useState(false);
+  const [enhancingImage, setEnhancingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const colorInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
@@ -65,6 +66,28 @@ export default function ProductsPage() {
     if (url) { setForm({ ...form, image_url: url }); show("✅ تم رفع الصورة"); }
     setUploading(false);
     e.target.value = "";
+  };
+
+  const handleEnhanceImage = async () => {
+    if (!form.image_url || enhancingImage) return;
+    setEnhancingImage(true);
+    try {
+      const res = await fetch("/api/admin/image-enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: form.image_url }),
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        setForm({ ...form, image_url: data.url });
+        show("✅ تمت إزالة الخلفية وتحسين الصورة!");
+      } else {
+        show(`❌ ${data.error || "فشل تحسين الصورة"}`, "error");
+      }
+    } catch {
+      show("❌ فشل الاتصال", "error");
+    }
+    setEnhancingImage(false);
   };
 
   const handleGalleryImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -493,13 +516,20 @@ export default function ProductsPage() {
 
               {/* Main image preview */}
               {form.image_url && (
-                <div className="relative mb-2 bg-surface-elevated rounded-xl flex items-center justify-center cursor-pointer" style={{ height: 120 }} onClick={() => setZoomImage(form.image_url!)}>
+                <div className="relative mb-2 bg-surface-elevated rounded-xl flex items-center justify-center cursor-pointer" style={{ height: 120 }} onClick={() => !enhancingImage && setZoomImage(form.image_url!)}>
                   <img src={form.image_url} alt="صورة" className="max-h-[90%] max-w-[90%] object-contain rounded-lg" />
                   <div className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/50 text-white text-xs flex items-center justify-center">🔍</div>
                   <button
-                    onClick={() => setForm({ ...form, image_url: undefined })}
+                    onClick={(e) => { e.stopPropagation(); setForm({ ...form, image_url: undefined }); }}
                     className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-state-error/80 text-white text-xs flex items-center justify-center cursor-pointer border-0"
                   >✕</button>
+                  {enhancingImage && (
+                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center rounded-xl z-10">
+                      <div className="text-2xl animate-pulse mb-1">✨</div>
+                      <div className="text-white text-[11px] font-bold">جاري إزالة الخلفية...</div>
+                      <div className="text-white/50 text-[9px] mt-0.5">Remove.bg AI</div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -513,6 +543,15 @@ export default function ProductsPage() {
                 >
                   {uploading ? "⏳ جاري الرفع..." : "📷 رفع من الجهاز"}
                 </button>
+                {form.image_url && (
+                  <button
+                    onClick={handleEnhanceImage}
+                    disabled={enhancingImage}
+                    className="py-2 px-3 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 disabled:opacity-40"
+                  >
+                    {enhancingImage ? "⏳ جاري..." : "✨ إزالة الخلفية"}
+                  </button>
+                )}
               </div>
               <FormField label="أو رابط صورة مباشر">
                 <input className="input text-xs" dir="ltr" value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value || undefined })} placeholder="https://..." />

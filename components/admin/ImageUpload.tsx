@@ -24,6 +24,8 @@ interface ImageUploadProps {
   maxSizeMB?: number;
   /** rounded style for logos etc */
   rounded?: boolean;
+  /** show AI enhance button (remove bg) */
+  enableEnhance?: boolean;
 }
 
 export function ImageUpload({
@@ -35,10 +37,12 @@ export function ImageUpload({
   accept = "image/jpeg,image/png,image/webp,image/avif",
   maxSizeMB = 5,
   rounded = false,
+  enableEnhance = false,
 }: ImageUploadProps) {
   const scr = useScreen();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
 
@@ -85,6 +89,29 @@ export function ImageUpload({
     onChange("");
   };
 
+  const handleEnhance = async () => {
+    if (!value || enhancing) return;
+    setEnhancing(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/image-enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: value }),
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        onChange(data.url);
+      } else {
+        setError(data.error || "فشل تحسين الصورة");
+      }
+    } catch {
+      setError("فشل الاتصال بالسيرفر");
+    } finally {
+      setEnhancing(false);
+    }
+  };
+
   return (
     <div className="mb-3">
       {/* Label & dimensions hint */}
@@ -115,6 +142,16 @@ export function ImageUpload({
           </div>
           {/* Overlay actions */}
           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-xl">
+            {enableEnhance && (
+              <button
+                onClick={handleEnhance}
+                disabled={enhancing}
+                className="px-3 py-1.5 text-white text-[11px] font-bold rounded-lg border-0 cursor-pointer backdrop-blur-sm disabled:opacity-50"
+                style={{ background: enhancing ? "rgba(124,58,237,0.6)" : "rgba(124,58,237,0.5)" }}
+              >
+                {enhancing ? "⏳ جاري التحسين..." : "✨ إزالة الخلفية"}
+              </button>
+            )}
             <button
               onClick={() => inputRef.current?.click()}
               className="px-3 py-1.5 bg-white/20 text-white text-[11px] font-bold rounded-lg border-0 cursor-pointer hover:bg-white/30 backdrop-blur-sm"
@@ -128,6 +165,14 @@ export function ImageUpload({
               🗑 حذف
             </button>
           </div>
+          {/* Enhancing overlay */}
+          {enhancing && (
+            <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center rounded-xl z-10">
+              <div className="text-2xl animate-pulse mb-1">✨</div>
+              <div className="text-white text-[11px] font-bold">جاري إزالة الخلفية...</div>
+              <div className="text-white/60 text-[9px] mt-0.5">Remove.bg AI</div>
+            </div>
+          )}
         </div>
       ) : (
         <div
