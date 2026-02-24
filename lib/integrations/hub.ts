@@ -173,9 +173,12 @@ export async function initializeProviders() {
     registerProvider("payment", new RivhitProvider());
   }
 
-  // Email — SendGrid (check DB config first, then env)
+  // Email — Resend (primary) or SendGrid (fallback)
   const emailCfg = await getIntegrationConfig("email");
-  if (emailCfg.api_key || process.env.SENDGRID_API_KEY) {
+  if (emailCfg.api_key || process.env.RESEND_API_KEY) {
+    const { ResendProvider } = await import("./resend");
+    registerProvider("email", new ResendProvider());
+  } else if (process.env.SENDGRID_API_KEY) {
     const { SendGridProvider } = await import("./sendgrid");
     registerProvider("email", new SendGridProvider());
   }

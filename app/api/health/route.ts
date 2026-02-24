@@ -30,7 +30,13 @@ export async function GET() {
   checks.payment = { ok: !!process.env.RIVHIT_API_KEY, error: !process.env.RIVHIT_API_KEY ? "Not configured" : undefined };
 
   // 4. Email provider
-  checks.email = { ok: !!process.env.SENDGRID_API_KEY, error: !process.env.SENDGRID_API_KEY ? "Not configured" : undefined };
+  const hasEmail = !!(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY);
+  checks.email = {
+    ok: hasEmail,
+    error: hasEmail
+      ? (process.env.RESEND_API_KEY ? "Resend ✓" : "SendGrid ✓")
+      : "Not configured",
+  };
 
   // 5. WhatsApp provider
   checks.whatsapp = { ok: !!process.env.YCLOUD_API_KEY, error: !process.env.YCLOUD_API_KEY ? "Not configured" : undefined };

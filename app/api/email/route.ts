@@ -8,7 +8,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { getProvider } from "@/lib/integrations/hub";
 import type { EmailProvider } from "@/lib/integrations/hub";
-import { buildOrderConfirmEmail, buildStatusUpdateEmail } from "@/lib/integrations/sendgrid";
+import { buildOrderConfirmEmail, buildStatusUpdateEmail } from "@/lib/integrations/resend";
 
 export async function POST(req: NextRequest) {
   try {
