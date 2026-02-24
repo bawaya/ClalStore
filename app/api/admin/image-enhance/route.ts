@@ -71,8 +71,15 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("[Image Enhance Error]", err);
+    // Return detailed error for debugging
+    const detail = err.message || "Image enhancement failed";
+    const step = detail.includes("Remove.bg")
+      ? "removebg"
+      : detail.includes("R2") || detail.includes("Upload")
+        ? "upload"
+        : "unknown";
     return NextResponse.json(
-      { error: err.message || "Image enhancement failed" },
+      { error: detail, step, success: false },
       { status: 500 }
     );
   }

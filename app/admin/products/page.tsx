@@ -121,7 +121,7 @@ export default function ProductsPage() {
     }
 
     // Process each image
-    const enhanceSingle = async (url: string): Promise<string | null> => {
+    const enhanceSingle = async (url: string, label: string): Promise<string | null> => {
       let currentUrl = url;
       try {
         // Step 1: Remove background
@@ -135,6 +135,8 @@ export default function ProductsPage() {
           if (data.success && data.url) {
             currentUrl = data.url;
           } else {
+            console.error(`[Enhance] ${label} failed:`, data.error, data.step);
+            show(`❌ ${label}: ${data.error || "فشل غير معروف"}`, "error");
             return null;
           }
         }
@@ -149,7 +151,9 @@ export default function ProductsPage() {
           }
         }
         return currentUrl;
-      } catch {
+      } catch (err: any) {
+        console.error(`[Enhance] ${label} error:`, err);
+        show(`❌ ${label}: ${err.message || "خطأ غير متوقع"}`, "error");
         return null;
       }
     };
@@ -164,7 +168,7 @@ export default function ProductsPage() {
         : `صورة اللون ${(form.colors || [])[item.index]?.name_ar || item.index + 1}`;
       setEnhanceLabel(`${label} (${i + 1}/${allImages.length})...`);
 
-      const result = await enhanceSingle(item.url);
+      const result = await enhanceSingle(item.url, label);
       if (result) {
         successCount++;
         // Update the correct image in form
