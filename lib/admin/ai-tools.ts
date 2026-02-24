@@ -140,16 +140,20 @@ export function generateDescription(
   nameHe: string,
   brand: string,
 ): { description_ar: string; description_he: string } {
-  const partsAr: string[] = [nameAr || brand];
-  const partsHe: string[] = [nameHe || brand];
+  const partsAr: string[] = [];
+  const partsHe: string[] = [];
+
+  // Opening line with product name
+  partsAr.push(`${nameAr || brand} — تصميم أنيق وأداء مذهل!`);
+  partsHe.push(`${nameHe || brand} — עיצוב אלגנטי וביצועים מרשימים!`);
 
   // Screen
   if (specs.screen) {
     const sizeMatch = specs.screen.match(/([\d.]+)\s*inches?/i);
     const typeMatch = specs.screen.match(/(OLED|AMOLED|Super Retina|LTPO|LCD|IPS|Dynamic AMOLED)/i);
     if (sizeMatch) {
-      partsAr.push(`شاشة ${sizeMatch[1]} بوصة${typeMatch ? ` ${typeMatch[1]}` : ""}`);
-      partsHe.push(`מסך ${sizeMatch[1]} אינץ'${typeMatch ? ` ${typeMatch[1]}` : ""}`);
+      partsAr.push(`شاشة ${sizeMatch[1]} بوصة${typeMatch ? ` ${typeMatch[1]}` : ""} بجودة خارقة`);
+      partsHe.push(`מסך ${sizeMatch[1]} אינץ'${typeMatch ? ` ${typeMatch[1]}` : ""} באיכות מדהימה`);
     }
   }
 
@@ -157,17 +161,11 @@ export function generateDescription(
   if (specs.camera) {
     const mpMatch = specs.camera.match(/([\d.]+)\s*MP/i);
     if (mpMatch) {
-      partsAr.push(`كاميرا ${mpMatch[1]}MP`);
-      partsHe.push(`מצלמה ${mpMatch[1]}MP`);
-    }
-  }
-
-  // Battery
-  if (specs.battery) {
-    const batMatch = specs.battery.match(/([\d,]+)\s*mAh/i);
-    if (batMatch) {
-      partsAr.push(`بطارية ${batMatch[1]} mAh`);
-      partsHe.push(`סוללה ${batMatch[1]} mAh`);
+      const frontMp = specs.front_camera?.match(/([\d.]+)\s*MP/i);
+      const frontPart = frontMp ? ` وأمامية ${frontMp[1]}MP` : "";
+      const frontPartHe = frontMp ? ` וקדמית ${frontMp[1]}MP` : "";
+      partsAr.push(`كاميرا مذهلة ${mpMatch[1]}MP${frontPart}`);
+      partsHe.push(`מצלמה מרשימה ${mpMatch[1]}MP${frontPartHe}`);
     }
   }
 
@@ -175,8 +173,32 @@ export function generateDescription(
   if (specs.cpu) {
     const cpuShort = specs.cpu.split("(")[0].trim();
     if (cpuShort.length < 60) {
-      partsAr.push(`معالج ${cpuShort}`);
-      partsHe.push(`מעבד ${cpuShort}`);
+      partsAr.push(`معالج ${cpuShort} القوي`);
+      partsHe.push(`מעבד ${cpuShort} עוצמתי`);
+    }
+  }
+
+  // RAM
+  if (specs.ram) {
+    partsAr.push(`ذاكرة ${specs.ram}`);
+    partsHe.push(`זיכרון ${specs.ram}`);
+  }
+
+  // Battery + Charging combined
+  if (specs.battery) {
+    const batMatch = specs.battery.match(/([\d,]+)\s*mAh/i);
+    if (batMatch) {
+      const wattMatch = specs.charging?.match(/(\d+)\s*W/i);
+      const chargePart = wattMatch ? ` مع شحن سريع ${wattMatch[1]}W` : "";
+      const chargePartHe = wattMatch ? ` עם טעינה מהירה ${wattMatch[1]}W` : "";
+      partsAr.push(`بطارية ${batMatch[1]} mAh تدوم طول اليوم${chargePart}`);
+      partsHe.push(`סוללה ${batMatch[1]} mAh שמחזיקה כל היום${chargePartHe}`);
+    }
+  } else if (specs.charging) {
+    const wattMatch = specs.charging.match(/(\d+)\s*W/i);
+    if (wattMatch) {
+      partsAr.push(`شحن سريع ${wattMatch[1]}W`);
+      partsHe.push(`טעינה מהירה ${wattMatch[1]}W`);
     }
   }
 
@@ -186,18 +208,30 @@ export function generateDescription(
     partsHe.push(`עמידות במים ${specs.waterproof}`);
   }
 
-  // Charging
-  if (specs.charging) {
-    const wattMatch = specs.charging.match(/(\d+)\s*W/i);
-    if (wattMatch) {
-      partsAr.push(`شحن سريع ${wattMatch[1]}W`);
-      partsHe.push(`טעינה מהירה ${wattMatch[1]}W`);
-    }
+  // NFC
+  if (specs.nfc && !/no/i.test(specs.nfc)) {
+    partsAr.push("يدعم NFC");
+    partsHe.push("תומך NFC");
   }
 
+  // Build final description as flowing text
+  if (partsAr.length <= 2) {
+    // Not enough specs — simple description
+    return {
+      description_ar: partsAr.join(" "),
+      description_he: partsHe.join(" "),
+    };
+  }
+
+  // First part is the intro, rest are specs joined naturally
+  const introAr = partsAr[0];
+  const introHe = partsHe[0];
+  const specsAr = partsAr.slice(1).join("، ");
+  const specsHe = partsHe.slice(1).join(", ");
+
   return {
-    description_ar: partsAr.join(" — "),
-    description_he: partsHe.join(" — "),
+    description_ar: `${introAr} ${specsAr}.`,
+    description_he: `${introHe} ${specsHe}.`,
   };
 }
 

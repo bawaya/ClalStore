@@ -229,7 +229,11 @@
     "waterproof": "עמידות במים",
     "network": "רשת",
     "charging": "טעינה",
-    "dimensions": "מידות"
+    "dimensions": "מידות",
+    "ram": "זיכרון RAM",
+    "gps": "מיקום",
+    "sensors": "חיישנים",
+    "quickSpecs": "מפרט עיקרי"
   },
   "errors": {
     "pageNotFound": "הדף לא נמצא",

@@ -286,6 +286,35 @@ export function ProductCard({ product: p }: { product: Product }) {
           </div>
         )}
 
+        {/* ── Quick Specs Strip (devices only) ── */}
+        {p.type === "device" && p.specs && (() => {
+          const s = p.specs as Record<string, string>;
+          const items: { icon: string; val: string }[] = [];
+          if (s.screen) {
+            const m = s.screen.match(/([\d.]+)\s*inches?/i);
+            if (m) items.push({ icon: "📱", val: `${m[1]}"` });
+          }
+          if (s.camera) {
+            const m = s.camera.match(/([\d.]+)\s*MP/i);
+            if (m) items.push({ icon: "📸", val: `${m[1]}MP` });
+          }
+          if (s.battery) {
+            const m = s.battery.match(/([\d,]+)\s*mAh/i);
+            if (m) items.push({ icon: "🔋", val: `${m[1]}` });
+          }
+          if (s.ram) items.push({ icon: "⚡", val: s.ram });
+          if (items.length === 0) return null;
+          return (
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 mb-1.5">
+              {items.map((it, i) => (
+                <span key={i} className="text-[#a1a1aa] font-semibold whitespace-nowrap" style={{ fontSize: scr.mobile ? 8 : 10 }}>
+                  {it.icon} {it.val}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* ── Price ── */}
         <div className="flex items-baseline gap-1.5 mb-2 flex-wrap">
           {storage.length > 1 && (

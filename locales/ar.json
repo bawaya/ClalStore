@@ -229,7 +229,11 @@
     "waterproof": "مقاومة الماء",
     "network": "الشبكة",
     "charging": "الشحن",
-    "dimensions": "الأبعاد"
+    "dimensions": "الأبعاد",
+    "ram": "الرام",
+    "gps": "تحديد الموقع",
+    "sensors": "المستشعرات",
+    "quickSpecs": "أهم المواصفات"
   },
   "errors": {
     "pageNotFound": "الصفحة غير موجودة",

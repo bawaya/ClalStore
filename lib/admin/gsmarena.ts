@@ -462,30 +462,51 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
   }
 
   // ── Generate bilingual description ──
-  const descParts_ar: string[] = [phone_name];
-  const descParts_he: string[] = [phone_name];
+  const descParts_ar: string[] = [`${phone_name} — تصميم أنيق وأداء مذهل!`];
+  const descParts_he: string[] = [`${phone_name} — עיצוב אלגנטי וביצועים מרשימים!`];
 
   if (specs.screen) {
     const size = specs.screen.match(/([\d.]+)\s*inches/i);
+    const type = specs.screen.match(/(OLED|AMOLED|Super Retina|LTPO|Dynamic AMOLED)/i);
     if (size) {
-      descParts_ar.push(`شاشة ${size[1]} بوصة`);
-      descParts_he.push(`מסך ${size[1]} אינץ'`);
+      descParts_ar.push(`شاشة ${size[1]} بوصة${type ? ` ${type[1]}` : ""} بجودة خارقة`);
+      descParts_he.push(`מסך ${size[1]} אינץ'${type ? ` ${type[1]}` : ""} באיכות מדהימה`);
     }
   }
   if (specs.camera) {
-    descParts_ar.push(`كاميرا ${specs.camera}`);
-    descParts_he.push(`מצלמה ${specs.camera}`);
+    const mp = specs.camera.match(/([\d.]+)\s*MP/i);
+    const frontMp = specs.front_camera?.match(/([\d.]+)\s*MP/i);
+    if (mp) {
+      const frontAr = frontMp ? ` وأمامية ${frontMp[1]}MP` : "";
+      const frontHe = frontMp ? ` וקדמית ${frontMp[1]}MP` : "";
+      descParts_ar.push(`كاميرا مذهلة ${mp[1]}MP${frontAr}`);
+      descParts_he.push(`מצלמה מרשימה ${mp[1]}MP${frontHe}`);
+    }
+  }
+  if (specs.cpu) {
+    const cpuShort = specs.cpu.split("(")[0].trim();
+    if (cpuShort.length < 60) {
+      descParts_ar.push(`معالج ${cpuShort} القوي`);
+      descParts_he.push(`מעבד ${cpuShort} עוצמתי`);
+    }
+  }
+  if (specs.ram) {
+    descParts_ar.push(`ذاكرة ${specs.ram}`);
+    descParts_he.push(`זיכרון ${specs.ram}`);
   }
   if (specs.battery) {
     const batNum = specs.battery.match(/([\d,]+)\s*mAh/i);
     if (batNum) {
-      descParts_ar.push(`بطارية ${batNum[1]} mAh`);
-      descParts_he.push(`סוללה ${batNum[1]} mAh`);
+      const watt = specs.charging?.match(/(\d+)\s*W/i);
+      const chargeAr = watt ? ` مع شحن سريع ${watt[1]}W` : "";
+      const chargeHe = watt ? ` עם טעינה מהירה ${watt[1]}W` : "";
+      descParts_ar.push(`بطارية ${batNum[1]} mAh تدوم طول اليوم${chargeAr}`);
+      descParts_he.push(`סוללה ${batNum[1]} mAh שמחזיקה כל היום${chargeHe}`);
     }
   }
-  if (specs.cpu) {
-    descParts_ar.push(specs.cpu.split("(")[0].trim());
-    descParts_he.push(specs.cpu.split("(")[0].trim());
+  if (specs.waterproof) {
+    descParts_ar.push(`مقاومة الماء ${specs.waterproof}`);
+    descParts_he.push(`עמידות במים ${specs.waterproof}`);
   }
 
   // Build specs object, filtering out empty values
@@ -500,8 +521,8 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
 
   return {
     phone_name,
-    description_ar: descParts_ar.join(" - "),
-    description_he: descParts_he.join(" - "),
+    description_ar: descParts_ar.length > 2 ? `${descParts_ar[0]} ${descParts_ar.slice(1).join("، ")}.` : descParts_ar.join(" "),
+    description_he: descParts_he.length > 2 ? `${descParts_he[0]} ${descParts_he.slice(1).join(", ")}.` : descParts_he.join(" "),
     specs: allSpecs,
     colors,
     storage_options,

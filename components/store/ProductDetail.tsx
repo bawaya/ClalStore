@@ -69,10 +69,11 @@ export function ProductDetailClient({
 
   const specLabels: Record<string, string> = {
     screen: t("detail.screen"), camera: t("detail.camera"), front_camera: t("detail.frontCamera"), battery: t("detail.battery"),
-    cpu: t("detail.cpu"), ram: "RAM", weight: t("detail.weight"),
+    cpu: t("detail.cpu"), ram: t("detail.ram"), weight: t("detail.weight"),
     os: t("detail.os"), waterproof: t("detail.waterproof"), sim: "SIM",
     network: t("detail.network"), charging: t("detail.charging"),
-    bluetooth: "Bluetooth", usb: "USB", nfc: "NFC", dimensions: t("detail.dimensions"),
+    bluetooth: "Bluetooth", usb: "USB", nfc: "NFC", gps: t("detail.gps"),
+    sensors: t("detail.sensors"), dimensions: t("detail.dimensions"),
   };
 
   const handleAdd = () => {
