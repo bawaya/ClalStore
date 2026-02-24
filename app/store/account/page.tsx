@@ -217,18 +217,17 @@ export default function AccountPage() {
       <StoreHeader />
       <main
         dir="rtl"
-        className="min-h-screen pt-20 pb-24 px-4"
-        style={{ background: "var(--surface-bg, #f8f9fa)" }}
+        className="min-h-screen pt-20 pb-24 px-4 bg-surface-bg text-white"
       >
         <div className="max-w-4xl mx-auto">
           {/* Page Header */}
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-2xl font-black text-white">
               {lang === "he" ? "החשבון שלי" : "حسابي"}
             </h1>
             <button
               onClick={handleLogout}
-              className="text-sm text-gray-500 hover:text-red-600 transition"
+              className="text-sm text-muted hover:text-state-error transition"
             >
               {lang === "he" ? "התנתק" : "تسجيل خروج"}
             </button>
@@ -236,24 +235,22 @@ export default function AccountPage() {
 
           {/* Customer Welcome */}
           {customer?.name && (
-            <p className="text-gray-600 mb-4">
+            <p className="text-muted mb-4">
               {lang === "he" ? `שלום ${customer.name}` : `مرحباً ${customer.name}`} 👋
             </p>
           )}
 
           {/* Tabs */}
-          <div className="flex gap-1 mb-6 rounded-xl overflow-hidden"
-               style={{ background: "var(--card-bg, #fff)", border: "1px solid var(--card-border, #e5e7eb)" }}>
+          <div className="flex gap-1 mb-6 rounded-xl overflow-hidden card">
             {tabs.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`flex-1 py-3 text-sm font-medium transition-all ${
+                className={`flex-1 py-3 text-sm font-bold transition-all ${
                   tab === t.key
-                    ? "text-white"
-                    : "text-gray-600 hover:bg-gray-50"
+                    ? "text-white bg-brand"
+                    : "text-muted hover:bg-surface-elevated"
                 }`}
-                style={tab === t.key ? { background: "#c41040" } : {}}
               >
                 <span className="mr-1">{t.icon}</span>
                 {lang === "he" ? t.label_he : t.label_ar}
@@ -265,21 +262,19 @@ export default function AccountPage() {
           {tab === "orders" && (
             <div>
               {loadingOrders ? (
-                <div className="text-center py-16 text-gray-400">
+                <div className="text-center py-16 text-muted">
                   <div className="animate-spin text-3xl mb-2">⏳</div>
                   {lang === "he" ? "טוען..." : "جاري التحميل..."}
                 </div>
               ) : orders.length === 0 ? (
-                <div className="text-center py-16"
-                     style={{ background: "var(--card-bg, #fff)", borderRadius: 16, border: "1px solid var(--card-border, #e5e7eb)" }}>
+                <div className="text-center py-16 card" style={{ borderRadius: 16 }}>
                   <div className="text-5xl mb-4">📦</div>
-                  <p className="text-gray-500 text-lg">
+                  <p className="text-muted text-lg">
                     {lang === "he" ? "אין הזמנות עדיין" : "لا توجد طلبات بعد"}
                   </p>
                   <button
                     onClick={() => router.push("/store")}
-                    className="mt-4 px-6 py-2 rounded-xl text-white text-sm font-medium"
-                    style={{ background: "#c41040" }}
+                    className="mt-4 btn-primary"
                   >
                     {lang === "he" ? "התחל לקנות" : "ابدأ التسوق"}
                   </button>
@@ -292,8 +287,7 @@ export default function AccountPage() {
                     return (
                       <div
                         key={order.id}
-                        className="rounded-xl overflow-hidden"
-                        style={{ background: "var(--card-bg, #fff)", border: "1px solid var(--card-border, #e5e7eb)" }}
+                        className="card rounded-xl overflow-hidden"
                       >
                         {/* Order Header — clickable */}
                         <button
@@ -313,56 +307,55 @@ export default function AccountPage() {
                             <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusConf.color}`}>
                               {lang === "he" ? statusConf.label_he : statusConf.label_ar}
                             </span>
-                            <span className="font-bold text-sm">₪{order.total}</span>
-                            <span className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}>▼</span>
+                            <span className="font-bold text-sm text-white">₪{order.total}</span>
+                            <span className={`text-muted transition-transform ${isExpanded ? "rotate-180" : ""}`}>▼</span>
                           </div>
                         </button>
 
                         {/* Order Details — expanded */}
                         {isExpanded && (
-                          <div className="px-4 pb-4 border-t" style={{ borderColor: "var(--card-border, #e5e7eb)" }}>
+                          <div className="px-4 pb-4 border-t border-surface-border">
                             {/* Items */}
                             <div className="mt-3 space-y-2">
                               {order.items.map((item) => (
                                 <div key={item.id} className="flex items-center justify-between text-sm">
                                   <div>
-                                    <span className="font-medium">{item.product_name}</span>
-                                    {item.color && <span className="text-gray-400 mr-2">({item.color})</span>}
-                                    {item.storage && <span className="text-gray-400 mr-1">{item.storage}</span>}
-                                    <span className="text-gray-400"> ×{item.quantity}</span>
+                                    <span className="font-medium text-white">{item.product_name}</span>
+                                    {item.color && <span className="text-muted mr-2">({item.color})</span>}
+                                    {item.storage && <span className="text-muted mr-1">{item.storage}</span>}
+                                    <span className="text-muted"> ×{item.quantity}</span>
                                   </div>
-                                  <span className="font-medium">₪{item.price * item.quantity}</span>
+                                  <span className="font-medium text-brand">₪{item.price * item.quantity}</span>
                                 </div>
                               ))}
                             </div>
 
                             {/* Summary */}
-                            <div className="mt-3 pt-3 border-t text-sm space-y-1"
-                                 style={{ borderColor: "var(--card-border, #e5e7eb)" }}>
+                            <div className="mt-3 pt-3 border-t border-surface-border text-sm space-y-1">
                               {order.discount_amount > 0 && (
-                                <div className="flex justify-between text-green-600">
+                                <div className="flex justify-between text-state-success">
                                   <span>{lang === "he" ? "הנחה" : "خصم"}</span>
                                   <span>-₪{order.discount_amount}</span>
                                 </div>
                               )}
                               {order.coupon_code && (
-                                <div className="flex justify-between text-gray-400 text-xs">
+                                <div className="flex justify-between text-muted text-xs">
                                   <span>{lang === "he" ? "קופון" : "كوبون"}</span>
                                   <span>{order.coupon_code}</span>
                                 </div>
                               )}
-                              <div className="flex justify-between">
+                              <div className="flex justify-between text-white">
                                 <span>{lang === "he" ? "שיטת תשלום" : "طريقة الدفع"}</span>
                                 <span>{order.payment_method === "credit" ? (lang === "he" ? "אשראי" : "بطاقة ائتمان") : order.payment_method === "bank" ? (lang === "he" ? "העברה בנקאית" : "تحويل بنكي") : order.payment_method}</span>
                               </div>
                               {order.shipping_city && (
-                                <div className="flex justify-between">
+                                <div className="flex justify-between text-muted">
                                   <span>{lang === "he" ? "עיר" : "المدينة"}</span>
                                   <span>{order.shipping_city}</span>
                                 </div>
                               )}
                               {order.shipping_address && (
-                                <div className="flex justify-between text-xs text-gray-500">
+                                <div className="flex justify-between text-xs text-dim">
                                   <span>{lang === "he" ? "כתובת" : "العنوان"}</span>
                                   <span className="max-w-[200px] truncate">{order.shipping_address}</span>
                                 </div>
@@ -380,54 +373,51 @@ export default function AccountPage() {
 
           {/* ===== PROFILE TAB ===== */}
           {tab === "profile" && (
-            <div className="rounded-xl p-6"
-                 style={{ background: "var(--card-bg, #fff)", border: "1px solid var(--card-border, #e5e7eb)" }}>
+            <div className="card rounded-xl p-6">
               {loadingProfile ? (
-                <div className="text-center py-8 text-gray-400">
+                <div className="text-center py-8 text-muted">
                   {lang === "he" ? "טוען..." : "جاري التحميل..."}
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Phone — readonly */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                    <label className="block text-xs font-semibold text-muted mb-1">
                       {lang === "he" ? "טלפון" : "الهاتف"}
                     </label>
                     <input
                       type="text"
                       value={customer?.phone || ""}
                       readOnly
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed text-sm"
+                      className="input opacity-60 cursor-not-allowed"
                       dir="ltr"
                     />
                   </div>
 
                   {/* Name */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                    <label className="block text-xs font-semibold text-muted mb-1">
                       {lang === "he" ? "שם" : "الاسم"}
                     </label>
                     <input
                       type="text"
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl text-sm"
-                      style={{ background: "var(--surface-bg, #f8f9fa)", border: "1px solid var(--card-border, #e5e7eb)" }}
+                      className="input"
                       placeholder={lang === "he" ? "הזן שם" : "أدخل اسمك"}
                     />
                   </div>
 
                   {/* Email */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                    <label className="block text-xs font-semibold text-muted mb-1">
                       {lang === "he" ? "אימייל" : "البريد الإلكتروني"}
                     </label>
                     <input
                       type="email"
                       value={formEmail}
                       onChange={(e) => setFormEmail(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl text-sm"
-                      style={{ background: "var(--surface-bg, #f8f9fa)", border: "1px solid var(--card-border, #e5e7eb)" }}
+                      className="input"
                       placeholder="example@email.com"
                       dir="ltr"
                     />
@@ -435,29 +425,27 @@ export default function AccountPage() {
 
                   {/* City */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                    <label className="block text-xs font-semibold text-muted mb-1">
                       {lang === "he" ? "עיר" : "المدينة"}
                     </label>
                     <input
                       type="text"
                       value={formCity}
                       onChange={(e) => setFormCity(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl text-sm"
-                      style={{ background: "var(--surface-bg, #f8f9fa)", border: "1px solid var(--card-border, #e5e7eb)" }}
+                      className="input"
                       placeholder={lang === "he" ? "הזן עיר" : "أدخل المدينة"}
                     />
                   </div>
 
                   {/* Address */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                    <label className="block text-xs font-semibold text-muted mb-1">
                       {lang === "he" ? "כתובת" : "العنوان"}
                     </label>
                     <textarea
                       value={formAddress}
                       onChange={(e) => setFormAddress(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl text-sm resize-none"
-                      style={{ background: "var(--surface-bg, #f8f9fa)", border: "1px solid var(--card-border, #e5e7eb)" }}
+                      className="input resize-none"
                       rows={2}
                       placeholder={lang === "he" ? "הזן כתובת" : "أدخل العنوان"}
                     />
@@ -467,8 +455,7 @@ export default function AccountPage() {
                   <button
                     onClick={handleSaveProfile}
                     disabled={savingProfile}
-                    className="w-full py-3 rounded-xl text-white font-bold text-sm transition disabled:opacity-50"
-                    style={{ background: "#c41040" }}
+                    className="btn-primary w-full disabled:opacity-50"
                   >
                     {savingProfile
                       ? (lang === "he" ? "שומר..." : "جاري الحفظ...")
@@ -476,7 +463,7 @@ export default function AccountPage() {
                   </button>
 
                   {profileMsg && (
-                    <p className={`text-center text-sm font-medium ${profileMsg.includes("بنجاح") || profileMsg.includes("בהצלחה") ? "text-green-600" : "text-red-600"}`}>
+                    <p className={`text-center text-sm font-medium ${profileMsg.includes("بنجاح") || profileMsg.includes("בהצלחה") ? "text-state-success" : "text-state-error"}`}>
                       {profileMsg}
                     </p>
                   )}
@@ -489,16 +476,14 @@ export default function AccountPage() {
           {tab === "wishlist" && (
             <div>
               {wishlist.items.length === 0 ? (
-                <div className="text-center py-16"
-                     style={{ background: "var(--card-bg, #fff)", borderRadius: 16, border: "1px solid var(--card-border, #e5e7eb)" }}>
+                <div className="card text-center py-16">
                   <div className="text-5xl mb-4">🤍</div>
-                  <p className="text-gray-500 text-lg">
+                  <p className="text-muted text-lg">
                     {lang === "he" ? "אין מועדפים עדיין" : "لا توجد منتجات مفضلة"}
                   </p>
                   <button
                     onClick={() => router.push("/store")}
-                    className="mt-4 px-6 py-2 rounded-xl text-white text-sm font-medium"
-                    style={{ background: "#c41040" }}
+                    className="btn-primary mt-4 px-6 py-2 rounded-xl text-sm"
                   >
                     {lang === "he" ? "גלה מוצרים" : "تصفح المنتجات"}
                   </button>
@@ -506,20 +491,19 @@ export default function AccountPage() {
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       {wishlist.items.length} {lang === "he" ? "מוצרים" : "منتج"}
                     </p>
                     <div className="flex gap-2">
                       <button
                         onClick={handleAddAllWishlistToCart}
-                        className="text-xs px-3 py-1.5 rounded-lg text-white font-medium"
-                        style={{ background: "#c41040" }}
+                        className="btn-primary text-xs px-3 py-1.5 rounded-lg"
                       >
                         {lang === "he" ? "הוסף הכל לסל" : "أضف الكل للسلة"}
                       </button>
                       <button
                         onClick={() => wishlist.clearAll()}
-                        className="text-xs px-3 py-1.5 rounded-lg text-red-600 bg-red-50 font-medium"
+                        className="text-xs px-3 py-1.5 rounded-lg text-state-error bg-state-error/10 font-medium"
                       >
                         {lang === "he" ? "נקה הכל" : "مسح الكل"}
                       </button>
@@ -530,35 +514,34 @@ export default function AccountPage() {
                     {wishlist.items.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-xl overflow-hidden relative group"
-                        style={{ background: "var(--card-bg, #fff)", border: "1px solid var(--card-border, #e5e7eb)" }}
+                        className="card rounded-xl overflow-hidden relative group"
                       >
                         {/* Image */}
-                        <div className="relative aspect-square bg-gray-50">
+                        <div className="relative aspect-square bg-surface-elevated">
                           {item.image_url ? (
                             <img src={item.image_url} alt={lang === "he" ? item.name_he : item.name_ar}
                                  className="w-full h-full object-contain p-2" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">📱</div>
+                            <div className="w-full h-full flex items-center justify-center text-4xl text-dim">📱</div>
                           )}
                           {/* Remove button */}
                           <button
                             onClick={() => wishlist.removeItem(item.id)}
-                            className="absolute top-2 left-2 w-7 h-7 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-sm hover:bg-red-100 transition"
+                            className="absolute top-2 left-2 w-7 h-7 rounded-full bg-state-error/10 text-state-error flex items-center justify-center text-sm hover:bg-state-error/20 transition"
                           >
                             ✕
                           </button>
                         </div>
                         {/* Info */}
                         <div className="p-3">
-                          <p className="text-xs text-gray-400">{item.brand}</p>
-                          <p className="text-sm font-bold line-clamp-1">
+                          <p className="text-xs text-muted">{item.brand}</p>
+                          <p className="text-sm font-bold text-white line-clamp-1">
                             {lang === "he" ? item.name_he : item.name_ar}
                           </p>
                           <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm" style={{ color: "#c41040" }}>₪{item.price}</span>
+                            <span className="font-bold text-sm text-brand">₪{item.price}</span>
                             {item.old_price && item.old_price > item.price && (
-                              <span className="text-xs text-gray-400 line-through">₪{item.old_price}</span>
+                              <span className="text-xs text-dim line-through">₪{item.old_price}</span>
                             )}
                           </div>
                           <button
@@ -570,8 +553,7 @@ export default function AccountPage() {
                               image: item.image_url,
                               type: item.type,
                             })}
-                            className="mt-2 w-full py-2 rounded-lg text-xs text-white font-medium"
-                            style={{ background: "#c41040" }}
+                            className="btn-primary mt-2 w-full py-2 rounded-lg text-xs"
                           >
                             {lang === "he" ? "הוסף לסל" : "أضف للسلة"}
                           </button>
