@@ -44,7 +44,7 @@ export function ProductDetailClient({
   const { t, lang } = useLang();
   const addItem = useCart((s) => s.addItem);
   const { toasts, show } = useToast();
-  const [selColor, setSelColor] = useState(0);
+  const [selColor, setSelColor] = useState(-1); // -1 = no color selected → show main image
   const [selStorage, setSelStorage] = useState(0);
 
   const colors = (p.colors || []) as ProductColor[];
@@ -59,7 +59,8 @@ export function ProductDetailClient({
 
   /* Device names always English (name_ar holds English names like "Galaxy S25 Ultra") */
   const productName = p.name_ar;
-  const colorName = colors[selColor]?.name_ar;
+  const activeColor = selColor >= 0 ? colors[selColor] : undefined;
+  const colorName = activeColor?.name_ar;
 
   const specLabels: Record<string, string> = {
     screen: t("detail.screen"), camera: t("detail.camera"), battery: t("detail.battery"),
@@ -73,7 +74,7 @@ export function ProductDetailClient({
       brand: p.brand,
       type: p.type as "device" | "accessory",
       price: displayPrice,
-      image: colors[selColor]?.image || p.image_url || undefined,
+      image: (activeColor?.image) || p.image_url || undefined,
       color: colorName,
       storage: storage[selStorage],
     });
@@ -105,7 +106,7 @@ export function ProductDetailClient({
             }}
           >
             {(() => {
-              const colorImg = colors[selColor]?.image;
+              const colorImg = selColor >= 0 ? colors[selColor]?.image : undefined;
               const imgSrc = colorImg || p.image_url;
               return imgSrc ? (
                 <img src={imgSrc} alt={productName} className="max-h-[90%] max-w-[90%] object-contain" />

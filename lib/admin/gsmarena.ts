@@ -6,10 +6,65 @@
 
 const BASE = "https://www.gsmarena.com";
 const HEADERS: Record<string, string> = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Referer": "https://www.google.com/",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "cross-site",
+  "Sec-Ch-Ua": '"Chromium";v="131", "Not_A Brand";v="24"',
+  "Sec-Ch-Ua-Mobile": "?0",
+  "Sec-Ch-Ua-Platform": '"Windows"',
+  "Upgrade-Insecure-Requests": "1",
+  "Cache-Control": "max-age=0",
 };
+
+/**
+ * Fetch a URL directly, falling back to a CORS proxy if blocked
+ */
+async function smartFetch(url: string): Promise<string | null> {
+  // Attempt 1: Direct fetch with realistic headers
+  try {
+    const res = await fetch(url, { headers: HEADERS });
+    if (res.ok) {
+      const html = await res.text();
+      // Check for CloudFlare challenge page
+      if (html.includes("cf-browser-verification") || html.includes("cf_chl_opt") || html.includes("Just a moment...")) {
+        console.log("[GSMArena] CloudFlare challenge detected, trying proxy...");
+      } else {
+        return html;
+      }
+    }
+  } catch (e) {
+    console.log("[GSMArena] Direct fetch failed:", e);
+  }
+
+  // Attempt 2: CORS proxy fallbacks
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  ];
+
+  for (const proxyUrl of proxies) {
+    try {
+      const res = await fetch(proxyUrl, {
+        headers: { "User-Agent": HEADERS["User-Agent"] },
+      });
+      if (res.ok) {
+        const html = await res.text();
+        if (!html.includes("cf-browser-verification") && !html.includes("Just a moment...") && html.length > 1000) {
+          return html;
+        }
+      }
+    } catch {
+      // Try next proxy
+    }
+  }
+
+  return null;
+}
 
 // ===== Comprehensive color mapping =====
 const COLORS: Record<string, { hex: string; ar: string; he: string }> = {
@@ -155,10 +210,8 @@ async function searchGSMArena(name: string, brand: string): Promise<string | nul
   const query = encodeURIComponent(`${brand} ${name}`);
   const url = `${BASE}/results.php3?sQuickSearch=yes&sName=${query}`;
 
-  const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) return null;
-
-  const html = await res.text();
+  const html = await smartFetch(url);
+  if (!html) return null;
 
   // Find all result links inside <div class="makers">
   const makersMatch = html.match(/<div class="makers">([\s\S]*?)<\/div>/);
@@ -211,10 +264,8 @@ async function searchGSMArena(name: string, brand: string): Promise<string | nul
  * Scrape a GSMArena product page for specs, colors, images
  */
 async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
-  const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) return null;
-
-  const html = await res.text();
+  const html = await smartFetch(url);
+  if (!html) return null;
 
   // ── Phone name ──
   const nameMatch = html.match(/<h1[^>]*class="specs-phone-name-title"[^>]*>([^<]+)/);
@@ -297,9 +348,8 @@ async function scrapeProductPage(url: string): Promise<AutoFillResult | null> {
   if (galleryLinkMatch) {
     const galleryUrl = `${BASE}/${galleryLinkMatch[1].replace(/^"/, "")}`;
     try {
-      const galleryRes = await fetch(galleryUrl, { headers: HEADERS });
-      if (galleryRes.ok) {
-        const galleryHtml = await galleryRes.text();
+      const galleryHtml = await smartFetch(galleryUrl);
+      if (galleryHtml) {
         // Extract official product images (pics/ URLs, not reviews)
         const picMatches = galleryHtml.matchAll(/(https?:\/\/fdn2?\.gsmarena\.com\/vv\/pics\/[^"'\s>]+\.(?:jpg|png|webp))/g);
         for (const pm of picMatches) {
@@ -364,13 +414,13 @@ export async function fetchProductData(name: string, brand: string): Promise<Aut
   // Search GSMArena
   const productUrl = await searchGSMArena(name, brand);
   if (!productUrl) {
-    throw new Error(`لم يتم العثور على "${brand} ${name}" في GSMArena`);
+    throw new Error(`لم يتم العثور على "${brand} ${name}" — تأكد من الاسم بالإنجليزية (مثال: Galaxy S25 Ultra). إذا استمرت المشكلة، قد يكون الموقع محجوباً مؤقتاً.`);
   }
 
   // Scrape product page
   const result = await scrapeProductPage(productUrl);
   if (!result) {
-    throw new Error("فشل في قراءة بيانات المنتج من GSMArena");
+    throw new Error(`تم العثور على المنتج لكن فشل قراءة البيانات. حاول مرة أخرى بعد دقيقة.`);
   }
 
   return result;

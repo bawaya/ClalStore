@@ -51,7 +51,7 @@ export function ProductCard({ product: p }: { product: Product }) {
   const { addItem: addToWishlist, removeItem: removeFromWishlist, isInWishlist } = useWishlist();
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
-  const [selColor, setSelColor] = useState(0);
+  const [selColor, setSelColor] = useState(-1); // -1 = no color selected → show main image
   const [selStorage, setSelStorage] = useState(0);
   const [wishAnim, setWishAnim] = useState(false);
   const [compareToast, setCompareToast] = useState("");
@@ -69,14 +69,15 @@ export function ProductCard({ product: p }: { product: Product }) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    const activeColor = selColor >= 0 ? colors[selColor] : undefined;
     addItem({
       productId: p.id,
       name: p.name_ar,
       brand: p.brand,
       type: p.type as "device" | "accessory",
       price: displayPrice,
-      image: colors[selColor]?.image || p.image_url || undefined,
-      color: colors[selColor]?.name_ar,
+      image: (activeColor?.image) || p.image_url || undefined,
+      color: activeColor?.name_ar,
       storage: storage[selStorage],
     });
   };
@@ -178,7 +179,7 @@ export function ProductCard({ product: p }: { product: Product }) {
         style={{ height: scr.mobile ? 180 : 230, padding: scr.mobile ? 8 : 16 }}
       >
         {(() => {
-          const colorImg = colors[selColor]?.image;
+          const colorImg = selColor >= 0 ? colors[selColor]?.image : undefined;
           const imgSrc = colorImg || p.image_url;
           return imgSrc ? (
             <img
