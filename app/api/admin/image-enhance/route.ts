@@ -2,13 +2,13 @@ export const runtime = "edge";
 
 // =====================================================
 // ClalMobile — AI Image Enhance API
-// POST: Remove background + upload to Supabase Storage
+// POST: Remove background + upload to R2 (public URL)
 // Uses Remove.bg for background removal
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { removeBackground, removeBackgroundFromBuffer } from "@/lib/integrations/removebg";
-import { uploadImage } from "@/lib/storage";
+import { uploadToR2 } from "@/lib/storage-r2";
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,10 +57,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unsupported content type" }, { status: 400 });
     }
 
-    // Upload processed image to Supabase Storage
+    // Upload processed image to R2 (fallback: Supabase Storage)
     const filename = `enhanced-${Date.now()}.png`;
-    const bytes = new Uint8Array(resultBuffer);
-    const url = await uploadImage(bytes, filename, "image/png");
+    const url = await uploadToR2(resultBuffer, filename, "image/png");
 
     return NextResponse.json({
       success: true,

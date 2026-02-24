@@ -71,9 +71,13 @@ export async function GET() {
 
   // 7. Image processing
   const hasRemoveBg = !!process.env.REMOVEBG_API_KEY;
+  const hasR2 = !!(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_PUBLIC_URL);
   checks.imageAI = {
     ok: hasRemoveBg,
-    error: hasRemoveBg ? "RemoveBG ✓ (Supabase Storage)" : "RemoveBG ✗",
+    error: [
+      hasRemoveBg ? "RemoveBG ✓" : "RemoveBG ✗",
+      hasR2 ? "R2 ✓" : "R2 ✗ (Supabase fallback)",
+    ].join(" | "),
   };
 
   const allOk = Object.values(checks).every((c) => c.ok);
