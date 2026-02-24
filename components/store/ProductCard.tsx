@@ -52,12 +52,17 @@ export function ProductCard({ product: p }: { product: Product }) {
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
   const [selColor, setSelColor] = useState(-1); // -1 = no color selected → show main image
-  const [selStorage, setSelStorage] = useState(0);
+  const [selStorage, setSelStorage] = useState(storage.length > 1 ? -1 : 0); // -1 = not selected yet
   const [wishAnim, setWishAnim] = useState(false);
   const [compareToast, setCompareToast] = useState("");
 
-  // Variant-aware pricing
-  const activeVariant = getActiveVariant(p, selStorage);
+  // Selection completeness check
+  const needsColor = colors.length > 0 && selColor < 0;
+  const needsStorage = storage.length > 1 && selStorage < 0;
+  const selectionIncomplete = needsColor || needsStorage;
+
+  // Variant-aware pricing (show lowest when no storage selected)
+  const activeVariant = getActiveVariant(p, selStorage < 0 ? 0 : selStorage);
   const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
   const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
 
@@ -69,6 +74,7 @@ export function ProductCard({ product: p }: { product: Product }) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (selectionIncomplete) return;
     const activeColor = selColor >= 0 ? colors[selColor] : undefined;
     addItem({
       productId: p.id,
@@ -374,10 +380,28 @@ export function ProductCard({ product: p }: { product: Product }) {
         {/* ── Spacer ── */}
         <div className="flex-1" />
 
+        {/* ── Selection hint ── */}
+        {selectionIncomplete && (
+          <div
+            className="text-center font-bold mb-1"
+            style={{
+              fontSize: scr.mobile ? 9 : 11,
+              color: "#f59e0b",
+            }}
+          >
+            {needsColor && needsStorage
+              ? t("store.selectColorAndStorage")
+              : needsColor
+                ? t("store.selectColor")
+                : t("store.selectStorage")}
+          </div>
+        )}
+
         {/* ── Add to Cart button ── */}
         <button
           onClick={handleAddToCart}
-          className="w-full cursor-pointer transition-all active:scale-[0.97] font-extrabold rounded-lg"
+          disabled={selectionIncomplete}
+          className="w-full cursor-pointer transition-all active:scale-[0.97] font-extrabold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
           style={{
             border: "1.5px solid #c41040",
             background: "transparent",

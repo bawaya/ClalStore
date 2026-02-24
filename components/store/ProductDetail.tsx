@@ -45,14 +45,14 @@ export function ProductDetailClient({
   const addItem = useCart((s) => s.addItem);
   const { toasts, show } = useToast();
   const [selColor, setSelColor] = useState(-1); // -1 = no color selected → show main image
-  const [selStorage, setSelStorage] = useState(0);
+  const [selStorage, setSelStorage] = useState((p.storage_options || []).length > 1 ? -1 : 0);
 
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
   const specs = (p.specs || {}) as Record<string, string>;
 
-  // Variant-aware pricing
-  const activeVariant = getActiveVariant(p, selStorage);
+  // Variant-aware pricing (show lowest when no storage selected)
+  const activeVariant = getActiveVariant(p, selStorage < 0 ? 0 : selStorage);
   const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
   const variantStock = getVariantStock(p, activeVariant);
   const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
@@ -62,12 +62,18 @@ export function ProductDetailClient({
   const activeColor = selColor >= 0 ? colors[selColor] : undefined;
   const colorName = activeColor?.name_ar;
 
+  // Selection completeness check
+  const needsColor = colors.length > 0 && selColor < 0;
+  const needsStorage = storage.length > 1 && selStorage < 0;
+  const selectionIncomplete = needsColor || needsStorage;
+
   const specLabels: Record<string, string> = {
     screen: t("detail.screen"), camera: t("detail.camera"), battery: t("detail.battery"),
     cpu: t("detail.cpu"), ram: "RAM", weight: t("detail.weight"),
   };
 
   const handleAdd = () => {
+    if (selectionIncomplete) return;
     addItem({
       productId: p.id,
       name: productName,
@@ -220,9 +226,27 @@ export function ProductDetailClient({
             )}
 
             {/* Add to cart */}
+            {selectionIncomplete && (
+              <div
+                className="text-center font-bold mb-2 rounded-lg"
+                style={{
+                  fontSize: scr.mobile ? 11 : 13,
+                  color: "#f59e0b",
+                  background: "rgba(245,158,11,0.08)",
+                  border: "1px solid rgba(245,158,11,0.2)",
+                  padding: scr.mobile ? "8px 12px" : "10px 16px",
+                }}
+              >
+                {needsColor && needsStorage
+                  ? t("store.selectColorAndStorage")
+                  : needsColor
+                    ? t("store.selectColor")
+                    : t("store.selectStorage")}
+              </div>
+            )}
             <button
               onClick={handleAdd}
-              disabled={variantStock === 0}
+              disabled={variantStock === 0 || selectionIncomplete}
               className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ fontSize: scr.mobile ? 14 : 16, padding: "14px 20px" }}
             >
