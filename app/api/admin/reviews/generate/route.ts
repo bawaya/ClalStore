@@ -7,8 +7,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+import { callClaude } from "@/lib/ai/claude";
 
 // ── Common Arab Israeli first + last names ──
 const FIRST_NAMES_MALE = [
@@ -64,37 +63,10 @@ function randomDate(): string {
   return date.toISOString();
 }
 
-async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.9,
-      max_tokens: 4000,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI error: ${res.status} — ${err}`);
-  }
-
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() || "";
-}
-
 export async function POST(req: NextRequest) {
   try {
-    if (!OPENAI_API_KEY) {
-      return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 500 });
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ error: "Anthropic API key not configured" }, { status: 500 });
     }
 
     const db = createAdminSupabase();
@@ -198,7 +170,15 @@ ${specsText ? `المواصفات: ${specsText}` : ""}
 اكتب ${batchCount} تقييمات متنوعة وفريدة:
 ${reviewRequests}`;
 
-      const raw = await callOpenAI(systemPrompt, userPrompt);
+      const result = await callClaude({
+        systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        maxTokens: 4000,
+        temperature: 0.95,
+      });
+
+      if (!result) throw new Error("Claude API call failed");
+      const raw = result.text;
 
       // Parse JSON
       let reviews: Array<{ title: string; body: string }> = [];
