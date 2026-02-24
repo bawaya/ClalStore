@@ -103,30 +103,11 @@ function translateWord(word: string, lang: "ar" | "he"): string {
 export function translateProductName(nameEn: string): { name_ar: string; name_he: string } {
   if (!nameEn?.trim()) return { name_ar: "", name_he: "" };
 
-  const words = nameEn.trim().split(/\s+/);
-  const arWords: string[] = [];
-  const heWords: string[] = [];
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-
-    // Handle compound words like "PowerBank" → split CamelCase
-    if (/^[a-z]+[A-Z]/.test(word)) {
-      const parts = word.replace(/([a-z])([A-Z])/g, "$1 $2").split(" ");
-      for (const part of parts) {
-        arWords.push(translateWord(part, "ar"));
-        heWords.push(translateWord(part, "he"));
-      }
-      continue;
-    }
-
-    arWords.push(translateWord(word, "ar"));
-    heWords.push(translateWord(word, "he"));
-  }
-
+  // Keep the English name as-is in all languages
+  const name = nameEn.trim();
   return {
-    name_ar: arWords.join(" "),
-    name_he: heWords.join(" "),
+    name_ar: name,
+    name_he: name,
   };
 }
 
