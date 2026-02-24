@@ -184,7 +184,7 @@ export function ProductCard({ product: p }: { product: Product }) {
       {/* ── Product Image ── */}
       <div
         className="bg-[#1a1a1e] flex items-center justify-center overflow-hidden relative"
-        style={{ height: scr.mobile ? 180 : 230, padding: scr.mobile ? 8 : 16 }}
+        style={{ height: scr.mobile ? 180 : 230, padding: scr.mobile ? 16 : 24 }}
       >
         {(() => {
           const colorImg = selColor >= 0 ? colors[selColor]?.image : undefined;
@@ -193,7 +193,7 @@ export function ProductCard({ product: p }: { product: Product }) {
             <img
               src={imgSrc}
               alt={getProductName(p, lang)}
-              className="w-[75%] h-[75%] object-contain drop-shadow-lg"
+              className="w-full h-full object-contain drop-shadow-lg"
             />
           ) : (
             <span

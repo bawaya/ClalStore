@@ -520,7 +520,7 @@ export default function AccountPage() {
                         <div className="relative aspect-square bg-surface-elevated">
                           {item.image_url ? (
                             <img src={item.image_url} alt={lang === "he" ? item.name_he : item.name_ar}
-                                 className="w-[80%] h-[80%] object-contain mx-auto" />
+                                 className="w-full h-full object-contain p-2" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-4xl text-dim">📱</div>
                           )}

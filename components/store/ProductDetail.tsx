@@ -109,7 +109,8 @@ export function ProductDetailClient({
             className="bg-surface-elevated rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{
               width: scr.mobile ? "100%" : 380,
-              height: scr.mobile ? 220 : 380,
+              height: scr.mobile ? 260 : 380,
+              padding: scr.mobile ? 20 : 32,
               marginBottom: scr.mobile ? 12 : 0,
             }}
           >
@@ -117,7 +118,7 @@ export function ProductDetailClient({
               const colorImg = selColor >= 0 ? colors[selColor]?.image : undefined;
               const imgSrc = colorImg || p.image_url;
               return imgSrc ? (
-                <img src={imgSrc} alt={productName} className="w-[85%] h-[85%] object-contain drop-shadow-lg" />
+                <img src={imgSrc} alt={productName} className="w-full h-full object-contain drop-shadow-lg" />
               ) : (
                 <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
                   {p.type === "device" ? "📱" : "🔌"}
