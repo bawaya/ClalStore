@@ -9,11 +9,13 @@ export interface CartItem {
   cartId: string;
   productId: string;
   name: string;
+  name_he?: string;        // Hebrew name for language switching
   brand: string;
   type: "device" | "accessory";
   price: number;
   image?: string;
   color?: string;
+  color_he?: string;       // Hebrew color name for language switching
   storage?: string;
   quantity: number;
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
-import { calcDiscount } from "@/lib/utils";
+import { calcDiscount, getProductName, getColorName } from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
 import { trackAddToCart, trackViewProduct } from "@/components/shared/Analytics";
 import { StoreHeader } from "./StoreHeader";
@@ -57,10 +57,10 @@ export function ProductDetailClient({
   const variantStock = getVariantStock(p, activeVariant);
   const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
 
-  /* Device names always English (name_ar holds English names like "Galaxy S25 Ultra") */
-  const productName = p.name_ar;
+  /* Smart bilingual name */
+  const productName = getProductName(p, lang);
   const activeColor = selColor >= 0 ? colors[selColor] : undefined;
-  const colorName = activeColor?.name_ar;
+  const colorName = activeColor ? getColorName(activeColor, lang) : undefined;
 
   // Selection completeness check
   const needsColor = colors.length > 0 && selColor < 0;
@@ -76,12 +76,14 @@ export function ProductDetailClient({
     if (selectionIncomplete) return;
     addItem({
       productId: p.id,
-      name: productName,
+      name: p.name_ar,
+      name_he: p.name_he || undefined,
       brand: p.brand,
       type: p.type as "device" | "accessory",
       price: displayPrice,
       image: (activeColor?.image) || p.image_url || undefined,
-      color: colorName,
+      color: activeColor?.name_ar,
+      color_he: activeColor?.name_he || undefined,
       storage: storage[selStorage],
     });
     trackAddToCart(productName, displayPrice);

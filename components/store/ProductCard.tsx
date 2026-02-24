@@ -7,7 +7,7 @@ import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
 import { useCompare } from "@/lib/store/compare";
 import { useWishlist } from "@/lib/store/wishlist";
-import { calcDiscount } from "@/lib/utils";
+import { calcDiscount, getProductName, getColorName, getDescription } from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
 
@@ -45,7 +45,7 @@ function getWarrantyKey(p: Product): string | null {
 
 export function ProductCard({ product: p }: { product: Product }) {
   const scr = useScreen();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const addItem = useCart((s) => s.addItem);
   const { addItem: addToCompare, removeItem: removeFromCompare, isInCompare } = useCompare();
   const { addItem: addToWishlist, removeItem: removeFromWishlist, isInWishlist } = useWishlist();
@@ -79,11 +79,13 @@ export function ProductCard({ product: p }: { product: Product }) {
     addItem({
       productId: p.id,
       name: p.name_ar,
+      name_he: p.name_he || undefined,
       brand: p.brand,
       type: p.type as "device" | "accessory",
       price: displayPrice,
       image: (activeColor?.image) || p.image_url || undefined,
       color: activeColor?.name_ar,
+      color_he: activeColor?.name_he || undefined,
       storage: storage[selStorage],
     });
   };
@@ -190,7 +192,7 @@ export function ProductCard({ product: p }: { product: Product }) {
           return imgSrc ? (
             <img
               src={imgSrc}
-              alt={p.name_ar}
+              alt={getProductName(p, lang)}
               className="max-h-full max-w-full object-contain drop-shadow-lg"
             />
           ) : (
@@ -269,18 +271,18 @@ export function ProductCard({ product: p }: { product: Product }) {
           style={{ fontSize: scr.mobile ? 13 : 16 }}
           dir="ltr"
         >
-          {p.name_ar}
+          {getProductName(p, lang)}
         </div>
 
         {/* Description (subtitle) */}
-        {p.description_ar && (
+        {getDescription(p, lang) && (
           <div
             className="text-[#71717a] leading-snug mb-1.5"
             style={{ fontSize: scr.mobile ? 9 : 11 }}
           >
-            {p.description_ar.length > 60
-              ? p.description_ar.slice(0, 60) + "..."
-              : p.description_ar}
+            {getDescription(p, lang).length > 60
+              ? getDescription(p, lang).slice(0, 60) + "..."
+              : getDescription(p, lang)}
           </div>
         )}
 
@@ -357,7 +359,7 @@ export function ProductCard({ product: p }: { product: Product }) {
                   e.stopPropagation();
                   setSelColor(i);
                 }}
-                title={c.name_ar}
+                title={getColorName(c, lang)}
                 className="rounded-full cursor-pointer transition-all flex-shrink-0"
                 style={{
                   width: scr.mobile ? 18 : 22,

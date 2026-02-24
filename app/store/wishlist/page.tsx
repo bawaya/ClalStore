@@ -12,6 +12,7 @@ import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { ProductCard } from "@/components/store/ProductCard";
+import { getProductName } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
 export default function WishlistPage() {
@@ -25,6 +26,7 @@ export default function WishlistPage() {
       addToCart({
         productId: item.id,
         name: item.name_ar,
+        name_he: item.name_he || undefined,
         brand: item.brand,
         type: item.type,
         price: item.price,

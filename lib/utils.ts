@@ -98,3 +98,24 @@ export function groupBy<T>(arr: T[], key: keyof T): Record<string, T[]> {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// ===== Bilingual product helpers =====
+type Lang = "ar" | "he";
+
+/** Get product name based on language. Fallback: name_ar (English device names) */
+export function getProductName(p: { name_ar: string; name_he?: string }, lang: Lang): string {
+  if (lang === "he" && p.name_he) return p.name_he;
+  return p.name_ar;
+}
+
+/** Get color name based on language */
+export function getColorName(c: { name_ar: string; name_he?: string }, lang: Lang): string {
+  if (lang === "he" && c.name_he) return c.name_he;
+  return c.name_ar;
+}
+
+/** Get description based on language */
+export function getDescription(p: { description_ar?: string; description_he?: string }, lang: Lang): string {
+  if (lang === "he" && p.description_he) return p.description_he;
+  return p.description_ar || "";
+}

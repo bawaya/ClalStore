@@ -11,6 +11,7 @@ import { useCart } from "@/lib/store/cart";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "@/components/store/StoreHeader";
+import { getProductName, getColorName } from "@/lib/utils";
 
 export default function ComparePage() {
   const scr = useScreen();
@@ -22,6 +23,7 @@ export default function ComparePage() {
     addToCart({
       productId: item.id,
       name: item.name_ar,
+      name_he: item.name_he || undefined,
       brand: item.brand,
       type: item.type,
       price: item.price,
@@ -139,13 +141,13 @@ export default function ComparePage() {
                         style={{ width: scr.mobile ? 80 : 120, height: scr.mobile ? 80 : 120 }}
                       >
                         {item.image_url ? (
-                          <img src={item.image_url} alt={item.name_ar} className="max-w-full max-h-full object-contain p-1" />
+                          <img src={item.image_url} alt={getProductName(item, lang)} className="max-w-full max-h-full object-contain p-1" />
                         ) : (
                           <span className="opacity-20 text-3xl">📱</span>
                         )}
                       </div>
                       <div className="font-extrabold text-white" style={{ fontSize: scr.mobile ? 11 : 14 }} dir="ltr">
-                        {item.name_ar}
+                        {getProductName(item, lang)}
                       </div>
                     </div>
                   </th>
@@ -224,7 +226,7 @@ export default function ComparePage() {
                   <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 6 : 10 }}>
                     <div className="flex justify-center gap-1 flex-wrap">
                       {(item.colors || []).slice(0, 5).map((c: any, i: number) => (
-                        <span key={i} className="inline-block rounded-full border border-surface-border" style={{ width: 16, height: 16, background: c?.hex || "#888" }} title={c?.name_ar} />
+                        <span key={i} className="inline-block rounded-full border border-surface-border" style={{ width: 16, height: 16, background: c?.hex || "#888" }} title={getColorName(c, lang)} />
                       ))}
                       {(!item.colors || item.colors.length === 0) && <span className="text-muted">—</span>}
                     </div>

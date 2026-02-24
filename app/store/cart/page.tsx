@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useScreen, useToast } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { Footer } from "@/components/website/sections";
@@ -26,7 +27,7 @@ interface PaymentInfo {
 }
 
 interface OrderResult {
-  id: string; total: number; items: { name: string; price: number }[];
+  id: string; total: number; items: { name: string; name_he?: string; price: number }[];
   city: string; address: string; customer: string; phone: string;
   notes: string; hasDevice: boolean; date: string;
   installments: number; monthlyAmount: number; bankName: string;
@@ -118,6 +119,7 @@ function CityCombobox({ value, onChange, error }: { value: string; onChange: (v:
 
 export default function CartPage() {
   const scr = useScreen();
+  const { lang } = useLang();
   const router = useRouter();
   const { toasts, show } = useToast();
   const cart = useCart();
@@ -270,7 +272,7 @@ export default function CartPage() {
       setOrder({
         id: data.orderId,
         total,
-        items: items.map((i) => ({ name: i.name, price: i.price })),
+        items: items.map((i) => ({ name: i.name, name_he: i.name_he, price: i.price })),
         city: info.city,
         address: info.address,
         customer: info.name,
@@ -329,10 +331,10 @@ export default function CartPage() {
               <button onClick={() => cart.removeItem(item.cartId)}
                 className="w-7 h-7 rounded-lg border border-state-error/30 bg-transparent text-state-error text-xs cursor-pointer flex items-center justify-center">✕</button>
               <div className="flex-1 text-right mr-2">
-                <div className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>{item.name}</div>
+                <div className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>{lang === "he" ? (item.name_he || item.name) : item.name}</div>
                 <div className="text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>
                   {item.brand} • {item.type === "device" ? "📱 جهاز" : "🔌 إكسسوار"}
-                  {item.color && ` • ${item.color}`}
+                  {item.color && ` • ${lang === "he" ? (item.color_he || item.color) : item.color}`}
                   {item.storage && ` • ${item.storage}`}
                 </div>
               </div>
@@ -505,7 +507,7 @@ export default function CartPage() {
         {order?.items.map((it, i) => (
           <div key={i} className="flex justify-between py-1.5 border-b border-surface-border">
             <span className="text-brand" style={{ fontSize: scr.mobile ? 11 : 13 }}>₪{it.price}</span>
-            <span style={{ fontSize: scr.mobile ? 11 : 13 }}>{it.name}</span>
+            <span style={{ fontSize: scr.mobile ? 11 : 13 }}>{lang === "he" ? (it.name_he || it.name) : it.name}</span>
           </div>
         ))}
         <div className="flex justify-between pt-2 mt-1">

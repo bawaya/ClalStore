@@ -47,7 +47,7 @@ export function CompareBar() {
               {item.image_url ? (
                 <img
                   src={item.image_url}
-                  alt={item.name_ar}
+                  alt={item.name_he || item.name_ar}
                   className="w-full h-full object-contain p-1"
                 />
               ) : (
