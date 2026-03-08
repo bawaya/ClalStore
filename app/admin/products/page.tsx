@@ -51,6 +51,7 @@ export default function ProductsPage() {
   const [payngoResults, setPayngoResults] = useState<{ name: string; image_url: string }[]>([]);
   const [payngoLoading, setPayngoLoading] = useState(false);
   const [payngoColorLoading, setPayngoColorLoading] = useState<number | null>(null);
+  const [gsmaColorLoading, setGsmaColorLoading] = useState<number | null>(null);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -533,6 +534,86 @@ export default function ProductsPage() {
       show(`❌ ${err.message}`, "error");
     }
     setPayngoColorLoading(null);
+  };
+
+  // Import color image from GSMArena gallery
+  const importGsmaColorImage = async (colorIndex: number) => {
+    const productName = form.name_en || nameEn || form.name_ar || "";
+    if (!productName || !form.brand) { show("أدخل اسم المنتج والشركة أولاً", "error"); return; }
+    const color = (form.colors || [])[colorIndex];
+    if (!color) return;
+    setGsmaColorLoading(colorIndex);
+    try {
+      // First try: fetch all GSMArena color images for this product
+      const res = await fetch("/api/admin/products/color-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: productName, brand: form.brand }),
+      });
+      const data = await res.json();
+
+      if (data.error && !data.colors?.length) {
+        show(`❌ ${data.error}`, "error");
+        setGsmaColorLoading(null);
+        return;
+      }
+
+      const allColors = data.colors || [];
+      if (allColors.length === 0) {
+        show("لم يتم العثور على صور ألوان في GSMArena", "error");
+        setGsmaColorLoading(null);
+        return;
+      }
+
+      // Match by Arabic→English: find matching color by name
+      const colorAr = color.name_ar?.trim() || "";
+      const colorHe = color.name_he?.trim() || "";
+
+      // Build reverse map (Arabic → possible English names)
+      const arToEn: Record<string, string[]> = {};
+      for (const [en, info] of Object.entries({
+        "black": "أسود", "white": "أبيض", "red": "أحمر", "blue": "أزرق",
+        "green": "أخضر", "pink": "وردي", "gray": "رمادي", "purple": "بنفسجي",
+        "gold": "ذهبي", "silver": "فضي", "orange": "برتقالي",
+        "titanium": "تيتانيوم", "natural titanium": "تيتانيوم طبيعي",
+        "black titanium": "تيتانيوم أسود", "white titanium": "تيتانيوم أبيض",
+        "desert titanium": "تيتانيوم صحراوي", "blue titanium": "تيتانيوم أزرق",
+      })) {
+        if (!arToEn[info]) arToEn[info] = [];
+        arToEn[info].push(en);
+      }
+
+      // Find matching GSMArena color
+      const enCandidates = arToEn[colorAr] || [];
+      let matched = allColors.find((c: any) =>
+        enCandidates.some(en => c.name_en.toLowerCase().includes(en))
+      );
+
+      // Fallback: try positional match (same index)
+      if (!matched && colorIndex < allColors.length) {
+        matched = allColors[colorIndex];
+      }
+
+      if (matched) {
+        setForm(prev => {
+          const updated = [...(prev.colors || [])];
+          updated[colorIndex] = { ...updated[colorIndex], image: matched.image_url };
+          return { ...prev, colors: updated };
+        });
+        show(`✅ تم استيراد صورة (${matched.name_en}) من GSMArena`);
+      } else {
+        // Use first available
+        setForm(prev => {
+          const updated = [...(prev.colors || [])];
+          updated[colorIndex] = { ...updated[colorIndex], image: allColors[0].image_url };
+          return { ...prev, colors: updated };
+        });
+        show(`✅ تم استيراد صورة (${allColors[0].name_en}) من GSMArena`);
+      }
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setGsmaColorLoading(null);
   };
 
   const distributeStock = async (mode: string) => {
@@ -1036,8 +1117,17 @@ export default function ProductsPage() {
                       onClick={() => importPaynGoColorImage(i)}
                       disabled={payngoColorLoading === i}
                       className="py-1.5 px-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[9px] cursor-pointer flex-shrink-0"
+                      title="PaynGo"
                     >
                       {payngoColorLoading === i ? "⏳" : "🛒"}
+                    </button>
+                    <button
+                      onClick={() => importGsmaColorImage(i)}
+                      disabled={gsmaColorLoading === i}
+                      className="py-1.5 px-2 rounded-lg border border-orange-500/30 bg-orange-500/10 text-orange-400 text-[9px] cursor-pointer flex-shrink-0"
+                      title="GSMArena"
+                    >
+                      {gsmaColorLoading === i ? "⏳" : "📱"}
                     </button>
                   </div>
                   {/* Apply all suggested images button */}
