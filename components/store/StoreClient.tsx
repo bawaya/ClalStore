@@ -108,6 +108,22 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
           (p.name_he && p.name_he.toLowerCase().includes(q))
       );
     }
+    // Sort: images first, then Apple, then Samsung, then rest
+    list = [...list].sort((a, b) => {
+      const hasImgA = a.image_url ? 1 : 0;
+      const hasImgB = b.image_url ? 1 : 0;
+      if (hasImgA !== hasImgB) return hasImgB - hasImgA;
+      const brandOrder = (p: typeof a) => {
+        const br = p.brand.toLowerCase();
+        if (br === "apple") return 0;
+        if (br === "samsung") return 1;
+        return 2;
+      };
+      const bo = brandOrder(a) - brandOrder(b);
+      if (bo !== 0) return bo;
+      if (a.featured !== b.featured) return a.featured ? -1 : 1;
+      return (b.sold || 0) - (a.sold || 0);
+    });
     return list;
   }, [items, typeCat, brandCat, search, smartResults, isSmartQuery]);
 
