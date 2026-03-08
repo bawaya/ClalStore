@@ -39,6 +39,7 @@ export default function ProductsPage() {
   const [uploadingColor, setUploadingColor] = useState<number | null>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
   const [nameEn, setNameEn] = useState("");
   const [duplicateWarning, setDuplicateWarning] = useState<{ name: string; confidence: string }[]>([]);
   const [aiProcessing, setAiProcessing] = useState(false);
@@ -260,8 +261,9 @@ export default function ProductsPage() {
     e.target.value = "";
   };
 
-  // === GSMArena Auto-Fill ===
-  const handleAutoFill = async () => {
+  // === Auto-Fill (MobileAPI / GSMArena) ===
+  const handleAutoFill = async (provider: "mobileapi" | "gsmarena" | "combined") => {
+    setShowProviderPicker(false);
     if (!form.brand || (!form.name_ar && !nameEn)) {
       show("❌ أدخل اسم المنتج والشركة أولاً", "error");
       return;
@@ -272,7 +274,7 @@ export default function ProductsPage() {
       const res = await fetch("/api/admin/products/autofill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: searchName, brand: form.brand }),
+        body: JSON.stringify({ name: searchName, brand: form.brand, provider }),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -312,7 +314,7 @@ export default function ProductsPage() {
 
   // === Variant Management ===
   const addVariant = () => {
-    setForm(prev => ({ ...prev, variants: [...(prev.variants || []), { storage: "", price: 0, old_price: undefined, cost: 0, stock: 0 }] }));
+    setForm(prev => ({ ...prev, variants: [...(prev.variants || []), { storage: "", price: 0, old_price: undefined, cost: 0, stock: 10 }] }));
   };
 
   const updateVariant = (idx: number, field: keyof ProductVariant, value: string | number | undefined) => {
@@ -605,30 +607,84 @@ export default function ProductsPage() {
               <textarea className="input min-h-[60px] resize-y" value={form.description_he || ""} onChange={(e) => setForm(prev => ({ ...prev, description_he: e.target.value }))} dir="rtl" placeholder="נוצר אוטומטית מהמפרט בעת השמירה..." />
             </FormField>
 
-            {/* ===== Auto-Fill from GSMArena ===== */}
+            {/* ===== Auto-Fill (MobileAPI / GSMArena) ===== */}
             {form.type === "device" && (
-              <button
-                onClick={handleAutoFill}
-                disabled={autoFilling || !form.brand || (!form.name_ar && !nameEn)}
-                className="w-full mb-3 py-2.5 rounded-xl font-extrabold cursor-pointer transition-all active:scale-[0.97] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{
-                  background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
-                  color: "white",
-                  border: "none",
-                  fontSize: scr.mobile ? 12 : 14,
-                }}
-              >
-                {autoFilling ? (
+              <div className="relative mb-3">
+                {/* Main auto-fill button */}
+                <button
+                  onClick={() => {
+                    if (autoFilling) return;
+                    if (!form.brand || (!form.name_ar && !nameEn)) {
+                      show("❌ أدخل اسم المنتج والشركة أولاً", "error");
+                      return;
+                    }
+                    setShowProviderPicker(!showProviderPicker);
+                  }}
+                  disabled={autoFilling}
+                  className="w-full py-2.5 rounded-xl font-extrabold cursor-pointer transition-all active:scale-[0.97] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                    color: "white",
+                    border: "none",
+                    fontSize: scr.mobile ? 12 : 14,
+                  }}
+                >
+                  {autoFilling ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      جاري جلب البيانات...
+                    </>
+                  ) : (
+                    <>
+                      🤖 جلب المواصفات والألوان والصور تلقائياً
+                    </>
+                  )}
+                </button>
+
+                {/* Provider picker dropdown */}
+                {showProviderPicker && (
                   <>
-                    <span className="animate-spin">⏳</span>
-                    جاري الجلب من GSMArena...
-                  </>
-                ) : (
-                  <>
-                    🤖 جلب المواصفات والألوان والصور تلقائياً
+                    <div className="fixed inset-0 z-40" onClick={() => setShowProviderPicker(false)} />
+                    <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl overflow-hidden shadow-xl border border-white/10" style={{ background: "var(--surface-elevated, #1e293b)" }}>
+                      <div className="text-[10px] text-center py-1.5 font-bold opacity-60 border-b border-white/10">اختر مزود البيانات</div>
+                      <button
+                        onClick={() => handleAutoFill("combined")}
+                        className="w-full flex items-center gap-3 px-4 py-3 cursor-pointer border-0 border-b border-white/5 transition-all hover:brightness-125"
+                        style={{ background: "linear-gradient(90deg, rgba(139,92,246,0.15) 0%, transparent 100%)" }}
+                      >
+                        <span className="text-xl">🔗</span>
+                        <div className="text-right flex-1">
+                          <div className="font-extrabold text-[13px]" style={{ color: "#8b5cf6" }}>مدمج (MobileAPI + GSMArena)</div>
+                          <div className="text-[9px] opacity-60">بيانات API + صور ألوان GSMArena — الأدق 🎯</div>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold" style={{ background: "#7c3aed", color: "white" }}>موصى</span>
+                      </button>
+                      <button
+                        onClick={() => handleAutoFill("mobileapi")}
+                        className="w-full flex items-center gap-3 px-4 py-3 cursor-pointer border-0 border-b border-white/5 transition-all hover:brightness-125"
+                        style={{ background: "linear-gradient(90deg, rgba(5,150,105,0.15) 0%, transparent 100%)" }}
+                      >
+                        <span className="text-xl">📡</span>
+                        <div className="text-right flex-1">
+                          <div className="font-extrabold text-[13px]" style={{ color: "#10b981" }}>MobileAPI</div>
+                          <div className="text-[9px] opacity-60">API رسمي — سريع ودقيق ✅</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleAutoFill("gsmarena")}
+                        className="w-full flex items-center gap-3 px-4 py-3 cursor-pointer border-0 transition-all hover:brightness-125"
+                        style={{ background: "linear-gradient(90deg, rgba(230,126,34,0.1) 0%, transparent 100%)" }}
+                      >
+                        <span className="text-xl">🌐</span>
+                        <div className="text-right flex-1">
+                          <div className="font-extrabold text-[13px]" style={{ color: "#f39c12" }}>GSMArena</div>
+                          <div className="text-[9px] opacity-60">Scraping — صور ألوان فقط 📸</div>
+                        </div>
+                      </button>
+                    </div>
                   </>
                 )}
-              </button>
+              </div>
             )}
 
             {/* ===== Image Upload Section ===== */}
@@ -770,7 +826,7 @@ export default function ProductsPage() {
                         >✕</button>
                       </div>
                     )}
-                    {/* Show suggested image from GSMArena if available and not already set */}
+                    {/* Show suggested image if available and not already set */}
                     {!c.image && suggestedColorImages[i] && (
                       <div
                         className="relative w-12 h-12 bg-surface-bg rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer border-2 border-dashed border-brand/40 hover:border-brand"
@@ -802,7 +858,7 @@ export default function ProductsPage() {
                   {/* Apply all suggested images button */}
                   {!c.image && suggestedColorImages[i] && (
                     <div className="text-[8px] text-brand text-right mt-0.5 opacity-70">
-                      ✨ صورة مقترحة من GSMArena — اضغط عليها لتطبيقها
+                      ✨ صورة مقترحة — اضغط عليها لتطبيقها
                     </div>
                   )}
                 </div>

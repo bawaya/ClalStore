@@ -29,7 +29,12 @@ function getDisplayPrice(p: Product, variant: ProductVariant | null): { price: n
 }
 
 function getVariantStock(p: Product, variant: ProductVariant | null): number {
-  if (variant && variant.stock !== undefined) return variant.stock;
+  if (variant && variant.stock !== undefined && variant.stock !== null) {
+    // If variant has explicit stock, use it; but if it's 0 and product stock > 0, treat as fallback
+    if (variant.stock > 0) return variant.stock;
+    if (p.stock > 0) return p.stock;
+    return 0;
+  }
   return p.stock;
 }
 

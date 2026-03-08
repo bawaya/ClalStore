@@ -163,6 +163,7 @@ export async function POST(req: NextRequest) {
         const { error: stockErr } = await (supabase.rpc as any)("decrement_stock", {
           product_id: item.productId,
           qty: item.quantity || 1,
+          variant_storage: item.storage || null,
         });
         if (stockErr) {
           console.error("Stock decrement failed:", stockErr);
