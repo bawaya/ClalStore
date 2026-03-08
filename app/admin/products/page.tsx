@@ -44,6 +44,8 @@ export default function ProductsPage() {
   const [duplicateWarning, setDuplicateWarning] = useState<{ name: string; confidence: string }[]>([]);
   const [aiProcessing, setAiProcessing] = useState(false);
   const [suggestedColorImages, setSuggestedColorImages] = useState<Record<number, string>>({}); // index → url from auto-fill
+  const [stockMode, setStockMode] = useState(false);
+  const [distributing, setDistributing] = useState(false);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -454,6 +456,28 @@ export default function ProductsPage() {
     setConfirm(null);
   };
 
+  const distributeStock = async (mode: string) => {
+    setDistributing(true);
+    try {
+      const res = await fetch("/api/admin/products/distribute-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        show(`✅ تم توزيع المخزون على ${data.updated} منتج`, "success");
+        setStockMode(false);
+        window.location.reload();
+      } else {
+        show(`❌ ${data.error}`, "error");
+      }
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setDistributing(false);
+  };
+
   const margin = form.price && form.cost ? calcMargin(Number(form.price), Number(form.cost)) : 0;
   const profit = (Number(form.price) || 0) - (Number(form.cost) || 0);
 
@@ -462,6 +486,36 @@ export default function ProductsPage() {
   return (
     <div>
       <PageHeader title="📱 المنتجات" count={products.length} onAdd={openCreate} addLabel="منتج جديد" />
+
+      {/* Stock Distribution Tool */}
+      <div className="mb-3">
+        <button onClick={() => setStockMode(!stockMode)}
+          className="chip chip-active flex items-center gap-1">
+          📦 توزيع المخزون
+        </button>
+        {stockMode && (
+          <div className="card mt-2 p-3">
+            <p className="text-sm text-muted mb-2">اختر نمط توزيع المخزون على جميع المنتجات النشطة:</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { mode: "scarce",    icon: "🔴", label: "شحيح",  desc: "2-5 قطع" },
+                { mode: "medium",    icon: "🟡", label: "متوسط", desc: "4-9 قطع" },
+                { mode: "available", icon: "🟢", label: "متوفر", desc: "7-13 قطعة" },
+                { mode: "abundant",  icon: "🔵", label: "وفير",  desc: "10-15 قطعة" },
+              ].map((m) => (
+                <button key={m.mode} onClick={() => !distributing && distributeStock(m.mode)}
+                  disabled={distributing}
+                  className="card p-3 text-center hover:border-brand/40 transition-all cursor-pointer disabled:opacity-50">
+                  <div className="text-2xl mb-1">{m.icon}</div>
+                  <div className="font-bold text-sm">{m.label}</div>
+                  <div className="text-xs text-muted">{m.desc}</div>
+                </button>
+              ))}
+            </div>
+            {distributing && <p className="text-center text-muted text-xs mt-2">⏳ جاري التوزيع...</p>}
+          </div>
+        )}
+      </div>
 
       {/* Filters — Type + Stock */}
       <div className="flex gap-1 mb-2 overflow-x-auto">

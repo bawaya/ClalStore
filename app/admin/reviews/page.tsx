@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 // =====================================================
 // ClalMobile — Admin Reviews Moderation + AI Generator
 // Approve, reject, reply to product reviews
-// Generate realistic AI reviews with Arab Israeli names
+// Generate realistic AI reviews with Arab + Jewish Israeli names
 // =====================================================
 
 import { useState, useEffect } from "react";
@@ -50,7 +50,7 @@ export default function AdminReviewsPage() {
   const [generating, setGenerating] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
   const [manualDist, setManualDist] = useState(false);
-  const [dist, setDist] = useState({ star5: 5, star4: 3, star3: 1, star2: 1, star1: 0 });
+  const [dist, setDist] = useState({ star5: 6, star4: 3, star3: 1, star2: 0, star1: 0 });
 
   useEffect(() => { load(); loadProducts(); }, []);
 
