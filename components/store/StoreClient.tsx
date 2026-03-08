@@ -108,7 +108,25 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
           (p.name_he && p.name_he.toLowerCase().includes(q))
       );
     }
-    // Sort: images first, then Apple, then Samsung, then rest
+    // Sort: images first, then Apple, then Samsung, then rest; newest models first
+    const getModelGen = (p: typeof list[0]): number => {
+      const name = (p.name_ar + " " + (p.name_he || "")).toLowerCase();
+      // Extract highest number from model name (iPhone 17→17, S25→25, Z Fold 7→7, Pixel 9→9)
+      const nums = name.match(/(?:iphone|آيفون|galaxy|جالكسي|s|a|z\s*(?:fold|flip|فولد|فليب))\s*(\d+)/gi);
+      if (nums) {
+        const extracted = nums.map(m => {
+          const d = m.match(/(\d+)/);
+          return d ? parseInt(d[1]) : 0;
+        });
+        return Math.max(...extracted);
+      }
+      // Fallback: check for "Pro Max" tier or year-like patterns
+      const yearMatch = name.match(/20(\d{2})/);
+      if (yearMatch) return parseInt(yearMatch[1]);
+      const anyNum = name.match(/(\d+)/);
+      return anyNum ? parseInt(anyNum[1]) : 0;
+    };
+
     list = [...list].sort((a, b) => {
       const hasImgA = a.image_url ? 1 : 0;
       const hasImgB = b.image_url ? 1 : 0;
@@ -121,6 +139,10 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
       };
       const bo = brandOrder(a) - brandOrder(b);
       if (bo !== 0) return bo;
+      // Newer model first (within same brand group)
+      const genA = getModelGen(a);
+      const genB = getModelGen(b);
+      if (genA !== genB) return genB - genA;
       if (a.featured !== b.featured) return a.featured ? -1 : 1;
       return (b.sold || 0) - (a.sold || 0);
     });
