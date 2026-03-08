@@ -55,6 +55,7 @@ export default function ProductsPage() {
   const [pexelsOpen, setPexelsOpen] = useState<number | null>(null); // colorIndex or null
   const [pexelsResults, setPexelsResults] = useState<{ id: number; alt: string; src: string; thumb: string }[]>([]);
   const [pexelsLoading, setPexelsLoading] = useState(false);
+  const [bulkColorLoading, setBulkColorLoading] = useState(false);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -665,6 +666,66 @@ export default function ProductsPage() {
     show("✅ تم اختيار الصورة من Pexels");
   };
 
+  // Bulk fetch all color images (PaynGo → GSMArena → skip)
+  const fetchAllColorImages = async () => {
+    const productName = form.name_en || nameEn || form.name_ar || "";
+    if (!productName || !form.brand) { show("أدخل اسم المنتج والشركة أولاً", "error"); return; }
+    const colors = form.colors || [];
+    if (colors.length === 0) { show("لم تتم إضافة ألوان", "error"); return; }
+
+    const colorsWithoutImages = colors.filter(c => !c.image);
+    if (colorsWithoutImages.length === 0) { show("جميع الألوان لديها صور بالفعل ✅"); return; }
+
+    setBulkColorLoading(true);
+    try {
+      const res = await fetch("/api/admin/products/bulk-color-images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: productName,
+          brand: form.brand,
+          colors: colors.map(c => ({
+            name_ar: c.name_ar,
+            name_he: c.name_he,
+            has_image: !!c.image,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (data.error) { show(`❌ ${data.error}`, "error"); setBulkColorLoading(false); return; }
+
+      const results = data.results || [];
+      const succeeded = results.filter((r: any) => r.image_url);
+      const failed = results.filter((r: any) => !r.image_url);
+
+      if (succeeded.length > 0) {
+        setForm(prev => {
+          const updated = [...(prev.colors || [])];
+          for (const r of succeeded) {
+            if (updated[r.index]) {
+              updated[r.index] = { ...updated[r.index], image: r.image_url };
+            }
+          }
+          return { ...prev, colors: updated };
+        });
+      }
+
+      const sources = succeeded.map((r: any) => r.source);
+      const payngoCount = sources.filter((s: string) => s === "payngo").length;
+      const gsmaCount = sources.filter((s: string) => s === "gsmarena").length;
+
+      let msg = `✅ تم جلب ${succeeded.length} من ${results.length} صور`;
+      if (payngoCount) msg += ` (PaynGo: ${payngoCount})`;
+      if (gsmaCount) msg += ` (GSMArena: ${gsmaCount})`;
+      if (failed.length > 0) msg += ` | ❌ ${failed.length} فشل: ${failed.map((r: any) => r.color_name).join("، ")}`;
+
+      show(msg, failed.length > 0 && succeeded.length === 0 ? "error" : "success");
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setBulkColorLoading(false);
+  };
+
   const distributeStock = async (mode: string) => {
     setDistributing(true);
     try {
@@ -1109,6 +1170,19 @@ export default function ProductsPage() {
                   ✨ تطبيق جميع صور الألوان المقترحة ({Object.keys(suggestedColorImages).filter(i => !(form.colors || [])[Number(i)]?.image).length})
                 </button>
               )}
+              {/* Bulk fetch all color images */}
+              {(form.colors || []).length > 0 && (form.colors || []).some(c => !c.image) && (
+                <button
+                  onClick={fetchAllColorImages}
+                  disabled={bulkColorLoading}
+                  className="w-full py-2 rounded-lg bg-gradient-to-r from-emerald-500/10 via-orange-500/10 to-sky-500/10 text-[11px] cursor-pointer border border-emerald-500/30 font-bold mb-2 flex items-center justify-center gap-2"
+                >
+                  {bulkColorLoading
+                    ? <><span className="animate-spin">⏳</span> جاري البحث في PaynGo + GSMArena...</>
+                    : <>🎨 جلب صور جميع الألوان تلقائياً ({(form.colors || []).filter(c => !c.image).length} ألوان بدون صور)</>
+                  }
+                </button>
+              )}
               {(form.colors || []).length === 0 && (
                 <div className="text-center text-dim text-[10px] py-2">لم تتم إضافة ألوان</div>
               )}
@@ -1211,6 +1285,46 @@ export default function ProductsPage() {
                   {!c.image && suggestedColorImages[i] && (
                     <div className="text-[8px] text-brand text-right mt-0.5 opacity-70">
                       ✨ صورة مقترحة — اضغط عليها لتطبيقها
+                    </div>
+                  )}
+                  {/* Manual URL paste */}
+                  {!c.image && (
+                    <div className="flex gap-1 mt-1">
+                      <input
+                        className="input text-[9px] flex-1"
+                        placeholder="🔗 الصق رابط صورة..."
+                        dir="ltr"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const url = (e.target as HTMLInputElement).value.trim();
+                            if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+                              setForm(prev => {
+                                const updated = [...(prev.colors || [])];
+                                updated[i] = { ...updated[i], image: url };
+                                return { ...prev, colors: updated };
+                              });
+                              (e.target as HTMLInputElement).value = "";
+                              show("✅ تم تطبيق الصورة");
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        className="text-[8px] px-2 py-1 rounded bg-surface-bg border border-surface-border text-muted cursor-pointer"
+                        onClick={(e) => {
+                          const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement;
+                          const url = input?.value?.trim();
+                          if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+                            setForm(prev => {
+                              const updated = [...(prev.colors || [])];
+                              updated[i] = { ...updated[i], image: url };
+                              return { ...prev, colors: updated };
+                            });
+                            input.value = "";
+                            show("✅ تم تطبيق الصورة");
+                          }
+                        }}
+                      >تطبيق</button>
                     </div>
                   )}
                 </div>
