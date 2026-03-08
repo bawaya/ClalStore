@@ -52,6 +52,9 @@ export default function ProductsPage() {
   const [payngoLoading, setPayngoLoading] = useState(false);
   const [payngoColorLoading, setPayngoColorLoading] = useState<number | null>(null);
   const [gsmaColorLoading, setGsmaColorLoading] = useState<number | null>(null);
+  const [pexelsOpen, setPexelsOpen] = useState<number | null>(null); // colorIndex or null
+  const [pexelsResults, setPexelsResults] = useState<{ id: number; alt: string; src: string; thumb: string }[]>([]);
+  const [pexelsLoading, setPexelsLoading] = useState(false);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -616,6 +619,52 @@ export default function ProductsPage() {
     setGsmaColorLoading(null);
   };
 
+  // Open Pexels search for a color
+  const openPexelsForColor = async (colorIndex: number) => {
+    const productName = form.name_en || nameEn || form.name_ar || "";
+    if (!productName) { show("أدخل اسم المنتج أولاً", "error"); return; }
+    const color = (form.colors || [])[colorIndex];
+    if (!color) return;
+    // Map Arabic color to English for Pexels search
+    const arToEn: Record<string, string> = {
+      "أسود": "black", "أبيض": "white", "أحمر": "red", "أزرق": "blue",
+      "أخضر": "green", "وردي": "pink", "رمادي": "gray", "بنفسجي": "purple",
+      "ذهبي": "gold", "فضي": "silver", "برتقالي": "orange", "بيج": "beige",
+      "تيتانيوم": "titanium", "تيتانيوم أسود": "black titanium",
+      "تيتانيوم طبيعي": "natural titanium", "تيتانيوم أبيض": "white titanium",
+      "تيتانيوم صحراوي": "desert titanium",
+    };
+    const colorEn = arToEn[color.name_ar?.trim()] || color.name_ar || "";
+    const query = `${form.brand || ""} ${productName} ${colorEn} smartphone`.trim();
+    setPexelsOpen(colorIndex);
+    setPexelsResults([]);
+    setPexelsLoading(true);
+    try {
+      const res = await fetch("/api/admin/products/pexels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, per_page: 12 }),
+      });
+      const data = await res.json();
+      setPexelsResults(data.photos || []);
+      if (!data.photos?.length) show("لم يتم العثور على نتائج في Pexels", "error");
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setPexelsLoading(false);
+  };
+
+  const selectPexelsImage = (colorIndex: number, imageUrl: string) => {
+    setForm(prev => {
+      const updated = [...(prev.colors || [])];
+      updated[colorIndex] = { ...updated[colorIndex], image: imageUrl };
+      return { ...prev, colors: updated };
+    });
+    setPexelsOpen(null);
+    setPexelsResults([]);
+    show("✅ تم اختيار الصورة من Pexels");
+  };
+
   const distributeStock = async (mode: string) => {
     setDistributing(true);
     try {
@@ -1129,7 +1178,35 @@ export default function ProductsPage() {
                     >
                       {gsmaColorLoading === i ? "⏳" : "📱"}
                     </button>
+                    <button
+                      onClick={() => openPexelsForColor(i)}
+                      disabled={pexelsOpen === i && pexelsLoading}
+                      className="py-1.5 px-2 rounded-lg border border-sky-500/30 bg-sky-500/10 text-sky-400 text-[9px] cursor-pointer flex-shrink-0"
+                      title="Pexels"
+                    >
+                      {pexelsOpen === i && pexelsLoading ? "⏳" : "🔍"}
+                    </button>
                   </div>
+                  {/* Pexels results picker */}
+                  {pexelsOpen === i && pexelsResults.length > 0 && (
+                    <div className="mt-1.5 p-2 bg-surface-bg rounded-lg border border-sky-500/20">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <button onClick={() => { setPexelsOpen(null); setPexelsResults([]); }} className="text-[8px] text-dim cursor-pointer bg-transparent border-0">✕ إغلاق</button>
+                        <span className="text-[9px] text-sky-400 font-bold">🔍 Pexels — اختر صورة</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {pexelsResults.map((photo) => (
+                          <div
+                            key={photo.id}
+                            className="relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 border-transparent hover:border-sky-500 transition-all"
+                            onClick={() => selectPexelsImage(i, photo.src)}
+                          >
+                            <img src={photo.thumb} alt={photo.alt} className="w-full h-full object-cover" loading="lazy" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {/* Apply all suggested images button */}
                   {!c.image && suggestedColorImages[i] && (
                     <div className="text-[8px] text-brand text-right mt-0.5 opacity-70">
