@@ -33,15 +33,21 @@ function extractImage(product: any): string | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const { query } = await req.json() as { query: string };
+    const { query, color_he } = await req.json() as { query: string; color_he?: string };
     if (!query || query.trim().length < 2) {
       return NextResponse.json({ error: "أدخل اسم المنتج للبحث" }, { status: 400 });
     }
 
+    // PaynGo names phones as: "סמארטפון Samsung Galaxy S26 Ultra ... צבע שחור"
+    // For color search: prefix with סמארטפון and append color in Hebrew
+    const searchTerm = color_he
+      ? `סמארטפון%${query.trim()}%צבע ${color_he.trim()}%`
+      : `%${query.trim()}%`;
+
     // Search PaynGo Magento API
     const searchUrl = `${PAYNGO_API}?` + new URLSearchParams({
       "searchCriteria[filterGroups][0][filters][0][field]": "name",
-      "searchCriteria[filterGroups][0][filters][0][value]": `%${query.trim()}%`,
+      "searchCriteria[filterGroups][0][filters][0][value]": searchTerm,
       "searchCriteria[filterGroups][0][filters][0][conditionType]": "like",
       "searchCriteria[filterGroups][1][filters][0][field]": "visibility",
       "searchCriteria[filterGroups][1][filters][0][value]": "4",

@@ -492,15 +492,14 @@ export default function ProductsPage() {
     show("✅ تم استيراد الصورة من PaynGo");
   };
 
-  // Color-to-English mapping for PaynGo search
-  const colorNameMap: Record<string, string> = {
-    "أسود": "black", "أبيض": "white", "أحمر": "red", "أزرق": "blue",
-    "أخضر": "green", "وردي": "pink", "رمادي": "gray", "بنفسجي": "purple",
-    "ذهبي": "gold", "فضي": "silver", "برتقالي": "orange", "بيج": "beige",
-    "تيتانيوم": "titanium", "كريمي": "cream", "سماوي": "blue",
-    "שחור": "black", "לבן": "white", "אדום": "red", "כחול": "blue",
-    "ירוק": "green", "ורוד": "pink", "אפור": "gray", "סגול": "purple",
-    "זהב": "gold", "כסף": "silver", "בז'": "beige", "טיטניום": "titanium",
+  // Arabic-to-Hebrew color mapping for PaynGo search (PaynGo uses Hebrew names like "צבע שחור")
+  const colorToHebrew: Record<string, string> = {
+    "أسود": "שחור", "أبيض": "לבן", "أحمر": "אדום", "أزرق": "כחול",
+    "أخضر": "ירוק", "وردي": "ורוד", "رمادي": "אפור", "بنفسجي": "סגול",
+    "ذهبي": "זהב", "فضي": "כסף", "برتقالي": "כתום", "بيج": "בז'",
+    "تيتانيوم": "טיטניום", "كريمي": "קרם", "سماوي": "כחול",
+    "تيتانيوم أسود": "שחור טיטניום", "تيتانيوم طبيعي": "טיטניום טבעי",
+    "تيتانيوم أبيض": "לבן טיטניום", "تيتانيوم صحراوي": "טיטניום מדברי",
   };
 
   const importPaynGoColorImage = async (colorIndex: number) => {
@@ -508,15 +507,15 @@ export default function ProductsPage() {
     if (!productName) { show("أدخل اسم المنتج أولاً", "error"); return; }
     const color = (form.colors || [])[colorIndex];
     if (!color) return;
-    // Determine English color name
-    const colorEn = colorNameMap[color.name_ar?.trim()] || colorNameMap[color.name_he?.trim()] || color.name_ar || "";
-    const query = `${productName} ${colorEn}`.trim();
+    // Get Hebrew color name for PaynGo search
+    const colorHe = color.name_he?.trim() || colorToHebrew[color.name_ar?.trim()] || "";
+    const colorLabel = color.name_ar || colorHe;
     setPayngoColorLoading(colorIndex);
     try {
       const res = await fetch("/api/admin/products/import-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query: productName, color_he: colorHe }),
       });
       const data = await res.json();
       if (data.results?.length > 0) {
@@ -526,9 +525,9 @@ export default function ProductsPage() {
           updated[colorIndex] = { ...updated[colorIndex], image: imgUrl };
           return { ...prev, colors: updated };
         });
-        show(`✅ تم استيراد صورة اللون: ${colorEn}`);
+        show(`✅ تم استيراد صورة اللون: ${colorLabel}`);
       } else {
-        show("لم يتم العثور على صورة لهذا اللون", "error");
+        show("لم يتم العثور على صورة لهذا اللون في PaynGo", "error");
       }
     } catch (err: any) {
       show(`❌ ${err.message}`, "error");
