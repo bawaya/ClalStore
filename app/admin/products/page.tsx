@@ -46,6 +46,10 @@ export default function ProductsPage() {
   const [suggestedColorImages, setSuggestedColorImages] = useState<Record<number, string>>({}); // index → url from auto-fill
   const [stockMode, setStockMode] = useState(false);
   const [distributing, setDistributing] = useState(false);
+  const [payngoOpen, setPayngoOpen] = useState(false);
+  const [payngoQuery, setPayngoQuery] = useState("");
+  const [payngoResults, setPayngoResults] = useState<{ name: string; image_url: string }[]>([]);
+  const [payngoLoading, setPayngoLoading] = useState(false);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -456,6 +460,37 @@ export default function ProductsPage() {
     setConfirm(null);
   };
 
+  const searchPaynGo = async () => {
+    if (!payngoQuery.trim()) return;
+    setPayngoLoading(true);
+    setPayngoResults([]);
+    try {
+      const res = await fetch("/api/admin/products/import-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: payngoQuery.trim() }),
+      });
+      const data = await res.json();
+      if (data.results) {
+        setPayngoResults(data.results);
+        if (data.results.length === 0) show("لم يتم العثور على نتائج", "error");
+      } else {
+        show(`❌ ${data.error}`, "error");
+      }
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setPayngoLoading(false);
+  };
+
+  const selectPaynGoImage = (imageUrl: string) => {
+    setForm(prev => ({ ...prev, image_url: imageUrl }));
+    setPayngoOpen(false);
+    setPayngoResults([]);
+    setPayngoQuery("");
+    show("✅ تم استيراد الصورة من PaynGo");
+  };
+
   const distributeStock = async (mode: string) => {
     setDistributing(true);
     try {
@@ -774,6 +809,12 @@ export default function ProductsPage() {
                 >
                   {uploading ? "⏳ جاري الرفع..." : "📷 رفع من الجهاز"}
                 </button>
+                <button
+                  onClick={() => { setPayngoOpen(!payngoOpen); setPayngoQuery(form.name_en || form.name_ar || ""); }}
+                  className="py-2 px-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                >
+                  🛒 PaynGo
+                </button>
                 {form.image_url && (
                   <div className="relative">
                     <button
@@ -806,6 +847,43 @@ export default function ProductsPage() {
                 <input className="input text-xs" dir="ltr" value={form.image_url || ""} onChange={(e) => setForm(prev => ({ ...prev, image_url: e.target.value || undefined }))} placeholder="https://..." />
               </FormField>
               <div className="text-[9px] text-muted text-right mt-0.5">📐 المقاس المفضّل: {IMAGE_DIMS.product}</div>
+
+              {/* PaynGo Image Import */}
+              {payngoOpen && (
+                <div className="card mt-2 mb-2 p-2.5 border-emerald-500/20">
+                  <div className="flex gap-1.5 mb-2">
+                    <input
+                      className="input text-xs flex-1"
+                      dir="ltr"
+                      value={payngoQuery}
+                      onChange={(e) => setPayngoQuery(e.target.value)}
+                      placeholder="Search PaynGo... e.g. Galaxy S25 Ultra"
+                      onKeyDown={(e) => e.key === "Enter" && searchPaynGo()}
+                    />
+                    <button
+                      onClick={searchPaynGo}
+                      disabled={payngoLoading}
+                      className="py-1.5 px-3 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold cursor-pointer border border-emerald-500/30"
+                    >
+                      {payngoLoading ? "⏳" : "🔍 بحث"}
+                    </button>
+                  </div>
+                  {payngoResults.length > 0 && (
+                    <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto">
+                      {payngoResults.map((r, i) => (
+                        <div
+                          key={i}
+                          onClick={() => selectPaynGoImage(r.image_url)}
+                          className="bg-surface-elevated rounded-lg p-1.5 cursor-pointer hover:border-emerald-500/50 border border-transparent transition-all"
+                        >
+                          <img src={r.image_url} alt={r.name} className="w-full h-16 object-contain mb-1" />
+                          <div className="text-[8px] text-muted text-center leading-tight line-clamp-2">{r.name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Gallery */}
               <div className="font-bold text-right mt-3 mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>🖼️ معرض صور إضافية</div>

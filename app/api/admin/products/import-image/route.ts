@@ -1,0 +1,86 @@
+export const runtime = 'edge';
+
+// =====================================================
+// ClalMobile — Import Images from PaynGo (Magento REST API)
+// POST: { query } → { image_url, name }
+// =====================================================
+
+import { NextRequest, NextResponse } from "next/server";
+
+const PAYNGO_API = "https://www.payngo.co.il/rest/V1/products";
+const PAYNGO_MEDIA = "https://www.payngo.co.il/media/catalog/product";
+
+interface PaynGoProduct {
+  name: string;
+  sku: string;
+  image_path: string;
+  image_url: string;
+}
+
+function extractImage(product: any): string | null {
+  const attrs = product.custom_attributes || [];
+  const imgAttr = attrs.find((a: any) => a.attribute_code === "image");
+  if (imgAttr?.value && imgAttr.value !== "no_selection") {
+    return `${PAYNGO_MEDIA}${imgAttr.value}`;
+  }
+  // Fallback to media_gallery_entries
+  const gallery = product.media_gallery_entries || [];
+  if (gallery.length > 0 && gallery[0].file) {
+    return `${PAYNGO_MEDIA}${gallery[0].file}`;
+  }
+  return null;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { query } = await req.json() as { query: string };
+    if (!query || query.trim().length < 2) {
+      return NextResponse.json({ error: "أدخل اسم المنتج للبحث" }, { status: 400 });
+    }
+
+    // Search PaynGo Magento API
+    const searchUrl = `${PAYNGO_API}?` + new URLSearchParams({
+      "searchCriteria[filterGroups][0][filters][0][field]": "name",
+      "searchCriteria[filterGroups][0][filters][0][value]": `%${query.trim()}%`,
+      "searchCriteria[filterGroups][0][filters][0][conditionType]": "like",
+      "searchCriteria[filterGroups][1][filters][0][field]": "visibility",
+      "searchCriteria[filterGroups][1][filters][0][value]": "4",
+      "searchCriteria[filterGroups][1][filters][0][conditionType]": "eq",
+      "searchCriteria[pageSize]": "20",
+      "searchCriteria[sortOrders][0][field]": "updated_at",
+      "searchCriteria[sortOrders][0][direction]": "DESC",
+      "fields": "items[id,name,sku,custom_attributes,media_gallery_entries]",
+    }).toString();
+
+    const res = await fetch(searchUrl, {
+      headers: { "Accept": "application/json" },
+    });
+
+    if (!res.ok) {
+      return NextResponse.json({ error: `PaynGo API error: ${res.status}` }, { status: 502 });
+    }
+
+    const data = await res.json();
+    const items = data.items || [];
+
+    // Extract unique products (deduplicate by image)
+    const seen = new Set<string>();
+    const results: PaynGoProduct[] = [];
+
+    for (const item of items) {
+      const imageUrl = extractImage(item);
+      if (!imageUrl || seen.has(imageUrl)) continue;
+      seen.add(imageUrl);
+      results.push({
+        name: item.name,
+        sku: item.sku,
+        image_path: imageUrl.replace(PAYNGO_MEDIA, ""),
+        image_url: imageUrl,
+      });
+    }
+
+    return NextResponse.json({ results, total: results.length });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "فشل في البحث" }, { status: 500 });
+  }
+}
