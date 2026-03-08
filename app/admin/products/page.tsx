@@ -50,6 +50,7 @@ export default function ProductsPage() {
   const [payngoQuery, setPayngoQuery] = useState("");
   const [payngoResults, setPayngoResults] = useState<{ name: string; image_url: string }[]>([]);
   const [payngoLoading, setPayngoLoading] = useState(false);
+  const [payngoColorLoading, setPayngoColorLoading] = useState<number | null>(null);
 
   // === Image Upload (single file) ===
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -489,6 +490,50 @@ export default function ProductsPage() {
     setPayngoResults([]);
     setPayngoQuery("");
     show("✅ تم استيراد الصورة من PaynGo");
+  };
+
+  // Color-to-English mapping for PaynGo search
+  const colorNameMap: Record<string, string> = {
+    "أسود": "black", "أبيض": "white", "أحمر": "red", "أزرق": "blue",
+    "أخضر": "green", "وردي": "pink", "رمادي": "gray", "بنفسجي": "purple",
+    "ذهبي": "gold", "فضي": "silver", "برتقالي": "orange", "بيج": "beige",
+    "تيتانيوم": "titanium", "كريمي": "cream", "سماوي": "blue",
+    "שחור": "black", "לבן": "white", "אדום": "red", "כחול": "blue",
+    "ירוק": "green", "ורוד": "pink", "אפור": "gray", "סגול": "purple",
+    "זהב": "gold", "כסף": "silver", "בז'": "beige", "טיטניום": "titanium",
+  };
+
+  const importPaynGoColorImage = async (colorIndex: number) => {
+    const productName = form.name_en || form.name_ar || "";
+    if (!productName) { show("أدخل اسم المنتج أولاً", "error"); return; }
+    const color = (form.colors || [])[colorIndex];
+    if (!color) return;
+    // Determine English color name
+    const colorEn = colorNameMap[color.name_ar?.trim()] || colorNameMap[color.name_he?.trim()] || color.name_ar || "";
+    const query = `${productName} ${colorEn}`.trim();
+    setPayngoColorLoading(colorIndex);
+    try {
+      const res = await fetch("/api/admin/products/import-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const data = await res.json();
+      if (data.results?.length > 0) {
+        const imgUrl = data.results[0].image_url;
+        setForm(prev => {
+          const updated = [...(prev.colors || [])];
+          updated[colorIndex] = { ...updated[colorIndex], image: imgUrl };
+          return { ...prev, colors: updated };
+        });
+        show(`✅ تم استيراد صورة اللون: ${colorEn}`);
+      } else {
+        show("لم يتم العثور على صورة لهذا اللون", "error");
+      }
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setPayngoColorLoading(null);
   };
 
   const distributeStock = async (mode: string) => {
@@ -985,6 +1030,13 @@ export default function ProductsPage() {
                       className="flex-1 py-1.5 rounded-lg border border-dashed border-state-purple/30 text-state-purple text-[9px] cursor-pointer bg-transparent"
                     >
                       {uploadingColor === i ? "⏳ جاري..." : c.image ? "📷 تغيير صورة اللون" : "📷 رفع صورة لهذا اللون"}
+                    </button>
+                    <button
+                      onClick={() => importPaynGoColorImage(i)}
+                      disabled={payngoColorLoading === i}
+                      className="py-1.5 px-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[9px] cursor-pointer flex-shrink-0"
+                    >
+                      {payngoColorLoading === i ? "⏳" : "🛒"}
                     </button>
                   </div>
                   {/* Apply all suggested images button */}
