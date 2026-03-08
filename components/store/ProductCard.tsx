@@ -344,6 +344,26 @@ export function ProductCard({ product: p }: { product: Product }) {
           )}
         </div>
 
+        {/* ── Stock indicator ── */}
+        {(() => {
+          const total = getTotalStock(p);
+          if (total === 0) return (
+            <div className="text-[#ef4444] font-bold mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+              ❌ {t("store.outOfStock")}
+            </div>
+          );
+          if (total <= 5) return (
+            <div className="text-[#f59e0b] font-bold mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+              ⚠️ {lang === "ar" ? `باقي ${total} قطع فقط!` : `נשארו ${total} יחידות בלבד!`}
+            </div>
+          );
+          return (
+            <div className="text-[#22c55e] font-bold mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+              ✅ {t("store.inStock")} ({total})
+            </div>
+          );
+        })()}
+
         {/* ── Storage options (selectable pills) ── */}
         {storage.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2">
