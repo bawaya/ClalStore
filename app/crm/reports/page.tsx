@@ -8,18 +8,25 @@ export default function CRMReportsPage() {
   const [reportType, setReportType] = useState<"daily" | "weekly">("daily");
   const [loading, setLoading] = useState(false);
   const [reportHtml, setReportHtml] = useState("");
+  const [error, setError] = useState("");
 
   const loadReport = async () => {
     setLoading(true);
     setReportHtml("");
+    setError("");
     try {
       const res = await fetch(`/api/crm/reports?type=${reportType}&date=${selectedDate}`);
+      if (!res.ok) {
+        setError(`خطأ ${res.status}: فشل في تحميل التقرير`);
+        return;
+      }
       const html = await res.text();
       setReportHtml(html);
     } catch {
-      setReportHtml("<p style='color:red;text-align:center;padding:40px'>فشل في تحميل التقرير</p>");
+      setError("فشل في الاتصال بالسيرفر");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -67,6 +74,12 @@ export default function CRMReportsPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-card p-4 text-center text-red-400">
+          ⚠️ {error}
+        </div>
+      )}
+
       {reportHtml && (
         <div className="bg-surface-card rounded-card border border-surface-border overflow-hidden">
           <iframe
@@ -78,10 +91,10 @@ export default function CRMReportsPage() {
         </div>
       )}
 
-      {!reportHtml && !loading && (
+      {!reportHtml && !loading && !error && (
         <div className="text-center py-20 text-muted">
           <div className="text-4xl mb-3">📊</div>
-          <p>اختر نوع التقرير والتاريخ ثم اضغط "عرض التقرير"</p>
+          <p>اختر نوع التقرير والتاريخ ثم اضغط &quot;عرض التقرير&quot;</p>
         </div>
       )}
     </div>
