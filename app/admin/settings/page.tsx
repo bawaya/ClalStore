@@ -11,6 +11,7 @@ import { invalidateLogoCache } from "@/components/shared/Logo";
 
 // ===== Provider Config Fields =====
 const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string; placeholder: string }[]> = {
+  // --- Payment ---
   "רווחית (Rivhit)": [
     { key: "api_key", label: "API Key", type: "password", placeholder: "أدخل Rivhit API Key" },
     { key: "business_id", label: "Business ID", type: "text", placeholder: "رقم العمل" },
@@ -26,6 +27,37 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
   Stripe: [
     { key: "api_key", label: "Secret Key", type: "password", placeholder: "sk_live_xxxxx" },
     { key: "publishable_key", label: "Publishable Key", type: "text", placeholder: "pk_live_xxxxx" },
+  ],
+  // --- WhatsApp ---
+  yCloud: [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
+    { key: "phone_id", label: "رقم الهاتف المسجّل", type: "text", placeholder: "+972XXXXXXXXX" },
+    { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
+    { key: "admin_phone", label: "📱 رقم الأدمن (إشعارات الطلبات)", type: "text", placeholder: "05X-XXXXXXX" },
+    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX" },
+  ],
+  "Meta API": [
+    { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
+    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "" },
+    { key: "verify_token", label: "Verify Token", type: "text", placeholder: "" },
+  ],
+  Twilio: [
+    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
+    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
+    { key: "phone_number", label: "From Number", type: "text", placeholder: "+1..." },
+  ],
+  // --- SMS / OTP ---
+  "Twilio SMS": [
+    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
+    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
+    { key: "verify_service_sid", label: "Verify Service SID (OTP)", type: "text", placeholder: "VA..." },
+    { key: "phone_number", label: "From Number (اختياري)", type: "text", placeholder: "+972..." },
+    { key: "messaging_service_sid", label: "Messaging Service SID (اختياري)", type: "text", placeholder: "MG..." },
+  ],
+  // --- Email ---
+  Resend: [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "re_xxxxx" },
+    { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "ClalMobile <noreply@clalmobile.com>" },
   ],
   SendGrid: [
     { key: "api_key", label: "API Key", type: "password", placeholder: "SG.xxxxx" },
@@ -49,35 +81,50 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
     { key: "password", label: "Password", type: "password", placeholder: "" },
     { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "noreply@clalmobile.com" },
   ],
-  yCloud: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
-    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "رقم الهاتف" },
-    { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
-    { key: "admin_phone", label: "📱 رقم الأدمن", type: "text", placeholder: "05X-XXXXXXX — يستقبل إشعارات الطلبات" },
-    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },
+  // --- AI (Bot + Search) ---
+  "Anthropic Claude": [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "sk-ant-xxxxx" },
+    { key: "api_key_bot", label: "API Key — بوت (اختياري)", type: "password", placeholder: "مفتاح منفصل للبوت" },
+    { key: "api_key_store", label: "API Key — متجر (اختياري)", type: "password", placeholder: "مفتاح منفصل للبحث الذكي" },
   ],
-  "Meta API": [
-    { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
-    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "" },
-    { key: "verify_token", label: "Verify Token", type: "text", placeholder: "" },
+  // --- AI (Admin) ---
+  OpenAI: [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "sk-xxxxx" },
+    { key: "api_key_admin", label: "API Key — أدمن (اختياري)", type: "password", placeholder: "مفتاح منفصل لترجمة المنتجات" },
   ],
-  Twilio: [
-    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
-    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
-    { key: "phone_number", label: "From Number", type: "text", placeholder: "+1..." },
+  // --- Storage ---
+  "Cloudflare R2": [
+    { key: "account_id", label: "Account ID", type: "text", placeholder: "Cloudflare Account ID" },
+    { key: "access_key", label: "Access Key ID", type: "password", placeholder: "R2 Access Key" },
+    { key: "secret_key", label: "Secret Access Key", type: "password", placeholder: "R2 Secret Key" },
+    { key: "bucket_name", label: "Bucket Name", type: "text", placeholder: "clalmobile-images" },
+    { key: "public_url", label: "Public URL", type: "text", placeholder: "https://your-r2-url.com" },
   ],
-  InforUMobile: [
-    { key: "username", label: "اسم المستخدم", type: "text", placeholder: "" },
-    { key: "password", label: "كلمة المرور", type: "password", placeholder: "" },
-    { key: "sender", label: "اسم المرسل", type: "text", placeholder: "ClalMobile" },
+  // --- Image Processing ---
+  RemoveBG: [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "RemoveBG API Key" },
   ],
-  "Twilio SMS": [
-    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
-    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
-    { key: "verify_service_sid", label: "Verify Service SID (OTP)", type: "text", placeholder: "VA..." },
-    { key: "phone_number", label: "From Number (اختياري)", type: "text", placeholder: "+1..." },
-    { key: "messaging_service_sid", label: "Messaging Service SID (اختياري)", type: "text", placeholder: "MG..." },
+  // --- Device Specs ---
+  MobileAPI: [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "MobileAPI Token" },
   ],
+  // --- Image Search ---
+  Pexels: [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "Pexels API Key" },
+  ],
+  // --- Push Notifications ---
+  "Web Push (VAPID)": [
+    { key: "vapid_public", label: "VAPID Public Key", type: "text", placeholder: "BKs7L8mH_Z_Ra..." },
+    { key: "vapid_private", label: "VAPID Private Key", type: "password", placeholder: "مفتاح خاص" },
+  ],
+  // --- Analytics ---
+  "Google Analytics": [
+    { key: "measurement_id", label: "Measurement ID", type: "text", placeholder: "G-XXXXXXXX" },
+  ],
+  Mixpanel: [
+    { key: "project_token", label: "Project Token", type: "text", placeholder: "" },
+  ],
+  // --- CRM ---
   HubSpot: [
     { key: "api_key", label: "API Key", type: "password", placeholder: "HubSpot Private App Token" },
   ],
@@ -85,12 +132,6 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
     { key: "client_id", label: "Client ID", type: "text", placeholder: "" },
     { key: "client_secret", label: "Client Secret", type: "password", placeholder: "" },
     { key: "instance_url", label: "Instance URL", type: "text", placeholder: "https://xxx.salesforce.com" },
-  ],
-  "Google Analytics": [
-    { key: "measurement_id", label: "Measurement ID", type: "text", placeholder: "G-XXXXXXXX" },
-  ],
-  Mixpanel: [
-    { key: "project_token", label: "Project Token", type: "text", placeholder: "" },
   ],
 };
 

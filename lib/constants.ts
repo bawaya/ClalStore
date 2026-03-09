@@ -107,12 +107,19 @@ export const BANKS = [
 ] as const;
 
 export const INTEGRATION_TYPES = {
-  whatsapp: { label: "WhatsApp", icon: "💬", providers: ["yCloud", "Meta API", "Twilio"] },
-  email: { label: "Email", icon: "📧", providers: ["SendGrid", "Resend", "Mailgun"] },
-  payment: { label: "الدفع", icon: "💳", providers: ["Rivhit", "Tranzila", "PayPlus"] },
-  sms: { label: "SMS", icon: "📱", providers: ["Twilio", "019SMS"] },
-  crm_external: { label: "CRM خارجي", icon: "🔄", providers: ["HubSpot", "Salesforce"] },
-  analytics: { label: "Analytics", icon: "📊", providers: ["Google Analytics", "Mixpanel"] },
+  whatsapp: { label: "WhatsApp", icon: "💬", providers: ["yCloud", "Meta API", "Twilio"] as readonly string[] },
+  sms: { label: "SMS / OTP", icon: "📱", providers: ["Twilio SMS"] as readonly string[] },
+  payment: { label: "الدفع", icon: "💳", providers: ["רווחית (Rivhit)", "Tranzila", "PayPlus", "Stripe"] as readonly string[] },
+  email: { label: "Email", icon: "📧", providers: ["Resend", "SendGrid", "Mailgun", "Amazon SES", "SMTP"] as readonly string[] },
+  ai_chat: { label: "ذكاء اصطناعي (بوت + بحث)", icon: "🤖", providers: ["Anthropic Claude"] as readonly string[] },
+  ai_admin: { label: "ذكاء اصطناعي (أدمن)", icon: "🧠", providers: ["OpenAI"] as readonly string[] },
+  storage: { label: "تخزين الصور", icon: "☁️", providers: ["Cloudflare R2"] as readonly string[] },
+  image_processing: { label: "معالجة الصور", icon: "🖼️", providers: ["RemoveBG"] as readonly string[] },
+  device_specs: { label: "مواصفات الأجهزة", icon: "📋", providers: ["MobileAPI"] as readonly string[] },
+  image_search: { label: "بحث صور المنتجات", icon: "🔍", providers: ["Pexels"] as readonly string[] },
+  push_notifications: { label: "إشعارات Push", icon: "🔔", providers: ["Web Push (VAPID)"] as readonly string[] },
+  analytics: { label: "Analytics", icon: "📊", providers: ["Google Analytics", "Mixpanel"] as readonly string[] },
+  crm_external: { label: "CRM خارجي", icon: "🔄", providers: ["HubSpot", "Salesforce"] as readonly string[] },
 } as const;
 
 export const PRODUCT_TYPES = {

@@ -4,6 +4,7 @@
 // =====================================================
 
 import { createAdminSupabase } from "@/lib/supabase";
+import { INTEGRATION_TYPES } from "@/lib/constants";
 import type { Product, Coupon, Hero, LinePlan, Integration } from "@/types/database";
 
 const db = () => createAdminSupabase();
@@ -161,8 +162,18 @@ export async function updateSetting(key: string, value: string) {
 
 // ===== Integrations =====
 export async function getIntegrations() {
-  const { data } = await db().from("integrations").select("*");
-  return (data || []) as Integration[];
+  const supabase = db();
+  const { data } = await supabase.from("integrations").select("*");
+  const existing = (data || []) as Integration[];
+  const existingTypes = new Set(existing.map((i) => i.type));
+  const allTypes = Object.keys(INTEGRATION_TYPES);
+  const missing = allTypes.filter((t) => !existingTypes.has(t));
+  if (missing.length > 0) {
+    const rows = missing.map((type) => ({ type, provider: "", config: {}, status: "inactive" as const }));
+    const { data: inserted } = await supabase.from("integrations").insert(rows).select();
+    if (inserted) existing.push(...(inserted as Integration[]));
+  }
+  return existing;
 }
 
 export async function updateIntegration(id: string, updates: any) {
