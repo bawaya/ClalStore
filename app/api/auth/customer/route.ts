@@ -108,21 +108,20 @@ async function checkViaTwilioVerify(phone: string, code: string): Promise<boolea
   }
 }
 
-/** Send OTP via WhatsApp (yCloud) — direct text message */
+/** Send OTP via WhatsApp (yCloud) — template first (no 24h window needed), text fallback */
 async function sendViaWhatsApp(phone: string, otpCode: string): Promise<boolean> {
   try {
     const { sendWhatsAppText, sendWhatsAppTemplate } = await import("@/lib/bot/whatsapp");
     const waPhone = phone.startsWith("972") ? phone : "972" + phone.slice(1);
     try {
-      await sendWhatsAppText(
-        waPhone,
-        `🔐 رمز التحقق الخاص بك: *${otpCode}*\n\nصالح لمدة 5 دقائق.\nClalMobile`
-      );
+      await sendWhatsAppTemplate(waPhone, "clal_otp_code", [otpCode]);
       return true;
     } catch {
-      // 24h window — try template
       try {
-        await sendWhatsAppTemplate(waPhone, "clal_otp_code", [otpCode]);
+        await sendWhatsAppText(
+          waPhone,
+          `\uD83D\uDD10 \u0631\u0645\u0632 \u0627\u0644\u062A\u062D\u0642\u0642 \u0627\u0644\u062E\u0627\u0635 \u0628\u0643: *${otpCode}*\n\n\u0635\u0627\u0644\u062D \u0644\u0645\u062F\u0629 5 \u062F\u0642\u0627\u0626\u0642.\nClalMobile`
+        );
         return true;
       } catch { return false; }
     }
