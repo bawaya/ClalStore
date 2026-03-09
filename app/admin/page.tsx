@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useScreen } from "@/lib/hooks";
 import { StatCard } from "@/components/admin/shared";
@@ -104,6 +105,24 @@ export default function AdminDashboard() {
         >
           📄 تصدير PDF
         </button>
+      </div>
+
+      <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18 }}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-right">
+            <h2 className="font-bold" style={{ fontSize: scr.mobile ? 13 : 15 }}>📌 ترتيب أولوية المنتجات</h2>
+            <p className="text-muted mt-1" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+              اختر 3 منتجات لتظهر أولاً في المتجر والصفحة الرئيسية.
+            </p>
+          </div>
+          <Link
+            href="/admin/order"
+            className="btn-primary"
+            style={{ fontSize: scr.mobile ? 11 : 13, padding: "10px 18px" }}
+          >
+            فتح الترتيب
+          </Link>
+        </div>
       </div>
 
       {/* Stats grid */}
