@@ -327,7 +327,7 @@ export function ProductCard({ product: p }: { product: Product }) {
               className="text-[#a1a1aa] font-bold"
               style={{ fontSize: scr.mobile ? 9 : 11 }}
             >
-              يبدأ من
+              {t("search.startsFrom")}
             </span>
           )}
           <span
@@ -361,7 +361,7 @@ export function ProductCard({ product: p }: { product: Product }) {
           );
           if (stockVal <= 5) return (
             <div className="text-[#f59e0b] font-bold mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-              ⚠️ {lang === "ar" ? `باقي ${stockVal} قطع فقط!` : `נשארו ${stockVal} יחידות בלבד!`}
+              ⚠️ {t("detail.lowStock").replace("{n}", String(stockVal))}
             </div>
           );
           return (

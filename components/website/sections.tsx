@@ -121,7 +121,7 @@ export function HeroSection({ cms }: { cms?: WebsiteContent }) {
         {/* Trust badges */}
         <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
           {[t("hero.trust1"), t("hero.trust2"), t("hero.trust3"), t("hero.trust4")].map((b) => (
-            <span key={b} className="text-dim text-[12px] bg-surface-elevated px-3 py-1.5 rounded-full">{b}</span>
+            <span key={b} className="text-muted text-[12px] bg-surface-elevated px-3 py-1.5 rounded-full border border-surface-border">{b}</span>
           ))}
         </div>
       </div>
@@ -155,7 +155,7 @@ export function StatsStrip({ cms }: { cms?: WebsiteContent }) {
           <div key={s.label} className="text-center" style={{ padding: scr.mobile ? 8 : 16 }}>
             <div className="text-xl mb-1">{s.icon}</div>
             <div className="font-black text-brand" style={{ fontSize: scr.mobile ? 20 : 28 }}>{s.value}</div>
-            <div className="text-muted" style={{ fontSize: scr.mobile ? 12 : 14 }}>{s.label}</div>
+            <div className="text-white/70 font-medium" style={{ fontSize: scr.mobile ? 12 : 14 }}>{s.label}</div>
           </div>
         ))}
       </div>
