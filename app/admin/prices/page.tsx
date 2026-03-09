@@ -10,13 +10,6 @@ import { PageHeader } from "@/components/admin/shared";
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type PdfRow = {
-  deviceName: string;
-  storage: string;
-  priceRaw: number;
-  priceWithVat: number;
-};
-
 type MatchResult = {
   pdfDeviceName: string;
   pdfStorage: string;
@@ -45,66 +38,33 @@ type Summary = {
 /*  PDF Parsing Helpers                                                */
 /* ------------------------------------------------------------------ */
 
-function parsePrice(text: string): number | null {
-  const cleaned = text.replace(/[,،\s]/g, "").replace(/[^\d.]/g, "");
-  const num = parseFloat(cleaned);
-  return isNaN(num) || num < 50 ? null : num;
-}
-
-function extractStorage(text: string): string {
-  const gb = text.match(/(\d{2,4})\s*(?:GB|gb)/i);
-  if (gb) return `${parseInt(gb[1])}GB`;
-  const tb = text.match(/(\d)\s*(?:TB|tb)/i);
-  if (tb) return `${parseInt(tb[1])}TB`;
-  return "";
-}
-
-const BRAND_EN =
-  /iphone|samsung|galaxy|xiaomi|redmi|poco|oppo|vivo|huawei|honor|google|pixel|oneplus|motorola|nokia|realme|nothing|asus|sony|lg|tecno|infinix|zte|tcl/i;
-
-const BRAND_HE =
-  /אייפון|סמסונג|גלקסי|שיאומי|רדמי|פוקו|אופו|ויוו|וואווי|הונור|גוגל|פיקסל|נוקיה|ריאלמי|מוטורולה/;
-
-const SKIP_ROW =
-  /סה"כ|סהכ|מחירון|דגם מכשיר|תשלומים|רווח|מחיר חודשי|עמוד|page|הערות|לא כולל|כולל מע|מע"מ|תאריך|ציוד קצה|לקוחות עסקיים/i;
-
-function hasDeviceBrand(text: string): boolean {
-  return BRAND_EN.test(text) || BRAND_HE.test(text);
-}
-
-async function parsePdfFile(file: File): Promise<PdfRow[]> {
+async function extractPdfText(file: File): Promise<string> {
   const pdfjsLib = await import("pdfjs-dist");
   pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
   const buf = await file.arrayBuffer();
   const doc = await pdfjsLib.getDocument({ data: buf }).promise;
 
-  type Item = { text: string; x: number; y: number; w: number };
-  const all: Item[] = [];
+  const items: { text: string; x: number; y: number }[] = [];
 
   for (let p = 1; p <= doc.numPages; p++) {
-    const page = await doc.getPage(p);
-    const tc = await page.getTextContent();
+    const pg = await doc.getPage(p);
+    const tc = await pg.getTextContent();
     for (const it of tc.items) {
       if (!("str" in it) || !it.str.trim()) continue;
       const t = (it as any).transform as number[];
-      all.push({
-        text: it.str.trim(),
-        x: t[4],
-        y: Math.round(t[5]),
-        w: (it as any).width ?? 0,
-      });
+      items.push({ text: it.str.trim(), x: t[4], y: Math.round(t[5]) });
     }
   }
 
-  if (all.length === 0) return [];
+  if (items.length === 0) return "";
 
-  all.sort((a, b) => b.y - a.y);
-  const rows: Item[][] = [];
-  let curRow: Item[] = [];
-  let curY = all[0].y;
+  items.sort((a, b) => b.y - a.y);
+  const rows: { text: string; x: number; y: number }[][] = [];
+  let curRow: { text: string; x: number; y: number }[] = [];
+  let curY = items[0].y;
 
-  for (const it of all) {
+  for (const it of items) {
     if (Math.abs(it.y - curY) <= 4) {
       curRow.push(it);
     } else {
@@ -115,83 +75,11 @@ async function parsePdfFile(file: File): Promise<PdfRow[]> {
   }
   if (curRow.length) rows.push(curRow);
 
-  for (const r of rows) r.sort((a, b) => a.x - b.x);
-
-  let deviceColX = -1;
-  let priceColX = -1;
-
-  for (const row of rows) {
-    for (const it of row) {
-      if (/דגם/.test(it.text) && deviceColX < 0) {
-        deviceColX = it.x;
-      }
-      if (/1-18/.test(it.text) && priceColX < 0) {
-        priceColX = it.x;
-      }
-    }
-    if (deviceColX > 0 && priceColX > 0) break;
-  }
-
-  const COL_TOLERANCE = 120;
-  const results: PdfRow[] = [];
-
-  for (const row of rows) {
-    const fullText = row.map((i) => i.text).join(" ");
-
-    if (SKIP_ROW.test(fullText)) continue;
-    if (!hasDeviceBrand(fullText)) continue;
-
-    const deviceParts: string[] = [];
-    const nums: { x: number; val: number }[] = [];
-
-    for (const it of row) {
-      const val = parsePrice(it.text);
-      if (val !== null && val >= 100) {
-        nums.push({ x: it.x, val });
-      }
-
-      if (/^[\d,.\s%]+$/.test(it.text)) continue;
-      if (it.text.length < 2) continue;
-
-      if (deviceColX > 0) {
-        if (Math.abs(it.x - deviceColX) <= COL_TOLERANCE) {
-          deviceParts.push(it.text);
-        }
-      } else {
-        if (BRAND_EN.test(it.text) || BRAND_HE.test(it.text) || /\d+\s*GB/i.test(it.text)) {
-          deviceParts.push(it.text);
-        }
-      }
-    }
-
-    if (nums.length === 0 || deviceParts.length === 0) continue;
-
-    const deviceName = deviceParts.join(" ").replace(/\s+/g, " ").trim();
-    if (deviceName.length < 4) continue;
-
-    const storage = extractStorage(deviceName) || extractStorage(fullText);
-
-    let price: number;
-    if (priceColX > 0) {
-      const nearPrice = nums
-        .filter((n) => Math.abs(n.x - priceColX) <= 80)
-        .sort((a, b) => a.x - b.x);
-      price = nearPrice.length > 0 ? nearPrice[0].val : nums.sort((a, b) => a.x - b.x)[0].val;
-    } else {
-      nums.sort((a, b) => a.x - b.x);
-      price = nums[0].val;
-    }
-
-    const priceWithVat = Math.round(price * 1.18);
-
-    results.push({ deviceName, storage, priceRaw: price, priceWithVat });
-  }
-
-  return results;
+  return rows
+    .map((r) => r.sort((a, b) => a.x - b.x).map((i) => i.text).join(" | "))
+    .join("\n");
 }
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
 export default function PricesPage() {
@@ -204,7 +92,6 @@ export default function PricesPage() {
   const [matching, setMatching] = useState(false);
   const [applying, setApplying] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [pdfRows, setPdfRows] = useState<PdfRow[]>([]);
   const [results, setResults] = useState<MatchResult[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -224,20 +111,19 @@ export default function PricesPage() {
       setParsing(true);
 
       try {
-        const rows = await parsePdfFile(file);
-        if (rows.length === 0) {
-          show("لم يتم العثور على بيانات أسعار في الملف", "error");
+        const pdfText = await extractPdfText(file);
+        if (!pdfText) {
+          show("لم يتم العثور على نص في الملف", "error");
           setParsing(false);
           return;
         }
-        setPdfRows(rows);
-        show(`تم استخراج ${rows.length} جهاز من الملف`, "success");
+        show("تم استخراج النص، جاري التحليل بالذكاء الاصطناعي...", "success");
 
         setMatching(true);
         const res = await fetch("/api/admin/prices/match", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rows }),
+          body: JSON.stringify({ pdfText }),
         });
         const json = await res.json();
         if (json.error) throw new Error(json.error);
@@ -317,7 +203,6 @@ export default function PricesPage() {
 
   const reset = () => {
     setStep("upload");
-    setPdfRows([]);
     setResults([]);
     setSummary(null);
     setSelected(new Set());
@@ -396,7 +281,7 @@ export default function PricesPage() {
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-3 border-brand border-t-transparent rounded-full animate-spin" />
                 <p className="text-muted text-sm">
-                  {parsing ? "جاري تحليل الملف..." : "جاري مطابقة الأجهزة..."}
+                  {parsing ? "جاري استخراج النص من الملف..." : "🧠 الذكاء الاصطناعي يحلل ويطابق الأجهزة..."}
                 </p>
               </div>
             ) : (
@@ -444,7 +329,7 @@ export default function PricesPage() {
 
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="text-muted text-xs">
-              📄 {fileName} {"—"} {pdfRows.length} {"جهاز"}
+              📄 {fileName} {"—"} {results.length} {"جهاز"}
             </div>
             <div className="flex gap-2">
               <button onClick={reset} className="btn-outline text-xs px-4 py-2">
