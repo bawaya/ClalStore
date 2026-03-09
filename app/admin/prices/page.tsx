@@ -46,7 +46,7 @@ type Summary = {
 /* ------------------------------------------------------------------ */
 
 function parsePrice(text: string): number | null {
-  const cleaned = text.replace(/[,\u060C\s]/g, "").replace(/[^\d.]/g, "");
+  const cleaned = text.replace(/[,،\s]/g, "").replace(/[^\d.]/g, "");
   const num = parseFloat(cleaned);
   return isNaN(num) || num < 50 ? null : num;
 }
@@ -63,10 +63,10 @@ const BRAND_EN =
   /iphone|samsung|galaxy|xiaomi|redmi|poco|oppo|vivo|huawei|honor|google|pixel|oneplus|motorola|nokia|realme|nothing|asus|sony|lg|tecno|infinix|zte|tcl/i;
 
 const BRAND_HE =
-  /\u05D0\u05D9\u05D9\u05E4\u05D5\u05DF|\u05E1\u05DE\u05E1\u05D5\u05E0\u05D2|\u05D2\u05DC\u05E7\u05E1\u05D9|\u05E9\u05D9\u05D0\u05D5\u05DE\u05D9|\u05E8\u05D3\u05DE\u05D9|\u05E4\u05D5\u05E7\u05D5|\u05D0\u05D5\u05E4\u05D5|\u05D5\u05D9\u05D5\u05D5|\u05D5\u05D5\u05D0\u05D5\u05D5\u05D9|\u05D4\u05D5\u05E0\u05D5\u05E8|\u05D2\u05D5\u05D2\u05DC|\u05E4\u05D9\u05E7\u05E1\u05DC|\u05E0\u05D5\u05E7\u05D9\u05D4|\u05E8\u05D9\u05D0\u05DC\u05DE\u05D9|\u05DE\u05D5\u05D8\u05D5\u05E8\u05D5\u05DC\u05D4/;
+  /אייפון|סמסונג|גלקסי|שיאומי|רדמי|פוקו|אופו|ויוו|וואווי|הונור|גוגל|פיקסל|נוקיה|ריאלמי|מוטורולה/;
 
 const SKIP_ROW =
-  /\u05E1\u05D4"\u05DB|\u05E1\u05D4\u05DB|\u05DE\u05D7\u05D9\u05E8\u05D5\u05DF|\u05D3\u05D2\u05DD \u05DE\u05DB\u05E9\u05D9\u05E8|\u05EA\u05E9\u05DC\u05D5\u05DE\u05D9\u05DD|\u05E8\u05D5\u05D5\u05D7|\u05DE\u05D7\u05D9\u05E8 \u05D7\u05D5\u05D3\u05E9\u05D9|\u05E2\u05DE\u05D5\u05D3|page|\u05D4\u05E2\u05E8\u05D5\u05EA|\u05DC\u05D0 \u05DB\u05D5\u05DC\u05DC|\u05DB\u05D5\u05DC\u05DC \u05DE\u05E2|\u05DE\u05E2"\u05DE|\u05EA\u05D0\u05E8\u05D9\u05DA|\u05E6\u05D9\u05D5\u05D3 \u05E7\u05E6\u05D4|\u05DC\u05E7\u05D5\u05D7\u05D5\u05EA \u05E2\u05E1\u05E7\u05D9\u05D9\u05DD/i;
+  /סה"כ|סהכ|מחירון|דגם מכשיר|תשלומים|רווח|מחיר חודשי|עמוד|page|הערות|לא כולל|כולל מע|מע"מ|תאריך|ציוד קצה|לקוחות עסקיים/i;
 
 function hasDeviceBrand(text: string): boolean {
   return BRAND_EN.test(text) || BRAND_HE.test(text);
@@ -122,7 +122,7 @@ async function parsePdfFile(file: File): Promise<PdfRow[]> {
 
   for (const row of rows) {
     for (const it of row) {
-      if (/\u05D3\u05D2\u05DD/.test(it.text) && deviceColX < 0) {
+      if (/דגם/.test(it.text) && deviceColX < 0) {
         deviceColX = it.x;
       }
       if (/1-18/.test(it.text) && priceColX < 0) {
@@ -217,7 +217,7 @@ export default function PricesPage() {
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.name.endsWith(".pdf")) {
-        show("\u064A\u0631\u062C\u0649 \u0631\u0641\u0639 \u0645\u0644\u0641 PDF", "error");
+        show("يرجى رفع ملف PDF", "error");
         return;
       }
       setFileName(file.name);
@@ -226,12 +226,12 @@ export default function PricesPage() {
       try {
         const rows = await parsePdfFile(file);
         if (rows.length === 0) {
-          show("\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u0639\u062B\u0648\u0631 \u0639\u0644\u0649 \u0628\u064A\u0627\u0646\u0627\u062A \u0623\u0633\u0639\u0627\u0631 \u0641\u064A \u0627\u0644\u0645\u0644\u0641", "error");
+          show("لم يتم العثور على بيانات أسعار في الملف", "error");
           setParsing(false);
           return;
         }
         setPdfRows(rows);
-        show(`\u062A\u0645 \u0627\u0633\u062A\u062E\u0631\u0627\u062C ${rows.length} \u062C\u0647\u0627\u0632 \u0645\u0646 \u0627\u0644\u0645\u0644\u0641`, "success");
+        show(`تم استخراج ${rows.length} جهاز من الملف`, "success");
 
         setMatching(true);
         const res = await fetch("/api/admin/prices/match", {
@@ -253,7 +253,7 @@ export default function PricesPage() {
 
         setStep("preview");
       } catch (err: any) {
-        show(`\u062E\u0637\u0623: ${err.message}`, "error");
+        show(`خطأ: ${err.message}`, "error");
       } finally {
         setParsing(false);
         setMatching(false);
@@ -291,7 +291,7 @@ export default function PricesPage() {
       }));
 
     if (updates.length === 0) {
-      show("\u0644\u0627 \u062A\u0648\u062C\u062F \u062A\u062D\u062F\u064A\u062B\u0627\u062A \u0644\u0644\u062A\u0637\u0628\u064A\u0642", "error");
+      show("لا توجد تحديثات للتطبيق", "error");
       return;
     }
 
@@ -307,9 +307,9 @@ export default function PricesPage() {
 
       setApplyResult({ updated: json.updated, failed: json.failed });
       setStep("done");
-      show(`\u062A\u0645 \u062A\u062D\u062F\u064A\u062B ${json.updated} \u0633\u0639\u0631 \u0628\u0646\u062C\u0627\u062D`, "success");
+      show(`تم تحديث ${json.updated} سعر بنجاح`, "success");
     } catch (err: any) {
-      show(`\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u062F\u064A\u062B: ${err.message}`, "error");
+      show(`خطأ في التحديث: ${err.message}`, "error");
     } finally {
       setApplying(false);
     }
@@ -350,7 +350,7 @@ export default function PricesPage() {
 
   return (
     <div style={{ padding: pad }}>
-      <PageHeader title="\u062A\u062D\u062F\u064A\u062B \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0645\u0646 \u0645\u0644\u0641 PDF" />
+      <PageHeader title="تحديث الأسعار من ملف PDF" />
 
       <div className="fixed top-4 left-4 z-[200] flex flex-col gap-2">
         {toasts.map((t) => (
@@ -396,35 +396,35 @@ export default function PricesPage() {
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-3 border-brand border-t-transparent rounded-full animate-spin" />
                 <p className="text-muted text-sm">
-                  {parsing ? "\u062C\u0627\u0631\u064A \u062A\u062D\u0644\u064A\u0644 \u0627\u0644\u0645\u0644\u0641..." : "\u062C\u0627\u0631\u064A \u0645\u0637\u0627\u0628\u0642\u0629 \u0627\u0644\u0623\u062C\u0647\u0632\u0629..."}
+                  {parsing ? "جاري تحليل الملف..." : "جاري مطابقة الأجهزة..."}
                 </p>
               </div>
             ) : (
               <>
-                <div className="text-5xl mb-4">{"\uD83D\uDCC4"}</div>
+                <div className="text-5xl mb-4">📄</div>
                 <p className="font-bold text-lg mb-2">
-                  {"\u0627\u0633\u062D\u0628 \u0645\u0644\u0641 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0647\u0646\u0627 \u0623\u0648 \u0627\u0636\u063A\u0637 \u0644\u0644\u0627\u062E\u062A\u064A\u0627\u0631"}
+                  {"اسحب ملف الأسعار هنا أو اضغط للاختيار"}
                 </p>
                 <p className="text-muted text-sm">
-                  {"\u0645\u0644\u0641 PDF \u064A\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u062C\u062F\u0648\u0644 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u2014 \u0633\u064A\u062A\u0645 \u0627\u062D\u062A\u0633\u0627\u0628 \u0636\u0631\u064A\u0628\u0629 18% \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B"}
+                  {"ملف PDF يحتوي على جدول الأسعار — سيتم احتساب ضريبة 18% تلقائياً"}
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-6 text-muted text-xs">
-                  <span>{"\uD83D\uDCCA"} {"\u0627\u0633\u062A\u062E\u0631\u0627\u062C \u0639\u0645\u0648\u062F 1-18 \u062F\u0641\u0639\u0629"}</span>
-                  <span>{"\uD83D\uDCB0"} +18% {"\u0636\u0631\u064A\u0628\u0629"}</span>
-                  <span>{"\uD83D\uDD17"} {"\u0645\u0637\u0627\u0628\u0642\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0629"}</span>
+                  <span>📊 استخراج عمود 1-18 دفعة</span>
+                  <span>💰 +18% ضريبة</span>
+                  <span>🔗 مطابقة تلقائية</span>
                 </div>
               </>
             )}
           </div>
 
           <div className="mt-6 card p-5">
-            <h3 className="font-bold mb-3 text-sm">{"\u0643\u064A\u0641 \u064A\u0639\u0645\u0644\u061F"}</h3>
+            <h3 className="font-bold mb-3 text-sm">{"كيف يعمل؟"}</h3>
             <ol className="text-muted text-xs space-y-2 list-decimal list-inside">
-              <li>{"\u0627\u0631\u0641\u0639 \u0645\u0644\u0641 PDF \u0627\u0644\u0645\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u062C\u062F\u0648\u0644 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 (\u0628\u062F\u0648\u0646 \u0636\u0631\u064A\u0628\u0629)"}</li>
-              <li>{"\u0627\u0644\u0646\u0638\u0627\u0645 \u064A\u0633\u062A\u062E\u0631\u062C \u0639\u0645\u0648\u062F \u0627\u0644\u0623\u0633\u0639\u0627\u0631 (1-18 \u062F\u0641\u0639\u0629) \u0645\u0646 \u0627\u0644\u062C\u062F\u0648\u0644"}</li>
-              <li>{"\u064A\u0636\u064A\u0641 \u0636\u0631\u064A\u0628\u0629 18% \u0639\u0644\u0649 \u0643\u0644 \u0633\u0639\u0631"}</li>
-              <li>{"\u064A\u0637\u0627\u0628\u0642 \u0627\u0644\u0623\u062C\u0647\u0632\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B \u0645\u0639 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0641\u064A \u0627\u0644\u0645\u062A\u062C\u0631"}</li>
-              <li>{"\u062A\u0631\u0627\u062C\u0639 \u0627\u0644\u0645\u0639\u0627\u064A\u0646\u0629 \u0648\u062A\u0624\u0643\u062F \u0627\u0644\u062A\u062D\u062F\u064A\u062B"}</li>
+              <li>{"ارفع ملف PDF المحتوي على جدول الأسعار (بدون ضريبة)"}</li>
+              <li>{"النظام يستخرج عمود الأسعار (1-18 دفعة) من الجدول"}</li>
+              <li>{"يضيف ضريبة 18% على كل سعر"}</li>
+              <li>{"يطابق الأجهزة تلقائياً مع المنتجات في المتجر"}</li>
+              <li>{"تراجع المعاينة وتؤكد التحديث"}</li>
             </ol>
           </div>
         </div>
@@ -434,33 +434,33 @@ export default function PricesPage() {
         <div>
           {summary && (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
-              <SumCard label={"\u0627\u0644\u0645\u062C\u0645\u0648\u0639"} value={summary.total} color="#a1a1aa" />
-              <SumCard label={"\u062A\u0637\u0627\u0628\u0642 \u062A\u0627\u0645"} value={summary.exact} color="#22c55e" />
-              <SumCard label={"\u062A\u0637\u0627\u0628\u0642 \u062C\u0632\u0626\u064A"} value={summary.fuzzy} color="#f59e0b" />
-              <SumCard label={"\u0628\u062F\u0648\u0646 \u062A\u0637\u0627\u0628\u0642"} value={summary.unmatched} color="#ef4444" />
-              <SumCard label={"\u0645\u062D\u062F\u062F \u0644\u0644\u062A\u062D\u062F\u064A\u062B"} value={selected.size} color="#c41040" />
+              <SumCard label={"المجموع"} value={summary.total} color="#a1a1aa" />
+              <SumCard label={"تطابق تام"} value={summary.exact} color="#22c55e" />
+              <SumCard label={"تطابق جزئي"} value={summary.fuzzy} color="#f59e0b" />
+              <SumCard label={"بدون تطابق"} value={summary.unmatched} color="#ef4444" />
+              <SumCard label={"محدد للتحديث"} value={selected.size} color="#c41040" />
             </div>
           )}
 
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="text-muted text-xs">
-              {"\uD83D\uDCC4"} {fileName} {"\u2014"} {pdfRows.length} {"\u062C\u0647\u0627\u0632"}
+              📄 {fileName} {"—"} {pdfRows.length} {"جهاز"}
             </div>
             <div className="flex gap-2">
               <button onClick={reset} className="btn-outline text-xs px-4 py-2">
-                {"\u0645\u0644\u0641 \u062C\u062F\u064A\u062F"}
+                {"ملف جديد"}
               </button>
               <button onClick={toggleAll} className="btn-outline text-xs px-4 py-2">
                 {selected.size === results.filter((r) => r.matched).length
-                  ? "\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u0643\u0644"
-                  : "\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0643\u0644"}
+                  ? "إلغاء الكل"
+                  : "تحديد الكل"}
               </button>
               <button
                 onClick={handleApply}
                 disabled={applying || selected.size === 0}
                 className="btn-primary text-xs px-5 py-2 disabled:opacity-40"
               >
-                {applying ? "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u062F\u064A\u062B..." : `\u062A\u062D\u062F\u064A\u062B ${selected.size} \u0633\u0639\u0631`}
+                {applying ? "جاري التحديث..." : `تحديث ${selected.size} سعر`}
               </button>
             </div>
           </div>
@@ -470,20 +470,20 @@ export default function PricesPage() {
               <thead>
                 <tr className="bg-surface-card border-b border-surface-border">
                   <th className="p-2.5 w-8"></th>
-                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u062C\u0647\u0627\u0632 (PDF)"}</th>
-                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u0633\u0639\u0629"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"الجهاز (PDF)"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"السعة"}</th>
                   <th className="p-2.5 font-bold text-muted">
-                    {"\u0633\u0639\u0631 PDF"}
-                    <span className="text-[10px] block text-dim">{"\u0628\u062F\u0648\u0646 \u0636\u0631\u064A\u0628\u0629"}</span>
+                    {"سعر PDF"}
+                    <span className="text-[10px] block text-dim">{"بدون ضريبة"}</span>
                   </th>
                   <th className="p-2.5 font-bold text-muted">
-                    {"\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062C\u062F\u064A\u062F"}
-                    <span className="text-[10px] block text-dim">+18% {"\u0636\u0631\u064A\u0628\u0629"}</span>
+                    {"السعر الجديد"}
+                    <span className="text-[10px] block text-dim">+18% {"ضريبة"}</span>
                   </th>
-                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u0645\u0646\u062A\u062C \u0627\u0644\u0645\u0637\u0627\u0628\u0642"}</th>
-                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062D\u0627\u0644\u064A"}</th>
-                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u0641\u0631\u0642"}</th>
-                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u062D\u0627\u0644\u0629"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"المنتج المطابق"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"السعر الحالي"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"الفرق"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"الحالة"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -517,7 +517,7 @@ export default function PricesPage() {
                       </td>
                       <td className="p-2.5">
                         <span className="bg-zinc-800 px-2 py-0.5 rounded text-xs">
-                          {r.pdfStorage || "\u2014"}
+                          {r.pdfStorage || "—"}
                         </span>
                       </td>
                       <td className="p-2.5 text-muted">
@@ -537,13 +537,13 @@ export default function PricesPage() {
                             )}
                           </span>
                         ) : (
-                          <span className="text-dim">{"\u2014"}</span>
+                          <span className="text-dim">{"—"}</span>
                         )}
                       </td>
                       <td className="p-2.5 text-muted">
                         {r.currentPrice != null
                           ? r.currentPrice.toLocaleString()
-                          : "\u2014"}
+                          : "—"}
                       </td>
                       <td className="p-2.5">
                         {diff != null ? (
@@ -560,7 +560,7 @@ export default function PricesPage() {
                             {diff.toLocaleString()}
                           </span>
                         ) : (
-                          "\u2014"
+                          "—"
                         )}
                       </td>
                       <td className="p-2.5">
@@ -575,7 +575,7 @@ export default function PricesPage() {
 
           <div className="mt-4 flex items-center justify-between">
             <button onClick={reset} className="btn-outline text-xs px-4 py-2">
-              {"\u0625\u0644\u063A\u0627\u0621"}
+              {"إلغاء"}
             </button>
             <button
               onClick={handleApply}
@@ -583,8 +583,8 @@ export default function PricesPage() {
               className="btn-primary px-6 py-2.5 disabled:opacity-40"
             >
               {applying
-                ? "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u062F\u064A\u062B..."
-                : `\u062A\u0623\u0643\u064A\u062F \u062A\u062D\u062F\u064A\u062B ${selected.size} \u0633\u0639\u0631`}
+                ? "جاري التحديث..."
+                : `تأكيد تحديث ${selected.size} سعر`}
             </button>
           </div>
         </div>
@@ -593,18 +593,18 @@ export default function PricesPage() {
       {step === "done" && applyResult && (
         <div className="max-w-md mx-auto text-center py-12">
           <div className="text-6xl mb-4">
-            {applyResult.failed === 0 ? "\u2705" : "\u26A0\uFE0F"}
+            {applyResult.failed === 0 ? "✅" : "⚠️"}
           </div>
-          <h2 className="font-black text-xl mb-2">{"\u062A\u0645 \u0627\u0644\u062A\u062D\u062F\u064A\u062B"}</h2>
+          <h2 className="font-black text-xl mb-2">{"تم التحديث"}</h2>
           <p className="text-muted text-sm mb-6">
-            {"\u062A\u0645 \u062A\u062D\u062F\u064A\u062B"}{" "}
+            {"تم تحديث"}{" "}
             <span className="text-green-400 font-bold">
               {applyResult.updated}
             </span>{" "}
-            {"\u0633\u0639\u0631 \u0628\u0646\u062C\u0627\u062D"}
+            {"سعر بنجاح"}
             {applyResult.failed > 0 && (
               <>
-                {" \u2014 \u0641\u0634\u0644 "}
+                {" — فشل "}
                 <span className="text-red-400 font-bold">
                   {applyResult.failed}
                 </span>
@@ -612,7 +612,7 @@ export default function PricesPage() {
             )}
           </p>
           <button onClick={reset} className="btn-primary px-8 py-3">
-            {"\u0631\u0641\u0639 \u0645\u0644\u0641 \u062C\u062F\u064A\u062F"}
+            {"رفع ملف جديد"}
           </button>
         </div>
       )}
@@ -649,9 +649,9 @@ function ConfidenceBadge({
   confidence: "exact" | "fuzzy" | "none";
 }) {
   const map = {
-    exact: { bg: "bg-green-500/20", text: "text-green-400", label: "\u062A\u0627\u0645" },
-    fuzzy: { bg: "bg-amber-500/20", text: "text-amber-400", label: "\u062C\u0632\u0626\u064A" },
-    none: { bg: "bg-red-500/20", text: "text-red-400", label: "\u0644\u0627 \u064A\u0648\u062C\u062F" },
+    exact: { bg: "bg-green-500/20", text: "text-green-400", label: "تام" },
+    fuzzy: { bg: "bg-amber-500/20", text: "text-amber-400", label: "جزئي" },
+    none: { bg: "bg-red-500/20", text: "text-red-400", label: "لا يوجد" },
   };
   const s = map[confidence];
   return (
