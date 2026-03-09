@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { key: "products", href: "/admin/products", icon: "📱", label: "المنتجات" },
   { key: "coupons", href: "/admin/coupons", icon: "🏷️", label: "كوبونات" },
   { key: "heroes", href: "/admin/heroes", icon: "🖼️", label: "بنرات" },
+  { key: "order", href: "/admin/order", icon: "📌", label: "ترتيب الأولوية" },
   { key: "deals", href: "/admin/deals", icon: "🔥", label: "العروض" },
   { key: "reviews", href: "/admin/reviews", icon: "⭐", label: "التقييمات" },
   { key: "lines", href: "/admin/lines", icon: "📡", label: "باقات" },

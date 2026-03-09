@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
 
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
 // =====================================================
 // ClalMobile — PWA Install Prompt + SW Registration
 // Shows install banner on mobile/desktop if not installed
@@ -31,9 +40,11 @@ export function PWAInstallPrompt() {
             try {
               const perm = await Notification.requestPermission();
               if (perm === "granted") {
+                const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+                const appKey = vapidKey ? urlBase64ToUint8Array(vapidKey) : undefined;
                 const sub = await reg.pushManager.subscribe({
                   userVisibleOnly: true,
-                  applicationServerKey: undefined,
+                  applicationServerKey: appKey ?? undefined,
                 });
                 await fetch("/api/push/subscribe", {
                   method: "POST",

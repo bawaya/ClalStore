@@ -74,8 +74,27 @@ export async function getProducts(options?: {
     console.error("Error fetching products:", error);
     return [];
   }
-  const list = (data as Product[]) || [];
-  return sortProductsByBrandAndTier(list);
+  let list = (data as Product[]) || [];
+  const sorted = sortProductsByBrandAndTier(list);
+
+  const { data: settingsRows } = await supabase.from("settings").select("value").eq("key", "priority_product_ids").single();
+  let priorityIds: string[] = [];
+  try {
+    const raw = settingsRows?.value;
+    if (raw) priorityIds = JSON.parse(raw);
+    if (!Array.isArray(priorityIds)) priorityIds = [];
+  } catch {}
+  priorityIds = priorityIds.slice(0, 3).filter(Boolean);
+
+  if (priorityIds.length > 0) {
+    const byId = new Map(sorted.map((p) => [p.id, p]));
+    const ordered = priorityIds.map((id) => byId.get(id)).filter(Boolean) as Product[];
+    const rest = sorted.filter((p) => !priorityIds.includes(p.id));
+    list = [...ordered, ...rest];
+  } else {
+    list = sorted;
+  }
+  return list;
 }
 
 export async function getProduct(id: string): Promise<Product | null> {

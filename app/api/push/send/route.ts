@@ -1,8 +1,19 @@
-export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
+import webPush from "web-push";
 import { createAdminSupabase } from "@/lib/supabase";
+
+// Configure web-push with VAPID keys (required for sending)
+const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
+if (vapidPublic && vapidPrivate) {
+  webPush.setVapidDetails(
+    "mailto:support@clalmobile.com",
+    vapidPublic,
+    vapidPrivate
+  );
+}
 
 // POST — Admin: Send push notification to all subscribers
 export async function POST(req: NextRequest) {
@@ -17,16 +28,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing title or body" }, { status: 400 });
     }
 
+    if (!vapidPublic || !vapidPrivate) {
+      return NextResponse.json(
+        { error: "VAPID keys غير مُعدّة. أضف NEXT_PUBLIC_VAPID_PUBLIC_KEY و VAPID_PRIVATE_KEY في .env.local" },
+        { status: 500 }
+      );
+    }
+
     // Get all active subscriptions
     const { data: subs } = await db.from("push_subscriptions")
       .select("*")
       .eq("active", true);
 
     const subscribers = subs || [];
+    const payload = JSON.stringify({
+      title,
+      body: notifBody,
+      url: url || "https://clalmobile.com",
+      icon: icon || "/icons/icon-192x192.svg",
+    });
 
-    // Note: In edge runtime, we can't use web-push library (requires Node.js crypto).
-    // Push notifications will be sent via the Web Push Protocol when VAPID keys are configured.
-    // For now, we log the notification and store it for tracking.
+    let sent = 0;
+    const expiredEndpoints: string[] = [];
+
+    for (const sub of subscribers) {
+      try {
+        const keys = sub.keys as { p256dh?: string; auth?: string } | null;
+        if (!keys?.p256dh || !keys?.auth) continue;
+        await webPush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: { p256dh: keys.p256dh, auth: keys.auth },
+          },
+          payload,
+          { TTL: 86400 }
+        );
+        sent++;
+      } catch (e: any) {
+        const code = e?.statusCode ?? e?.status;
+        const isExpired = code === 410 || code === 404;
+        if (isExpired) expiredEndpoints.push(sub.endpoint);
+        console.warn("Push failed:", sub.endpoint?.slice(0, 50), code, e?.message);
+      }
+    }
+
+    // Mark expired subscriptions as inactive (410 Gone / 404)
+    if (expiredEndpoints.length > 0) {
+      await db.from("push_subscriptions")
+        .update({ active: false })
+        .in("endpoint", expiredEndpoints);
+    }
 
     // Save notification record
     const { data: notif, error } = await db.from("push_notifications").insert({
@@ -34,7 +85,7 @@ export async function POST(req: NextRequest) {
       body: notifBody,
       url: url || "https://clalmobile.com",
       icon: icon || "/icons/icon-192x192.svg",
-      sent_count: subscribers.length,
+      sent_count: sent,
       target: "all",
     }).select().single();
 
@@ -42,8 +93,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       notification: notif,
-      sent_to: subscribers.length,
-      message: `تم إرسال الإشعار إلى ${subscribers.length} مشترك`,
+      sent_to: sent,
+      failed: subscribers.length - sent,
+      message: `تم إرسال الإشعار إلى ${sent} مشترك${expiredEndpoints.length ? ` (${expiredEndpoints.length} اشتراك منتهي)` : ""}`,
     });
   } catch (err: any) {
     console.error("Push send error:", err);
