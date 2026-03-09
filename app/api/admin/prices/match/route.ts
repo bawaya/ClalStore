@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await response.json();
-    const aiText = data.choices?.[0]?.message?.content || '';
+    const aiText: string = data.choices?.[0]?.message?.content || '';
     const tokens = {
       input: data.usage?.prompt_tokens || 0,
       output: data.usage?.completion_tokens || 0,
@@ -131,15 +131,15 @@ export async function POST(req: NextRequest) {
         .replace(/```/g, '')
         .trim();
 
-      const lines = cleaned
+      const lines: string[] = cleaned
         .split(/\r?\n/)
-        .map((line) => line.trim())
+        .map((line: string) => line.trim())
         .filter(Boolean)
-        .filter((line) => line.includes('||'));
+        .filter((line: string) => line.includes('||'));
 
       parsed = lines
-        .map((line) => {
-          const parts = line.split('||').map((part) => part.trim());
+        .map((line: string) => {
+          const parts = line.split('||').map((part: string) => part.trim());
           const [
             deviceName = '',
             storage = '',
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
             confidence: confidence as AiParsedRow['confidence'],
           };
         })
-        .filter((row) => row.deviceName && row.price > 0);
+        .filter((row: AiParsedRow) => row.deviceName && row.price > 0);
     } catch (e: any) {
       return NextResponse.json({ error: 'Parse: ' + e.message, aiText: aiText.substring(0, 1000), steps }, { status: 500 });
     }
@@ -212,3 +212,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || String(err), steps, stack: err.stack?.substring(0, 300) }, { status: 500 });
   }
 }
+
