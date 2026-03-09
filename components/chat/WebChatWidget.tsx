@@ -41,21 +41,16 @@ export function WebChatWidget() {
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
-  // Persist messages and escalation state
   useEffect(() => {
-    try {
-      sessionStorage.setItem("clal_webchat_msgs", JSON.stringify(msgs.slice(-50)));
-    } catch {}
+    try { sessionStorage.setItem("clal_webchat_msgs", JSON.stringify(msgs.slice(-50))); } catch {}
   }, [msgs]);
 
   useEffect(() => {
     try { sessionStorage.setItem("clal_webchat_escalated", String(escalated)); } catch {}
   }, [escalated]);
 
-  // Welcome message on first open
   useEffect(() => {
     if (open && msgs.length === 0) {
       setMsgs([{
@@ -69,7 +64,6 @@ export function WebChatWidget() {
     if (open) setUnread(0);
   }, [open, msgs.length]);
 
-  // Focus input when opened
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 200); }, [open]);
 
   const send = useCallback(async (text: string) => {
@@ -116,14 +110,12 @@ export function WebChatWidget() {
     }
   }, [loading, escalated, sessionId, open]);
 
-  // === Render formatted text (bold, links, phone numbers) ===
   const renderText = (text: string) => {
     const parts = text.split(/(\*[^*]+\*|https?:\/\/[^\s]+|0\d{1,2}[- ]?\d{3}[- ]?\d{4})/g);
     return parts.map((part, i) => {
       if (part.startsWith("*") && part.endsWith("*")) {
         return <strong key={i} className="font-bold">{part.slice(1, -1)}</strong>;
       }
-      // Phone numbers → clickable tel: and wa.me links
       if (/^0\d{1,2}[- ]?\d{3}[- ]?\d{4}$/.test(part)) {
         const clean = part.replace(/[-\s]/g, "");
         const intl = "972" + clean.slice(1);
@@ -148,96 +140,118 @@ export function WebChatWidget() {
     });
   };
 
-  // === Floating AI Bubble ===
+  // === AI Floating Bubble ===
   if (!open) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed z-[9999] group cursor-pointer border-0 flex items-center gap-2"
+        className="fixed z-[9999] group cursor-pointer border-0"
         style={{
-          bottom: scr.mobile ? 20 : 24,
-          left: scr.mobile ? 14 : 24,
+          bottom: scr.mobile ? 20 : 28,
+          left: scr.mobile ? 14 : 28,
           marginBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
-        <div
-          className="rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(196,16,64,0.4)]"
+        {/* Glow ring */}
+        <div className="absolute inset-0 rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-500"
           style={{
-            width: scr.mobile ? 56 : 60,
-            height: scr.mobile ? 56 : 60,
-            background: "linear-gradient(135deg, #c41040 0%, #8b0a2e 50%, #6d28d9 100%)",
+            background: "radial-gradient(circle, rgba(139,92,246,0.5) 0%, transparent 70%)",
+            transform: "scale(1.8)",
+            animation: "pulse 3s ease-in-out infinite",
+          }}
+        />
+        {/* Main bubble */}
+        <div
+          className="relative flex items-center justify-center rounded-full shadow-2xl transition-all duration-300 group-hover:scale-110"
+          style={{
+            width: scr.mobile ? 58 : 62,
+            height: scr.mobile ? 58 : 62,
+            background: "linear-gradient(135deg, #7c3aed, #c41040, #ec4899)",
+            boxShadow: "0 8px 32px rgba(124,58,237,0.4), 0 2px 8px rgba(0,0,0,0.3)",
           }}
         >
+          {/* AI sparkle icon */}
           <svg width={scr.mobile ? 26 : 28} height={scr.mobile ? 26 : 28} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/>
-            <path d="M10 21h4"/>
-            <circle cx="12" cy="9" r="1" fill="white"/>
-            <path d="M9 9h.01M15 9h.01" strokeWidth="2.5"/>
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
           </svg>
-          {unread > 0 && (
-            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
-              {unread}
-            </span>
-          )}
         </div>
-        {!scr.mobile && (
-          <span className="bg-surface-card text-white text-[11px] font-medium px-3 py-1.5 rounded-full border border-surface-border shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-            AI مساعد ذكي
+        {/* Unread badge */}
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+            {unread}
           </span>
         )}
+        {/* Label */}
+        <div
+          className="absolute whitespace-nowrap bg-white/10 backdrop-blur-md text-white text-[10px] font-bold rounded-full px-2.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+          style={{
+            bottom: "calc(100% + 8px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            border: "1px solid rgba(255,255,255,0.15)",
+          }}
+        >
+          AI مساعد ذكي
+        </div>
+        <style>{`@keyframes pulse { 0%, 100% { transform: scale(1.6); opacity: 0.3; } 50% { transform: scale(2); opacity: 0.5; } }`}</style>
       </button>
     );
   }
 
   // === Chat Window ===
-  const w = scr.mobile ? "100vw" : 380;
+  const w = scr.mobile ? "100vw" : 400;
 
   return (
     <div
-      className="fixed z-[9999] flex flex-col bg-surface-bg text-white overflow-hidden"
+      className="fixed z-[9999] flex flex-col overflow-hidden"
       dir="rtl"
       style={{
         width: w,
-        height: scr.mobile ? "100dvh" : 560,
-        bottom: scr.mobile ? 0 : 24,
-        left: scr.mobile ? 0 : 24,
-        borderRadius: scr.mobile ? 0 : 20,
-        border: scr.mobile ? "none" : "1px solid #27272a",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        height: scr.mobile ? "100dvh" : 580,
+        bottom: scr.mobile ? 0 : 28,
+        left: scr.mobile ? 0 : 28,
+        borderRadius: scr.mobile ? 0 : 24,
+        border: scr.mobile ? "none" : "1px solid rgba(124,58,237,0.25)",
+        boxShadow: "0 24px 80px rgba(0,0,0,0.5), 0 0 40px rgba(124,58,237,0.15)",
+        background: "#09090b",
       }}
     >
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 flex-shrink-0"
         style={{
-          height: scr.mobile ? 56 : 52,
-          background: "linear-gradient(135deg, #c41040 0%, #8b0a2e 50%, #6d28d9 100%)",
+          height: scr.mobile ? 60 : 56,
+          background: "linear-gradient(135deg, #18082e, #1a0a2e, #200a1e)",
+          borderBottom: "1px solid rgba(124,58,237,0.2)",
         }}
       >
         <button
           onClick={() => setOpen(false)}
-          className="w-8 h-8 rounded-full bg-white/10 border-0 text-white cursor-pointer flex items-center justify-center text-sm hover:bg-white/20 transition-colors"
+          className="w-8 h-8 rounded-full border-0 text-white/60 cursor-pointer flex items-center justify-center text-sm hover:bg-white/10 hover:text-white transition-colors"
+          style={{ background: "transparent" }}
         >
           ✕
         </button>
-        <div className="flex items-center gap-2.5">
-          <div>
-            <div className="font-bold text-sm text-right">ClalMobile AI</div>
-            <div className="text-[9px] text-right flex items-center gap-1 justify-end">
-              {escalated ? (
-                <span className="text-yellow-300">{t("chat.escalated")}</span>
-              ) : (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
-                  <span className="text-white/80">{t("chat.online")}</span>
-                </>
-              )}
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="font-bold text-sm text-white">ClalMobile AI</div>
+            <div className="text-[10px] flex items-center gap-1 justify-end">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" style={{ animation: "pulse 2s infinite" }} />
+              <span className="text-green-400/80">
+                {escalated ? t("chat.escalated") : t("chat.online")}
+              </span>
             </div>
           </div>
-          <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center backdrop-blur-sm border border-white/20">
+          {/* AI Avatar */}
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{
+              background: "linear-gradient(135deg, #7c3aed, #c41040)",
+              boxShadow: "0 0 16px rgba(124,58,237,0.4)",
+            }}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/>
-              <path d="M10 21h4"/>
+              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
             </svg>
           </div>
         </div>
@@ -245,39 +259,55 @@ export function WebChatWidget() {
 
       {/* Messages */}
       <div
-        className="flex-1 overflow-y-auto px-3 py-3 space-y-2"
-        style={{ background: "#0a0a0c" }}
+        className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5"
+        style={{ background: "#09090b" }}
       >
         {msgs.map((m) => (
           <div key={m.id}>
-            <div className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}>
+            <div className={`flex ${m.role === "user" ? "justify-start" : "justify-end"} items-end gap-1.5`}>
+              {/* Bot avatar (small) */}
+              {m.role === "bot" && (
+                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 order-1"
+                  style={{ background: "linear-gradient(135deg, #7c3aed, #c41040)" }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                  </svg>
+                </div>
+              )}
               <div
-                className="max-w-[85%] rounded-2xl px-3 py-2 whitespace-pre-wrap"
+                className="max-w-[80%] px-3.5 py-2.5 whitespace-pre-wrap"
                 style={{
-                  fontSize: scr.mobile ? 12 : 13,
-                  lineHeight: 1.6,
-                  background: m.role === "user" ? "#c41040" : "#18181b",
-                  border: m.role === "bot" ? "1px solid #27272a" : "none",
-                  borderTopLeftRadius: m.role === "user" ? 4 : 20,
-                  borderTopRightRadius: m.role === "bot" ? 4 : 20,
+                  fontSize: scr.mobile ? 12.5 : 13.5,
+                  lineHeight: 1.65,
+                  borderRadius: m.role === "user" ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
+                  background: m.role === "user"
+                    ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
+                    : "rgba(255,255,255,0.05)",
+                  border: m.role === "bot" ? "1px solid rgba(255,255,255,0.08)" : "none",
+                  color: m.role === "user" ? "#fff" : "#e4e4e7",
                 }}
               >
                 {renderText(m.text)}
               </div>
             </div>
-            <div className={`text-[8px] text-dim mt-0.5 ${m.role === "user" ? "text-left" : "text-right"}`}>
+            <div className={`text-[8px] text-zinc-600 mt-0.5 px-8 ${m.role === "user" ? "text-left" : "text-right"}`}>
               {m.time}
             </div>
 
             {/* Quick Replies */}
             {m.quickReplies && m.quickReplies.length > 0 && (
-              <div className="flex gap-1 mt-1.5 flex-wrap justify-end">
+              <div className="flex gap-1.5 mt-2 flex-wrap justify-end pr-8">
                 {m.quickReplies.map((qr, i) => (
                   <button
                     key={i}
                     onClick={() => send(qr)}
                     disabled={loading || escalated}
-                    className="px-2.5 py-1.5 rounded-full border border-brand/40 text-brand text-[10px] font-bold cursor-pointer bg-brand/5 hover:bg-brand/15 transition-colors disabled:opacity-30"
+                    className="px-3 py-1.5 rounded-full text-[11px] font-bold cursor-pointer transition-all duration-200 disabled:opacity-30 hover:scale-105"
+                    style={{
+                      background: "rgba(124,58,237,0.1)",
+                      border: "1px solid rgba(124,58,237,0.3)",
+                      color: "#a78bfa",
+                    }}
                   >
                     {qr}
                   </button>
@@ -289,11 +319,18 @@ export function WebChatWidget() {
 
         {/* Typing indicator */}
         {loading && (
-          <div className="flex justify-end">
-            <div className="bg-surface-card border border-surface-border rounded-2xl px-4 py-2.5 flex gap-1.5 items-center">
-              <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+          <div className="flex justify-end items-end gap-1.5">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #7c3aed, #c41040)" }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+              </svg>
+            </div>
+            <div className="rounded-2xl px-4 py-3 flex gap-1.5 items-center"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
             </div>
           </div>
         )}
@@ -303,34 +340,60 @@ export function WebChatWidget() {
 
       {/* Escalation Banner */}
       {escalated && (
-        <div className="px-4 py-2 bg-yellow-600/20 border-t border-yellow-600/30 text-center text-[11px] text-yellow-300">
+        <div className="px-4 py-2.5 text-center text-[11px] font-medium"
+          style={{ background: "rgba(234,179,8,0.08)", borderTop: "1px solid rgba(234,179,8,0.15)", color: "#fbbf24" }}>
           {t("chat.escalatedBanner")}
         </div>
       )}
 
       {/* Input */}
       <div
-        className="flex items-center gap-2 border-t border-surface-border flex-shrink-0 bg-surface-card"
-        style={{ padding: scr.mobile ? "10px 12px" : "10px 14px", paddingBottom: scr.mobile ? "calc(10px + env(safe-area-inset-bottom, 0px))" : "10px" }}
+        className="flex items-center gap-2 flex-shrink-0"
+        style={{
+          padding: scr.mobile ? "12px 14px" : "12px 16px",
+          paddingBottom: scr.mobile ? "calc(12px + env(safe-area-inset-bottom, 0px))" : "12px",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          background: "rgba(255,255,255,0.02)",
+        }}
       >
         <button
           onClick={() => send(input)}
           disabled={!input.trim() || loading || escalated}
-          className="w-9 h-9 rounded-full text-white border-0 cursor-pointer flex items-center justify-center text-sm disabled:opacity-30 flex-shrink-0 transition-all hover:shadow-[0_0_15px_rgba(196,16,64,0.4)]"
-          style={{ background: "linear-gradient(135deg, #c41040, #6d28d9)" }}
+          className="flex-shrink-0 border-0 cursor-pointer flex items-center justify-center transition-all duration-200 disabled:opacity-20 hover:scale-110"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            background: !input.trim() || loading ? "rgba(124,58,237,0.15)" : "linear-gradient(135deg, #7c3aed, #c41040)",
+            boxShadow: input.trim() && !loading ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
+          }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5" />
+            <polyline points="5 12 12 5 19 12" />
+          </svg>
         </button>
         <input
           ref={inputRef}
-          className="flex-1 bg-surface-elevated rounded-full border border-surface-border text-white outline-none text-right"
-          style={{ padding: "8px 14px", fontSize: scr.mobile ? 12 : 13 }}
+          className="flex-1 bg-transparent outline-none text-white text-right"
+          style={{
+            padding: "10px 16px",
+            fontSize: scr.mobile ? 13 : 14,
+            borderRadius: 14,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
           placeholder={escalated ? t("chat.waitingAgent") : t("chat.placeholder")}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send(input)}
           disabled={loading || escalated}
         />
+      </div>
+
+      {/* Powered by */}
+      <div className="text-center pb-2 text-[9px] text-zinc-700">
+        Powered by <span className="text-violet-500/60 font-semibold">ClalMobile AI</span>
       </div>
     </div>
   );
