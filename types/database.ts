@@ -228,6 +228,7 @@ export type ProductVariant = {
   storage: string;          // e.g. "256GB"
   price: number;
   old_price?: number;
+  monthly_price?: number;   // قسط شهري ×36
   cost?: number;
   stock?: number;
 }
@@ -459,52 +460,6 @@ export type Category = {
 
 // ===== Bot Tables (Season 5) =====
 
-export type BotConversation = {
-  id: string;
-  visitor_id: string;
-  channel: "webchat" | "whatsapp" | "sms";
-  status: "active" | "closed" | "escalated";
-  language: string;
-  intent?: string;
-  qualification: Record<string, unknown>;
-  products_discussed: string[];
-  customer_id?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  source?: string;
-  message_count: number;
-  csat_score?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export type BotMessage = {
-  id: string;
-  conversation_id: string;
-  role: "user" | "bot" | "system";
-  content: string;
-  intent?: string;
-  confidence?: number;
-  metadata?: Record<string, unknown>;
-  created_at: string;
-}
-
-export type BotHandoff = {
-  id: string;
-  conversation_id: string;
-  customer_id?: string;
-  reason: string;
-  summary?: string;
-  products_interested: string[];
-  last_price_quoted?: number;
-  customer_phone?: string;
-  customer_name?: string;
-  status: "pending" | "assigned" | "resolved";
-  assigned_to?: string;
-  resolved_at?: string;
-  created_at: string;
-}
-
 export type BotPolicy = {
   id: string;
   type: string;
@@ -512,17 +467,6 @@ export type BotPolicy = {
   title_he: string;
   content_ar: string;
   content_he: string;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export type BotTemplate = {
-  id: string;
-  key: string;
-  content_ar: string;
-  content_he: string;
-  variables: string[];
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -726,4 +670,62 @@ export type InboxQuickReply = {
   created_at: string;
 }
 
-// (Bot types defined above in Season 5 section)
+// ===== Bot Types =====
+
+export type BotConversation = {
+  id: string;
+  visitor_id: string;
+  channel: "webchat" | "whatsapp" | "sms";
+  customer_id: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  language: string;
+  status: "active" | "closed" | "escalated";
+  intent: string | null;
+  qualification: Record<string, unknown>;
+  products_discussed: string[];
+  source: string | null;
+  message_count: number;
+  csat_score: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BotMessage = {
+  id: string;
+  conversation_id: string;
+  role: "user" | "bot" | "system";
+  content: string;
+  intent: string | null;
+  confidence: number | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export type BotHandoff = {
+  id: string;
+  conversation_id: string;
+  customer_id: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  reason: string;
+  summary: string | null;
+  products_interested: string[];
+  last_price_quoted: number | null;
+  status: "pending" | "assigned" | "resolved";
+  assigned_to: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}
+
+export type BotTemplate = {
+  id: string;
+  key: string;
+  content_ar: string;
+  content_he: string | null;
+  channel: "all" | "webchat" | "whatsapp";
+  variables: string[] | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}

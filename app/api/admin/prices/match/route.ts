@@ -9,6 +9,7 @@ type AiParsedRow = {
   storage: string;
   price: number;
   priceWithVat: number;
+  monthlyPrice: number;
   productId: string | null;
   variantStorage: string | null;
   confidence: 'exact' | 'fuzzy' | 'none';
@@ -58,22 +59,27 @@ export async function POST(req: NextRequest) {
     }
 
     const systemPrompt = [
-      'You extract device prices from PDF text and match them to a product catalog.',
+      'You extract device prices from PDF/Excel text and match them to a product catalog.',
       'CATALOG: [{id,b:brand,n:name,v:[storages]}]',
-      'TASK: From the Hebrew PDF price list, extract each device with its 1-18 column price (the first numeric price column from the left, BEFORE VAT).',
+      'TASK: From the price list, extract each device with:',
+      '1. The 1-18 installments price column (BEFORE VAT)',
+      '2. The 36-installments monthly payment column (the monthly amount for 36 months, BEFORE VAT)',
       'Translate Hebrew device names to English when possible.',
       'Match by brand + model + storage.',
       'SKIP headers, totals, notes, and non-device lines.',
       'Compute priceWithVat = Math.round(price * 1.18).',
+      'Compute monthlyWithVat = Math.round(monthlyPrice * 1.18) where monthlyPrice is the 36-month column value.',
+      'If no 36-month column exists, set monthlyWithVat to 0.',
       'Return ONE LINE per detected device in this exact pipe-separated format:',
-      'deviceName || storage || price || priceWithVat || productId || variantStorage || confidence',
+      'deviceName || storage || price || priceWithVat || monthlyWithVat || productId || variantStorage || confidence',
       'Rules for empty values:',
       '- If no product match, leave productId empty',
       '- If no variant match, leave variantStorage empty',
+      '- If no 36-month price, use 0 for monthlyWithVat',
       '- confidence must be exact or fuzzy or none',
       'Return ONLY data lines. No JSON. No markdown. No numbering. No explanation.',
       'Example:',
-      'iPhone 16 Pro Max || 256GB || 4200 || 4956 || prod_123 || 256GB || exact',
+      'iPhone 16 Pro Max || 256GB || 4200 || 4956 || 150 || prod_123 || 256GB || exact',
     ].join('\n');
 
     const userMsg = 'CATALOG:\n' + JSON.stringify(productList) + '\n\nPDF:\n' + pdfText;
@@ -145,6 +151,7 @@ export async function POST(req: NextRequest) {
             storage = '',
             priceText = '',
             priceWithVatText = '',
+            monthlyPriceText = '',
             productIdRaw = '',
             variantStorageRaw = '',
             confidenceRaw = 'none',
@@ -152,6 +159,7 @@ export async function POST(req: NextRequest) {
 
           const price = Number(priceText.replace(/[^\d.]/g, ''));
           const priceWithVat = Number(priceWithVatText.replace(/[^\d.]/g, ''));
+          const monthlyPrice = Number(monthlyPriceText.replace(/[^\d.]/g, ''));
           const confidence = /^(exact|fuzzy|none)$/i.test(confidenceRaw)
             ? confidenceRaw.toLowerCase()
             : 'none';
@@ -161,6 +169,7 @@ export async function POST(req: NextRequest) {
             storage,
             price: Number.isFinite(price) ? price : 0,
             priceWithVat: Number.isFinite(priceWithVat) ? priceWithVat : 0,
+            monthlyPrice: Number.isFinite(monthlyPrice) ? monthlyPrice : 0,
             productId: productIdRaw || null,
             variantStorage: variantStorageRaw || null,
             confidence: confidence as AiParsedRow['confidence'],
@@ -186,6 +195,7 @@ export async function POST(req: NextRequest) {
         pdfStorage: row.storage || '',
         pdfPriceRaw: row.price,
         priceWithVat: row.priceWithVat,
+        monthlyPrice: row.monthlyPrice || 0,
         matched: !!variant,
         confidence: row.confidence || 'none',
         productId: product?.id || null,
@@ -193,6 +203,7 @@ export async function POST(req: NextRequest) {
         productNameHe: product?.name_he || null,
         variantStorage: variant?.storage || null,
         currentPrice: variant?.price ?? null,
+        currentMonthly: variant?.monthly_price ?? null,
         newPrice: row.priceWithVat,
         matchScore: row.confidence === 'exact' ? 1 : row.confidence === 'fuzzy' ? 0.6 : 0,
       };

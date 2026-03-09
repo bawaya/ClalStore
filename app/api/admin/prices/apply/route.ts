@@ -9,6 +9,7 @@ type PriceUpdate = {
   productId: string;
   variantStorage: string;
   newPrice: number;
+  monthlyPrice?: number;
 };
 
 export async function POST(req: NextRequest) {
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
               ...variants[idx],
               old_price: variants[idx].price,
               price: update.newPrice,
+              ...(update.monthlyPrice ? { monthly_price: update.monthlyPrice } : {}),
             };
             successCount++;
           } else {

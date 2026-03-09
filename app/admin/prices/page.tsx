@@ -15,6 +15,7 @@ type MatchResult = {
   pdfStorage: string;
   pdfPriceRaw: number;
   priceWithVat: number;
+  monthlyPrice: number;
   matched: boolean;
   confidence: "exact" | "fuzzy" | "none";
   productId: string | null;
@@ -22,6 +23,7 @@ type MatchResult = {
   productNameHe: string | null;
   variantStorage: string | null;
   currentPrice: number | null;
+  currentMonthly: number | null;
   newPrice: number;
   matchScore: number;
 };
@@ -221,6 +223,7 @@ export default function PricesPage() {
         productId: r.productId!,
         variantStorage: r.variantStorage!,
         newPrice: r.newPrice,
+        ...(r.monthlyPrice ? { monthlyPrice: r.monthlyPrice } : {}),
       }));
 
     if (updates.length === 0) {
@@ -341,8 +344,9 @@ export default function PricesPage() {
                 <p className="text-muted text-sm">
                   {"يدعم Excel و CSV و PDF — سيتم احتساب ضريبة 18% تلقائياً"}
                 </p>
-                <div className="mt-6 flex items-center justify-center gap-6 text-muted text-xs">
-                  <span>📊 استخراج عمود 1-18 دفعة</span>
+                <div className="mt-6 flex items-center justify-center gap-6 text-muted text-xs flex-wrap">
+                  <span>📊 عمود 1-18 دفعة</span>
+                  <span>📅 عمود قسط ×36</span>
                   <span>💰 +18% ضريبة</span>
                   <span>🔗 مطابقة تلقائية</span>
                 </div>
@@ -364,10 +368,10 @@ export default function PricesPage() {
             <h3 className="font-bold mb-3 text-sm">{"كيف يعمل؟"}</h3>
             <ol className="text-muted text-xs space-y-2 list-decimal list-inside">
               <li>{"ارفع ملف Excel أو CSV أو PDF المحتوي على جدول الأسعار (بدون ضريبة)"}</li>
-              <li>{"النظام يستخرج عمود الأسعار (1-18 دفعة) من الجدول"}</li>
+              <li>{"النظام يستخرج عمود الأسعار (1-18 دفعة) + عمود القسط الشهري (36 دفعة)"}</li>
               <li>{"يضيف ضريبة 18% على كل سعر"}</li>
               <li>{"يطابق الأجهزة تلقائياً مع المنتجات في المتجر"}</li>
-              <li>{"تراجع المعاينة وتؤكد التحديث"}</li>
+              <li>{"تراجع المعاينة وتؤكد التحديث — يُحدّث السعر + القسط الشهري"}</li>
             </ol>
           </div>
         </div>
@@ -423,6 +427,10 @@ export default function PricesPage() {
                     {"السعر الجديد"}
                     <span className="text-[10px] block text-dim">+18% {"ضريبة"}</span>
                   </th>
+                  <th className="p-2.5 font-bold text-muted">
+                    {"قسط ×36"}
+                    <span className="text-[10px] block text-dim">{"شهري"}</span>
+                  </th>
                   <th className="p-2.5 font-bold text-muted">{"المنتج المطابق"}</th>
                   <th className="p-2.5 font-bold text-muted">{"السعر الحالي"}</th>
                   <th className="p-2.5 font-bold text-muted">{"الفرق"}</th>
@@ -468,6 +476,15 @@ export default function PricesPage() {
                       </td>
                       <td className="p-2.5 font-bold text-brand">
                         {r.priceWithVat.toLocaleString()}
+                      </td>
+                      <td className="p-2.5">
+                        {r.monthlyPrice ? (
+                          <span className="font-bold text-purple-400">
+                            ₪{r.monthlyPrice.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-dim">—</span>
+                        )}
                       </td>
                       <td className="p-2.5 max-w-[180px] truncate">
                         {r.productNameAr ? (

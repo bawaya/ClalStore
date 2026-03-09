@@ -142,7 +142,7 @@ export function ProductDetailClient({
               }}
             >
               {allImages.length > 0 ? (
-                <img src={allImages[selImage] || allImages[0]} alt={productName} loading="eager" decoding="async" className="w-full h-full object-contain drop-shadow-lg" />
+                <img src={allImages[selImage] || allImages[0]} alt={productName} className="w-full h-full object-contain drop-shadow-lg" />
               ) : (
                 <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
                   {p.type === "device" ? "📱" : "🔌"}
@@ -165,7 +165,7 @@ export function ProductDetailClient({
                       opacity: selImage === i ? 1 : 0.6,
                     }}
                   >
-                    <img src={img} alt="" loading="lazy" className="w-full h-full object-contain" />
+                    <img src={img} alt="" className="w-full h-full object-contain" />
                   </button>
                 ))}
               </div>
@@ -193,7 +193,7 @@ export function ProductDetailClient({
             </h1>
 
             {/* Price */}
-            <div className="flex items-baseline gap-2 mb-4">
+            <div className="flex items-baseline gap-2 mb-1">
               <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 24 : 32 }}>
                 ₪{displayPrice.toLocaleString()}
               </span>
@@ -206,8 +206,19 @@ export function ProductDetailClient({
                 </>
               )}
             </div>
+            {activeVariant?.monthly_price ? (
+              <div className="mb-4" style={{ fontSize: scr.mobile ? 12 : 14 }}>
+                <span className="text-[#a78bfa] font-bold">₪{activeVariant.monthly_price.toLocaleString()} × 36</span>
+                <span className="text-muted mr-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>قسط شهري</span>
+              </div>
+            ) : <div className="mb-4" />}
 
-            {/* Accessory quick-ship note */}
+            {/* Type info */}
+            {p.type === "device" && (
+              <div className="bg-state-info/10 rounded-[10px] p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                <span className="text-state-info">{t("detail.deviceNote")}</span>
+              </div>
+            )}
             {p.type === "accessory" && (
               <div className="bg-state-success/10 rounded-[10px] p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
                 <span className="text-state-success">{t("detail.accessoryNote")}</span>

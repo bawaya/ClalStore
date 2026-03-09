@@ -158,7 +158,6 @@ export function ProductCard({ product: p }: { product: Product }) {
         onClick={handleWishlist}
         className="absolute z-10 flex items-center justify-center rounded-full border-0 cursor-pointer transition-all"
         title={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
-        aria-label={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
         style={{
           top: scr.mobile ? 6 : 8,
           left: scr.mobile ? 6 : 8,
@@ -194,8 +193,6 @@ export function ProductCard({ product: p }: { product: Product }) {
             <img
               src={imgSrc}
               alt={getProductName(p, lang)}
-              loading="lazy"
-              decoding="async"
               className="w-full h-full object-contain drop-shadow-lg"
             />
           ) : (
@@ -233,7 +230,6 @@ export function ProductCard({ product: p }: { product: Product }) {
           onClick={handleCompare}
           className="absolute z-10 flex items-center justify-center rounded-full border-0 cursor-pointer transition-all"
           title={inCompare ? t("compare.inCompare") : t("compare.add")}
-          aria-label={inCompare ? t("compare.inCompare") : t("compare.add")}
           style={{
             bottom: scr.mobile ? 4 : 8,
             right: scr.mobile ? 4 : 8,
@@ -259,7 +255,6 @@ export function ProductCard({ product: p }: { product: Product }) {
             <img
               src={getBrandLogo(p.brand)!}
               alt={p.brand}
-              loading="lazy"
               className="flex-shrink-0"
               style={{ width: scr.mobile ? 14 : 18, height: scr.mobile ? 14 : 18 }}
             />
@@ -321,13 +316,13 @@ export function ProductCard({ product: p }: { product: Product }) {
         })()}
 
         {/* ── Price ── */}
-        <div className="flex items-baseline gap-1.5 mb-2 flex-wrap">
+        <div className="flex items-baseline gap-1.5 mb-1 flex-wrap">
           {storage.length > 1 && (
             <span
               className="text-[#a1a1aa] font-bold"
               style={{ fontSize: scr.mobile ? 9 : 11 }}
             >
-              {t("search.startsFrom")}
+              يبدأ من
             </span>
           )}
           <span
@@ -348,6 +343,12 @@ export function ProductCard({ product: p }: { product: Product }) {
             </span>
           )}
         </div>
+        {activeVariant?.monthly_price ? (
+          <div className="mb-2" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+            <span className="text-[#a78bfa] font-bold">₪{activeVariant.monthly_price.toLocaleString()} × 36</span>
+            <span className="text-[#a1a1aa] mr-1" style={{ fontSize: scr.mobile ? 8 : 10 }}>شهري</span>
+          </div>
+        ) : <div className="mb-2" />}
 
         {/* ── Stock indicator ── */}
         {(() => {
@@ -361,7 +362,7 @@ export function ProductCard({ product: p }: { product: Product }) {
           );
           if (stockVal <= 5) return (
             <div className="text-[#f59e0b] font-bold mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-              ⚠️ {t("detail.lowStock").replace("{n}", String(stockVal))}
+              ⚠️ {lang === "ar" ? `باقي ${stockVal} قطع فقط!` : `נשארו ${stockVal} יחידות בלבד!`}
             </div>
           );
           return (
