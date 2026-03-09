@@ -51,18 +51,26 @@ function parsePrice(text: string): number | null {
   return isNaN(num) || num < 50 ? null : num;
 }
 
-function extractStorage(name: string): string {
-  const match = name.match(/(\d+)\s*(GB|TB|gb|tb)/i);
-  if (match) {
-    const num = parseInt(match[1]);
-    const unit = match[2].toUpperCase().startsWith("T") ? "TB" : "GB";
-    return `${num}${unit}`;
-  }
+function extractStorage(text: string): string {
+  const gb = text.match(/(\d{2,4})\s*(?:GB|gb)/i);
+  if (gb) return `${parseInt(gb[1])}GB`;
+  const tb = text.match(/(\d)\s*(?:TB|tb)/i);
+  if (tb) return `${parseInt(tb[1])}TB`;
   return "";
 }
 
-const BRAND_RE =
+const BRAND_EN =
   /iphone|samsung|galaxy|xiaomi|redmi|poco|oppo|vivo|huawei|honor|google|pixel|oneplus|motorola|nokia|realme|nothing|asus|sony|lg|tecno|infinix|zte|tcl/i;
+
+const BRAND_HE =
+  /\u05D0\u05D9\u05D9\u05E4\u05D5\u05DF|\u05E1\u05DE\u05E1\u05D5\u05E0\u05D2|\u05D2\u05DC\u05E7\u05E1\u05D9|\u05E9\u05D9\u05D0\u05D5\u05DE\u05D9|\u05E8\u05D3\u05DE\u05D9|\u05E4\u05D5\u05E7\u05D5|\u05D0\u05D5\u05E4\u05D5|\u05D5\u05D9\u05D5\u05D5|\u05D5\u05D5\u05D0\u05D5\u05D5\u05D9|\u05D4\u05D5\u05E0\u05D5\u05E8|\u05D2\u05D5\u05D2\u05DC|\u05E4\u05D9\u05E7\u05E1\u05DC|\u05E0\u05D5\u05E7\u05D9\u05D4|\u05E8\u05D9\u05D0\u05DC\u05DE\u05D9|\u05DE\u05D5\u05D8\u05D5\u05E8\u05D5\u05DC\u05D4/;
+
+const SKIP_ROW =
+  /\u05E1\u05D4"\u05DB|\u05E1\u05D4\u05DB|\u05DE\u05D7\u05D9\u05E8\u05D5\u05DF|\u05D3\u05D2\u05DD \u05DE\u05DB\u05E9\u05D9\u05E8|\u05EA\u05E9\u05DC\u05D5\u05DE\u05D9\u05DD|\u05E8\u05D5\u05D5\u05D7|\u05DE\u05D7\u05D9\u05E8 \u05D7\u05D5\u05D3\u05E9\u05D9|\u05E2\u05DE\u05D5\u05D3|page|\u05D4\u05E2\u05E8\u05D5\u05EA|\u05DC\u05D0 \u05DB\u05D5\u05DC\u05DC|\u05DB\u05D5\u05DC\u05DC \u05DE\u05E2|\u05DE\u05E2"\u05DE|\u05EA\u05D0\u05E8\u05D9\u05DA|\u05E6\u05D9\u05D5\u05D3 \u05E7\u05E6\u05D4|\u05DC\u05E7\u05D5\u05D7\u05D5\u05EA \u05E2\u05E1\u05E7\u05D9\u05D9\u05DD/i;
+
+function hasDeviceBrand(text: string): boolean {
+  return BRAND_EN.test(text) || BRAND_HE.test(text);
+}
 
 async function parsePdfFile(file: File): Promise<PdfRow[]> {
   const pdfjsLib = await import("pdfjs-dist");
@@ -89,11 +97,12 @@ async function parsePdfFile(file: File): Promise<PdfRow[]> {
     }
   }
 
-  /* Group by Y (rows) — tolerance 4px */
+  if (all.length === 0) return [];
+
   all.sort((a, b) => b.y - a.y);
   const rows: Item[][] = [];
   let curRow: Item[] = [];
-  let curY = all[0]?.y ?? 0;
+  let curY = all[0].y;
 
   for (const it of all) {
     if (Math.abs(it.y - curY) <= 4) {
@@ -108,79 +117,36 @@ async function parsePdfFile(file: File): Promise<PdfRow[]> {
 
   for (const r of rows) r.sort((a, b) => a.x - b.x);
 
-  /* ---- Detect header row and column X ranges ---- */
-  let priceColCenter = -1;
-  let deviceColCenter = -1;
-
-  for (const row of rows) {
-    const joined = row.map((i) => i.text).join(" ");
-    if (joined.includes("1-18") || joined.includes("דגם")) {
-      for (const it of row) {
-        if (/1-18|1\u200f-\u200f18/.test(it.text) && priceColCenter < 0) {
-          priceColCenter = it.x + (it.w || 0) / 2;
-        }
-        if (it.text.includes("דגם") && deviceColCenter < 0) {
-          deviceColCenter = it.x + (it.w || 0) / 2;
-        }
-      }
-      if (priceColCenter > 0 && deviceColCenter > 0) break;
-    }
-  }
-
-  /* ---- Parse data rows ---- */
   const results: PdfRow[] = [];
 
   for (const row of rows) {
-    if (row.length < 3) continue;
+    const fullText = row.map((i) => i.text).join(" ");
 
-    const nums: { text: string; x: number; val: number }[] = [];
-    const texts: { text: string; x: number }[] = [];
+    if (SKIP_ROW.test(fullText)) continue;
+    if (!hasDeviceBrand(fullText)) continue;
+
+    const nums: { x: number; val: number }[] = [];
+    const textParts: string[] = [];
 
     for (const it of row) {
       const val = parsePrice(it.text);
       if (val !== null && val >= 100) {
-        nums.push({ text: it.text, x: it.x, val });
-      } else if (it.text.length > 3 && !/^\d+[%\u066A]?$/.test(it.text)) {
-        texts.push(it);
+        nums.push({ x: it.x, val });
+      }
+      if (!/^[\d,.\s%]+$/.test(it.text) && it.text.length >= 2) {
+        textParts.push(it.text);
       }
     }
 
     if (nums.length === 0) continue;
 
-    /* Find device name: item containing a brand keyword,
-       or item closest to device column center */
-    let deviceItem =
-      texts.find((t) => BRAND_RE.test(t.text)) ||
-      (deviceColCenter > 0
-        ? texts.reduce(
-            (best, cur) =>
-              Math.abs(cur.x - deviceColCenter) <
-              Math.abs((best?.x ?? 9999) - deviceColCenter)
-                ? cur
-                : best,
-            texts[0]
-          )
-        : texts.reduce(
-            (best, cur) =>
-              cur.text.length > (best?.text.length || 0) ? cur : best,
-            texts[0]
-          ));
+    const deviceName = textParts.join(" ").replace(/\s+/g, " ").trim();
+    if (deviceName.length < 4) continue;
 
-    if (!deviceItem) continue;
+    const storage = extractStorage(fullText);
 
-    /* Merge adjacent text items near the device item to form full name */
-    const nearby = texts
-      .filter((t) => Math.abs(t.x - deviceItem!.x) < 250)
-      .sort((a, b) => b.x - a.x);
-    const deviceName = nearby.map((t) => t.text).join(" ");
-
-    if (!deviceName || deviceName.length < 4) continue;
-
-    /* Price: leftmost numeric item (1-18 column) */
     nums.sort((a, b) => a.x - b.x);
     const price = nums[0].val;
-
-    const storage = extractStorage(deviceName);
     const priceWithVat = Math.round(price * 1.18);
 
     results.push({ deviceName, storage, priceRaw: price, priceWithVat });
@@ -213,11 +179,10 @@ export default function PricesPage() {
   } | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  /* ---- Upload & Parse ---- */
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.name.endsWith(".pdf")) {
-        show("يرجى رفع ملف PDF", "error");
+        show("\u064A\u0631\u062C\u0649 \u0631\u0641\u0639 \u0645\u0644\u0641 PDF", "error");
         return;
       }
       setFileName(file.name);
@@ -226,12 +191,12 @@ export default function PricesPage() {
       try {
         const rows = await parsePdfFile(file);
         if (rows.length === 0) {
-          show("لم يتم العثور على بيانات أسعار في الملف", "error");
+          show("\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u0639\u062B\u0648\u0631 \u0639\u0644\u0649 \u0628\u064A\u0627\u0646\u0627\u062A \u0623\u0633\u0639\u0627\u0631 \u0641\u064A \u0627\u0644\u0645\u0644\u0641", "error");
           setParsing(false);
           return;
         }
         setPdfRows(rows);
-        show(`تم استخراج ${rows.length} سطر من الملف`, "success");
+        show(`\u062A\u0645 \u0627\u0633\u062A\u062E\u0631\u0627\u062C ${rows.length} \u062C\u0647\u0627\u0632 \u0645\u0646 \u0627\u0644\u0645\u0644\u0641`, "success");
 
         setMatching(true);
         const res = await fetch("/api/admin/prices/match", {
@@ -253,7 +218,7 @@ export default function PricesPage() {
 
         setStep("preview");
       } catch (err: any) {
-        show(`خطأ: ${err.message}`, "error");
+        show(`\u062E\u0637\u0623: ${err.message}`, "error");
       } finally {
         setParsing(false);
         setMatching(false);
@@ -280,7 +245,6 @@ export default function PricesPage() {
     [handleFile]
   );
 
-  /* ---- Apply ---- */
   const handleApply = async () => {
     const updates = results
       .filter((_, i) => selected.has(i))
@@ -292,7 +256,7 @@ export default function PricesPage() {
       }));
 
     if (updates.length === 0) {
-      show("لا توجد تحديثات للتطبيق", "error");
+      show("\u0644\u0627 \u062A\u0648\u062C\u062F \u062A\u062D\u062F\u064A\u062B\u0627\u062A \u0644\u0644\u062A\u0637\u0628\u064A\u0642", "error");
       return;
     }
 
@@ -308,15 +272,14 @@ export default function PricesPage() {
 
       setApplyResult({ updated: json.updated, failed: json.failed });
       setStep("done");
-      show(`تم تحديث ${json.updated} سعر بنجاح`, "success");
+      show(`\u062A\u0645 \u062A\u062D\u062F\u064A\u062B ${json.updated} \u0633\u0639\u0631 \u0628\u0646\u062C\u0627\u062D`, "success");
     } catch (err: any) {
-      show(`خطأ في التحديث: ${err.message}`, "error");
+      show(`\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u062F\u064A\u062B: ${err.message}`, "error");
     } finally {
       setApplying(false);
     }
   };
 
-  /* ---- Reset ---- */
   const reset = () => {
     setStep("upload");
     setPdfRows([]);
@@ -350,14 +313,10 @@ export default function PricesPage() {
   const pad = scr.mobile ? 12 : 24;
   const fs = scr.mobile ? 11 : 13;
 
-  /* ================================================================ */
-  /*  Render                                                           */
-  /* ================================================================ */
   return (
     <div style={{ padding: pad }}>
-      <PageHeader title="تحديث الأسعار من ملف PDF" />
+      <PageHeader title="\u062A\u062D\u062F\u064A\u062B \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0645\u0646 \u0645\u0644\u0641 PDF" />
 
-      {/* Toast messages */}
       <div className="fixed top-4 left-4 z-[200] flex flex-col gap-2">
         {toasts.map((t) => (
           <div
@@ -375,7 +334,6 @@ export default function PricesPage() {
         ))}
       </div>
 
-      {/* ========== STEP 1: Upload ========== */}
       {step === "upload" && (
         <div className="max-w-2xl mx-auto">
           <div
@@ -403,137 +361,94 @@ export default function PricesPage() {
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-3 border-brand border-t-transparent rounded-full animate-spin" />
                 <p className="text-muted text-sm">
-                  {parsing ? "جاري تحليل الملف..." : "جاري مطابقة الأجهزة..."}
+                  {parsing ? "\u062C\u0627\u0631\u064A \u062A\u062D\u0644\u064A\u0644 \u0627\u0644\u0645\u0644\u0641..." : "\u062C\u0627\u0631\u064A \u0645\u0637\u0627\u0628\u0642\u0629 \u0627\u0644\u0623\u062C\u0647\u0632\u0629..."}
                 </p>
               </div>
             ) : (
               <>
-                <div className="text-5xl mb-4">📄</div>
+                <div className="text-5xl mb-4">{"\uD83D\uDCC4"}</div>
                 <p className="font-bold text-lg mb-2">
-                  اسحب ملف الأسعار هنا أو اضغط للاختيار
+                  {"\u0627\u0633\u062D\u0628 \u0645\u0644\u0641 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0647\u0646\u0627 \u0623\u0648 \u0627\u0636\u063A\u0637 \u0644\u0644\u0627\u062E\u062A\u064A\u0627\u0631"}
                 </p>
                 <p className="text-muted text-sm">
-                  ملف PDF يحتوي على جدول الأسعار — سيتم احتساب ضريبة 18%
-                  تلقائياً
+                  {"\u0645\u0644\u0641 PDF \u064A\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u062C\u062F\u0648\u0644 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u2014 \u0633\u064A\u062A\u0645 \u0627\u062D\u062A\u0633\u0627\u0628 \u0636\u0631\u064A\u0628\u0629 18% \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B"}
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-6 text-muted text-xs">
-                  <span>📊 استخراج عمود 1-18 دفعة</span>
-                  <span>💰 +18% ضريبة</span>
-                  <span>🔗 مطابقة تلقائية</span>
+                  <span>{"\uD83D\uDCCA"} {"\u0627\u0633\u062A\u062E\u0631\u0627\u062C \u0639\u0645\u0648\u062F 1-18 \u062F\u0641\u0639\u0629"}</span>
+                  <span>{"\uD83D\uDCB0"} +18% {"\u0636\u0631\u064A\u0628\u0629"}</span>
+                  <span>{"\uD83D\uDD17"} {"\u0645\u0637\u0627\u0628\u0642\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0629"}</span>
                 </div>
               </>
             )}
           </div>
 
-          {/* Instructions */}
           <div className="mt-6 card p-5">
-            <h3 className="font-bold mb-3 text-sm">كيف يعمل؟</h3>
+            <h3 className="font-bold mb-3 text-sm">{"\u0643\u064A\u0641 \u064A\u0639\u0645\u0644\u061F"}</h3>
             <ol className="text-muted text-xs space-y-2 list-decimal list-inside">
-              <li>
-                ارفع ملف PDF المحتوي على جدول الأسعار (بدون ضريبة)
-              </li>
-              <li>
-                النظام يستخرج عمود الأسعار (1-18 دفعة) من الجدول
-              </li>
-              <li>
-                يضيف ضريبة 18% على كل سعر
-              </li>
-              <li>
-                يطابق الأجهزة تلقائياً مع المنتجات في المتجر
-              </li>
-              <li>
-                تراجع المعاينة وتؤكد التحديث
-              </li>
+              <li>{"\u0627\u0631\u0641\u0639 \u0645\u0644\u0641 PDF \u0627\u0644\u0645\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u062C\u062F\u0648\u0644 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 (\u0628\u062F\u0648\u0646 \u0636\u0631\u064A\u0628\u0629)"}</li>
+              <li>{"\u0627\u0644\u0646\u0638\u0627\u0645 \u064A\u0633\u062A\u062E\u0631\u062C \u0639\u0645\u0648\u062F \u0627\u0644\u0623\u0633\u0639\u0627\u0631 (1-18 \u062F\u0641\u0639\u0629) \u0645\u0646 \u0627\u0644\u062C\u062F\u0648\u0644"}</li>
+              <li>{"\u064A\u0636\u064A\u0641 \u0636\u0631\u064A\u0628\u0629 18% \u0639\u0644\u0649 \u0643\u0644 \u0633\u0639\u0631"}</li>
+              <li>{"\u064A\u0637\u0627\u0628\u0642 \u0627\u0644\u0623\u062C\u0647\u0632\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B \u0645\u0639 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0641\u064A \u0627\u0644\u0645\u062A\u062C\u0631"}</li>
+              <li>{"\u062A\u0631\u0627\u062C\u0639 \u0627\u0644\u0645\u0639\u0627\u064A\u0646\u0629 \u0648\u062A\u0624\u0643\u062F \u0627\u0644\u062A\u062D\u062F\u064A\u062B"}</li>
             </ol>
           </div>
         </div>
       )}
 
-      {/* ========== STEP 2: Preview ========== */}
       {step === "preview" && (
         <div>
-          {/* Summary Cards */}
           {summary && (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
-              <SumCard
-                label="المجموع"
-                value={summary.total}
-                color="#a1a1aa"
-              />
-              <SumCard
-                label="تطابق تام"
-                value={summary.exact}
-                color="#22c55e"
-              />
-              <SumCard
-                label="تطابق جزئي"
-                value={summary.fuzzy}
-                color="#f59e0b"
-              />
-              <SumCard
-                label="بدون تطابق"
-                value={summary.unmatched}
-                color="#ef4444"
-              />
-              <SumCard
-                label="محدد للتحديث"
-                value={selected.size}
-                color="#c41040"
-              />
+              <SumCard label={"\u0627\u0644\u0645\u062C\u0645\u0648\u0639"} value={summary.total} color="#a1a1aa" />
+              <SumCard label={"\u062A\u0637\u0627\u0628\u0642 \u062A\u0627\u0645"} value={summary.exact} color="#22c55e" />
+              <SumCard label={"\u062A\u0637\u0627\u0628\u0642 \u062C\u0632\u0626\u064A"} value={summary.fuzzy} color="#f59e0b" />
+              <SumCard label={"\u0628\u062F\u0648\u0646 \u062A\u0637\u0627\u0628\u0642"} value={summary.unmatched} color="#ef4444" />
+              <SumCard label={"\u0645\u062D\u062F\u062F \u0644\u0644\u062A\u062D\u062F\u064A\u062B"} value={selected.size} color="#c41040" />
             </div>
           )}
 
-          {/* File info */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="text-muted text-xs">
-              📄 {fileName} — {pdfRows.length} جهاز
+              {"\uD83D\uDCC4"} {fileName} {"\u2014"} {pdfRows.length} {"\u062C\u0647\u0627\u0632"}
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={reset}
-                className="btn-outline text-xs px-4 py-2"
-              >
-                ملف جديد
+              <button onClick={reset} className="btn-outline text-xs px-4 py-2">
+                {"\u0645\u0644\u0641 \u062C\u062F\u064A\u062F"}
               </button>
               <button onClick={toggleAll} className="btn-outline text-xs px-4 py-2">
                 {selected.size === results.filter((r) => r.matched).length
-                  ? "إلغاء الكل"
-                  : "تحديد الكل"}
+                  ? "\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u0643\u0644"
+                  : "\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0643\u0644"}
               </button>
               <button
                 onClick={handleApply}
                 disabled={applying || selected.size === 0}
                 className="btn-primary text-xs px-5 py-2 disabled:opacity-40"
               >
-                {applying ? "جاري التحديث..." : `تحديث ${selected.size} سعر`}
+                {applying ? "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u062F\u064A\u062B..." : `\u062A\u062D\u062F\u064A\u062B ${selected.size} \u0633\u0639\u0631`}
               </button>
             </div>
           </div>
 
-          {/* Table */}
           <div className="overflow-x-auto rounded-xl border border-surface-border">
             <table className="w-full text-right" style={{ fontSize: fs }}>
               <thead>
                 <tr className="bg-surface-card border-b border-surface-border">
                   <th className="p-2.5 w-8"></th>
-                  <th className="p-2.5 font-bold text-muted">الجهاز (PDF)</th>
-                  <th className="p-2.5 font-bold text-muted">السعة</th>
+                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u062C\u0647\u0627\u0632 (PDF)"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u0633\u0639\u0629"}</th>
                   <th className="p-2.5 font-bold text-muted">
-                    سعر PDF
-                    <span className="text-[10px] block text-dim">
-                      بدون ضريبة
-                    </span>
+                    {"\u0633\u0639\u0631 PDF"}
+                    <span className="text-[10px] block text-dim">{"\u0628\u062F\u0648\u0646 \u0636\u0631\u064A\u0628\u0629"}</span>
                   </th>
                   <th className="p-2.5 font-bold text-muted">
-                    السعر الجديد
-                    <span className="text-[10px] block text-dim">
-                      +18% ضريبة
-                    </span>
+                    {"\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062C\u062F\u064A\u062F"}
+                    <span className="text-[10px] block text-dim">+18% {"\u0636\u0631\u064A\u0628\u0629"}</span>
                   </th>
-                  <th className="p-2.5 font-bold text-muted">المنتج المطابق</th>
-                  <th className="p-2.5 font-bold text-muted">السعر الحالي</th>
-                  <th className="p-2.5 font-bold text-muted">الفرق</th>
-                  <th className="p-2.5 font-bold text-muted">الحالة</th>
+                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u0645\u0646\u062A\u062C \u0627\u0644\u0645\u0637\u0627\u0628\u0642"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062D\u0627\u0644\u064A"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u0641\u0631\u0642"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"\u0627\u0644\u062D\u0627\u0644\u0629"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -567,7 +482,7 @@ export default function PricesPage() {
                       </td>
                       <td className="p-2.5">
                         <span className="bg-zinc-800 px-2 py-0.5 rounded text-xs">
-                          {r.pdfStorage || "—"}
+                          {r.pdfStorage || "\u2014"}
                         </span>
                       </td>
                       <td className="p-2.5 text-muted">
@@ -587,13 +502,13 @@ export default function PricesPage() {
                             )}
                           </span>
                         ) : (
-                          <span className="text-dim">—</span>
+                          <span className="text-dim">{"\u2014"}</span>
                         )}
                       </td>
                       <td className="p-2.5 text-muted">
                         {r.currentPrice != null
                           ? r.currentPrice.toLocaleString()
-                          : "—"}
+                          : "\u2014"}
                       </td>
                       <td className="p-2.5">
                         {diff != null ? (
@@ -610,7 +525,7 @@ export default function PricesPage() {
                             {diff.toLocaleString()}
                           </span>
                         ) : (
-                          "—"
+                          "\u2014"
                         )}
                       </td>
                       <td className="p-2.5">
@@ -623,13 +538,9 @@ export default function PricesPage() {
             </table>
           </div>
 
-          {/* Bottom action bar */}
           <div className="mt-4 flex items-center justify-between">
-            <button
-              onClick={reset}
-              className="btn-outline text-xs px-4 py-2"
-            >
-              إلغاء
+            <button onClick={reset} className="btn-outline text-xs px-4 py-2">
+              {"\u0625\u0644\u063A\u0627\u0621"}
             </button>
             <button
               onClick={handleApply}
@@ -637,30 +548,28 @@ export default function PricesPage() {
               className="btn-primary px-6 py-2.5 disabled:opacity-40"
             >
               {applying
-                ? "جاري التحديث..."
-                : `تأكيد تحديث ${selected.size} سعر`}
+                ? "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u062F\u064A\u062B..."
+                : `\u062A\u0623\u0643\u064A\u062F \u062A\u062D\u062F\u064A\u062B ${selected.size} \u0633\u0639\u0631`}
             </button>
           </div>
         </div>
       )}
 
-      {/* ========== STEP 3: Done ========== */}
       {step === "done" && applyResult && (
         <div className="max-w-md mx-auto text-center py-12">
           <div className="text-6xl mb-4">
-            {applyResult.failed === 0 ? "✅" : "⚠️"}
+            {applyResult.failed === 0 ? "\u2705" : "\u26A0\uFE0F"}
           </div>
-          <h2 className="font-black text-xl mb-2">تم التحديث</h2>
+          <h2 className="font-black text-xl mb-2">{"\u062A\u0645 \u0627\u0644\u062A\u062D\u062F\u064A\u062B"}</h2>
           <p className="text-muted text-sm mb-6">
-            تم تحديث{" "}
+            {"\u062A\u0645 \u062A\u062D\u062F\u064A\u062B"}{" "}
             <span className="text-green-400 font-bold">
               {applyResult.updated}
             </span>{" "}
-            سعر بنجاح
+            {"\u0633\u0639\u0631 \u0628\u0646\u062C\u0627\u062D"}
             {applyResult.failed > 0 && (
               <>
-                {" "}
-                — فشل{" "}
+                {" \u2014 \u0641\u0634\u0644 "}
                 <span className="text-red-400 font-bold">
                   {applyResult.failed}
                 </span>
@@ -668,7 +577,7 @@ export default function PricesPage() {
             )}
           </p>
           <button onClick={reset} className="btn-primary px-8 py-3">
-            رفع ملف جديد
+            {"\u0631\u0641\u0639 \u0645\u0644\u0641 \u062C\u062F\u064A\u062F"}
           </button>
         </div>
       )}
@@ -705,9 +614,9 @@ function ConfidenceBadge({
   confidence: "exact" | "fuzzy" | "none";
 }) {
   const map = {
-    exact: { bg: "bg-green-500/20", text: "text-green-400", label: "تام" },
-    fuzzy: { bg: "bg-amber-500/20", text: "text-amber-400", label: "جزئي" },
-    none: { bg: "bg-red-500/20", text: "text-red-400", label: "لا يوجد" },
+    exact: { bg: "bg-green-500/20", text: "text-green-400", label: "\u062A\u0627\u0645" },
+    fuzzy: { bg: "bg-amber-500/20", text: "text-amber-400", label: "\u062C\u0632\u0626\u064A" },
+    none: { bg: "bg-red-500/20", text: "text-red-400", label: "\u0644\u0627 \u064A\u0648\u062C\u062F" },
   };
   const s = map[confidence];
   return (
