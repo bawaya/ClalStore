@@ -126,7 +126,10 @@ export default function PricesPage() {
           body: JSON.stringify({ pdfText }),
         });
         const json = await res.json();
-        if (json.error) throw new Error(json.error);
+        if (json.error) {
+          console.error('Match API error:', json);
+          throw new Error(json.error + (json.steps ? ' [' + json.steps.join(' > ') + ']' : ''));
+        }
 
         setResults(json.data);
         setSummary(json.summary);
