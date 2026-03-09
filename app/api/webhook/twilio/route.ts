@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
     const errorMessage = data.ErrorMessage || "";
 
     // Log delivery status
-    console.log(`[Twilio Webhook] SID=${messageSid} Status=${messageStatus} To=${to} From=${from}${
-      errorCode ? ` Error=${errorCode}: ${errorMessage}` : ""
+    console.log(`[Twilio Webhook] SID=${messageSid} Status=${messageStatus}${
+      errorCode ? ` Error=${errorCode}` : ""
     }`);
 
     // Twilio expects 200 response

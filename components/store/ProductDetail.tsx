@@ -142,7 +142,7 @@ export function ProductDetailClient({
               }}
             >
               {allImages.length > 0 ? (
-                <img src={allImages[selImage] || allImages[0]} alt={productName} className="w-full h-full object-contain drop-shadow-lg" />
+                <img src={allImages[selImage] || allImages[0]} alt={productName} loading="eager" decoding="async" className="w-full h-full object-contain drop-shadow-lg" />
               ) : (
                 <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
                   {p.type === "device" ? "📱" : "🔌"}
@@ -165,7 +165,7 @@ export function ProductDetailClient({
                       opacity: selImage === i ? 1 : 0.6,
                     }}
                   >
-                    <img src={img} alt="" className="w-full h-full object-contain" />
+                    <img src={img} alt="" loading="lazy" className="w-full h-full object-contain" />
                   </button>
                 ))}
               </div>

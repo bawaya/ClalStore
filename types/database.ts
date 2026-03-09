@@ -632,3 +632,98 @@ export type CustomerOTP = {
   verified: boolean;
   created_at: string;
 }
+
+// ===== Inbox Types =====
+
+export type InboxConversation = {
+  id: string;
+  customer_phone: string;
+  customer_name: string | null;
+  channel: "whatsapp" | "webchat";
+  status: "active" | "waiting" | "bot" | "resolved" | "archived";
+  assigned_to: string | null;
+  assigned_at: string | null;
+  priority: "low" | "normal" | "high" | "urgent";
+  pinned: boolean;
+  is_blocked: boolean;
+  unread_count: number;
+  last_message_text: string | null;
+  last_message_at: string | null;
+  last_message_direction: "inbound" | "outbound";
+  first_response_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  source: string;
+  metadata: Record<string, unknown>;
+  sentiment: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type InboxMessage = {
+  id: string;
+  conversation_id: string;
+  direction: "inbound" | "outbound";
+  sender_type: "customer" | "agent" | "bot" | "system";
+  sender_id: string | null;
+  sender_name: string | null;
+  message_type: "text" | "image" | "document" | "audio" | "video" | "template" | "note" | "location";
+  content: string | null;
+  media_url: string | null;
+  media_mime_type: string | null;
+  media_filename: string | null;
+  template_name: string | null;
+  template_params: Record<string, string> | null;
+  reply_to_id: string | null;
+  whatsapp_message_id: string | null;
+  status: "pending" | "sent" | "delivered" | "read" | "failed";
+  error_message: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export type InboxLabel = {
+  id: string;
+  name: string;
+  color: string;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export type InboxNote = {
+  id: string;
+  conversation_id: string;
+  author_id: string | null;
+  author_name: string | null;
+  content: string;
+  created_at: string;
+}
+
+export type InboxTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  content: string;
+  variables: string[];
+  is_active: boolean;
+  usage_count: number;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type InboxQuickReply = {
+  id: string;
+  shortcut: string;
+  title: string;
+  content: string;
+  category: string;
+  usage_count: number;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+// (Bot types defined above in Season 5 section)

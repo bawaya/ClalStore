@@ -25,5 +25,25 @@ export default async function ProductPage({ params }: Props) {
   const related = await getProducts({ type: product.type as any, limit: 4 });
   const filtered = related.filter((p) => p.id !== product.id).slice(0, 3);
 
-  return <ProductDetailClient product={product} related={filtered} />;
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name_ar,
+    description: product.description_ar || `${product.brand} ${product.name_ar}`,
+    brand: { "@type": "Brand", name: product.brand },
+    image: product.image_url || undefined,
+    offers: {
+      "@type": "Offer",
+      price: product.price,
+      priceCurrency: "ILS",
+      availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+  };
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+      <ProductDetailClient product={product} related={filtered} />
+    </>
+  );
 }

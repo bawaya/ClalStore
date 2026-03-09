@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useScreen } from "@/lib/hooks";
+import { BUSINESS } from "@/lib/constants";
 import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
@@ -378,9 +379,10 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
     {
       title: t("footer.contactUs"),
       links: [
-        { href: `tel:${fc.phone || "0533337653"}`, label: `📞 ${fc.phone || "053-3337653"}` },
-        { href: `https://wa.me/${fc.whatsapp || "972533337653"}`, label: "💬 WhatsApp" },
-        { href: `mailto:${fc.email || "info@clalmobile.com"}`, label: `📧 ${fc.email || "info@clalmobile.com"}` },
+        { href: `tel:${fc.phone || BUSINESS.phone.replace(/-/g, "")}`, label: `📞 ${fc.phone || BUSINESS.phone}` },
+        { href: `https://wa.me/${fc.whatsapp || BUSINESS.phoneRaw}`, label: "💬 WhatsApp" },
+        { href: `mailto:${fc.email || BUSINESS.email}`, label: `📧 ${fc.email || BUSINESS.email}` },
+        { href: "#", label: `🕐 ${lang === "he" ? BUSINESS.workingHours.days_he : BUSINESS.workingHours.days_ar} ${BUSINESS.workingHours.hours}`, isText: true },
       ],
     },
   ];
@@ -404,7 +406,9 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
             <div key={col.title} className="text-right">
               <div className="font-bold text-xs mb-2">{col.title}</div>
               <div className="space-y-1.5">
-                {col.links.map((l) => (
+                {col.links.map((l, i) => (l as any).isText ? (
+                  <span key={i} className="block text-muted text-xs">{l.label}</span>
+                ) : (
                   <Link key={l.href} href={l.href} className="block text-muted text-xs hover:text-white transition-colors">{l.label}</Link>
                 ))}
               </div>

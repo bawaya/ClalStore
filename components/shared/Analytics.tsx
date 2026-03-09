@@ -15,6 +15,9 @@ export function Analytics() {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
+    const consent = localStorage.getItem("clal_cookie_consent");
+    if (consent !== "accepted") return;
+
     async function loadSettings() {
       try {
         const res = await fetch("/api/admin/settings");
@@ -107,5 +110,24 @@ export function trackViewProduct(productName: string, price: number) {
   trackEvent("view_item", { items: [{ item_name: productName, price }], currency: "ILS", value: price });
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "ViewContent", { content_name: productName, value: price, currency: "ILS" });
+  }
+}
+
+export function trackBeginCheckout(value: number, items: { item_name: string; price: number; quantity: number }[]) {
+  trackEvent("begin_checkout", { value, currency: "ILS", items });
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", "InitiateCheckout", { value, currency: "ILS" });
+  }
+}
+
+export function trackPurchaseWithItems(orderId: string, value: number, items: { item_name: string; price: number; quantity: number }[]) {
+  trackPurchase(value, "ILS", orderId);
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "purchase", {
+      transaction_id: orderId,
+      value,
+      currency: "ILS",
+      items: items.map((i) => ({ item_name: i.item_name, price: i.price, quantity: i.quantity })),
+    });
   }
 }

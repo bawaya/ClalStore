@@ -22,15 +22,20 @@ export default function WishlistPage() {
   const addToCart = useCart((s) => s.addItem);
 
   const handleAddAllToCart = () => {
-    items.forEach((item) => {
+    items.forEach((item: any) => {
+      const variants = item.variants || [];
+      const defaultVariant = variants[0];
       addToCart({
         productId: item.id,
         name: item.name_ar,
         name_he: item.name_he || undefined,
         brand: item.brand,
         type: item.type,
-        price: item.price,
+        price: defaultVariant?.price || item.price,
         image: item.image_url || undefined,
+        color: defaultVariant?.color || (item.colors?.[0]?.name_ar) || undefined,
+        color_he: defaultVariant?.color_he || (item.colors?.[0]?.name_he) || undefined,
+        storage: defaultVariant?.storage || undefined,
       });
     });
   };

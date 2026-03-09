@@ -42,17 +42,35 @@ export async function getCRMDashboard() {
 
   const pipelineValue = p.filter((x: any) => x.stage !== "lost").reduce((s: number, x: any) => s + Number(x.value), 0);
 
+  const suggestedFollowupsList = c
+    .filter((x: any) => ["cold", "lost", "inactive"].includes(x.segment) || (!x.last_order_at && (x.total_orders || 0) === 0))
+    .sort((a: any, b: any) => {
+      const aDate = a.last_order_at ? new Date(a.last_order_at).getTime() : 0;
+      const bDate = b.last_order_at ? new Date(b.last_order_at).getTime() : 0;
+      return aDate - bDate;
+    })
+    .slice(0, 10);
+
   return {
     totalOrders: o.length, revenue, newCount, noReply, noReply3,
     totalCustomers: c.length, vipCount: c.filter((x: any) => x.segment === "vip").length,
     openTasks, pipelineValue, pipelineDeals: p.length,
     byStatus, bySource, alerts,
     recentOrders: o.slice(0, 5),
+    suggestedFollowups: suggestedFollowupsList.map((x: any) => ({ id: x.id, name: x.name, phone: x.phone, last_order_at: x.last_order_at, segment: x.segment })),
   };
 }
 
 // ===== Orders =====
-export async function getCRMOrders(filters?: { status?: string; source?: string; search?: string }) {
+export async function getCRMOrders(filters?: {
+  status?: string;
+  source?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  amountMin?: number;
+  amountMax?: number;
+}) {
   const s = db();
   let query = s.from("orders").select(`*, order_items(*), order_notes(*), customers(name, phone, segment, id_number)`).order("created_at", { ascending: false });
   if (filters?.status) {
@@ -60,6 +78,10 @@ export async function getCRMOrders(filters?: { status?: string; source?: string;
     else query = query.eq("status", filters.status);
   }
   if (filters?.source) query = query.eq("source", filters.source);
+  if (filters?.dateFrom) query = query.gte("created_at", filters.dateFrom);
+  if (filters?.dateTo) query = query.lte("created_at", filters.dateTo + "T23:59:59.999Z");
+  if (filters?.amountMin != null) query = query.gte("total", filters.amountMin);
+  if (filters?.amountMax != null) query = query.lte("total", filters.amountMax);
   const { data } = await query;
   let results = data || [];
   if (filters?.search) {

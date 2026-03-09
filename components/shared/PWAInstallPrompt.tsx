@@ -21,12 +21,32 @@ export function PWAInstallPrompt() {
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
   useEffect(() => {
-    // Register service worker
+    // Register service worker + push subscription
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
-        .then((reg) => {
+        .then(async (reg) => {
           console.log("SW registered:", reg.scope);
+          if ("PushManager" in window && reg.pushManager) {
+            try {
+              const perm = await Notification.requestPermission();
+              if (perm === "granted") {
+                const sub = await reg.pushManager.subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey: undefined,
+                });
+                await fetch("/api/push/subscribe", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    endpoint: sub.endpoint,
+                    keys: sub.toJSON().keys,
+                    visitor_id: localStorage.getItem("clal_visitor_id") || crypto.randomUUID?.(),
+                  }),
+                });
+              }
+            } catch {}
+          }
         })
         .catch((err) => {
           console.log("SW registration failed:", err);

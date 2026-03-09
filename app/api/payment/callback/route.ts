@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    console.log("Rivhit callback received:", JSON.stringify(body, null, 2));
+    console.log("Rivhit callback received for:", body.custom_field_1 || "unknown");
 
     const {
       status,
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const orderId = custom_field_1 || body.comment?.match(/CLM-\d{5}/)?.[0];
 
     if (!orderId) {
-      console.error("Payment callback: missing order ID", body);
+      console.error("Payment callback: missing order ID");
       return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
     }
 

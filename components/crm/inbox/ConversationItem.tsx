@@ -7,24 +7,12 @@
 import type { InboxConversation } from "@/lib/crm/inbox-types";
 import { STATUS_CONFIG } from "@/lib/crm/inbox-types";
 import { analyzeSentiment, SENTIMENT_CONFIG, type Sentiment } from "@/lib/crm/sentiment";
+import { timeAgo } from "@/lib/utils";
 
 interface Props {
   conversation: InboxConversation;
   isSelected: boolean;
   onClick: () => void;
-}
-
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "الآن";
-  if (mins < 60) return `${mins}د`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}س`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}ي`;
-  return new Date(dateStr).toLocaleDateString("ar-EG", { day: "numeric", month: "numeric" });
 }
 
 export function ConversationItem({ conversation, isSelected, onClick }: Props) {
@@ -105,7 +93,7 @@ export function ConversationItem({ conversation, isSelected, onClick }: Props) {
           </span>
         ))}
         {c.assigned_to && (
-          <span className="text-[9px] text-muted">👤 {(c as any).assigned_user?.name || "موظف"}</span>
+          <span className="text-[9px] text-muted">👤 {c.assigned_user?.name || "موظف"}</span>
         )}
       </div>
     </button>

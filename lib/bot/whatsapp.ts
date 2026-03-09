@@ -135,6 +135,72 @@ export async function sendWhatsAppTemplate(
   return res.json();
 }
 
+// ===== Send Image Message =====
+export async function sendWhatsAppImage(
+  to: string,
+  imageUrl: string,
+  caption?: string
+) {
+  const phone = normalizePhone(to);
+  const headers = await getHeaders();
+  const from = await getFromPhone();
+  const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      from,
+      to: phone,
+      type: "image",
+      image: {
+        link: imageUrl,
+        ...(caption ? { caption } : {}),
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("yCloud image error:", err);
+    throw new Error(`yCloud image error: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// ===== Send Document Message =====
+export async function sendWhatsAppDocument(
+  to: string,
+  documentUrl: string,
+  filename: string,
+  caption?: string
+) {
+  const phone = normalizePhone(to);
+  const headers = await getHeaders();
+  const from = await getFromPhone();
+  const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      from,
+      to: phone,
+      type: "document",
+      document: {
+        link: documentUrl,
+        filename,
+        ...(caption ? { caption } : {}),
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("yCloud document error:", err);
+    throw new Error(`yCloud doc error: ${res.status}`);
+  }
+
+  return res.json();
+}
+
 // ===== Legacy Notify Team (DO NOT USE — use admin-notify.ts instead) =====
 // Kept for backward compat with index.ts export
 export async function notifyTeam(message: string) {
@@ -148,10 +214,13 @@ export interface WhatsAppIncoming {
   from: string;
   name?: string;
   messageId: string;
-  type: "text" | "button" | "image" | "document" | "other";
+  type: "text" | "button" | "image" | "document" | "audio" | "video" | "other";
   text?: string;
   buttonId?: string;
   buttonText?: string;
+  mediaUrl?: string;
+  mediaFilename?: string;
+  mediaMimeType?: string;
   timestamp: string;
 }
 
@@ -188,6 +257,51 @@ export function parseWebhook(body: unknown): WhatsAppIncoming | null {
         from, name, messageId, type: "button",
         buttonId: reply?.id || "", buttonText: reply?.title || "",
         text: reply?.title || "", timestamp,
+      };
+    }
+
+    if (msg.type === "image") {
+      const img = msg.image as Record<string, string> | undefined;
+      return {
+        from, name, messageId, type: "image",
+        text: img?.caption || "",
+        mediaUrl: img?.link || img?.url || "",
+        mediaMimeType: img?.mime_type || "image/jpeg",
+        timestamp,
+      };
+    }
+
+    if (msg.type === "document") {
+      const doc = msg.document as Record<string, string> | undefined;
+      return {
+        from, name, messageId, type: "document",
+        text: doc?.caption || "",
+        mediaUrl: doc?.link || doc?.url || "",
+        mediaFilename: doc?.filename || "document",
+        mediaMimeType: doc?.mime_type || "application/pdf",
+        timestamp,
+      };
+    }
+
+    if (msg.type === "audio") {
+      const audio = msg.audio as Record<string, string> | undefined;
+      return {
+        from, name, messageId, type: "audio",
+        text: "",
+        mediaUrl: audio?.link || audio?.url || "",
+        mediaMimeType: audio?.mime_type || "audio/ogg",
+        timestamp,
+      };
+    }
+
+    if (msg.type === "video") {
+      const video = msg.video as Record<string, string> | undefined;
+      return {
+        from, name, messageId, type: "video",
+        text: video?.caption || "",
+        mediaUrl: video?.link || video?.url || "",
+        mediaMimeType: video?.mime_type || "video/mp4",
+        timestamp,
       };
     }
 

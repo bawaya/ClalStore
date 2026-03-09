@@ -18,6 +18,6 @@ export async function GET(req: NextRequest) {
     const data = await getCRMCustomers(filters);
     return NextResponse.json({ data });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

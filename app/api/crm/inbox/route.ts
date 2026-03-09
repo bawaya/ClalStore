@@ -32,7 +32,12 @@ export async function GET(req: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (status && status !== "all") {
-      query = query.eq("status", status);
+      if (status === "pending") {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        query = query.eq("last_message_direction", "inbound").lt("last_message_at", cutoff);
+      } else {
+        query = query.eq("status", status);
+      }
     }
     if (assigned) {
       query = query.eq("assigned_to", assigned);
@@ -86,24 +91,53 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Enrich with labels
+    // Get assigned user names
+    const assignedIds = [...new Set(filteredConvs.map((c: any) => c.assigned_to).filter(Boolean))];
+    let usersMap: Record<string, { id: string; name: string }> = {};
+    if (assignedIds.length > 0) {
+      const { data: users } = await supabase
+        .from("users")
+        .select("id, full_name, email")
+        .in("id", assignedIds);
+      (users || []).forEach((u: any) => {
+        usersMap[u.id] = { id: u.id, name: u.full_name || u.email || "موظف" };
+      });
+    }
+
+    // Enrich with labels + assigned_user
     const enriched = filteredConvs.map((c: any) => ({
       ...c,
       labels: labelsMap[c.id] || [],
+      assigned_user: c.assigned_to ? usersMap[c.assigned_to] || null : null,
     }));
 
     // Stats
-    const { data: allConvs } = await supabase
-      .from("inbox_conversations")
-      .select("status, unread_count");
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
+
+    const [allConvsRes, resolvedTodayRes, messagesTodayRes] = await Promise.all([
+      supabase.from("inbox_conversations").select("status, unread_count"),
+      supabase
+        .from("inbox_conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "resolved")
+        .gte("updated_at", todayISO),
+      supabase
+        .from("inbox_messages")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", todayISO),
+    ]);
+
+    const allConvs = allConvsRes.data || [];
     const stats = {
-      total_conversations: (allConvs || []).length,
-      active: (allConvs || []).filter((c: any) => c.status === "active").length,
-      waiting: (allConvs || []).filter((c: any) => c.status === "waiting").length,
-      bot: (allConvs || []).filter((c: any) => c.status === "bot").length,
-      resolved_today: 0,
-      messages_today: 0,
-      unread_total: (allConvs || []).reduce((sum: number, c: any) => sum + (c.unread_count || 0), 0),
+      total_conversations: allConvs.length,
+      active: allConvs.filter((c: any) => c.status === "active").length,
+      waiting: allConvs.filter((c: any) => c.status === "waiting").length,
+      bot: allConvs.filter((c: any) => c.status === "bot").length,
+      resolved_today: resolvedTodayRes.count || 0,
+      messages_today: messagesTodayRes.count || 0,
+      unread_total: allConvs.reduce((sum: number, c: any) => sum + (c.unread_count || 0), 0),
     };
 
     return NextResponse.json({

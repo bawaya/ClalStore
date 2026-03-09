@@ -24,6 +24,6 @@ export async function GET(req: NextRequest) {
     const result = await getCRMChats(filters);
     return NextResponse.json({ conversations: result.data, total: result.total });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

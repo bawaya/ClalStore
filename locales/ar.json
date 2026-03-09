@@ -2,6 +2,7 @@
   "nav": {
     "home": "الرئيسية",
     "store": "المتجر",
+    "track": "تتبع الطلب",
     "plans": "الباقات",
     "about": "من نحن",
     "faq": "أسئلة شائعة",
@@ -58,7 +59,16 @@
     "installments": "تقسيط حتى",
     "payments": "دفعات",
     "orderNow": "اطلب الآن",
-    "featured": "منتجات مميزة"
+    "featured": "منتجات مميزة",
+    "sortBy": "ترتيب",
+    "sortDefault": "الافتراضي",
+    "sortPriceAsc": "السعر: من الأقل",
+    "sortPriceDesc": "السعر: من الأعلى",
+    "sortNewest": "الأحدث",
+    "sortBestselling": "الأكثر مبيعاً",
+    "priceRange": "نطاق السعر",
+    "priceFrom": "من",
+    "priceTo": "إلى"
   },
   "footer": {
     "quickLinks": "روابط سريعة",
@@ -159,7 +169,8 @@
   "cookie": {
     "text": "🍪 هذا الموقع يستخدم ملفات تعريف الارتباط (Cookies) لتحسين تجربة التصفح.",
     "link": "سياسة الخصوصية",
-    "accept": "✅ موافق"
+    "accept": "✅ موافق",
+    "decline": "رفض"
   },
   "features": {
     "title": "✨ ليش ClalMobile؟",
@@ -328,6 +339,22 @@
     "resend": "إعادة إرسال الرمز",
     "tryOtherChannel": "تجربة طريقة أخرى",
     "footerNote": "رمز التحقق صالح لمدة 5 دقائق"
+  },
+  "search": {
+    "placeholder": "ابحث عن جهاز، إكسسوار...",
+    "hint": "اضغط Enter للبحث",
+    "smartSearch": "بحث ذكي",
+    "searching": "جاري البحث...",
+    "results": "نتائج البحث",
+    "noResults": "لا توجد نتائج",
+    "startsFrom": "يبدأ من"
+  },
+  "checkout": {
+    "successTitle": "تم الطلب بنجاح!",
+    "successDesc": "شكراً لطلبك من ClalMobile",
+    "orderTracking": "تتبع الطلب",
+    "continueShopping": "متابعة التسوق",
+    "orderConfirmed": "تم تأكيد طلبك وسنتواصل معك قريباً"
   },
   "account": {
     "title": "حسابي",

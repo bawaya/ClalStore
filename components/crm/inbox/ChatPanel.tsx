@@ -92,20 +92,22 @@ export function ChatPanel({
 
   /* Fetch templates/quick-replies once */
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const data = await fetchTemplates();
-        if (data.success) {
+        if (!cancelled && data.success) {
           setTemplates(data.templates || []);
           setQuickReplies(data.quick_replies || []);
         }
       } catch {}
     })();
+    return () => { cancelled = true; };
   }, []);
 
-  /* Auto-load summary for conversations with 5+ messages */
+  /* Auto-load summary for conversations with 3+ messages */
   useEffect(() => {
-    if (messages.length >= 5) {
+    if (messages.length >= 3) {
       // Check cached summary in metadata
       const meta = conversation.metadata as Record<string, unknown> | undefined;
       const cached = meta?.ai_summary as ConversationSummary | undefined;
@@ -218,7 +220,7 @@ export function ChatPanel({
       </div>
 
       {/* AI Summary banner (collapsible) */}
-      {messages.length >= 5 && (
+      {messages.length >= 3 && (
         <div className="border-b border-surface-border bg-surface-elevated">
           {/* Summary header (always visible) */}
           <button

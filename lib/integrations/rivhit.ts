@@ -67,7 +67,7 @@ export async function createPaymentPage(params: {
           apple_pay: false,
           google_pay: false,
         },
-        success_url: `${appUrl}/store/checkout/success?order=${params.orderId}`,
+        success_url: `${appUrl}/store/checkout/success?order=${params.orderId}&value=${params.amount}`,
         failure_url: `${appUrl}/store/checkout/failed?order=${params.orderId}`,
         cancel_url: `${appUrl}/store/cart?cancelled=1`,
         callback_url: `${appUrl}/api/payment/callback`,

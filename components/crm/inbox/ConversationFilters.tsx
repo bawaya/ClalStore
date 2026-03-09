@@ -4,8 +4,11 @@
 
 "use client";
 
+import { useState, useEffect } from "react";
 import type { Sentiment } from "@/lib/crm/sentiment";
 import { SENTIMENT_CONFIG } from "@/lib/crm/sentiment";
+import type { InboxLabel } from "@/lib/crm/inbox-types";
+import { fetchAllLabels } from "@/lib/crm/inbox";
 
 interface Props {
   activeTab: string;
@@ -14,12 +17,15 @@ interface Props {
   onSearchChange: (q: string) => void;
   sentimentFilter?: Sentiment | "all";
   onSentimentChange?: (s: Sentiment | "all") => void;
+  labelFilter?: string;
+  onLabelChange?: (labelId: string) => void;
 }
 
 const TABS: { key: string; label: string }[] = [
   { key: "all", label: "الكل" },
   { key: "active", label: "نشطة" },
   { key: "waiting", label: "بانتظار" },
+  { key: "pending", label: "تحتاج متابعة" },
   { key: "bot", label: "بوت" },
   { key: "resolved", label: "محلولة" },
 ];
@@ -38,7 +44,19 @@ export function ConversationFilters({
   onSearchChange,
   sentimentFilter = "all",
   onSentimentChange,
+  labelFilter,
+  onLabelChange,
 }: Props) {
+  const [labels, setLabels] = useState<InboxLabel[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAllLabels().then((res) => {
+      if (!cancelled && res.success) setLabels(res.labels);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="border-b border-surface-border">
       {/* Search */}
@@ -86,6 +104,36 @@ export function ConversationFilters({
           </button>
         ))}
       </div>
+
+      {/* Label filter */}
+      {labels.length > 0 && (
+        <div className="flex gap-1 px-2 pb-1.5 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => onLabelChange?.("")}
+            className="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap transition-colors"
+            style={{
+              background: !labelFilter ? "rgba(196,16,64,0.15)" : "transparent",
+              color: !labelFilter ? "#c41040" : "#71717a",
+            }}
+          >
+            🏷️ الكل
+          </button>
+          {labels.map((l) => (
+            <button
+              key={l.id}
+              onClick={() => onLabelChange?.(l.id)}
+              className="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap transition-colors"
+              style={{
+                background: labelFilter === l.id ? `${l.color}30` : "transparent",
+                color: labelFilter === l.id ? l.color : "#71717a",
+                border: labelFilter === l.id ? `1px solid ${l.color}` : "1px solid transparent",
+              }}
+            >
+              {l.name}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

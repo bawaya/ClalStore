@@ -7,8 +7,8 @@ import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
 
 // ADMIN_REPORT_PHONE = رقم مُرسِل التقارير (FROM) — +972537777963
 // ADMIN_PERSONAL_PHONE = رقم الأدمن الشخصي (TO) — يستقبل التقارير والإشعارات
-const REPORT_FROM = () => process.env.ADMIN_REPORT_PHONE || "+972537777963";
-const ADMIN_TO = () => process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
+const REPORT_FROM = () => process.env.ADMIN_REPORT_PHONE || "";
+const ADMIN_TO = () => process.env.ADMIN_PERSONAL_PHONE || "";
 const TEAM_NUMBERS = () => (process.env.TEAM_WHATSAPP_NUMBERS || "").split(",").filter(Boolean);
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
@@ -145,6 +145,43 @@ export async function notifyAdminAngryCustomer(details: {
     `💬 رسالة الزبون:\n"${details.message.slice(0, 500)}"\n\n` +
     `⚠️ يُنصح بالتواصل الفوري مع الزبون!\n` +
     `⏰ الوقت: ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}`;
+
+  await notifyAdmin(msg);
+}
+
+// ===== New Incoming Message Alert =====
+// Rate-limited: max 1 notification per phone per 10 minutes
+const _msgNotifyCache = new Map<string, number>();
+const MSG_NOTIFY_COOLDOWN = 10 * 60 * 1000; // 10 minutes
+
+export async function notifyAdminNewMessage(details: {
+  phone: string;
+  name: string;
+  preview: string;
+  isMedia?: boolean;
+}): Promise<void> {
+  const cacheKey = details.phone.replace(/[^0-9]/g, "");
+  const lastNotified = _msgNotifyCache.get(cacheKey) || 0;
+
+  if (Date.now() - lastNotified < MSG_NOTIFY_COOLDOWN) return;
+  _msgNotifyCache.set(cacheKey, Date.now());
+
+  // Cleanup old entries (keep cache small)
+  if (_msgNotifyCache.size > 200) {
+    const cutoff = Date.now() - MSG_NOTIFY_COOLDOWN;
+    for (const [k, v] of _msgNotifyCache) {
+      if (v < cutoff) _msgNotifyCache.delete(k);
+    }
+  }
+
+  const mediaLabel = details.isMedia ? " 📎" : "";
+  const msg =
+    `💬 *رسالة واتساب جديدة!*${mediaLabel}\n\n` +
+    `👤 ${details.name || "مجهول"}\n` +
+    `📞 ${details.phone}\n` +
+    `💬 "${details.preview.slice(0, 200)}"\n\n` +
+    `⏰ ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}\n` +
+    `🔗 ${BASE_URL}/crm/inbox`;
 
   await notifyAdmin(msg);
 }

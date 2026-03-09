@@ -42,7 +42,9 @@ export function TemplateSelector({ templates, onSelect, onClose }: Props) {
   if (selectedTemplate) {
     const vars = selectedTemplate.variables || [];
     const preview = vars.reduce((text, v) => {
-      return text.replace(`{{${v}}}`, variables[v] || `[${v}]`);
+      return text
+        .replace(new RegExp(`\\{\\{${v}\\}\\}`, "g"), variables[v] || `[${v}]`)
+        .replace(new RegExp(`\\{${v}\\}`, "g"), variables[v] || `[${v}]`);
     }, selectedTemplate.content);
 
     return (

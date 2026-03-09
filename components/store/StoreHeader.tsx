@@ -32,6 +32,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
   const navLinks = [
     { href: "/", label: t("nav.home") },
     { href: "/store", label: t("nav.store") },
+    { href: "/store/track", label: t("nav.track") },
     { href: "/#plans", label: t("nav.plans") },
     { href: "/about", label: t("nav.about") },
     { href: "/faq", label: t("nav.faq") },
@@ -47,7 +48,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
         {/* Right: Menu + Back + Logo Icon */}
         <div className="flex items-center gap-2">
           {scr.mobile && (
-            <button onClick={() => setMenuOpen(!menuOpen)} className="text-white bg-transparent border-0 cursor-pointer text-xl">☰</button>
+            <button onClick={() => setMenuOpen(!menuOpen)} className="text-white bg-transparent border-0 cursor-pointer text-xl" aria-label="القائمة" aria-expanded={menuOpen}>☰</button>
           )}
           {showBack && (
             <Link

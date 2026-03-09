@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       title,
       body: notifBody,
       url: url || "https://clalmobile.com",
-      icon: icon || "/icons/icon-192x192.png",
+      icon: icon || "/icons/icon-192x192.svg",
       sent_count: subscribers.length,
       target: "all",
     }).select().single();
@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
       message: `تم إرسال الإشعار إلى ${subscribers.length} مشترك`,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Push send error:", err);
+    return NextResponse.json({ error: "فشل إرسال الإشعار" }, { status: 500 });
   }
 }
 

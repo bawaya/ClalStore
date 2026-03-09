@@ -23,12 +23,14 @@ export function ConversationList({ selectedId, onSelect }: Props) {
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
   const [sentimentFilter, setSentimentFilter] = useState<Sentiment | "all">("all");
+  const [labelFilter, setLabelFilter] = useState("");
   const debouncedSearch = useDebounce(search, 400);
 
   const { conversations, stats, loading } = useInboxConversations({
     status: tab === "all" ? undefined : tab,
     search: debouncedSearch || undefined,
     sentiment: sentimentFilter !== "all" ? sentimentFilter : undefined,
+    label: labelFilter || undefined,
   });
 
   // Sort: angry conversations first, then by last_message_at
@@ -67,6 +69,8 @@ export function ConversationList({ selectedId, onSelect }: Props) {
         onSearchChange={setSearch}
         sentimentFilter={sentimentFilter}
         onSentimentChange={setSentimentFilter}
+        labelFilter={labelFilter}
+        onLabelChange={setLabelFilter}
       />
 
       {/* Conversations */}

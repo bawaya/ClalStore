@@ -1,17 +1,34 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useScreen } from "@/lib/hooks";
 import { StoreHeader } from "@/components/store/StoreHeader";
+import { useCart } from "@/lib/store/cart";
+import { trackPurchase } from "@/components/shared/Analytics";
 
 function SuccessContent() {
   const scr = useScreen();
   const router = useRouter();
   const params = useSearchParams();
   const orderId = params.get("order") || "";
+  const valueParam = params.get("value");
+  const value = valueParam ? parseFloat(valueParam) : 0;
   const documentId = params.get("document_id") || "";
   const [countdown, setCountdown] = useState(15);
+  const clearCart = useCart((s) => s.clearCart);
+  const tracked = useRef(false);
+
+  useEffect(() => {
+    clearCart();
+  }, [clearCart]);
+
+  useEffect(() => {
+    if (orderId && value > 0 && !tracked.current) {
+      tracked.current = true;
+      trackPurchase(value, "ILS", orderId);
+    }
+  }, [orderId, value]);
 
   // Auto-redirect to store after 15s
   useEffect(() => {

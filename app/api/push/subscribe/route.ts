@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Push subscribe error:", err);
+    return NextResponse.json({ error: "فشل الاشتراك" }, { status: 500 });
   }
 }
 

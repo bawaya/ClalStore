@@ -2,6 +2,7 @@
   "nav": {
     "home": "דף הבית",
     "store": "חנות",
+    "track": "מעקב הזמנה",
     "plans": "חבילות",
     "about": "אודות",
     "faq": "שאלות נפוצות",
@@ -58,7 +59,16 @@
     "installments": "תשלומים עד",
     "payments": "תשלומים",
     "orderNow": "הזמן עכשיו",
-    "featured": "מוצרים מומלצים"
+    "featured": "מוצרים מומלצים",
+    "sortBy": "מיון",
+    "sortDefault": "ברירת מחדל",
+    "sortPriceAsc": "מחיר: נמוך לגבוה",
+    "sortPriceDesc": "מחיר: גבוה לנמוך",
+    "sortNewest": "החדשים",
+    "sortBestselling": "הנמכרים ביותר",
+    "priceRange": "טווח מחירים",
+    "priceFrom": "מ",
+    "priceTo": "עד"
   },
   "footer": {
     "quickLinks": "קישורים מהירים",
@@ -159,7 +169,8 @@
   "cookie": {
     "text": "🍪 אתר זה משתמש בעוגיות (Cookies) לשיפור חוויית הגלישה.",
     "link": "מדיניות פרטיות",
-    "accept": "✅ אישור"
+    "accept": "✅ אישור",
+    "decline": "דחייה"
   },
   "features": {
     "title": "✨ למה ClalMobile?",
@@ -328,6 +339,22 @@
     "resend": "שלח שוב את הקוד",
     "tryOtherChannel": "נסה אמצעי אחר",
     "footerNote": "קוד האימות תקף ל-5 דקות"
+  },
+  "search": {
+    "placeholder": "חפש מכשיר, אביזר...",
+    "hint": "הקש Enter לחיפוש",
+    "smartSearch": "חיפוש חכם",
+    "searching": "מחפש...",
+    "results": "תוצאות חיפוש",
+    "noResults": "אין תוצאות",
+    "startsFrom": "מתחיל מ"
+  },
+  "checkout": {
+    "successTitle": "ההזמנה בוצעה בהצלחה!",
+    "successDesc": "תודה על ההזמנה מ-ClalMobile",
+    "orderTracking": "מעקב הזמנה",
+    "continueShopping": "המשך קנייה",
+    "orderConfirmed": "ההזמנה אושרה וניצור איתך קשר בקרוב"
   },
   "account": {
     "title": "החשבון שלי",

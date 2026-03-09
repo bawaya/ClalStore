@@ -53,6 +53,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: result.error }, { status: 400 });
   } catch (err: any) {
     console.error("Payment API error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "حدث خطأ في معالجة الدفع" }, { status: 500 });
   }
 }

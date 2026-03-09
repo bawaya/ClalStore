@@ -12,6 +12,7 @@ import { exportStatsPDF } from "@/lib/pdf-export";
 interface Stats {
   totalRevenue: number; totalOrders: number; newOrders: number; noReply: number;
   totalProducts: number; lowStock: number; outOfStock: number;
+  lowStockProducts?: { name: string; stock: number }[];
   totalCustomers: number; vipCustomers: number;
   sources: Record<string, number>; statuses: Record<string, number>;
   recentOrders: any[]; topProducts: any[];
@@ -37,7 +38,8 @@ export default function AdminDashboard() {
 
         const productList = Array.isArray(products) ? products : (products.data || []);
         const totalProducts = productList.length;
-        const lowStock = productList.filter((p: any) => p.stock > 0 && p.stock <= 5).length;
+        const lowStockProducts = productList.filter((p: any) => p.stock > 0 && p.stock < 5);
+        const lowStock = lowStockProducts.length;
         const outOfStock = productList.filter((p: any) => p.stock === 0).length;
 
         // Top 5 best-selling products
@@ -63,6 +65,7 @@ export default function AdminDashboard() {
           topProducts,
           botTotal: botStats.total || 0,
           botEscalated: botStats.escalated || 0,
+          lowStockProducts: lowStockProducts.map((p: any) => ({ name: p.name_ar || p.name_he, stock: p.stock })),
         });
       } catch (err) {
         console.error("Dashboard fetch error:", err);
@@ -123,7 +126,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Alerts */}
-      {(stats.newOrders > 0 || stats.noReply > 0 || stats.outOfStock > 0) && (
+      {(stats.newOrders > 0 || stats.noReply > 0 || stats.outOfStock > 0 || (stats.lowStockProducts && stats.lowStockProducts.length > 0)) && (
         <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18 }}>
           <h3 className="font-bold mb-2 text-right" style={{ fontSize: scr.mobile ? 12 : 14 }}>⚡ تنبيهات</h3>
           <div className="space-y-1.5">
@@ -137,6 +140,14 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between bg-state-orange/10 rounded-xl px-3 py-2">
                 <span className="text-state-orange font-bold" style={{ fontSize: scr.mobile ? 10 : 12 }}>📞 {stats.noReply}</span>
                 <span className="text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>طلبات بدون رد</span>
+              </div>
+            )}
+            {stats.lowStockProducts && stats.lowStockProducts.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 bg-amber-500/10 rounded-xl px-3 py-2">
+                <span className="text-amber-400 font-bold" style={{ fontSize: scr.mobile ? 10 : 12 }}>📦 مخزون منخفض:</span>
+                {stats.lowStockProducts.map((p: any, i: number) => (
+                  <span key={i} className="text-muted text-xs">{p.name} ({p.stock})</span>
+                ))}
               </div>
             )}
             {stats.outOfStock > 0 && (

@@ -24,9 +24,15 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [amountMin, setAmountMin] = useState("");
+  const [amountMax, setAmountMax] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [selected, setSelected] = useState<any>(null);
   const [noteText, setNoteText] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -34,11 +40,15 @@ export default function OrdersPage() {
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (sourceFilter !== "all") params.set("source", sourceFilter);
     if (debouncedSearch) params.set("search", debouncedSearch);
+    if (dateFrom) params.set("dateFrom", dateFrom);
+    if (dateTo) params.set("dateTo", dateTo);
+    if (amountMin) params.set("amountMin", amountMin);
+    if (amountMax) params.set("amountMax", amountMax);
     const res = await fetch(`/api/crm/orders?${params}`);
     const json = await res.json();
     setOrders(json.data || []);
     setLoading(false);
-  }, [statusFilter, sourceFilter, debouncedSearch]);
+  }, [statusFilter, sourceFilter, debouncedSearch, dateFrom, dateTo, amountMin, amountMax]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -74,6 +84,51 @@ export default function OrdersPage() {
     { k: "all", l: "كل المصادر" },
     ...Object.entries(ORDER_SOURCE).map(([k, v]) => ({ k, l: `${v.icon} ${v.label}` })),
   ];
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === orders.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(orders.map((o: any) => o.id)));
+  };
+  const applyBulkStatus = async () => {
+    if (!bulkStatus || selectedIds.size === 0) return;
+    await fetch("/api/crm/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [...selectedIds], status: bulkStatus, userName: "مدير" }),
+    });
+    show(`✅ تم تحديث ${selectedIds.size} طلب`);
+    setSelectedIds(new Set());
+    setBulkStatus("");
+    fetchOrders();
+  };
+  const exportCSV = () => {
+    const headers = ["ID", "التاريخ", "الحالة", "المصدر", "المجموع", "الزبون", "الهاتف"];
+    const rows = orders.map((o: any) => [
+      o.id,
+      o.created_at,
+      o.status,
+      o.source,
+      o.total,
+      o.customers?.name || "",
+      o.customers?.phone || "",
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    show("📥 تم التصدير");
+  };
 
   const statusActions = (current: string) => {
     const map: Record<string, string[]> = {
@@ -112,25 +167,53 @@ export default function OrdersPage() {
       </div>
 
       {/* Source tabs */}
-      <div className="flex gap-1 mb-3 overflow-x-auto">
+      <div className="flex gap-1 mb-2 overflow-x-auto">
         {sourceTabs.map((t) => (
           <button key={t.k} onClick={() => setSourceFilter(t.k)}
             className={`chip whitespace-nowrap text-[10px] ${sourceFilter === t.k ? "chip-active" : ""}`}>{t.l}</button>
         ))}
       </div>
 
+      {/* Date + Amount filters */}
+      <div className="flex flex-wrap gap-2 mb-2">
+        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-surface-elevated border border-surface-border rounded-lg px-2 py-1 text-xs" />
+        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-surface-elevated border border-surface-border rounded-lg px-2 py-1 text-xs" />
+        <input type="number" placeholder="من ₪" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="w-20 bg-surface-elevated border border-surface-border rounded-lg px-2 py-1 text-xs" dir="ltr" />
+        <input type="number" placeholder="إلى ₪" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="w-20 bg-surface-elevated border border-surface-border rounded-lg px-2 py-1 text-xs" dir="ltr" />
+        <button onClick={exportCSV} className="chip text-[10px]">📥 تصدير CSV</button>
+      </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 mb-2 p-2 rounded-xl bg-brand/10 border border-brand/30">
+          <span className="text-xs font-bold">{selectedIds.size} محدد</span>
+          <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="bg-surface-elevated border border-surface-border rounded-lg px-2 py-1 text-xs">
+            <option value="">تحديث الحالة...</option>
+            {Object.entries(ORDER_STATUS).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+          </select>
+          <button onClick={applyBulkStatus} disabled={!bulkStatus} className="px-3 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer disabled:opacity-50">تطبيق</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-muted text-xs cursor-pointer">إلغاء</button>
+        </div>
+      )}
+
       {/* Orders list */}
       {loading ? <div className="text-center py-12 text-muted">⏳</div> :
         orders.length === 0 ? <div className="text-center py-12 text-dim"><div className="text-3xl mb-2">📦</div><div className="text-sm">لا توجد طلبات</div></div> : (
           <div className="space-y-1.5">
+            {/* Select all header */}
+            <div className="flex items-center gap-2 px-2 py-1 mb-1">
+              <input type="checkbox" checked={orders.length > 0 && selectedIds.size === orders.length} onChange={toggleSelectAll} onClick={(e) => e.stopPropagation()} className="cursor-pointer" />
+              <span className="text-[10px] text-muted">تحديد الكل</span>
+            </div>
             {orders.map((o) => {
               const st = ORDER_STATUS[o.status as keyof typeof ORDER_STATUS];
               const src = ORDER_SOURCE[o.source as keyof typeof ORDER_SOURCE];
               return (
-                <div key={o.id} className="card cursor-pointer hover:border-brand/30 transition-all"
+                <div key={o.id} className="card cursor-pointer hover:border-brand/30 transition-all flex items-start gap-2"
                   style={{ padding: scr.mobile ? "10px 12px" : "14px 18px" }}
                   onClick={() => setSelected(o)}>
-                  <div className="flex items-center justify-between">
+                  <input type="checkbox" checked={selectedIds.has(o.id)} onChange={() => toggleSelect(o.id)} onClick={(e) => e.stopPropagation()} className="mt-1 cursor-pointer flex-shrink-0" />
+                  <div className="flex items-center justify-between flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 14 : 18 }}>
                         {formatCurrency(Number(o.total))}

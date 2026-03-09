@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const data = await getCRMUsers();
     return NextResponse.json({ data });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
@@ -29,6 +29,6 @@ export async function PUT(req: NextRequest) {
     await updateUser(id, updates);
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

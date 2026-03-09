@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createAdminSupabase } from "@/lib/supabase";
+import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
+import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { notifyTeam, notifyAdmin } from "./admin-notify";
 
 const db = () => createAdminSupabase();
@@ -87,7 +89,7 @@ export async function createHandoff(req: HandoffRequest): Promise<string | null>
   }
 }
 
-// ===== Generate conversation summary =====
+// ===== Generate conversation summary (AI-powered with rule-based fallback) =====
 export async function generateConversationSummary(conversationId: string): Promise<string> {
   try {
     const { data: messages } = await db()
@@ -95,23 +97,75 @@ export async function generateConversationSummary(conversationId: string): Promi
       .select("role, content, intent")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
-      .limit(20);
+      .limit(25);
 
     if (!messages || messages.length === 0) return "لا توجد رسائل";
 
-    // Build summary from message history
+    const aiSummary = await generateAISummary(messages, conversationId);
+    if (aiSummary) return aiSummary;
+
     const userMessages = messages.filter((m: any) => m.role === "user");
     const intents = [...new Set(messages.filter((m: any) => m.intent).map((m: any) => m.intent))];
 
-    const summary = [
+    return [
       `عدد الرسائل: ${messages.length}`,
       `النوايا: ${intents.join(", ") || "غير محدد"}`,
       `آخر رسالة: "${userMessages[userMessages.length - 1]?.content?.slice(0, 100) || ""}"`,
     ].join("\n");
-
-    return summary;
   } catch {
     return "فشل في توليد الملخص";
+  }
+}
+
+async function generateAISummary(
+  messages: any[],
+  conversationId: string,
+): Promise<string | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const transcript = messages
+      .map((m: any) => `${m.role === "user" ? "زبون" : "بوت"}: ${m.content}`)
+      .join("\n");
+
+    const intents = [...new Set(messages.filter((m: any) => m.intent).map((m: any) => m.intent))];
+
+    const systemPrompt = `أنت محلل محادثات في CRM متجر ClalMobile.
+اكتب ملخص مختصر (3-5 أسطر) لهذه المحادثة يتضمن:
+1. ما يريده الزبون (المنتج/الخدمة)
+2. المشكلة أو السبب الرئيسي للتصعيد
+3. أي منتجات ذُكرت
+4. الخطوة التالية المطلوبة من الموظف
+5. مستوى الإلحاح (عادي/مرتفع/عاجل)
+
+اكتب بالعربية فقط. لا تكتب JSON — نص عادي فقط.`;
+
+    const cleaned = cleanAlternatingMessages([
+      { role: "user", content: `النوايا المكتشفة: ${intents.join(", ")}\n\nالمحادثة:\n${transcript}` },
+    ]);
+
+    const result = await callClaude({
+      systemPrompt,
+      messages: cleaned,
+      maxTokens: 300,
+      temperature: 0.3,
+      apiKey,
+    });
+
+    if (!result?.text) return null;
+
+    trackAIUsage({
+      feature: "summary",
+      inputTokens: result.tokens.input,
+      outputTokens: result.tokens.output,
+      durationMs: result.duration,
+      conversationId,
+    });
+
+    return result.text;
+  } catch {
+    return null;
   }
 }
 

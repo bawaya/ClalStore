@@ -225,6 +225,28 @@ export default function BotAdminPage() {
             </div>
           )}
 
+          {/* Charts */}
+          {analytics.length > 1 && (
+            <div className="grid grid-cols-1 desktop:grid-cols-2 gap-3">
+              <div className={cardStyle}>
+                <h3 className="text-[10px] font-bold text-muted mb-2">💬 المحادثات</h3>
+                <BotBarChart data={[...analytics].reverse()} valueKey="total_conversations" color="#10b981" />
+              </div>
+              <div className={cardStyle}>
+                <h3 className="text-[10px] font-bold text-muted mb-2">👤 التصعيدات</h3>
+                <BotBarChart data={[...analytics].reverse()} valueKey="handoffs" color="#ef4444" />
+              </div>
+              <div className={cardStyle}>
+                <h3 className="text-[10px] font-bold text-muted mb-2">🛒 نقرات المتجر</h3>
+                <BotBarChart data={[...analytics].reverse()} valueKey="store_clicks" color="#6366f1" />
+              </div>
+              <div className={cardStyle}>
+                <h3 className="text-[10px] font-bold text-muted mb-2">📨 الرسائل</h3>
+                <BotBarChart data={[...analytics].reverse()} valueKey="total_messages" color="#f59e0b" />
+              </div>
+            </div>
+          )}
+
           {/* Daily Table */}
           <div className={cardStyle}>
             <h3 className="text-xs font-bold mb-3">📅 يومي (آخر 30 يوم)</h3>
@@ -480,6 +502,37 @@ export default function BotAdminPage() {
             {t.message}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function BotBarChart({ data, valueKey, color }: {
+  data: { date: string; [key: string]: any }[];
+  valueKey: string;
+  color: string;
+}) {
+  if (data.length === 0) return null;
+  const max = Math.max(...data.map((d) => d[valueKey] || 0), 1);
+  return (
+    <div>
+      <div className="flex items-end gap-[2px]" style={{ height: 80 }}>
+        {data.map((d, i) => {
+          const val = d[valueKey] || 0;
+          const h = Math.max((val / max) * 100, 2);
+          return (
+            <div
+              key={i}
+              className="flex-1 rounded-t-sm hover:opacity-80"
+              style={{ height: `${h}%`, background: color, minWidth: 3 }}
+              title={`${new Date(d.date).toLocaleDateString("ar-EG")}: ${val}`}
+            />
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-[8px] text-dim mt-1">
+        <span>{new Date(data[0]?.date).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}</span>
+        <span>{new Date(data[data.length - 1]?.date).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}</span>
       </div>
     </div>
   );

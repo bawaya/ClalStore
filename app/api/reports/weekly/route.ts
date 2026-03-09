@@ -10,6 +10,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
+  const secret = req.nextUrl.searchParams.get("secret") || "";
+  const authHeader = req.headers.get("authorization") || "";
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || (secret !== cronSecret && authHeader !== `Bearer ${cronSecret}`)) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
   const dateParam = req.nextUrl.searchParams.get("date") || new Date().toISOString().split("T")[0];
   const endDate = new Date(dateParam + "T23:59:59.999Z");
   const startDate = new Date(endDate);

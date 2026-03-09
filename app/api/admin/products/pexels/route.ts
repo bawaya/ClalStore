@@ -8,7 +8,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 
 const PEXELS_API = "https://api.pexels.com/v1/search";
-const PEXELS_KEY = "CYXO6HMs8ZC2RwmiS1DG4NtQXUdrX8TTcLwKkVarRa41QHRWj1qWfXsk";
+const PEXELS_KEY = process.env.PEXELS_API_KEY || "";
 
 export async function POST(req: NextRequest) {
   try {

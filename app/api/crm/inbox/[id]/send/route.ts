@@ -7,7 +7,7 @@ export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { sendWhatsAppText } from "@/lib/bot/whatsapp";
+import { sendWhatsAppText, sendWhatsAppImage, sendWhatsAppDocument } from "@/lib/bot/whatsapp";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -61,8 +61,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         const paramValues = template_params ? Object.values(template_params) as string[] : [];
         const result = await sendWhatsAppTemplate(phone, template_name, paramValues);
         waMessageId = result?.id || null;
-        // Use template content for display
         messageContent = content || `[قالب: ${template_name}]`;
+      } else if (type === "image" && media_url) {
+        const result = await sendWhatsAppImage(phone, media_url, messageContent || undefined);
+        waMessageId = result?.id || null;
+        messageContent = messageContent || "[صورة]";
+      } else if (type === "document" && media_url) {
+        const filename = body.media_filename || "document";
+        const result = await sendWhatsAppDocument(phone, media_url, filename, messageContent || undefined);
+        waMessageId = result?.id || null;
+        messageContent = messageContent || `[مستند: ${filename}]`;
       } else {
         const result = await sendWhatsAppText(phone, messageContent);
         waMessageId = result?.id || null;

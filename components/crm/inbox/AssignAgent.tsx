@@ -24,19 +24,25 @@ export function AssignAgent({ conversationId, currentAssignee, onAssigned }: Pro
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
-  /* Fetch CRM users */
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/crm/inbox?limit=0");
-        // Fallback: just use a static list or fetch from crm users endpoint
-        const data = await fetch("/api/admin/users").then(r => r.json()).catch(() => ({ users: [] }));
-        setUsers(data.users || []);
+        const res = await fetch("/api/crm/users");
+        const data = await res.json();
+        if (cancelled) return;
+        const list = (data.data || []).map((u: any) => ({
+          id: u.id,
+          full_name: u.full_name || u.email || "موظف",
+          role: u.role,
+        }));
+        setUsers(list);
       } catch {
-        setUsers([]);
+        if (!cancelled) setUsers([]);
       }
     })();
+    return () => { cancelled = true; };
   }, [open]);
 
   const handleAssign = async (userId: string) => {

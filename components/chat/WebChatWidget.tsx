@@ -16,17 +16,44 @@ export function WebChatWidget() {
   const scr = useScreen();
   const { t } = useLang();
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState<Message[]>([]);
+  const [msgs, setMsgs] = useState<Message[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = sessionStorage.getItem("clal_webchat_msgs");
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [escalated, setEscalated] = useState(false);
+  const [escalated, setEscalated] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem("clal_webchat_escalated") === "true";
+  });
   const [unread, setUnread] = useState(0);
-  const [sessionId] = useState(() => `wc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+  const [sessionId] = useState(() => {
+    if (typeof window === "undefined") return `wc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const stored = sessionStorage.getItem("clal_webchat_session");
+    if (stored) return stored;
+    const id = `wc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    sessionStorage.setItem("clal_webchat_session", id);
+    return id;
+  });
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
+
+  // Persist messages and escalation state
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("clal_webchat_msgs", JSON.stringify(msgs.slice(-50)));
+    } catch {}
+  }, [msgs]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem("clal_webchat_escalated", String(escalated)); } catch {}
+  }, [escalated]);
 
   // Welcome message on first open
   useEffect(() => {

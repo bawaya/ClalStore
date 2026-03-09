@@ -21,7 +21,7 @@ export default function StoreContactPage() {
     }
     setSending(true);
     try {
-      const res = await fetch("/api/admin/contact-notify", {
+      const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

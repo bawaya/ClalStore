@@ -25,9 +25,13 @@ ALTER TABLE sub_pages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "sub_pages_public_read" ON sub_pages
   FOR SELECT USING (is_visible = true);
 
+-- Authenticated users (admin) full access
+CREATE POLICY "sub_pages_authenticated_all" ON sub_pages
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 -- Service role full access
 CREATE POLICY "sub_pages_service_all" ON sub_pages
-  FOR ALL USING (true) WITH CHECK (true);
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ===== Done! =====
 -- ✅ sub_pages table with bilingual content

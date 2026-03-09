@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type {
   InboxConversation,
   InboxLabel,
@@ -12,7 +12,13 @@ import type {
   ConversationStatus,
 } from "@/lib/crm/inbox-types";
 import { STATUS_CONFIG } from "@/lib/crm/inbox-types";
-import { updateConversationStatus } from "@/lib/crm/inbox";
+import {
+  updateConversationStatus,
+  fetchAllLabels,
+  addLabelToConversation,
+  removeLabelFromConversation,
+  createLabel,
+} from "@/lib/crm/inbox";
 import { AssignAgent } from "./AssignAgent";
 import { NotesPanel } from "./NotesPanel";
 
@@ -51,6 +57,41 @@ export function ContactPanel({
   onClose,
 }: Props) {
   const [changingStatus, setChangingStatus] = useState(false);
+  const [allLabels, setAllLabels] = useState<InboxLabel[]>([]);
+  const [showLabelPicker, setShowLabelPicker] = useState(false);
+  const [newLabelName, setNewLabelName] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAllLabels().then((res) => {
+      if (!cancelled && res.success) setAllLabels(res.labels);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const currentLabelIds = new Set(labels.map((l) => l.id));
+
+  const handleToggleLabel = async (label: InboxLabel) => {
+    if (currentLabelIds.has(label.id)) {
+      await removeLabelFromConversation(conversation.id, label.id);
+    } else {
+      await addLabelToConversation(conversation.id, label.id);
+    }
+    onRefresh();
+  };
+
+  const handleCreateLabel = async () => {
+    if (!newLabelName.trim()) return;
+    const colors = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7", "#ec4899"];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const res = await createLabel(newLabelName.trim(), color);
+    if (res.success && res.label) {
+      setAllLabels((prev) => [...prev, res.label!]);
+      await addLabelToConversation(conversation.id, res.label.id);
+      onRefresh();
+    }
+    setNewLabelName("");
+  };
 
   const handleStatus = async (status: ConversationStatus) => {
     if (status === conversation.status) return;
@@ -152,20 +193,71 @@ export function ContactPanel({
 
         {/* Labels */}
         <div className="space-y-2">
-          <h4 className="text-xs font-bold text-muted uppercase tracking-wide">🏷️ التصنيفات</h4>
-          {labels.length === 0 ? (
-            <p className="text-xs text-muted">لا توجد تصنيفات</p>
-          ) : (
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-muted uppercase tracking-wide">🏷️ التصنيفات</h4>
+            <button
+              onClick={() => setShowLabelPicker(!showLabelPicker)}
+              className="text-xs text-brand hover:text-brand-light transition-colors"
+            >
+              {showLabelPicker ? "إغلاق" : "+ إضافة"}
+            </button>
+          </div>
+
+          {labels.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {labels.map((l) => (
-                <span
+                <button
                   key={l.id}
-                  className="px-2 py-0.5 rounded-full text-[10px] text-white"
+                  onClick={() => handleToggleLabel(l)}
+                  className="group px-2 py-0.5 rounded-full text-[10px] text-white flex items-center gap-1 transition-colors hover:opacity-80"
                   style={{ backgroundColor: l.color + "30", borderColor: l.color, borderWidth: 1 }}
+                  title="اضغط لإزالة"
                 >
                   {l.name}
-                </span>
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity">✕</span>
+                </button>
               ))}
+            </div>
+          )}
+
+          {labels.length === 0 && !showLabelPicker && (
+            <p className="text-xs text-muted">لا توجد تصنيفات</p>
+          )}
+
+          {showLabelPicker && (
+            <div className="bg-surface-bg rounded-lg p-2 space-y-2">
+              {allLabels.filter((l) => !currentLabelIds.has(l.id)).length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {allLabels
+                    .filter((l) => !currentLabelIds.has(l.id))
+                    .map((l) => (
+                      <button
+                        key={l.id}
+                        onClick={() => handleToggleLabel(l)}
+                        className="px-2 py-0.5 rounded-full text-[10px] text-muted border border-surface-border hover:text-white hover:border-white/30 transition-colors"
+                      >
+                        + {l.name}
+                      </button>
+                    ))}
+                </div>
+              )}
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  value={newLabelName}
+                  onChange={(e) => setNewLabelName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateLabel()}
+                  placeholder="تصنيف جديد..."
+                  className="flex-1 bg-surface-elevated text-white text-xs px-2 py-1 rounded border border-surface-border focus:border-brand focus:outline-none"
+                />
+                <button
+                  onClick={handleCreateLabel}
+                  disabled={!newLabelName.trim()}
+                  className="px-2 py-1 rounded bg-brand text-white text-xs font-medium disabled:opacity-40"
+                >
+                  +
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -207,6 +299,9 @@ export function ContactPanel({
           </div>
         </div>
 
+        {/* AI Product Recommendations */}
+        <ProductRecommendations conversationId={conversation.id} />
+
         {/* Notes */}
         <NotesPanel
           conversationId={conversation.id}
@@ -214,6 +309,68 @@ export function ContactPanel({
           onNoteAdded={onRefresh}
         />
       </div>
+    </div>
+  );
+}
+
+function ProductRecommendations({ conversationId }: { conversationId: string }) {
+  const [recs, setRecs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const fetchRecs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/crm/inbox/${conversationId}/recommend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (data.success) setRecs(data.recommendations || []);
+    } catch {}
+    setLoading(false);
+    setLoaded(true);
+  }, [conversationId]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-bold text-muted uppercase tracking-wide">
+          🎯 منتجات مقترحة
+        </h4>
+        <button
+          onClick={fetchRecs}
+          disabled={loading}
+          className="text-xs text-brand hover:text-brand-light transition-colors disabled:opacity-50"
+        >
+          {loading ? "جاري..." : loaded ? "تحديث" : "اقتراح بالذكاء الاصطناعي"}
+        </button>
+      </div>
+
+      {recs.length > 0 && (
+        <div className="space-y-2">
+          {recs.map((r: any, i: number) => (
+            <div
+              key={r.id || i}
+              className="p-2 rounded-lg bg-surface-elevated border border-surface-border/50"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-white">
+                  {r.brand} {r.name}
+                </span>
+                <span className="text-xs text-brand font-bold">
+                  {Number(r.price).toLocaleString()}₪
+                </span>
+              </div>
+              <p className="text-[10px] text-muted">{r.reason}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loaded && recs.length === 0 && !loading && (
+        <p className="text-[10px] text-dim">لا توجد اقتراحات — حاول بعد مزيد من الرسائل</p>
+      )}
     </div>
   );
 }

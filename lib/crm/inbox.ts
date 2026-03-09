@@ -110,6 +110,30 @@ export async function fetchStats() {
   return api<{ success: boolean; stats: InboxStats }>("/api/crm/inbox/stats");
 }
 
+export async function fetchAllLabels() {
+  return api<{ success: boolean; labels: InboxLabel[] }>("/api/crm/inbox/labels");
+}
+
+export async function addLabelToConversation(conversationId: string, labelId: string) {
+  return api<{ success: boolean }>("/api/crm/inbox/labels", {
+    method: "POST",
+    body: JSON.stringify({ conversation_id: conversationId, label_id: labelId }),
+  });
+}
+
+export async function removeLabelFromConversation(conversationId: string, labelId: string) {
+  return api<{ success: boolean }>(`/api/crm/inbox/labels?conversation_id=${conversationId}&label_id=${labelId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function createLabel(name: string, color: string) {
+  return api<{ success: boolean; label?: InboxLabel }>("/api/crm/inbox/labels", {
+    method: "PUT",
+    body: JSON.stringify({ name, color }),
+  });
+}
+
 // ===== Hooks =====
 
 /** Poll conversations list every interval ms */

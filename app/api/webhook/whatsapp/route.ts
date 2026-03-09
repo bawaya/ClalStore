@@ -31,16 +31,19 @@ async function saveToInbox(
   inboundText: string,
   inboundMsgId: string | undefined,
   botReplyText: string | null,
+  media?: {
+    type: "image" | "document" | "audio" | "video";
+    url?: string;
+    filename?: string;
+    mimeType?: string;
+  },
 ) {
   try {
     const sb = createAdminSupabase();
 
-    // Normalize phone for consistent matching
     const phone = normalizePhone(rawPhone).replace(/^\+/, "");
-    // Also try with + prefix for older records
     const phoneWithPlus = "+" + phone;
 
-    // Find or create conversation — try both phone formats
     let existing: { id: string; unread_count?: number } | null = null;
     for (const ph of [phone, phoneWithPlus, rawPhone]) {
       const { data } = await sb
@@ -54,19 +57,24 @@ async function saveToInbox(
       if (data) { existing = data as any; break; }
     }
 
+    const displayText = inboundText
+      || (media?.type === "image" ? "📷 صورة" : "")
+      || (media?.type === "document" ? "📄 مستند" : "")
+      || (media?.type === "audio" ? "🎤 رسالة صوتية" : "")
+      || (media?.type === "video" ? "🎥 فيديو" : "")
+      || "";
+
     let convId: string;
 
     if (existing) {
       convId = existing.id;
       const currentUnread = (existing as any).unread_count || 0;
-      // Update conversation — increment unread manually (no RPC needed)
       const updateData: Record<string, unknown> = {
         last_message_at: new Date().toISOString(),
-        last_message_text: inboundText.substring(0, 200),
+        last_message_text: displayText.substring(0, 200),
         last_message_direction: "inbound",
         unread_count: currentUnread + 1,
       };
-      // Update customer name if we have one from WhatsApp and it's real
       if (customerName && customerName.trim().length > 1) {
         updateData.customer_name = customerName.trim();
       }
@@ -75,7 +83,6 @@ async function saveToInbox(
         .update(updateData as any)
         .eq("id", convId);
     } else {
-      // Create new conversation
       const { data: newConv } = await sb
         .from("inbox_conversations")
         .insert({
@@ -83,7 +90,7 @@ async function saveToInbox(
           customer_name: customerName?.trim() || null,
           status: "bot",
           last_message_at: new Date().toISOString(),
-          last_message_text: inboundText.substring(0, 200),
+          last_message_text: displayText.substring(0, 200),
           last_message_direction: "inbound",
           unread_count: 1,
         } as any)
@@ -94,13 +101,16 @@ async function saveToInbox(
       if (!convId) return;
     }
 
-    // Save inbound message
+    // Save inbound message (text or media)
     await sb.from("inbox_messages").insert({
       conversation_id: convId,
       direction: "inbound",
       sender_type: "customer",
-      message_type: "text",
-      content: inboundText,
+      message_type: media?.type || "text",
+      content: inboundText || null,
+      media_url: media?.url || null,
+      media_filename: media?.filename || null,
+      media_mime_type: media?.mimeType || null,
       whatsapp_message_id: inboundMsgId || null,
       status: "delivered",
     } as any);
@@ -116,7 +126,6 @@ async function saveToInbox(
         status: "sent",
       } as any);
 
-      // Update last message to bot reply
       await sb
         .from("inbox_conversations")
         .update({
@@ -125,6 +134,8 @@ async function saveToInbox(
         } as any)
         .eq("id", convId);
     }
+
+    return convId;
   } catch (err) {
     console.error("saveToInbox error:", err);
   }
@@ -135,38 +146,68 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Parse incoming message
     const msg = parseWebhook(body);
-    if (!msg || !msg.text) {
+    if (!msg) {
       return NextResponse.json({ received: true });
     }
 
-    // Process through new engine
-    const response = await handleWhatsAppMessage(msg);
+    const isMedia = ["image", "document", "audio", "video"].includes(msg.type);
+    const hasText = !!(msg.text && msg.text.trim());
 
-    // Send reply via WhatsApp (if there's a response)
+    // Skip completely empty messages
+    if (!hasText && !isMedia) {
+      return NextResponse.json({ received: true });
+    }
+
+    // For text/button messages or media with caption, process through bot
+    let response = { text: "" } as { text: string; quickReplies?: string[] };
+    if (hasText) {
+      response = await handleWhatsAppMessage(msg);
+    } else if (isMedia) {
+      // Media without caption — acknowledge receipt
+      const { getTemplate } = await import("@/lib/bot/templates");
+      response.text = await getTemplate("media_received", "ar") ||
+        "شكراً على الرسالة! 📎 كيف بقدر أساعدك؟";
+    }
+
     if (response.text) {
       await sendBotResponse(msg.from, response);
     }
 
-    // Save to inbox tables (customer message + bot reply)
+    // Save to inbox (with media info if applicable)
+    const mediaInfo = isMedia ? {
+      type: msg.type as "image" | "document" | "audio" | "video",
+      url: msg.mediaUrl,
+      filename: msg.mediaFilename,
+      mimeType: msg.mediaMimeType,
+    } : undefined;
+
     await saveToInbox(
       msg.from,
       msg.name,
-      msg.text,
+      msg.text || "",
       msg.messageId,
       response.text || null,
+      mediaInfo,
     );
 
+    // Notify admin for new conversations or high-priority messages
+    const { notifyAdminNewMessage } = await import("@/lib/bot/admin-notify");
+    await notifyAdminNewMessage({
+      phone: msg.from,
+      name: msg.name || "",
+      preview: msg.text || (isMedia ? `[${msg.type}]` : ""),
+      isMedia,
+    }).catch(() => {});
+
     // Legacy log
-    if (response.text) {
-      await logBotInteraction("whatsapp", msg.from, msg.text, response.text, "processed");
+    if (hasText && response.text) {
+      await logBotInteraction("whatsapp", msg.from, msg.text || "", response.text, "processed");
     }
 
     return NextResponse.json({ received: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Webhook error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Webhook error:", err instanceof Error ? err.message : "Unknown error");
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

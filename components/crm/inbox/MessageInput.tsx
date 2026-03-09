@@ -16,12 +16,14 @@ interface Props {
     content?: string;
     template_name?: string;
     template_params?: Record<string, string>;
+    media_url?: string;
+    media_filename?: string;
   }) => Promise<void>;
   templates: InboxTemplate[];
   quickReplies: InboxQuickReply[];
   disabled?: boolean;
   disabledReason?: string;
-  outsideWindow?: boolean; // 24h window expired
+  outsideWindow?: boolean;
 }
 
 export function MessageInput({
@@ -40,7 +42,9 @@ export function MessageInput({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggested, setAiSuggested] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [uploading, setUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* Auto-grow textarea */
   useEffect(() => {
@@ -117,7 +121,9 @@ export function MessageInput({
       const res = await fetch(`/api/crm/inbox/${conversationId}/suggest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          context: text.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (data.success && data.suggestion) {
@@ -141,6 +147,45 @@ export function MessageInput({
     setAiSuggested(false);
     textareaRef.current?.focus();
   };
+
+  /* File upload handler */
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || uploading) return;
+    // Reset input so same file can be selected again
+    e.target.value = "";
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/crm/inbox/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        setAiError(data.error || "فشل رفع الملف");
+        setTimeout(() => setAiError(""), 3000);
+        setUploading(false);
+        return;
+      }
+
+      await onSend({
+        type: data.type,
+        content: text.trim() || undefined,
+        media_url: data.url,
+        media_filename: data.filename,
+      });
+      setText("");
+    } catch {
+      setAiError("فشل رفع الملف — حاول مجدداً");
+      setTimeout(() => setAiError(""), 3000);
+    }
+    setUploading(false);
+  }, [uploading, onSend, text]);
 
   /* Disabled state */
   if (disabled) {
@@ -202,8 +247,29 @@ export function MessageInput({
 
       {/* Input area */}
       <div className="flex items-end gap-2 p-3">
-        {/* Toolbar: quick reply, template, AI */}
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.xls,.xlsx"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Toolbar: attachment, quick reply, template, AI */}
         <div className="flex gap-1">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || outsideWindow}
+            className="p-2 rounded-lg text-muted hover:text-white hover:bg-surface-elevated transition-colors disabled:opacity-50"
+            title="إرفاق صورة أو مستند"
+          >
+            {uploading ? (
+              <span className="animate-spin text-sm">⏳</span>
+            ) : (
+              <span className="text-sm">📎</span>
+            )}
+          </button>
           <button
             onClick={() => {
               setShowQuick(!showQuick);

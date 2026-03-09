@@ -15,7 +15,6 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // TODO: Replace with actual Supabase auth when connected
       const { signIn } = await import("@/lib/auth");
       await signIn(email, password);
       const params = new URLSearchParams(window.location.search);
