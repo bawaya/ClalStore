@@ -35,8 +35,18 @@ type Summary = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  PDF Parsing Helpers                                                */
+/*  File Parsing Helpers                                               */
 /* ------------------------------------------------------------------ */
+
+function isSpreadsheetFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".csv");
+}
+
+function isSupportedPriceFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".pdf") || isSpreadsheetFile(file);
+}
 
 async function extractPdfText(file: File): Promise<string> {
   const pdfjsLib = await import("pdfjs-dist");
@@ -80,6 +90,36 @@ async function extractPdfText(file: File): Promise<string> {
     .join("\n");
 }
 
+async function extractSpreadsheetText(file: File): Promise<string> {
+  const XLSX = await import("xlsx");
+  const buf = await file.arrayBuffer();
+  const workbook = XLSX.read(buf, { type: "array" });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return "";
+
+  const sheet = workbook.Sheets[firstSheetName];
+  const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(sheet, {
+    header: 1,
+    raw: false,
+    blankrows: false,
+    defval: "",
+  });
+
+  return rows
+    .map((row) =>
+      row
+        .map((cell) => String(cell ?? "").replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join(" | ")
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function extractFileText(file: File): Promise<string> {
+  return isSpreadsheetFile(file) ? extractSpreadsheetText(file) : extractPdfText(file);
+}
+
 /* ------------------------------------------------------------------ */
 
 export default function PricesPage() {
@@ -104,8 +144,8 @@ export default function PricesPage() {
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (!file.name.endsWith(".pdf")) {
-        show("يرجى رفع ملف PDF", "error");
+      if (!isSupportedPriceFile(file)) {
+        show("يرجى رفع ملف Excel أو CSV أو PDF", "error");
         return;
       }
       setFileName(file.name);
@@ -113,19 +153,19 @@ export default function PricesPage() {
       setErrorMsg(null);
 
       try {
-        const pdfText = await extractPdfText(file);
-        if (!pdfText) {
+        const extractedText = await extractFileText(file);
+        if (!extractedText) {
           show("لم يتم العثور على نص في الملف", "error");
           setParsing(false);
           return;
         }
-        show("تم استخراج النص، جاري التحليل بالذكاء الاصطناعي...", "success");
+        show("تم استخراج البيانات، جاري التحليل والمطابقة...", "success");
 
         setMatching(true);
         const res = await fetch("/api/admin/prices/match", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pdfText }),
+          body: JSON.stringify({ pdfText: extractedText }),
         });
         const json = await res.json();
         if (json.error) {
@@ -243,7 +283,7 @@ export default function PricesPage() {
 
   return (
     <div style={{ padding: pad }}>
-      <PageHeader title="تحديث الأسعار من ملف PDF" />
+      <PageHeader title="تحديث الأسعار من ملف" />
 
       <div className="fixed top-4 left-4 z-[200] flex flex-col gap-2">
         {toasts.map((t) => (
@@ -281,7 +321,7 @@ export default function PricesPage() {
             <input
               ref={fileRef}
               type="file"
-              accept=".pdf"
+              accept=".xlsx,.xls,.csv,.pdf"
               className="hidden"
               onChange={onFileInput}
             />
@@ -299,7 +339,7 @@ export default function PricesPage() {
                   {"اسحب ملف الأسعار هنا أو اضغط للاختيار"}
                 </p>
                 <p className="text-muted text-sm">
-                  {"ملف PDF يحتوي على جدول الأسعار — سيتم احتساب ضريبة 18% تلقائياً"}
+                  {"يدعم Excel و CSV و PDF — سيتم احتساب ضريبة 18% تلقائياً"}
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-6 text-muted text-xs">
                   <span>📊 استخراج عمود 1-18 دفعة</span>
@@ -323,7 +363,7 @@ export default function PricesPage() {
           <div className="mt-6 card p-5">
             <h3 className="font-bold mb-3 text-sm">{"كيف يعمل؟"}</h3>
             <ol className="text-muted text-xs space-y-2 list-decimal list-inside">
-              <li>{"ارفع ملف PDF المحتوي على جدول الأسعار (بدون ضريبة)"}</li>
+              <li>{"ارفع ملف Excel أو CSV أو PDF المحتوي على جدول الأسعار (بدون ضريبة)"}</li>
               <li>{"النظام يستخرج عمود الأسعار (1-18 دفعة) من الجدول"}</li>
               <li>{"يضيف ضريبة 18% على كل سعر"}</li>
               <li>{"يطابق الأجهزة تلقائياً مع المنتجات في المتجر"}</li>
@@ -373,10 +413,10 @@ export default function PricesPage() {
               <thead>
                 <tr className="bg-surface-card border-b border-surface-border">
                   <th className="p-2.5 w-8"></th>
-                  <th className="p-2.5 font-bold text-muted">{"الجهاز (PDF)"}</th>
+                  <th className="p-2.5 font-bold text-muted">{"الجهاز (الملف)"}</th>
                   <th className="p-2.5 font-bold text-muted">{"السعة"}</th>
                   <th className="p-2.5 font-bold text-muted">
-                    {"سعر PDF"}
+                    {"سعر الملف"}
                     <span className="text-[10px] block text-dim">{"بدون ضريبة"}</span>
                   </th>
                   <th className="p-2.5 font-bold text-muted">
