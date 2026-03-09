@@ -1,4 +1,4 @@
-﻿export const runtime = 'edge';
+export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase';
@@ -13,10 +13,26 @@ type AiParsedRow = {
   productId: string | null;
   variantStorage: string | null;
   confidence: 'exact' | 'fuzzy' | 'none';
+  brand: string;
 };
 
 const OPENAI_API = 'https://api.openai.com/v1/chat/completions';
 const MODEL = 'gpt-4o-mini';
+
+function inferBrand(brandRaw: string, deviceName: string): string {
+  if (brandRaw?.trim()) return brandRaw.trim();
+  const n = (deviceName || '').toLowerCase();
+  if (/iphone|ipad|mac|apple watch/i.test(n)) return 'Apple';
+  if (/galaxy|z flip|z fold|samsung|a\d|s\d/i.test(n)) return 'Samsung';
+  if (/xiaomi|redmi|poco/i.test(n)) return 'Xiaomi';
+  if (/google|pixel/i.test(n)) return 'Google';
+  if (/oppo|realme|oneplus/i.test(n)) return 'Oppo';
+  if (/honor|huawei/i.test(n)) return 'Honor';
+  if (/motorola|moto/i.test(n)) return 'Motorola';
+  if (/nokia/i.test(n)) return 'Nokia';
+  if (/sony|xperia/i.test(n)) return 'Sony';
+  return 'Other';
+}
 
 export async function POST(req: NextRequest) {
   const steps: string[] = [];
@@ -67,19 +83,19 @@ export async function POST(req: NextRequest) {
       'Translate Hebrew device names to English when possible.',
       'Match by brand + model + storage.',
       'SKIP headers, totals, notes, and non-device lines.',
-      'Compute priceWithVat = Math.round(price * 1.18).',
-      'Compute monthlyWithVat = Math.round(monthlyPrice * 1.18) where monthlyPrice is the 36-month column value.',
-      'If no 36-month column exists, set monthlyWithVat to 0.',
+      'Output price and monthlyPrice as the raw values (BEFORE VAT) from the PDF.',
+      'If no 36-month column exists, set monthlyPrice to 0.',
       'Return ONE LINE per detected device in this exact pipe-separated format:',
-      'deviceName || storage || price || priceWithVat || monthlyWithVat || productId || variantStorage || confidence',
+      'deviceName || storage || price || monthlyPrice || productId || variantStorage || confidence || brand',
       'Rules for empty values:',
       '- If no product match, leave productId empty',
       '- If no variant match, leave variantStorage empty',
-      '- If no 36-month price, use 0 for monthlyWithVat',
+      '- If no 36-month price, use 0 for monthlyPrice',
       '- confidence must be exact or fuzzy or none',
+      '- brand: always extract (Apple, Samsung, Xiaomi, etc.) from device name for creating new products',
       'Return ONLY data lines. No JSON. No markdown. No numbering. No explanation.',
       'Example:',
-      'iPhone 16 Pro Max || 256GB || 4200 || 4956 || 150 || prod_123 || 256GB || exact',
+      'iPhone 16 Pro Max || 256GB || 4200 || 127 || prod_123 || 256GB || exact || Apple',
     ].join('\n');
 
     const userMsg = 'CATALOG:\n' + JSON.stringify(productList) + '\n\nPDF:\n' + pdfText;
@@ -150,29 +166,32 @@ export async function POST(req: NextRequest) {
             deviceName = '',
             storage = '',
             priceText = '',
-            priceWithVatText = '',
             monthlyPriceText = '',
             productIdRaw = '',
             variantStorageRaw = '',
             confidenceRaw = 'none',
+            brandRaw = '',
           ] = parts;
 
           const price = Number(priceText.replace(/[^\d.]/g, ''));
-          const priceWithVat = Number(priceWithVatText.replace(/[^\d.]/g, ''));
-          const monthlyPrice = Number(monthlyPriceText.replace(/[^\d.]/g, ''));
+          const monthlyRaw = Number(monthlyPriceText.replace(/[^\d.]/g, ''));
           const confidence = /^(exact|fuzzy|none)$/i.test(confidenceRaw)
             ? confidenceRaw.toLowerCase()
             : 'none';
+          const brand = inferBrand(brandRaw, deviceName);
+          const priceWithVat = Number.isFinite(price) ? Math.round(price * 1.18) : 0;
+          const monthlyPrice = Number.isFinite(monthlyRaw) ? Math.round(monthlyRaw * 1.18) : 0;
 
           return {
             deviceName,
             storage,
             price: Number.isFinite(price) ? price : 0,
-            priceWithVat: Number.isFinite(priceWithVat) ? priceWithVat : 0,
-            monthlyPrice: Number.isFinite(monthlyPrice) ? monthlyPrice : 0,
+            priceWithVat,
+            monthlyPrice,
             productId: productIdRaw || null,
             variantStorage: variantStorageRaw || null,
             confidence: confidence as AiParsedRow['confidence'],
+            brand,
           };
         })
         .filter((row: AiParsedRow) => row.deviceName && row.price > 0);
@@ -183,16 +202,69 @@ export async function POST(req: NextRequest) {
     steps.push('parsed=' + parsed.length);
 
     const productMap = new Map((products as Product[]).map((p) => [p.id, p]));
+    const productListArr = products as Product[];
+
+    /** مطابقة محلية عند فشل OpenAI — تطابق brand + model + storage */
+    const fallbackMatch = (row: AiParsedRow): { productId: string | null; variantStorage: string | null } => {
+      const norm = (s: string) => (s || '').toUpperCase().replace(/\s/g, '');
+      const normStorage = (s: string) => norm(String(s || '').replace(/[^\dGBT]/gi, ''));
+      const baseModel = (name: string) => name.replace(/\s*(?:128|256|512|64|32|1)\s*(?:GB|TB)\s*$/i, '').trim();
+      const toCompare = (s: string) => (s || '').toLowerCase()
+        .replace(/آيفون|ايفون/g, 'iphone').replace(/جالكسي|جالاكسي/g, 'galaxy')
+        .replace(/^(samsung\s+)?galaxy\s+/i, '').replace(/\s*5g\s*/gi, ' ').replace(/\s+/g, ' ');
+
+      const rowBrand = (row.brand || inferBrand('', row.deviceName)).toLowerCase();
+      const rowStorage = normStorage(row.storage || '');
+      const rowModel = baseModel(row.deviceName || '');
+      const rowCompare = toCompare(rowModel);
+
+      let best: { productId: string; variantStorage: string; score: number } | null = null;
+
+      for (const p of productListArr) {
+        const pBrand = (p.brand || '').toLowerCase();
+        if (pBrand !== rowBrand) continue;
+
+        const pCompare = toCompare(p.name_en || p.name_ar || '');
+
+        const modelMatch = pCompare.includes(rowCompare) || rowCompare.includes(pCompare) ||
+          norm(pCompare) === norm(rowCompare) ||
+          (rowCompare.match(/\d+/) && pCompare.match(/\d+/) && rowCompare.match(/\d+/)?.[0] === pCompare.match(/\d+/)?.[0]);
+
+        if (!modelMatch) continue;
+
+        const variants = p.variants || [];
+        const storages = [...new Set([...(p.storage_options || []), ...variants.map((v: any) => v.storage).filter(Boolean)])];
+
+        for (const st of storages) {
+          if (!st) continue;
+          if (normStorage(st) === rowStorage || norm(st) === rowStorage) {
+            const score = pCompare === rowCompare ? 1 : 0.8;
+            if (!best || score > best.score) {
+              best = { productId: p.id, variantStorage: st, score };
+            }
+          }
+        }
+      }
+      return best ? { productId: best.productId, variantStorage: best.variantStorage } : { productId: null, variantStorage: null };
+    };
 
     const results = parsed.map((row) => {
-      const product = row.productId ? productMap.get(row.productId) : null;
+      let productId = row.productId;
+      let variantStorage = row.variantStorage;
+      if (!productId) {
+        const fb = fallbackMatch(row);
+        productId = fb.productId;
+        variantStorage = fb.variantStorage;
+      }
+      const product = productId ? productMap.get(productId) : null;
       const variant = product?.variants?.find(
-        (v) => v.storage?.toUpperCase().replace(/\s/g, '') === (row.variantStorage || '').toUpperCase().replace(/\s/g, '')
+        (v) => v.storage?.toUpperCase().replace(/\s/g, '') === (variantStorage || '').toUpperCase().replace(/\s/g, '')
       );
 
       return {
         pdfDeviceName: row.deviceName,
         pdfStorage: row.storage || '',
+        pdfBrand: row.brand || 'Other',
         pdfPriceRaw: row.price,
         priceWithVat: row.priceWithVat,
         monthlyPrice: row.monthlyPrice || 0,

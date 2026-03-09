@@ -46,12 +46,6 @@ export async function sendWhatsAppText(to: string, text: string, fromOverride?: 
   const phone = normalizePhone(to);
   const headers = await getHeaders();
   const from = fromOverride || await getFromPhone();
-
-  if (!from) {
-    console.error("[WA Text] No 'from' phone — check WHATSAPP_PHONE_ID env var");
-    throw new Error("WHATSAPP_PHONE_ID not configured");
-  }
-
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
     method: "POST",
     headers,
@@ -65,11 +59,10 @@ export async function sendWhatsAppText(to: string, text: string, fromOverride?: 
 
   if (!res.ok) {
     const err = await res.text();
-    console.error(`[WA Text] to ${phone} from ${from} failed (${res.status}):`, err);
+    console.error("yCloud send error:", err);
     throw new Error(`yCloud error: ${res.status}`);
   }
 
-  console.log(`[WA Text] to ${phone} sent OK`);
   return res.json();
 }
 
@@ -119,38 +112,27 @@ export async function sendWhatsAppTemplate(
   const phone = normalizePhone(to);
   const headers = await getHeaders();
   const from = await getFromPhone();
-
-  const payload = {
-    from,
-    to: phone,
-    type: "template",
-    template: {
-      name: templateName,
-      language: { code: "ar" },
-      components: [
-        {
-          type: "body",
-          parameters: params.map((p) => ({ type: "text", text: p })),
-        },
-      ],
-    },
-  };
-
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      from,
+      to: phone,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "ar" },
+        components: [
+          {
+            type: "body",
+            parameters: params.map((p) => ({ type: "text", text: p })),
+          },
+        ],
+      },
+    }),
   });
 
-  const data = await res.json();
-
-  if (!res.ok) {
-    console.error(`[WA Template] ${templateName} to ${phone} failed:`, JSON.stringify(data));
-    throw new Error(`yCloud template error: ${res.status} — ${data?.error?.message || "unknown"}`);
-  }
-
-  console.log(`[WA Template] ${templateName} to ${phone} sent OK`);
-  return data;
+  return res.json();
 }
 
 // ===== Send Image Message =====
@@ -339,6 +321,7 @@ export async function handleWhatsAppMessage(incoming: WhatsAppIncoming): Promise
     customerPhone: incoming.from,
     customerName: incoming.name,
     source: "whatsapp",
+    mediaType: incoming.type !== "text" && incoming.type !== "button" ? incoming.type : undefined,
   });
 
   return response;

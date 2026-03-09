@@ -32,12 +32,12 @@ const config: Config = {
           cyan: "#06b6d4",
           pink: "#ec4899",
         },
-        muted: "#a1a1aa",
-        dim: "#71717a",
+        muted: "#71717a",
+        dim: "#3f3f46",
       },
       fontFamily: {
         arabic: ["Tajawal", "sans-serif"],
-        hebrew: ["Rubik", "Heebo", "sans-serif"],
+        hebrew: ["David Libre", "Heebo", "serif"],
       },
       borderRadius: {
         card: "14px",

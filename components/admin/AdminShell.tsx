@@ -9,7 +9,6 @@ import { Logo } from "@/components/shared/Logo";
 const NAV_ITEMS = [
   { key: "dashboard", href: "/admin", icon: "📊", label: "داشبورد" },
   { key: "products", href: "/admin/products", icon: "📱", label: "المنتجات" },
-  { key: "prices", href: "/admin/prices", icon: "💰", label: "تحديث الأسعار" },
   { key: "coupons", href: "/admin/coupons", icon: "🏷️", label: "كوبونات" },
   { key: "heroes", href: "/admin/heroes", icon: "🖼️", label: "بنرات" },
   { key: "deals", href: "/admin/deals", icon: "🔥", label: "العروض" },
@@ -17,7 +16,6 @@ const NAV_ITEMS = [
   { key: "lines", href: "/admin/lines", icon: "📡", label: "باقات" },
   { key: "push", href: "/admin/push", icon: "🔔", label: "إشعارات" },
   { key: "bot", href: "/admin/bot", icon: "🤖", label: "البوت" },
-  { key: "analytics", href: "/admin/analytics", icon: "📈", label: "التحليلات" },
   { key: "homepage", href: "/admin/homepage", icon: "🏠", label: "الصفحة الرئيسية" },
   { key: "website", href: "/admin/website", icon: "🌐", label: "محتوى الموقع" },
   { key: "features", href: "/admin/features", icon: "🎛️", label: "الميزات" },

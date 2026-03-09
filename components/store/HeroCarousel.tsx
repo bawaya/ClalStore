@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import type { Hero } from "@/types/database";
@@ -48,9 +47,7 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
       {h.image_url && (
         <img
           src={h.image_url}
-          alt={title}
-          loading="eager"
-          decoding="async"
+          alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-20 rounded-[inherit]"
         />
       )}
@@ -73,15 +70,6 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
             style={{
               padding: scr.mobile ? "10px 28px" : "12px 36px",
               fontSize: scr.mobile ? 12 : 14,
-            }}
-            onClick={() => {
-              const url = h.link_url?.trim();
-              if (url) {
-                if (url.startsWith("http")) window.open(url, "_blank");
-                else window.location.href = url;
-              } else {
-                window.location.href = "/store";
-              }
             }}
           >
             {ctaText}

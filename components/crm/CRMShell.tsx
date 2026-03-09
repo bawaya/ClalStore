@@ -14,7 +14,6 @@ const NAV = [
   { key: "pipeline", href: "/crm/pipeline", icon: "🎯", label: "Pipeline" },
   { key: "tasks", href: "/crm/tasks", icon: "✅", label: "المهام" },
   { key: "chats", href: "/crm/chats", icon: "💬", label: "المحادثات" },
-  { key: "reports", href: "/crm/reports", icon: "📋", label: "التقارير" },
   { key: "users", href: "/crm/users", icon: "🔑", label: "الفريق" },
 ];
 

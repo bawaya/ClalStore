@@ -6,6 +6,48 @@
 import { createServerSupabase } from "@/lib/supabase";
 import type { Product, Hero, LinePlan, Coupon, Category, WebsiteContent } from "@/types/database";
 
+/** ترتيب: آيفون أولاً، جلاكسي ثانياً، ثم بريميوم → متوسط → اقتصادي */
+export function sortProductsByBrandAndTier(products: Product[]): Product[] {
+  const getPriceTier = (p: Product): number => {
+    const price = p.price || 0;
+    if (price >= 3500) return 0; // بريميوم
+    if (price >= 1500) return 1;  // متوسط
+    return 2;                     // اقتصادي
+  };
+  const getBrandOrder = (p: Product): number => {
+    const br = (p.brand || "").toLowerCase();
+    if (br === "apple") return 0;
+    if (br === "samsung") return 1;
+    return 2;
+  };
+  const getModelGen = (p: Product): number => {
+    const name = ((p.name_ar || "") + " " + (p.name_he || "")).toLowerCase();
+    const nums = name.match(/(?:iphone|آيفون|galaxy|جالكسي|s|a|z\s*(?:fold|flip|فولد|فليب))\s*(\d+)/gi);
+    if (nums) {
+      const extracted = nums.map((m) => { const d = m.match(/(\d+)/); return d ? parseInt(d[1]) : 0; });
+      return Math.max(...extracted);
+    }
+    const yearMatch = name.match(/20(\d{2})/);
+    if (yearMatch) return parseInt(yearMatch[1]);
+    const anyNum = name.match(/(\d+)/);
+    return anyNum ? parseInt(anyNum[1]) : 0;
+  };
+  return [...products].sort((a, b) => {
+    const hasImgA = a.image_url ? 1 : 0;
+    const hasImgB = b.image_url ? 1 : 0;
+    if (hasImgA !== hasImgB) return hasImgB - hasImgA;
+    const bo = getBrandOrder(a) - getBrandOrder(b);
+    if (bo !== 0) return bo;
+    const ta = getPriceTier(a), tb = getPriceTier(b);
+    if (ta !== tb) return ta - tb;
+    if (a.price !== b.price) return b.price - a.price;
+    const genA = getModelGen(a), genB = getModelGen(b);
+    if (genA !== genB) return genB - genA;
+    if (a.featured !== b.featured) return a.featured ? -1 : 1;
+    return (b.sold || 0) - (a.sold || 0);
+  });
+}
+
 // ===== Products =====
 export async function getProducts(options?: {
   type?: "device" | "accessory";
@@ -32,7 +74,8 @@ export async function getProducts(options?: {
     console.error("Error fetching products:", error);
     return [];
   }
-  return (data as Product[]) || [];
+  const list = (data as Product[]) || [];
+  return sortProductsByBrandAndTier(list);
 }
 
 export async function getProduct(id: string): Promise<Product | null> {

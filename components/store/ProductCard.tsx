@@ -343,12 +343,14 @@ export function ProductCard({ product: p }: { product: Product }) {
             </span>
           )}
         </div>
-        {activeVariant?.monthly_price ? (
-          <div className="mb-2" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-            <span className="text-[#a78bfa] font-bold">₪{activeVariant.monthly_price.toLocaleString()} × 36</span>
-            <span className="text-[#a1a1aa] mr-1" style={{ fontSize: scr.mobile ? 8 : 10 }}>شهري</span>
+        {p.type === "device" && displayPrice > 0 && (
+          <div className="mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+            <span className="text-[#a78bfa] font-semibold">
+              ₪{(activeVariant?.monthly_price ?? Math.ceil(displayPrice / 36)).toLocaleString()} × 36
+            </span>
+            <span className="text-[#a1a1aa] mr-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>شهري</span>
           </div>
-        ) : <div className="mb-2" />}
+        )}
 
         {/* ── Stock indicator ── */}
         {(() => {

@@ -206,12 +206,14 @@ export function ProductDetailClient({
                 </>
               )}
             </div>
-            {activeVariant?.monthly_price ? (
+            {p.type === "device" && displayPrice > 0 && (
               <div className="mb-4" style={{ fontSize: scr.mobile ? 12 : 14 }}>
-                <span className="text-[#a78bfa] font-bold">₪{activeVariant.monthly_price.toLocaleString()} × 36</span>
+                <span className="text-[#a78bfa] font-bold">
+                  ₪{(activeVariant?.monthly_price ?? Math.ceil(displayPrice / 36)).toLocaleString()} × 36
+                </span>
                 <span className="text-muted mr-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>قسط شهري</span>
               </div>
-            ) : <div className="mb-4" />}
+            )}
 
             {/* Type info */}
             {p.type === "device" && (

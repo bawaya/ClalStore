@@ -6,38 +6,21 @@ import { getCRMOrders, updateOrderStatus, addOrderNote, assignOrder } from "@/li
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const dateFrom = searchParams.get("dateFrom") || undefined;
-    const dateTo = searchParams.get("dateTo") || undefined;
-    const amountMin = searchParams.get("amountMin");
-    const amountMax = searchParams.get("amountMax");
     const filters = {
       status: searchParams.get("status") || undefined,
       source: searchParams.get("source") || undefined,
       search: searchParams.get("search") || undefined,
-      dateFrom,
-      dateTo,
-      amountMin: amountMin != null ? parseFloat(amountMin) : undefined,
-      amountMax: amountMax != null ? parseFloat(amountMax) : undefined,
     };
     const data = await getCRMOrders(filters);
     return NextResponse.json({ data });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    if (body.ids && body.status) {
-      const { ids, status } = body;
-      if (Array.isArray(ids) && ids.length > 0 && status) {
-        for (const orderId of ids) {
-          await updateOrderStatus(orderId, status, body.userName || "مدير");
-        }
-        return NextResponse.json({ success: true });
-      }
-    }
     if (body.action === "status") {
       await updateOrderStatus(body.orderId, body.status, body.userName || "مدير");
       // WhatsApp notification for status change
@@ -78,6 +61,6 @@ export async function PUT(req: NextRequest) {
     }
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

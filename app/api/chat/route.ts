@@ -6,7 +6,6 @@ export const runtime = 'edge';
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { BUSINESS } from "@/lib/constants";
 import { handleWebChatMessage, formatWebChatResponse } from "@/lib/bot/webchat";
 import { logBotInteraction } from "@/lib/bot/engine";
 
@@ -29,7 +28,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     console.error("Chat API error:", err);
     return NextResponse.json(
-      { text: `عذراً حصل خطأ. حاول مرة ثانية أو تواصل معنا:\n📞 ${BUSINESS.phone}`, quickReplies: [], escalate: false },
+      { text: "عذراً حصل خطأ. حاول مرة ثانية أو تواصل معنا:\n📞 053-3337653", quickReplies: [], escalate: false },
       { status: 200 }
     );
   }

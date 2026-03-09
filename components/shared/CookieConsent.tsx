@@ -25,12 +25,6 @@ export function CookieConsent() {
   const accept = () => {
     localStorage.setItem(COOKIE_KEY, "accepted");
     setVisible(false);
-    window.location.reload();
-  };
-
-  const decline = () => {
-    localStorage.setItem(COOKIE_KEY, "declined");
-    setVisible(false);
   };
 
   if (!visible) return null;
@@ -61,28 +55,16 @@ export function CookieConsent() {
             </Link>
           </p>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
-          <button
-            onClick={decline}
-            className="btn-outline whitespace-nowrap"
-            style={{
-              fontSize: scr.mobile ? 11 : 13,
-              padding: scr.mobile ? "8px 16px" : "10px 20px",
-            }}
-          >
-            {t("cookie.decline")}
-          </button>
-          <button
-            onClick={accept}
-            className="btn-primary whitespace-nowrap"
-            style={{
-              fontSize: scr.mobile ? 12 : 14,
-              padding: scr.mobile ? "8px 20px" : "10px 28px",
-            }}
-          >
-            {t("cookie.accept")}
-          </button>
-        </div>
+        <button
+          onClick={accept}
+          className="btn-primary whitespace-nowrap flex-shrink-0"
+          style={{
+            fontSize: scr.mobile ? 12 : 14,
+            padding: scr.mobile ? "8px 20px" : "10px 28px",
+          }}
+        >
+          {t("cookie.accept")}
+        </button>
       </div>
     </div>
   );

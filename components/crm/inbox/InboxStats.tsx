@@ -16,13 +16,12 @@ export function InboxStatsBar({ stats }: Props) {
   const items = [
     { label: "نشطة", value: stats.active, color: "bg-green-500" },
     { label: "بانتظار", value: stats.waiting, color: "bg-yellow-500" },
-    { label: "تحتاج متابعة", value: stats.pending_followup ?? 0, color: "bg-orange-500" },
     { label: "بوت", value: stats.bot, color: "bg-blue-500" },
     { label: "محلولة اليوم", value: stats.resolved_today, color: "bg-gray-500" },
   ];
 
   return (
-    <div className="grid grid-cols-5 gap-1.5 px-3 py-2">
+    <div className="grid grid-cols-4 gap-1.5 px-3 py-2">
       {items.map((item) => (
         <div key={item.label} className="text-center">
           <div className="flex items-center justify-center gap-1">

@@ -22,18 +22,6 @@ export function formatCurrencyCompact(amount: number): string {
   return `₪${amount}`;
 }
 
-export function getMonthlyInstallment(price: number, months = 36): number {
-  if (price <= 0 || months <= 0) return 0;
-  return Math.ceil(price / months);
-}
-
-export function getInstallmentMarketingText(price: number, lang: Lang, months = 36): string {
-  const monthly = getMonthlyInstallment(price, months);
-  if (!monthly) return "";
-  if (lang === "he") return `או רק ₪${monthly.toLocaleString()} לחודש עד ${months} תשלומים`;
-  return `أو فقط ₪${monthly.toLocaleString()} بالشهر حتى ${months} دفعة`;
-}
-
 // ===== Date formatters =====
 export function formatDate(date: string | Date): string {
   const d = typeof date === "string" ? new Date(date) : date;
@@ -56,8 +44,7 @@ export function formatDateTime(date: string | Date): string {
   return `${formatDate(date)} ${formatTime(date)}`;
 }
 
-export function timeAgo(date: string | Date | null | undefined): string {
-  if (!date) return "";
+export function timeAgo(date: string | Date): string {
   const d = typeof date === "string" ? new Date(date) : date;
   const diff = Date.now() - d.getTime();
   const mins = Math.floor(diff / 60000);

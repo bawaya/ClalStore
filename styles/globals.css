@@ -2,26 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=Rubik:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=David+Libre:wght@400;500;700&family=Heebo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap");
 
 @layer base {
-  :root {
-    --color-brand: #c41040;
-    --color-brand-light: #ff3366;
-    --color-brand-dark: #8b0a2e;
-    --color-brand-soft: rgba(196, 16, 64, 0.08);
-    --color-bg: #09090b;
-    --color-card: #111114;
-    --color-elevated: #18181b;
-    --color-border: #27272a;
-    --color-text: #fafafa;
-    --color-muted: #a1a1aa;
-    --color-dim: #71717a;
-    --radius-card: 14px;
-    --radius-button: 10px;
-    --radius-chip: 8px;
-  }
-
   * {
     box-sizing: border-box;
     margin: 0;
@@ -37,8 +20,8 @@
     font-family: "Tajawal", "Heebo", sans-serif;
     font-size: 15px;
     line-height: 1.6;
-    background: var(--color-bg);
-    color: var(--color-text);
+    background: #09090b;
+    color: #fafafa;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -47,7 +30,7 @@
   /* Hebrew override */
   [lang="he"] body,
   [dir="ltr"] body {
-    font-family: "Rubik", "Heebo", "Tajawal", sans-serif;
+    font-family: "David Libre", "Heebo", "Tajawal", serif;
   }
 
   /* Scrollbar */
@@ -56,14 +39,14 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: var(--color-bg);
+    background: #09090b;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+    background: #27272a;
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-dim);
+    background: #3f3f46;
   }
 
   /* Inputs */
@@ -77,78 +60,67 @@
   select:focus,
   textarea:focus {
     outline: none;
-    border-color: var(--color-brand) !important;
+    border-color: #c41040 !important;
   }
 
   /* Selection */
   ::selection {
     background: rgba(196, 16, 64, 0.3);
-    color: var(--color-text);
+    color: #fafafa;
   }
 }
 
 @layer components {
+  /* Shared card style */
   .card {
-    @apply rounded-[14px] border;
-    background: var(--color-card);
-    border-color: var(--color-border);
+    @apply bg-[#111114] rounded-[14px] border border-[#27272a];
   }
 
+  /* Shared input style */
   .input {
-    @apply w-full rounded-[10px] outline-none px-3 py-2.5 text-sm;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    color: var(--color-text);
-  }
-  .input:focus {
-    border-color: var(--color-brand);
+    @apply w-full bg-[#09090b] border border-[#27272a] rounded-[10px] text-[#fafafa] outline-none;
+    @apply px-3 py-2.5 text-sm;
+    @apply focus:border-[#c41040];
   }
 
+  /* Shared button styles */
   .btn-primary {
-    @apply px-5 py-2.5 rounded-[10px] border-none text-white font-bold cursor-pointer transition-colors;
-    background: var(--color-brand);
-  }
-  .btn-primary:hover {
-    background: var(--color-brand-dark);
+    @apply px-5 py-2.5 rounded-[10px] border-none bg-[#c41040] text-white font-bold cursor-pointer;
+    @apply hover:bg-[#a30d35] transition-colors;
   }
 
   .btn-outline {
-    @apply px-5 py-2.5 rounded-[10px] bg-transparent font-bold cursor-pointer transition-colors;
-    border: 1px solid var(--color-border);
-    color: var(--color-text);
-  }
-  .btn-outline:hover {
-    background: var(--color-elevated);
+    @apply px-5 py-2.5 rounded-[10px] border border-[#27272a] bg-transparent text-[#fafafa] font-bold cursor-pointer;
+    @apply hover:bg-[#18181b] transition-colors;
   }
 
+  /* Badge */
   .badge {
     @apply px-2.5 py-1 rounded-md font-bold whitespace-nowrap;
     font-size: 12px;
   }
 
+  /* Chip */
   .chip {
-    @apply px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer bg-transparent transition-colors;
-    border: 1px solid var(--color-border);
-    color: var(--color-muted);
-  }
-  .chip:hover {
-    background: var(--color-elevated);
+    @apply px-3 py-1.5 rounded-lg border border-[#27272a] text-xs font-semibold cursor-pointer bg-transparent text-[#71717a];
+    @apply hover:bg-[#18181b] transition-colors;
   }
 
   .chip-active {
-    background: var(--color-brand-soft);
-    color: var(--color-brand);
-    border-color: var(--color-brand);
+    @apply bg-[rgba(196,16,64,0.08)] text-[#c41040] border-[#c41040];
   }
 }
 
 @layer utilities {
+  /* RTL-aware margin/padding */
   .ms-auto {
     margin-inline-start: auto;
   }
   .me-auto {
     margin-inline-end: auto;
   }
+
+  /* Text utilities */
   .text-balance {
     text-wrap: balance;
   }

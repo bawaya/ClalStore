@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/admin/shared";
 type MatchResult = {
   pdfDeviceName: string;
   pdfStorage: string;
+  pdfBrand?: string;
   pdfPriceRaw: number;
   priceWithVat: number;
   monthlyPrice: number;
@@ -27,6 +28,11 @@ type MatchResult = {
   newPrice: number;
   matchScore: number;
 };
+
+/** Strip storage suffix (e.g. "256GB", "512GB") to get base device name */
+function baseDeviceName(name: string): string {
+  return name.replace(/\s*(?:128|256|512|64|32|1)\s*(?:GB|TB)\s*$/i, "").trim() || name;
+}
 
 type Summary = {
   total: number;
@@ -92,14 +98,76 @@ async function extractPdfText(file: File): Promise<string> {
     .join("\n");
 }
 
-async function extractSpreadsheetText(file: File): Promise<string> {
+/** Structured row for match-direct API (no AI, local matching) */
+type DirectMatchRow = {
+  brand: string;
+  model: string;
+  storage?: string;
+  price: number;
+  monthlyPrice: number;
+};
+
+/** Detect column indices from header row. Columns: #, Brand, Model, Cash price (1-18 payments), Monthly payment (36 months) */
+function detectColumnIndices(headers: string[]): {
+  brand: number;
+  model: number;
+  cashPrice: number;
+  monthlyPrice: number;
+} {
+  const norm = (s: string) => String(s ?? "").toLowerCase().trim();
+  let brandIdx = -1;
+  let modelIdx = -1;
+  let cashPriceIdx = -1;
+  let monthlyPriceIdx = -1;
+
+  for (let i = 0; i < headers.length; i++) {
+    const h = norm(headers[i]);
+    if (h.includes("brand") && brandIdx < 0) brandIdx = i;
+    if (h.includes("model") && modelIdx < 0) modelIdx = i;
+    if (
+      (h.includes("cash") && h.includes("price")) ||
+      h.includes("1-18") ||
+      h.includes("מחיר") ||
+      h.includes("سعر")
+    ) {
+      if (cashPriceIdx < 0) cashPriceIdx = i;
+    }
+    if (
+      (h.includes("monthly") && h.includes("payment")) ||
+      h.includes("36") ||
+      h.includes("חודש") ||
+      h.includes("قسط")
+    ) {
+      if (monthlyPriceIdx < 0) monthlyPriceIdx = i;
+    }
+  }
+  return { brand: brandIdx, model: modelIdx, cashPrice: cashPriceIdx, monthlyPrice: monthlyPriceIdx };
+}
+
+function parsePrice(val: unknown): number {
+  if (typeof val === "number" && !Number.isNaN(val)) return val;
+  const s = String(val ?? "").replace(/[₪$€,\s]/g, "").replace(/[^\d.]/g, "");
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Parse Excel/CSV to structured rows for match-direct API */
+async function parseSpreadsheetToRows(file: File): Promise<DirectMatchRow[]> {
   const XLSX = await import("xlsx");
   const buf = await file.arrayBuffer();
-  const workbook = XLSX.read(buf, { type: "array" });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) return "";
+  let workbook: import("xlsx").WorkBook;
+  try {
+    workbook = XLSX.read(buf, { type: "array", cellDates: false });
+  } catch (e: any) {
+    throw new Error("فشل قراءة الملف: " + (e?.message || "تأكد أن الملف Excel أو CSV صالح"));
+  }
+  const sheetNames = workbook.SheetNames.filter(Boolean);
+  if (!sheetNames.length) throw new Error("الملف لا يحتوي على أوراق بيانات");
 
+  const firstSheetName = sheetNames[0];
   const sheet = workbook.Sheets[firstSheetName];
+  if (!sheet) throw new Error("ورقة البيانات فارغة");
+
   const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(sheet, {
     header: 1,
     raw: false,
@@ -107,15 +175,81 @@ async function extractSpreadsheetText(file: File): Promise<string> {
     defval: "",
   });
 
-  return rows
+  if (!rows.length) throw new Error("الجدول فارغ");
+
+  const headerRow = rows[0].map((c) => String(c ?? "").trim());
+  const { brand, model, cashPrice, monthlyPrice } = detectColumnIndices(headerRow);
+
+  if (brand < 0 || model < 0 || cashPrice < 0) {
+    throw new Error(
+      "لم يتم العثور على الأعمدة المطلوبة. تأكد من وجود: Brand, Model, Cash price (1-18 payments)"
+    );
+  }
+
+  const result: DirectMatchRow[] = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r] as (string | number | boolean | null)[];
+    const brandVal = String(row[brand] ?? "").trim();
+    const modelVal = String(row[model] ?? "").trim();
+    const priceVal = parsePrice(cashPrice >= 0 ? row[cashPrice] : 0);
+    const monthlyVal = monthlyPrice >= 0 ? parsePrice(row[monthlyPrice]) : 0;
+
+    if (!modelVal || priceVal <= 0) continue;
+
+    result.push({
+      brand: brandVal || "Other",
+      model: modelVal,
+      price: priceVal,
+      monthlyPrice: monthlyVal,
+    });
+  }
+
+  if (!result.length) {
+    throw new Error("لم يتم استخراج أي صفوف صالحة — تأكد من وجود بيانات في الأعمدة");
+  }
+  return result;
+}
+
+async function extractSpreadsheetText(file: File): Promise<string> {
+  const XLSX = await import("xlsx");
+  const buf = await file.arrayBuffer();
+  let workbook: import("xlsx").WorkBook;
+  try {
+    workbook = XLSX.read(buf, { type: "array", cellDates: false });
+  } catch (e: any) {
+    throw new Error("فشل قراءة الملف: " + (e?.message || "تأكد أن الملف Excel أو CSV صالح"));
+  }
+  const sheetNames = workbook.SheetNames.filter(Boolean);
+  if (!sheetNames.length) throw new Error("الملف لا يحتوي على أوراق بيانات");
+
+  const firstSheetName = sheetNames[0];
+  const sheet = workbook.Sheets[firstSheetName];
+  if (!sheet) throw new Error("ورقة البيانات فارغة");
+
+  const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(sheet, {
+    header: 1,
+    raw: false,
+    blankrows: false,
+    defval: "",
+  });
+
+  const text = rows
     .map((row) =>
       row
-        .map((cell) => String(cell ?? "").replace(/\s+/g, " ").trim())
+        .map((cell) => {
+          const s = String(cell ?? "").replace(/\s+/g, " ").trim();
+          return s.replace(/[₪$€]/g, "").trim() || s;
+        })
         .filter(Boolean)
         .join(" | ")
     )
     .filter(Boolean)
     .join("\n");
+
+  if (!text || text.length < 30) {
+    throw new Error("لم يتم استخراج بيانات كافية من الملف — تأكد أن الجدول يحتوي أعمدة: Brand, Model, السعر، القسط الشهري");
+  }
+  return text;
 }
 
 async function extractFileText(file: File): Promise<string> {
@@ -139,6 +273,7 @@ export default function PricesPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [applyResult, setApplyResult] = useState<{
     updated: number;
+    created: number;
     failed: number;
   } | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -155,24 +290,39 @@ export default function PricesPage() {
       setErrorMsg(null);
 
       try {
-        const extractedText = await extractFileText(file);
-        if (!extractedText) {
-          show("لم يتم العثور على نص في الملف", "error");
-          setParsing(false);
-          return;
-        }
-        show("تم استخراج البيانات، جاري التحليل والمطابقة...", "success");
+        const isSpreadsheet = isSpreadsheetFile(file);
+        let json: { data: MatchResult[]; summary: Summary; error?: string; steps?: string[] };
 
-        setMatching(true);
-        const res = await fetch("/api/admin/prices/match", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pdfText: extractedText }),
-        });
-        const json = await res.json();
+        if (isSpreadsheet) {
+          const rows = await parseSpreadsheetToRows(file);
+          show("تم استخراج البيانات، جاري المطابقة المباشرة...", "success");
+          setMatching(true);
+          const res = await fetch("/api/admin/prices/match-direct", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rows }),
+          });
+          json = await res.json();
+        } else {
+          const extractedText = await extractFileText(file);
+          if (!extractedText) {
+            show("لم يتم العثور على نص في الملف", "error");
+            setParsing(false);
+            return;
+          }
+          show("تم استخراج البيانات، جاري التحليل والمطابقة...", "success");
+          setMatching(true);
+          const res = await fetch("/api/admin/prices/match", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pdfText: extractedText }),
+          });
+          json = await res.json();
+        }
+
         if (json.error) {
-          console.error('Match API error:', json);
-          throw new Error(json.error + (json.steps ? ' [' + json.steps.join(' > ') + ']' : ''));
+          console.error("Match API error:", json);
+          throw new Error(json.error + (json.steps ? " [" + json.steps.join(" > ") + "]" : ""));
         }
 
         setResults(json.data);
@@ -188,6 +338,7 @@ export default function PricesPage() {
       } catch (err: any) {
         const msg = err.message || String(err);
         setErrorMsg(msg);
+        show("حدث خطأ — راجع التفاصيل أدناه", "error");
         console.error("PRICE MATCH ERROR:", msg);
       } finally {
         setParsing(false);
@@ -226,8 +377,20 @@ export default function PricesPage() {
         ...(r.monthlyPrice ? { monthlyPrice: r.monthlyPrice } : {}),
       }));
 
-    if (updates.length === 0) {
-      show("لا توجد تحديثات للتطبيق", "error");
+    const selectedUnmatched = results
+      .filter((_, i) => selected.has(i))
+      .filter((r) => !r.matched);
+
+    const creates = selectedUnmatched.map((r) => ({
+      pdfDeviceName: r.pdfDeviceName,
+      pdfStorage: r.pdfStorage,
+      pdfBrand: r.pdfBrand || "Other",
+      newPrice: r.newPrice,
+      ...(r.monthlyPrice ? { monthlyPrice: r.monthlyPrice } : {}),
+    }));
+
+    if (updates.length === 0 && creates.length === 0) {
+      show("لا توجد تحديثات أو إنشاءات للتطبيق", "error");
       return;
     }
 
@@ -236,14 +399,21 @@ export default function PricesPage() {
       const res = await fetch("/api/admin/prices/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
+        body: JSON.stringify({ updates, creates }),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
 
-      setApplyResult({ updated: json.updated, failed: json.failed });
+      setApplyResult({
+        updated: json.updated ?? 0,
+        created: json.created ?? 0,
+        failed: json.failed ?? 0,
+      });
       setStep("done");
-      show(`تم تحديث ${json.updated} سعر بنجاح`, "success");
+      const parts: string[] = [];
+      if (json.updated > 0) parts.push(`تم تحديث ${json.updated} سعر`);
+      if (json.created > 0) parts.push(`إنشاء ${json.created} منتج جديد`);
+      show(parts.length ? parts.join(" — ") + " بنجاح" : "تم", "success");
     } catch (err: any) {
       show(`خطأ في التحديث: ${err.message}`, "error");
     } finally {
@@ -263,13 +433,11 @@ export default function PricesPage() {
   };
 
   const toggleAll = () => {
-    if (selected.size === results.filter((r) => r.matched).length) {
+    if (selected.size === results.length) {
       setSelected(new Set());
     } else {
       const all = new Set<number>();
-      results.forEach((r, i) => {
-        if (r.matched) all.add(i);
-      });
+      results.forEach((_, i) => all.add(i));
       setSelected(all);
     }
   };
@@ -332,7 +500,11 @@ export default function PricesPage() {
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-3 border-brand border-t-transparent rounded-full animate-spin" />
                 <p className="text-muted text-sm">
-                  {parsing ? "جاري استخراج النص من الملف..." : "🧠 الذكاء الاصطناعي يحلل ويطابق الأجهزة..."}
+                  {parsing
+                    ? "جاري استخراج النص من الملف..."
+                    : isSpreadsheetFile({ name: fileName } as File)
+                    ? "🔗 مطابقة مباشرة (بدون AI)..."
+                    : "🧠 الذكاء الاصطناعي يحلل ويطابق الأجهزة..."}
                 </p>
               </div>
             ) : (
@@ -368,6 +540,7 @@ export default function PricesPage() {
             <h3 className="font-bold mb-3 text-sm">{"كيف يعمل؟"}</h3>
             <ol className="text-muted text-xs space-y-2 list-decimal list-inside">
               <li>{"ارفع ملف Excel أو CSV أو PDF المحتوي على جدول الأسعار (بدون ضريبة)"}</li>
+              <li className="text-amber-400">{"إذا كان Excel يظهر «Protected View»: اضغط Enable Editing أو احفظ الملف أولاً (Save As) ثم ارفعه"}</li>
               <li>{"النظام يستخرج عمود الأسعار (1-18 دفعة) + عمود القسط الشهري (36 دفعة)"}</li>
               <li>{"يضيف ضريبة 18% على كل سعر"}</li>
               <li>{"يطابق الأجهزة تلقائياً مع المنتجات في المتجر"}</li>
@@ -398,7 +571,7 @@ export default function PricesPage() {
                 {"ملف جديد"}
               </button>
               <button onClick={toggleAll} className="btn-outline text-xs px-4 py-2">
-                {selected.size === results.filter((r) => r.matched).length
+                {selected.size === results.length
                   ? "إلغاء الكل"
                   : "تحديد الكل"}
               </button>
@@ -448,20 +621,16 @@ export default function PricesPage() {
                       className={`border-b border-surface-border/50 transition-colors ${
                         isSelected
                           ? "bg-brand/5"
-                          : r.matched
-                          ? "hover:bg-surface-card/50"
-                          : "opacity-50"
+                          : "hover:bg-surface-card/50"
                       }`}
                     >
                       <td className="p-2.5 text-center">
-                        {r.matched && (
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleOne(i)}
-                            className="accent-brand w-4 h-4 cursor-pointer"
-                          />
-                        )}
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleOne(i)}
+                          className="accent-brand w-4 h-4 cursor-pointer"
+                        />
                       </td>
                       <td className="p-2.5 font-medium max-w-[200px] truncate">
                         {r.pdfDeviceName}
@@ -524,7 +693,13 @@ export default function PricesPage() {
                         )}
                       </td>
                       <td className="p-2.5">
-                        <ConfidenceBadge confidence={r.confidence} />
+                        {!r.matched ? (
+                          <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                            إنشاء منتج جديد
+                          </span>
+                        ) : (
+                          <ConfidenceBadge confidence={r.confidence} />
+                        )}
                       </td>
                     </tr>
                   );
@@ -557,11 +732,21 @@ export default function PricesPage() {
           </div>
           <h2 className="font-black text-xl mb-2">{"تم التحديث"}</h2>
           <p className="text-muted text-sm mb-6">
-            {"تم تحديث"}{" "}
-            <span className="text-green-400 font-bold">
-              {applyResult.updated}
-            </span>{" "}
-            {"سعر بنجاح"}
+            {applyResult.updated > 0 && (
+              <>
+                {"تم تحديث "}
+                <span className="text-green-400 font-bold">{applyResult.updated}</span>
+                {" سعر بنجاح"}
+              </>
+            )}
+            {applyResult.created > 0 && (
+              <>
+                {applyResult.updated > 0 && " — "}
+                {"إنشاء "}
+                <span className="text-emerald-400 font-bold">{applyResult.created}</span>
+                {" منتج جديد"}
+              </>
+            )}
             {applyResult.failed > 0 && (
               <>
                 {" — فشل "}

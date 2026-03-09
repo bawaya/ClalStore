@@ -10,8 +10,8 @@ import { Footer } from "@/components/website/sections";
 import {
   validatePhone, validateIsraeliID, validateEmail,
   validateBranch, validateAccount,
+  generateOrderId,
 } from "@/lib/validators";
-import { trackBeginCheckout } from "@/components/shared/Analytics";
 import { BANKS } from "@/lib/constants";
 import { ISRAEL_CITIES, searchCities, type City } from "@/lib/cities";
 
@@ -129,39 +129,13 @@ export default function CartPage() {
   const hasDevices = cart.hasDevices();
   const onlyAccessories = cart.hasOnlyAccessories();
 
-  const CART_DRAFT_KEY = "clal_checkout_draft";
-
   const [step, setStep] = useState(0);
-  const [info, setInfo] = useState<CustomerInfo>(() => {
-    if (typeof window === "undefined") return { name: "", phone: "", email: "", city: "", address: "", idNumber: "", notes: "" };
-    try {
-      const raw = localStorage.getItem(CART_DRAFT_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<CustomerInfo>;
-        return { name: parsed.name ?? "", phone: parsed.phone ?? "", email: parsed.email ?? "", city: parsed.city ?? "", address: parsed.address ?? "", idNumber: parsed.idNumber ?? "", notes: parsed.notes ?? "" };
-      }
-    } catch {}
-    return { name: "", phone: "", email: "", city: "", address: "", idNumber: "", notes: "" };
-  });
+  const [info, setInfo] = useState<CustomerInfo>({ name: "", phone: "", email: "", city: "", address: "", idNumber: "", notes: "" });
   const [pay, setPay] = useState<PaymentInfo>({ method: "bank", bank: "", branch: "", account: "", installments: 1 });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [order, setOrder] = useState<OrderResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [couponInput, setCouponInput] = useState("");
-
-  // Save customer draft to localStorage (debounced)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        if (info.name || info.phone || info.email || info.city || info.address) {
-          localStorage.setItem(CART_DRAFT_KEY, JSON.stringify(info));
-        } else {
-          localStorage.removeItem(CART_DRAFT_KEY);
-        }
-      } catch {}
-    }, 500);
-    return () => clearTimeout(t);
-  }, [info]);
 
   // Styles
   const inp = "input";
@@ -282,7 +256,9 @@ export default function CartPage() {
         const payData = await payRes.json();
 
         if (payData.success && payData.paymentUrl) {
-          // Cart cleared on success page after payment confirmation — NOT here
+          // Clear cart before redirect
+          cart.clearCart();
+          // Redirect to Rivhit's hosted payment page
           window.location.href = payData.paymentUrl;
           return;
         } else {
@@ -362,22 +338,7 @@ export default function CartPage() {
                   {item.storage && ` • ${item.storage}`}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 border border-surface-border rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => item.quantity > 1 ? cart.updateQuantity(item.cartId, item.quantity - 1) : cart.removeItem(item.cartId)}
-                    className="w-7 h-7 bg-surface-elevated text-muted hover:text-white text-xs flex items-center justify-center transition-colors"
-                    aria-label="تقليل الكمية"
-                  >−</button>
-                  <span className="w-6 text-center text-xs font-bold">{item.quantity}</span>
-                  <button
-                    onClick={() => cart.updateQuantity(item.cartId, item.quantity + 1)}
-                    className="w-7 h-7 bg-surface-elevated text-muted hover:text-white text-xs flex items-center justify-center transition-colors"
-                    aria-label="زيادة الكمية"
-                  >+</button>
-                </div>
-                <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 14 : 16 }}>₪{(item.price * item.quantity).toLocaleString()}</span>
-              </div>
+              <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 14 : 16 }}>₪{item.price.toLocaleString()}</span>
             </div>
           ))}
 
@@ -441,7 +402,7 @@ export default function CartPage() {
         <Field label="📝 ملاحظات (اختياري)">
           <textarea className={`${inp} min-h-[60px] resize-y`} value={info.notes} onChange={(e) => setInfo({ ...info, notes: e.target.value })} placeholder="ملاحظات خاصة..." />
         </Field>
-        <button onClick={() => { if (validateInfo()) { trackBeginCheckout(total, items.map((i) => ({ item_name: i.name, price: i.price, quantity: i.quantity || 1 }))); setStep(2); } }} className="btn-primary w-full mt-1">المتابعة للدفع →</button>
+        <button onClick={() => validateInfo() && setStep(2)} className="btn-primary w-full mt-1">المتابعة للدفع →</button>
       </div>
     </div>
   );
@@ -523,11 +484,6 @@ export default function CartPage() {
             ? `📋 تأكيد الطلب — ₪${total.toLocaleString()}`
             : `🔒 متابعة للدفع الآمن — ₪${total.toLocaleString()}`}
         </button>
-        <div className="flex flex-wrap gap-3 justify-center mt-4 pt-3 border-t border-surface-border text-muted" style={{ fontSize: scr.mobile ? 9 : 10 }}>
-          <span>🔒 دفع آمن PCI-DSS</span>
-          <span>✅ ضمان استرجاع 14 يوم</span>
-          <span>🚚 توصيل مجاني</span>
-        </div>
       </div>
     </div>
   );

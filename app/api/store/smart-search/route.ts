@@ -7,6 +7,7 @@ export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { sortProductsByBrandAndTier } from "@/lib/store/queries";
 import { callClaude } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 
@@ -212,11 +213,16 @@ export async function GET(req: NextRequest) {
 
     query = query.limit(20);
 
-    const { data: products, error } = await query;
+    const { data: rawProducts, error } = await query;
 
     if (error) {
       console.error("Smart search query error:", error);
       return NextResponse.json({ success: false, error: "خطأ في البحث" }, { status: 500 });
+    }
+
+    let products = rawProducts || [];
+    if (products.length > 0 && !["price_asc", "price_desc", "newest"].includes(filters.sort || "")) {
+      products = sortProductsByBrandAndTier(products as any);
     }
 
     const total = products?.length || 0;

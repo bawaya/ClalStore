@@ -207,7 +207,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (err: unknown) {
-    console.error("Webhook error:", err instanceof Error ? err.message : "Unknown error");
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Webhook error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

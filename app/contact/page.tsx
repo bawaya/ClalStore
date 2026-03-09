@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
-import { BUSINESS } from "@/lib/constants";
 import { useLang } from "@/lib/i18n";
 import { Navbar, Footer } from "@/components/website/sections";
 
@@ -22,7 +21,7 @@ export default function ContactPage() {
     setSending(true);
     try {
       // Send WhatsApp notification to admin (primary notification)
-      const notifyRes = await fetch('/api/contact', {
+      const notifyRes = await fetch('/api/admin/contact-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -66,9 +65,9 @@ export default function ContactPage() {
   };
 
   const contactCards = [
-    { icon: "📞", title: t("contact.phoneLabel"), value: BUSINESS.phone, href: `tel:${BUSINESS.phone.replace(/-/g, "")}` },
-    { icon: "💬", title: t("contact.whatsapp"), value: BUSINESS.phone, href: BUSINESS.whatsapp },
-    { icon: "📧", title: t("contact.emailLabel"), value: BUSINESS.email, href: `mailto:${BUSINESS.email}` },
+    { icon: "📞", title: t("contact.phoneLabel"), value: "053-3337653", href: "tel:0533337653" },
+    { icon: "💬", title: t("contact.whatsapp"), value: "053-3337653", href: "https://wa.me/972533337653" },
+    { icon: "📧", title: t("contact.emailLabel"), value: "info@clalmobile.com", href: "mailto:info@clalmobile.com" },
   ];
 
   const days = [

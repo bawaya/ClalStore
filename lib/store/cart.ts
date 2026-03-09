@@ -4,7 +4,6 @@
 // =====================================================
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export interface CartItem {
   cartId: string;
@@ -42,9 +41,7 @@ interface CartStore {
   hasOnlyAccessories: () => boolean;
 }
 
-export const useCart = create<CartStore>()(
-  persist(
-    (set, get) => ({
+export const useCart = create<CartStore>((set, get) => ({
   items: [],
   couponCode: "",
   discountAmount: 0,
@@ -104,17 +101,7 @@ export const useCart = create<CartStore>()(
     const items = get().items;
     return items.length > 0 && items.every((i) => i.type === "accessory");
   },
-}),
-    {
-      name: "clal_cart",
-      partialize: (state) => ({
-        items: state.items,
-        couponCode: state.couponCode,
-        discountAmount: state.discountAmount,
-      }),
-    }
-  )
-);
+}));
 
 // ===== Abandoned Cart Tracking (fire-and-forget) =====
 function _getVisitorId(): string {

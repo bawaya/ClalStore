@@ -10,7 +10,7 @@ import { getPolicy, detectPolicyType, formatPolicyResponse } from "./policies";
 import {
   searchProducts, searchByModel, recommendProducts, lookupOrder,
   formatProductCards, calculateInstallments, formatComparison,
-  getLinePlans, formatLinePlans, upsertCustomer, getUpsellSuggestions,
+  getLinePlans, formatLinePlans, upsertCustomer,
   type QualificationState, getNextQualificationQuestion, parseQualificationAnswer,
 } from "./playbook";
 import {
@@ -411,23 +411,6 @@ async function routeIntent(
   }
 }
 
-// ===== HELPERS =====
-
-async function buildUpsellText(isAr: boolean): Promise<string> {
-  try {
-    const accessories = await getUpsellSuggestions();
-    if (accessories.length === 0) return "";
-    const items = accessories
-      .map(a => `  • ${a.name_ar} — ${Number(a.price).toLocaleString()}₪`)
-      .join("\n");
-    return isAr
-      ? `\n\n🛡️ *لا تنسى الحماية:*\n${items}`
-      : `\n\n🛡️ *אל תשכח הגנה:*\n${items}`;
-  } catch {
-    return "";
-  }
-}
-
 // ===== INTENT HANDLERS =====
 
 async function handleGreeting(session: SessionState): Promise<BotResponse> {
@@ -504,13 +487,11 @@ async function handleBuyNow(
       : `מצאתי ${Math.min(products.length, 3)} אפשרויות מעולות:`;
     const cta = isAr ? "جاهز تشتري؟ اضغط على الرابط وأكمل الطلب! 🛒" : "מוכן לרכוש? לחץ על הקישור! 🛒";
 
-    const upsellText = await buildUpsellText(isAr);
-
     return {
-      text: `${header}\n\n${cards}\n\n${cta}${upsellText}`,
+      text: `${header}\n\n${cards}\n\n${cta}`,
       quickReplies: isAr
-        ? ["💰 كم القسط؟", "🛡️ إكسسوارات", "👤 كلم موظف"]
-        : ["💰 כמה התשלום?", "🛡️ אביזרים", "👤 נציג"],
+        ? ["💰 كم القسط؟", "📱 منتجات ثانية", "👤 كلم موظف"]
+        : ["💰 כמה התשלום?", "📱 מוצרים נוספים", "👤 נציג"],
     };
   }
 
@@ -689,40 +670,7 @@ async function handleInstallments(session: SessionState, detected: DetectedInten
 }
 
 async function handleSpecs(session: SessionState, detected: DetectedIntent): Promise<BotResponse> {
-  const { model, brand } = detected.params as Record<string, string | undefined>;
   const isAr = session.language !== "he";
-
-  if (model) {
-    const products = await searchByModel(model);
-    if (products.length > 0) {
-      const p = products[0];
-      const specs = (p as any).specs || {};
-      const price = Number(p.price).toLocaleString();
-      session.lastProductIds = [p.id];
-
-      const specLines = [];
-      if (specs.screen) specLines.push(isAr ? `📱 الشاشة: ${specs.screen}` : `📱 מסך: ${specs.screen}`);
-      if (specs.processor) specLines.push(isAr ? `⚡ المعالج: ${specs.processor}` : `⚡ מעבד: ${specs.processor}`);
-      if (specs.ram) specLines.push(isAr ? `🧠 الرام: ${specs.ram}` : `🧠 RAM: ${specs.ram}`);
-      if (specs.storage) specLines.push(isAr ? `💾 التخزين: ${specs.storage}` : `💾 אחסון: ${specs.storage}`);
-      if (specs.camera) specLines.push(isAr ? `📷 الكاميرا: ${specs.camera}` : `📷 מצלמה: ${specs.camera}`);
-      if (specs.battery) specLines.push(isAr ? `🔋 البطارية: ${specs.battery}` : `🔋 סוללה: ${specs.battery}`);
-
-      const specText = specLines.length > 0
-        ? specLines.join("\n")
-        : (isAr ? "المواصفات التفصيلية على صفحة المنتج" : "מפרט מלא בעמוד המוצר");
-
-      return {
-        text: isAr
-          ? `📋 *مواصفات ${p.name_ar}:*\n\n${specText}\n\n💰 السعر: ${price}₪\n${p.stock > 0 ? "✅ متوفر" : "❌ غير متوفر حالياً"}\n\n🔗 ${BASE_URL}/store/product/${p.id}`
-          : `📋 *מפרט ${p.name_ar}:*\n\n${specText}\n\n💰 מחיר: ${price}₪\n${p.stock > 0 ? "✅ זמין" : "❌ לא זמין"}\n\n🔗 ${BASE_URL}/store/product/${p.id}`,
-        quickReplies: isAr
-          ? ["💰 كم القسط؟", "🛒 أبغى أطلب", "📱 منتجات ثانية"]
-          : ["💰 תשלומים?", "🛒 לרכוש", "📱 עוד מוצרים"],
-      };
-    }
-  }
-
   return {
     text: isAr
       ? "اكتب اسم الجهاز وأعطيك المواصفات + السعر!\nمثلاً: \"آيفون 17 برو\" أو \"S25 Ultra\""
@@ -866,6 +814,7 @@ async function handleEscalation(session: SessionState, reason: string, lang: "ar
 
   await trackAnalytics((channel ?? "whatsapp") as "webchat" | "whatsapp", { handoff: true });
 
+  // If complaint — also update inbox conversation status to "waiting" for agent attention
   if (reason === "complaint") {
     try {
       const sb = createAdminSupabase();
@@ -881,18 +830,9 @@ async function handleEscalation(session: SessionState, reason: string, lang: "ar
   }
 
   const isAr = lang !== "he";
-  const withinHours = isWithinWorkingHours();
-
-  let text: string;
-  if (withinHours) {
-    text = isAr
-      ? "أفهم تماماً وأعتذر عن أي إزعاج 🙏\n\nسأوصل طلبك فوراً لفريقنا وسيتواصل معك أحد الموظفين بأسرع وقت.\n\nهل هناك شيء آخر أقدر أساعدك فيه الآن؟"
-      : "אני מבין לגמרי ומתנצל על אי הנוחות 🙏\n\nאעביר את הפנייה שלך לצוות ונציג יחזור אליך בהקדם.\n\nיש משהו נוסף שאפשר לעזור?";
-  } else {
-    text = isAr
-      ? "أفهم تماماً 🙏\n\nفريقنا غير متاح حالياً (أوقات العمل: أحد-خميس، 9:00-18:00).\n\nتم تسجيل طلبك وسيتواصل معك أحد الموظفين أول شيء بداية الدوام القادم.\n\nبالهالوقت، أقدر أساعدك بأي سؤال ثاني!"
-      : "אני מבין לגמרי 🙏\n\nהצוות לא זמין כרגע (שעות פעילות: ראשון-חמישי, 9:00-18:00).\n\nהפנייה נרשמה ונציג יחזור אליך בתחילת יום העבודה הבא.\n\nבינתיים, אפשר לעזור במשהו אחר!";
-  }
+  const text = isAr
+    ? "أفهم تماماً وأعتذر عن أي إزعاج 🙏\n\nسأوصل طلبك فوراً لفريقنا وسيتواصل معك أحد الموظفين بأسرع وقت.\n\nهل هناك شيء آخر أقدر أساعدك فيه الآن؟"
+    : "אני מבין לגמרי ומתנצל על אי הנוחות 🙏\n\nאעביר את הפנייה שלך לצוות ונציג יחזור אליך בהקדם.\n\nיש משהו נוסף שאפשר לעזור?";
   return { text, escalate: true };
 }
 

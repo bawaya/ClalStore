@@ -1,48 +1,28 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { CookieConsent } from "@/components/shared/CookieConsent";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
 import { Analytics } from "@/components/shared/Analytics";
 import { Providers } from "@/components/shared/Providers";
 
-export const viewport: Viewport = {
-  themeColor: "#c41040",
-};
-
 export const metadata: Metadata = {
   title: "ClalMobile — وكيل رسمي لـ HOT Mobile",
   description: "متجر إلكتروني لبيع أجهزة وإكسسوارات وباقات HOT Mobile. توصيل لكل إسرائيل.",
   keywords: ["HOT Mobile", "ClalMobile", "أجهزة", "إكسسوارات", "باقات"],
   manifest: "/manifest.json",
+  themeColor: "#c41040",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "ClalMobile",
   },
   openGraph: {
-    title: "ClalMobile — وكيل رسمي لـ HOT Mobile",
-    description: "متجر إلكتروني لبيع أجهزة وإكسسوارات وباقات HOT Mobile. توصيل لكل إسرائيل.",
+    title: "ClalMobile",
+    description: "وكيل رسمي لـ HOT Mobile",
     url: "https://clalmobile.com",
     siteName: "ClalMobile",
     locale: "ar_IL",
     type: "website",
-    images: [
-      {
-        url: "https://clalmobile.com/icons/icon-512x512.svg",
-        width: 512,
-        height: 512,
-        alt: "ClalMobile",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "ClalMobile — وكيل رسمي لـ HOT Mobile",
-    description: "أجهزة ذكية، إكسسوارات، وباقات HOT Mobile. توصيل لكل إسرائيل.",
-    images: ["https://clalmobile.com/icons/icon-512x512.svg"],
-  },
-  alternates: {
-    canonical: "https://clalmobile.com",
   },
 };
 
@@ -59,7 +39,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ClalMobile" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=Rubik:wght@400;500;600;700;800;900&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap"
           rel="stylesheet"
         />
         <script

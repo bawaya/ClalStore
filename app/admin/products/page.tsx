@@ -6,7 +6,7 @@ import { useState, useRef, useMemo } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
-import { IMAGE_DIMS } from "@/components/admin/ImageUpload";
+ليش sms مش شغال وليش الدفع مش شغالimport { IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import { PRODUCT_TYPES } from "@/lib/constants";
 import { calcMargin, formatCurrency } from "@/lib/utils";
 import { aiEnhanceProduct, translateProductName, detectProductType, findDuplicates } from "@/lib/admin/ai-tools";

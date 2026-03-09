@@ -7,7 +7,6 @@ import { StoreHeader } from "./StoreHeader";
 import { HeroCarousel } from "./HeroCarousel";
 import { ProductCard } from "./ProductCard";
 import { LinePlans } from "./LinePlans";
-import { ReviewsSection } from "./ReviewsSection";
 import { Footer } from "@/components/website/sections";
 import type { Product, Hero, LinePlan } from "@/types/database";
 
@@ -32,18 +31,8 @@ interface Props {
 export function StoreClient({ products, heroes, linePlans }: Props) {
   const scr = useScreen();
   const { t } = useLang();
-
-  const [typeCat, setTypeCat] = useState(() => {
-    if (typeof window === "undefined") return "all";
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get("type");
-    if (t === "device" || t === "accessory") return t;
-    return "all";
-  });
+  const [typeCat, setTypeCat] = useState("all");
   const [brandCat, setBrandCat] = useState("all");
-  const [sortBy, setSortBy] = useState<"default" | "price_asc" | "price_desc" | "newest" | "bestselling">("default");
-  const [priceMin, setPriceMin] = useState("");
-  const [priceMax, setPriceMax] = useState("");
   const [search, setSearch] = useState("");
   const [smartSearching, setSmartSearching] = useState(false);
   const [smartResults, setSmartResults] = useState<Product[] | null>(null);
@@ -109,11 +98,6 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
     else if (typeCat === "accessory") list = list.filter((p) => p.type === "accessory");
     // Brand filter
     if (brandCat !== "all") list = list.filter((p) => p.brand === brandCat);
-    // Price range
-    const min = priceMin ? parseInt(priceMin, 10) : NaN;
-    const max = priceMax ? parseInt(priceMax, 10) : NaN;
-    if (!isNaN(min)) list = list.filter((p) => p.price >= min);
-    if (!isNaN(max)) list = list.filter((p) => p.price <= max);
     // Search (local — for short queries)
     if (search.trim() && !isSmartQuery(search)) {
       const q = search.toLowerCase();
@@ -124,39 +108,48 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
           (p.name_he && p.name_he.toLowerCase().includes(q))
       );
     }
-    // Sort
-    if (sortBy === "price_asc") list = [...list].sort((a, b) => a.price - b.price);
-    else if (sortBy === "price_desc") list = [...list].sort((a, b) => b.price - a.price);
-    else if (sortBy === "newest") list = [...list].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
-    else if (sortBy === "bestselling") list = [...list].sort((a, b) => (b.sold || 0) - (a.sold || 0));
-    else {
-      const getModelGen = (p: typeof list[0]): number => {
-        const name = (p.name_ar + " " + (p.name_he || "")).toLowerCase();
-        const nums = name.match(/(?:iphone|آيفون|galaxy|جالكسي|s|a|z\s*(?:fold|flip|فولد|فليب))\s*(\d+)/gi);
-        if (nums) {
-          const extracted = nums.map(m => { const d = m.match(/(\d+)/); return d ? parseInt(d[1]) : 0; });
-          return Math.max(...extracted);
-        }
-        const yearMatch = name.match(/20(\d{2})/);
-        if (yearMatch) return parseInt(yearMatch[1]);
-        const anyNum = name.match(/(\d+)/);
-        return anyNum ? parseInt(anyNum[1]) : 0;
+    // Sort: آيفون أولاً، جلاكسي ثانياً، بريميوم → متوسط → اقتصادي، ثم الأحدث
+    const getPriceTier = (p: typeof list[0]): number => {
+      const price = p.price || 0;
+      if (price >= 3500) return 0;
+      if (price >= 1500) return 1;
+      return 2;
+    };
+    const getModelGen = (p: typeof list[0]): number => {
+      const name = (p.name_ar + " " + (p.name_he || "")).toLowerCase();
+      const nums = name.match(/(?:iphone|آيفون|galaxy|جالكسي|s|a|z\s*(?:fold|flip|فولد|فليب))\s*(\d+)/gi);
+      if (nums) {
+        const extracted = nums.map(m => { const d = m.match(/(\d+)/); return d ? parseInt(d[1]) : 0; });
+        return Math.max(...extracted);
+      }
+      const yearMatch = name.match(/20(\d{2})/);
+      if (yearMatch) return parseInt(yearMatch[1]);
+      const anyNum = name.match(/(\d+)/);
+      return anyNum ? parseInt(anyNum[1]) : 0;
+    };
+
+    list = [...list].sort((a, b) => {
+      const hasImgA = a.image_url ? 1 : 0;
+      const hasImgB = b.image_url ? 1 : 0;
+      if (hasImgA !== hasImgB) return hasImgB - hasImgA;
+      const brandOrder = (p: typeof a) => {
+        const br = (p.brand || "").toLowerCase();
+        if (br === "apple") return 0;
+        if (br === "samsung") return 1;
+        return 2;
       };
-      list = [...list].sort((a, b) => {
-        const hasImgA = a.image_url ? 1 : 0;
-        const hasImgB = b.image_url ? 1 : 0;
-        if (hasImgA !== hasImgB) return hasImgB - hasImgA;
-        const brandOrder = (p: typeof a) => { const br = p.brand.toLowerCase(); if (br === "apple") return 0; if (br === "samsung") return 1; return 2; };
-        const bo = brandOrder(a) - brandOrder(b);
-        if (bo !== 0) return bo;
-        const genA = getModelGen(a), genB = getModelGen(b);
-        if (genA !== genB) return genB - genA;
-        if (a.featured !== b.featured) return a.featured ? -1 : 1;
-        return (b.sold || 0) - (a.sold || 0);
-      });
-    }
+      const bo = brandOrder(a) - brandOrder(b);
+      if (bo !== 0) return bo;
+      const ta = getPriceTier(a), tb = getPriceTier(b);
+      if (ta !== tb) return ta - tb;
+      if (a.price !== b.price) return b.price - a.price;
+      const genA = getModelGen(a), genB = getModelGen(b);
+      if (genA !== genB) return genB - genA;
+      if (a.featured !== b.featured) return a.featured ? -1 : 1;
+      return (b.sold || 0) - (a.sold || 0);
+    });
     return list;
-  }, [items, typeCat, brandCat, search, smartResults, isSmartQuery, sortBy, priceMin, priceMax]);
+  }, [items, typeCat, brandCat, search, smartResults, isSmartQuery]);
 
   const typeCategories = [
     { key: "all", label: t("store.all") },
@@ -173,7 +166,6 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
       <StoreHeader />
-      <main>
       <HeroCarousel heroes={heroes} />
 
       <div
@@ -283,30 +275,6 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
           ))}
         </div>
 
-        {/* Sort + Price filter */}
-        <div className="flex flex-wrap gap-3 items-center mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-muted text-xs">{t("store.sortBy")}:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-surface-elevated border border-surface-border rounded-lg px-2 py-1.5 text-xs text-white"
-            >
-              <option value="default">{t("store.sortDefault")}</option>
-              <option value="price_asc">{t("store.sortPriceAsc")}</option>
-              <option value="price_desc">{t("store.sortPriceDesc")}</option>
-              <option value="newest">{t("store.sortNewest")}</option>
-              <option value="bestselling">{t("store.sortBestselling")}</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-muted text-xs">{t("store.priceRange")}:</span>
-            <input type="number" placeholder={t("store.priceFrom")} value={priceMin} onChange={(e) => setPriceMin(e.target.value)} className="w-20 bg-surface-elevated border border-surface-border rounded-lg px-2 py-1 text-xs" dir="ltr" />
-            <span className="text-muted">-</span>
-            <input type="number" placeholder={t("store.priceTo")} value={priceMax} onChange={(e) => setPriceMax(e.target.value)} className="w-20 bg-surface-elevated border border-surface-border rounded-lg px-2 py-1 text-xs" dir="ltr" />
-          </div>
-        </div>
-
         {/* Products grid */}
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-dim">
@@ -321,12 +289,10 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
           </div>
         )}
 
-        <ReviewsSection />
         {/* Lines */}
         <LinePlans plans={linePlans} />
       </div>
 
-      </main>
       <Footer />
     </div>
   );

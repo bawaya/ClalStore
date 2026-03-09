@@ -8,7 +8,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useScreen } from "@/lib/hooks";
-import { BUSINESS } from "@/lib/constants";
 import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
@@ -121,7 +120,7 @@ export function HeroSection({ cms }: { cms?: WebsiteContent }) {
         {/* Trust badges */}
         <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
           {[t("hero.trust1"), t("hero.trust2"), t("hero.trust3"), t("hero.trust4")].map((b) => (
-            <span key={b} className="text-muted text-[12px] bg-surface-elevated px-3 py-1.5 rounded-full border border-surface-border">{b}</span>
+            <span key={b} className="text-dim text-[12px] bg-surface-elevated px-3 py-1.5 rounded-full">{b}</span>
           ))}
         </div>
       </div>
@@ -155,7 +154,7 @@ export function StatsStrip({ cms }: { cms?: WebsiteContent }) {
           <div key={s.label} className="text-center" style={{ padding: scr.mobile ? 8 : 16 }}>
             <div className="text-xl mb-1">{s.icon}</div>
             <div className="font-black text-brand" style={{ fontSize: scr.mobile ? 20 : 28 }}>{s.value}</div>
-            <div className="text-white/70 font-medium" style={{ fontSize: scr.mobile ? 12 : 14 }}>{s.label}</div>
+            <div className="text-muted" style={{ fontSize: scr.mobile ? 12 : 14 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -379,10 +378,9 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
     {
       title: t("footer.contactUs"),
       links: [
-        { href: `tel:${fc.phone || BUSINESS.phone.replace(/-/g, "")}`, label: `📞 ${fc.phone || BUSINESS.phone}` },
-        { href: `https://wa.me/${fc.whatsapp || BUSINESS.phoneRaw}`, label: "💬 WhatsApp" },
-        { href: `mailto:${fc.email || BUSINESS.email}`, label: `📧 ${fc.email || BUSINESS.email}` },
-        { href: "#", label: `🕐 ${lang === "he" ? BUSINESS.workingHours.days_he : BUSINESS.workingHours.days_ar} ${BUSINESS.workingHours.hours}`, isText: true },
+        { href: `tel:${fc.phone || "0533337653"}`, label: `📞 ${fc.phone || "053-3337653"}` },
+        { href: `https://wa.me/${fc.whatsapp || "972533337653"}`, label: "💬 WhatsApp" },
+        { href: `mailto:${fc.email || "info@clalmobile.com"}`, label: `📧 ${fc.email || "info@clalmobile.com"}` },
       ],
     },
   ];
@@ -406,9 +404,7 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
             <div key={col.title} className="text-right">
               <div className="font-bold text-xs mb-2">{col.title}</div>
               <div className="space-y-1.5">
-                {col.links.map((l, i) => (l as any).isText ? (
-                  <span key={i} className="block text-muted text-xs">{l.label}</span>
-                ) : (
+                {col.links.map((l) => (
                   <Link key={l.href} href={l.href} className="block text-muted text-xs hover:text-white transition-colors">{l.label}</Link>
                 ))}
               </div>
