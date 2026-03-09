@@ -16,6 +16,10 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 async function sendToAdmin(message: string, fromOverride?: string): Promise<void> {
   const from = fromOverride || REPORT_FROM();
   const to = ADMIN_TO();
+  if (!to || !from) {
+    console.error("[AdminNotify] SKIP — missing env: ADMIN_PERSONAL_PHONE or ADMIN_REPORT_PHONE");
+    return;
+  }
   try {
     const res = await sendWhatsAppText(to, message, from);
     // yCloud returns error for 24h window violations
@@ -49,6 +53,7 @@ export async function notifyAdminPersonal(message: string): Promise<void> {
 // ===== Send to all team members FROM report number =====
 export async function notifyTeam(message: string): Promise<void> {
   const numbers = TEAM_NUMBERS();
+  if (numbers.length === 0) return;
   for (const num of numbers) {
     try {
       await sendWhatsAppText(num.trim(), message, REPORT_FROM());
