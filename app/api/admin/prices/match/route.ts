@@ -68,7 +68,13 @@ export async function POST(req: NextRequest) {
       + '\n\n=== PDF PRICE LIST TEXT (rows by newlines, columns by |) ===\n'
       + pdfText;
 
+    const apiKey = process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || '';
+    if (!apiKey) {
+      return NextResponse.json({ error: 'ANTHROPIC_API_KEY_ADMIN not configured' }, { status: 500 });
+    }
+
     const aiResult = await callClaude({
+      apiKey,
       systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
       maxTokens: 4000,
@@ -78,7 +84,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!aiResult?.json && !aiResult?.text) {
-      return NextResponse.json({ error: 'AI analysis failed' }, { status: 500 });
+      return NextResponse.json({ error: 'AI analysis failed - check ANTHROPIC_API_KEY_ADMIN in env' }, { status: 500 });
     }
 
     let parsed: AiParsedRow[];
