@@ -100,6 +100,7 @@ export default function PricesPage() {
     failed: number;
   } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -109,6 +110,7 @@ export default function PricesPage() {
       }
       setFileName(file.name);
       setParsing(true);
+      setErrorMsg(null);
 
       try {
         const pdfText = await extractPdfText(file);
@@ -142,7 +144,9 @@ export default function PricesPage() {
 
         setStep("preview");
       } catch (err: any) {
-        show(`خطأ: ${err.message}`, "error");
+        const msg = err.message || String(err);
+        setErrorMsg(msg);
+        console.error("PRICE MATCH ERROR:", msg);
       } finally {
         setParsing(false);
         setMatching(false);
@@ -211,6 +215,7 @@ export default function PricesPage() {
     setSelected(new Set());
     setApplyResult(null);
     setFileName("");
+    setErrorMsg(null);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -305,6 +310,16 @@ export default function PricesPage() {
             )}
           </div>
 
+
+          {errorMsg && (
+            <div className="mt-4 p-4 bg-red-900/30 border border-red-500/50 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-red-400 font-bold text-sm">خطأ في التحليل</span>
+                <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-300 text-xs">×</button>
+              </div>
+              <pre className="text-red-300 text-xs whitespace-pre-wrap break-all font-mono" dir="ltr">{errorMsg}</pre>
+            </div>
+          )}
           <div className="mt-6 card p-5">
             <h3 className="font-bold mb-3 text-sm">{"كيف يعمل؟"}</h3>
             <ol className="text-muted text-xs space-y-2 list-decimal list-inside">
