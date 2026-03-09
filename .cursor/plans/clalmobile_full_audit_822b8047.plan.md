@@ -61,7 +61,7 @@ isProject: false
 
 - **Admin/CRM users:** Supabase Auth (email/password) via middleware protection
 - **Store customers:** Phone-based OTP via Twilio Verify, custom `customer_otps` table, auth token stored in `customers.auth_token`
-- **Protected routes:** `/admin/`*, `/crm/*`, `/api/admin/*`, `/api/crm/*` -- enforced by `[middleware.ts](middleware.ts)`
+- **Protected routes:** `/admin/`*, `/crm/`*, `/api/admin/*`, `/api/crm/*` -- enforced by `[middleware.ts](middleware.ts)`
 - **Roles:** super_admin, admin, sales, support, content, viewer -- with permission matrix in `[lib/constants.ts](lib/constants.ts)`
 
 ### State Management
@@ -75,7 +75,7 @@ isProject: false
 
 - Dark theme by default (`#09090b` background, `#fafafa` text)
 - Brand color: `#c41040` (red)
-- Custom Tailwind tokens in `[tailwind.config.ts](tailwind.config.ts)`: `brand.`*, `surface.*`, `state.*`, `muted`, `dim`
+- Custom Tailwind tokens in `[tailwind.config.ts](tailwind.config.ts)`: `brand.`*, `surface.`*, `state.*`, `muted`, `dim`
 - Custom breakpoints: `mobile` (max 767px), `tablet` (768-1023px), `desktop` (1024px+)
 - Fonts: Tajawal (Arabic), David Libre + Heebo (Hebrew)
 - RTL default: `html { direction: rtl; }` in `[styles/globals.css](styles/globals.css)`
@@ -254,7 +254,7 @@ isProject: false
 - **Component pattern:** Each component in its own file, `index.ts` barrel exports per module
 - **Error handling:** Try/catch in API routes returning `NextResponse.json({ error })` with appropriate status codes
 - **Responsive:** `useScreen()` hook returns `{ isMobile, isTablet, isDesktop }` -- components render different layouts conditionally
-- **RTL:** Default `dir="rtl"`, all spacing uses logical properties (`ms-`*, `me-*`, `ps-*`, `pe-*`)
+- **RTL:** Default `dir="rtl"`, all spacing uses logical properties (`ms-`*, `me-`*, `ps-*`, `pe-*`)
 - **TypeScript:** Strict mode enabled, types in `[types/database.ts](types/database.ts)` auto-generated from Supabase schema
 - **API pattern:** Route handlers in `app/api/` using `createAdminSupabase()` for server operations
 - **Translations:** All user-visible text from `locales/ar.json` / `locales/he.json` via `useLang()` hook

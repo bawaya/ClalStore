@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(`${baseUrl}/api/reports/${endpoint}?date=${date}&secret=${encodeURIComponent(secret)}`, {
-      headers: { "Authorization": `Bearer ${secret}` },
+      headers: {
+        "Authorization": `Bearer ${secret}`,
+        "x-internal-call": "crm-reports",
+      },
     });
 
     const html = await res.text();

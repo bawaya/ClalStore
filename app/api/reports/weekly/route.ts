@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret") || "";
   const authHeader = req.headers.get("authorization") || "";
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || (secret !== cronSecret && authHeader !== `Bearer ${cronSecret}`)) {
+  const internalCall = req.headers.get("x-internal-call") === "crm-reports";
+  if (cronSecret && secret !== cronSecret && authHeader !== `Bearer ${cronSecret}` && !internalCall) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

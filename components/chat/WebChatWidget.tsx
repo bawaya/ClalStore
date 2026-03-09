@@ -148,25 +148,41 @@ export function WebChatWidget() {
     });
   };
 
-  // === Floating Bubble ===
+  // === Floating AI Bubble ===
   if (!open) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed z-[9999] rounded-full shadow-2xl flex items-center justify-center cursor-pointer border-0 transition-transform hover:scale-110"
+        className="fixed z-[9999] group cursor-pointer border-0 flex items-center gap-2"
         style={{
           bottom: scr.mobile ? 20 : 24,
           left: scr.mobile ? 14 : 24,
-          width: scr.mobile ? 56 : 60,
-          height: scr.mobile ? 56 : 60,
-          background: "linear-gradient(135deg, #c41040, #ff3366)",
           marginBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
-        <span style={{ fontSize: scr.mobile ? 24 : 26 }}>💬</span>
-        {unread > 0 && (
-          <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-            {unread}
+        <div
+          className="rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(196,16,64,0.4)]"
+          style={{
+            width: scr.mobile ? 56 : 60,
+            height: scr.mobile ? 56 : 60,
+            background: "linear-gradient(135deg, #c41040 0%, #8b0a2e 50%, #6d28d9 100%)",
+          }}
+        >
+          <svg width={scr.mobile ? 26 : 28} height={scr.mobile ? 26 : 28} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/>
+            <path d="M10 21h4"/>
+            <circle cx="12" cy="9" r="1" fill="white"/>
+            <path d="M9 9h.01M15 9h.01" strokeWidth="2.5"/>
+          </svg>
+          {unread > 0 && (
+            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+              {unread}
+            </span>
+          )}
+        </div>
+        {!scr.mobile && (
+          <span className="bg-surface-card text-white text-[11px] font-medium px-3 py-1.5 rounded-full border border-surface-border shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+            AI مساعد ذكي
           </span>
         )}
       </button>
@@ -195,23 +211,35 @@ export function WebChatWidget() {
         className="flex items-center justify-between px-4 flex-shrink-0"
         style={{
           height: scr.mobile ? 56 : 52,
-          background: "linear-gradient(135deg, #c41040, #8b0a2e)",
+          background: "linear-gradient(135deg, #c41040 0%, #8b0a2e 50%, #6d28d9 100%)",
         }}
       >
         <button
           onClick={() => setOpen(false)}
-          className="w-8 h-8 rounded-full bg-white/10 border-0 text-white cursor-pointer flex items-center justify-center text-sm"
+          className="w-8 h-8 rounded-full bg-white/10 border-0 text-white cursor-pointer flex items-center justify-center text-sm hover:bg-white/20 transition-colors"
         >
           ✕
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <div>
-            <div className="font-bold text-sm text-right">ClalMobile</div>
-            <div className="text-[9px] opacity-80 text-right">
-              {escalated ? t("chat.escalated") : t("chat.online")}
+            <div className="font-bold text-sm text-right">ClalMobile AI</div>
+            <div className="text-[9px] text-right flex items-center gap-1 justify-end">
+              {escalated ? (
+                <span className="text-yellow-300">{t("chat.escalated")}</span>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+                  <span className="text-white/80">{t("chat.online")}</span>
+                </>
+              )}
             </div>
           </div>
-          <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center font-black text-sm">C</div>
+          <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center backdrop-blur-sm border border-white/20">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/>
+              <path d="M10 21h4"/>
+            </svg>
+          </div>
         </div>
       </div>
 
@@ -288,9 +316,10 @@ export function WebChatWidget() {
         <button
           onClick={() => send(input)}
           disabled={!input.trim() || loading || escalated}
-          className="w-9 h-9 rounded-full bg-brand text-white border-0 cursor-pointer flex items-center justify-center text-sm disabled:opacity-30 flex-shrink-0"
+          className="w-9 h-9 rounded-full text-white border-0 cursor-pointer flex items-center justify-center text-sm disabled:opacity-30 flex-shrink-0 transition-all hover:shadow-[0_0_15px_rgba(196,16,64,0.4)]"
+          style={{ background: "linear-gradient(135deg, #c41040, #6d28d9)" }}
         >
-          ↑
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
         </button>
         <input
           ref={inputRef}
