@@ -117,6 +117,22 @@ async function parsePdfFile(file: File): Promise<PdfRow[]> {
 
   for (const r of rows) r.sort((a, b) => a.x - b.x);
 
+  let deviceColX = -1;
+  let priceColX = -1;
+
+  for (const row of rows) {
+    for (const it of row) {
+      if (/\u05D3\u05D2\u05DD/.test(it.text) && deviceColX < 0) {
+        deviceColX = it.x;
+      }
+      if (/1-18/.test(it.text) && priceColX < 0) {
+        priceColX = it.x;
+      }
+    }
+    if (deviceColX > 0 && priceColX > 0) break;
+  }
+
+  const COL_TOLERANCE = 120;
   const results: PdfRow[] = [];
 
   for (const row of rows) {
@@ -125,28 +141,47 @@ async function parsePdfFile(file: File): Promise<PdfRow[]> {
     if (SKIP_ROW.test(fullText)) continue;
     if (!hasDeviceBrand(fullText)) continue;
 
+    const deviceParts: string[] = [];
     const nums: { x: number; val: number }[] = [];
-    const textParts: string[] = [];
 
     for (const it of row) {
       const val = parsePrice(it.text);
       if (val !== null && val >= 100) {
         nums.push({ x: it.x, val });
       }
-      if (!/^[\d,.\s%]+$/.test(it.text) && it.text.length >= 2) {
-        textParts.push(it.text);
+
+      if (/^[\d,.\s%]+$/.test(it.text)) continue;
+      if (it.text.length < 2) continue;
+
+      if (deviceColX > 0) {
+        if (Math.abs(it.x - deviceColX) <= COL_TOLERANCE) {
+          deviceParts.push(it.text);
+        }
+      } else {
+        if (BRAND_EN.test(it.text) || BRAND_HE.test(it.text) || /\d+\s*GB/i.test(it.text)) {
+          deviceParts.push(it.text);
+        }
       }
     }
 
-    if (nums.length === 0) continue;
+    if (nums.length === 0 || deviceParts.length === 0) continue;
 
-    const deviceName = textParts.join(" ").replace(/\s+/g, " ").trim();
+    const deviceName = deviceParts.join(" ").replace(/\s+/g, " ").trim();
     if (deviceName.length < 4) continue;
 
-    const storage = extractStorage(fullText);
+    const storage = extractStorage(deviceName) || extractStorage(fullText);
 
-    nums.sort((a, b) => a.x - b.x);
-    const price = nums[0].val;
+    let price: number;
+    if (priceColX > 0) {
+      const nearPrice = nums
+        .filter((n) => Math.abs(n.x - priceColX) <= 80)
+        .sort((a, b) => a.x - b.x);
+      price = nearPrice.length > 0 ? nearPrice[0].val : nums.sort((a, b) => a.x - b.x)[0].val;
+    } else {
+      nums.sort((a, b) => a.x - b.x);
+      price = nums[0].val;
+    }
+
     const priceWithVat = Math.round(price * 1.18);
 
     results.push({ deviceName, storage, priceRaw: price, priceWithVat });
