@@ -42,11 +42,9 @@ export async function POST(req: NextRequest) {
 
     const productList = (products as Product[]).map((p) => ({
       id: p.id,
-      brand: p.brand,
-      name_en: p.name_en || '',
-      name_ar: p.name_ar,
-      name_he: p.name_he || '',
-      variants: (p.variants || []).map((v) => ({ storage: v.storage, price: v.price })),
+      b: p.brand,
+      n: p.name_en || p.name_ar,
+      v: (p.variants || []).map((v) => v.storage),
     }));
 
     const apiKey = process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || '';
@@ -55,18 +53,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No API key', steps }, { status: 500 });
     }
 
-    const systemPrompt = 'You are a data extraction and matching assistant for a mobile phone store.\n\nTASK 1: Extract data from the PDF price list:\n- Hebrew PDF price list for mobile devices.\n- Each row has device name and multiple price columns.\n- Use FIRST price column from LEFT (labeled 1-18). Price is BEFORE VAT.\n- Extract: device name (English), storage (e.g. 256GB), price.\n- SKIP headers, totals, page numbers, notes.\n- Translate Hebrew names to English.\n\nTASK 2: Match to our database:\n- Match by brand + model + storage.\n- confidence: exact/fuzzy/none.\n\nRULES:\n- priceWithVat = Math.round(price * 1.18)\n- Separate rows per storage size.\n- Return ONLY JSON array.\n\nFORMAT: [{"deviceName":"iPhone 16 Pro Max","storage":"256GB","price":4200,"priceWithVat":4956,"productId":"id-or-null","variantStorage":"256GB-or-null","confidence":"exact"}]';
+    const systemPrompt = [
+      'You extract device prices from PDF text and match to a product catalog.',
+      'CATALOG: [{id,b:brand,n:name,v:[storages]}]',
+      'TASK: From Hebrew PDF price list, extract each device with its 1-18 column price (first numeric column from left, BEFORE VAT).',
+      'Match each to catalog by brand+model+storage. Translate Hebrew to English.',
+      'SKIP headers/totals/notes.',
+      'RULES: priceWithVat=Math.round(price*1.18). One row per storage.',
+      'Return ONLY a JSON array.',
+      'FORMAT: [{"deviceName":"iPhone 16 Pro Max","storage":"256GB","price":4200,"priceWithVat":4956,"productId":"id-or-null","variantStorage":"256GB-or-null","confidence":"exact|fuzzy|none"}]',
+      'Respond with JSON only. No markdown. No explanation.',
+    ].join('\n');
 
-    const userMsg = '=== PRODUCT CATALOG ===\n' + JSON.stringify(productList, null, 1) + '\n\n=== PDF TEXT ===\n' + pdfText;
+    const userMsg = 'CATALOG:\n' + JSON.stringify(productList) + '\n\nPDF:\n' + pdfText;
 
     steps.push('prompt=' + userMsg.length);
-    steps.push('calling Anthropic API directly');
+    steps.push('calling Anthropic');
 
     const anthropicBody = JSON.stringify({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: 16384,
       temperature: 0.1,
-      system: systemPrompt + '\n\nRespond with JSON only, no extra text or markdown.',
+      system: systemPrompt,
       messages: [{ role: 'user', content: userMsg }],
     });
 
@@ -86,27 +94,39 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      steps.push('errBody=' + errText.substring(0, 500));
-      return NextResponse.json({ error: 'Claude API ' + response.status + ': ' + errText.substring(0, 300), steps }, { status: 500 });
+      steps.push('err=' + errText.substring(0, 500));
+      return NextResponse.json({ error: 'Claude ' + response.status + ': ' + errText.substring(0, 300), steps }, { status: 500 });
     }
 
     const data = await response.json();
     const aiText = data.content?.[0]?.text || '';
     const tokens = { input: data.usage?.input_tokens || 0, output: data.usage?.output_tokens || 0 };
-    steps.push('tokens=' + tokens.input + '+' + tokens.output);
+    const stopReason = data.stop_reason || '';
+    steps.push('tokens=' + tokens.input + '+' + tokens.output + ' stop=' + stopReason);
 
     if (!aiText) {
-      return NextResponse.json({ error: 'Claude empty response', data, steps }, { status: 500 });
+      return NextResponse.json({ error: 'Empty response', data, steps }, { status: 500 });
     }
 
-    steps.push('parsing JSON');
+    if (stopReason === 'max_tokens') {
+      steps.push('WARNING: output truncated!');
+    }
+
+    steps.push('parsing JSON len=' + aiText.length);
     let parsed: AiParsedRow[];
     try {
-      const cleaned = aiText.replace(/```json\s*|```\s*/g, '').trim();
+      let cleaned = aiText.replace(/```json\s*|```\s*/g, '').trim();
+      if (stopReason === 'max_tokens' && !cleaned.endsWith(']')) {
+        const lastComplete = cleaned.lastIndexOf('},');
+        if (lastComplete > 0) {
+          cleaned = cleaned.substring(0, lastComplete + 1) + ']';
+          steps.push('truncation fixed at ' + lastComplete);
+        }
+      }
       parsed = JSON.parse(cleaned);
       if (!Array.isArray(parsed)) parsed = [];
     } catch (e: any) {
-      return NextResponse.json({ error: 'JSON parse: ' + e.message, aiText: aiText.substring(0, 500), steps }, { status: 500 });
+      return NextResponse.json({ error: 'JSON: ' + e.message, aiText: aiText.substring(0, 500), steps }, { status: 500 });
     }
 
     steps.push('parsed=' + parsed.length);
