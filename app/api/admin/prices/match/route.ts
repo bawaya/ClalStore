@@ -2,7 +2,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase';
-import { callClaude } from '@/lib/ai/claude';
 import type { Product } from '@/types/database';
 
 type AiParsedRow = {
@@ -15,6 +14,9 @@ type AiParsedRow = {
   confidence: 'exact' | 'fuzzy' | 'none';
 };
 
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
+const MODEL = 'claude-sonnet-4-20250514';
+
 export async function POST(req: NextRequest) {
   const steps: string[] = [];
 
@@ -23,14 +25,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const pdfText = body?.pdfText as string;
     if (!pdfText?.trim()) {
-      return NextResponse.json({ error: 'No PDF text provided', steps }, { status: 400 });
+      return NextResponse.json({ error: 'No PDF text', steps }, { status: 400 });
     }
-    steps.push('pdfText len=' + pdfText.length);
+    steps.push('pdfText=' + pdfText.length);
 
     steps.push('fetching products');
     const db = createAdminSupabase();
     const { data: products, error: dbErr } = await db.from('products').select('*').eq('type', 'device');
-
     if (dbErr) {
       return NextResponse.json({ error: 'DB: ' + dbErr.message, steps }, { status: 500 });
     }
@@ -49,51 +50,66 @@ export async function POST(req: NextRequest) {
     }));
 
     const apiKey = process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || '';
-    steps.push('key=' + (apiKey.length > 0) + ' len=' + apiKey.length);
+    steps.push('key=' + !!apiKey);
     if (!apiKey) {
-      return NextResponse.json({ error: 'No ANTHROPIC_API_KEY_ADMIN', steps }, { status: 500 });
+      return NextResponse.json({ error: 'No API key', steps }, { status: 500 });
     }
 
-    const systemPrompt = 'You are a data extraction and matching assistant for a mobile phone store.\n\nTASK 1: Extract data from the PDF price list:\n- The text is from a Hebrew PDF price list for mobile devices.\n- Each row has: device name (brand + model + storage) and multiple price columns.\n- Use the FIRST price column from the LEFT (labeled 1-18 or similar). This is the price BEFORE VAT.\n- Extract: device name (in English), storage capacity (e.g. 256GB), and the price.\n- SKIP headers, totals, page numbers, notes, and non-device rows.\n- Translate Hebrew device names to English.\n\nTASK 2: Match each extracted device to a product in our database:\n- I will provide our product catalog with IDs, names, and storage variants.\n- Match by brand + model + storage capacity.\n- confidence: exact = clear match, fuzzy = likely match, none = no match.\n\nRULES:\n- priceWithVat = Math.round(price * 1.18)\n- If a device appears with different storage sizes, output separate rows.\n- Return ONLY a JSON array. No explanation, no markdown.\n\nOUTPUT FORMAT:\n[{"deviceName":"iPhone 16 Pro Max","storage":"256GB","price":4200,"priceWithVat":4956,"productId":"id-or-null","variantStorage":"256GB-or-null","confidence":"exact"}]';
+    const systemPrompt = 'You are a data extraction and matching assistant for a mobile phone store.\n\nTASK 1: Extract data from the PDF price list:\n- Hebrew PDF price list for mobile devices.\n- Each row has device name and multiple price columns.\n- Use FIRST price column from LEFT (labeled 1-18). Price is BEFORE VAT.\n- Extract: device name (English), storage (e.g. 256GB), price.\n- SKIP headers, totals, page numbers, notes.\n- Translate Hebrew names to English.\n\nTASK 2: Match to our database:\n- Match by brand + model + storage.\n- confidence: exact/fuzzy/none.\n\nRULES:\n- priceWithVat = Math.round(price * 1.18)\n- Separate rows per storage size.\n- Return ONLY JSON array.\n\nFORMAT: [{"deviceName":"iPhone 16 Pro Max","storage":"256GB","price":4200,"priceWithVat":4956,"productId":"id-or-null","variantStorage":"256GB-or-null","confidence":"exact"}]';
 
-    const userMessage = '=== OUR PRODUCT CATALOG ===\n'
-      + JSON.stringify(productList, null, 1)
-      + '\n\n=== PDF PRICE LIST TEXT ===\n'
-      + pdfText;
+    const userMsg = '=== PRODUCT CATALOG ===\n' + JSON.stringify(productList, null, 1) + '\n\n=== PDF TEXT ===\n' + pdfText;
 
-    steps.push('prompt len=' + userMessage.length);
-    steps.push('calling Claude');
+    steps.push('prompt=' + userMsg.length);
+    steps.push('calling Anthropic API directly');
 
-    const aiResult = await callClaude({
-      apiKey,
-      systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-      maxTokens: 4000,
+    const anthropicBody = JSON.stringify({
+      model: MODEL,
+      max_tokens: 4096,
       temperature: 0.1,
-      jsonMode: true,
-      timeout: 55000,
+      system: systemPrompt + '\n\nRespond with JSON only, no extra text or markdown.',
+      messages: [{ role: 'user', content: userMsg }],
     });
 
-    if (!aiResult) {
-      return NextResponse.json({ error: 'Claude returned null', steps }, { status: 500 });
+    steps.push('reqBody=' + anthropicBody.length);
+
+    const response = await fetch(ANTHROPIC_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: anthropicBody,
+    });
+
+    steps.push('status=' + response.status);
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      steps.push('errBody=' + errText.substring(0, 500));
+      return NextResponse.json({ error: 'Claude API ' + response.status + ': ' + errText.substring(0, 300), steps }, { status: 500 });
     }
 
-    steps.push('claude ok ' + aiResult.duration + 'ms tok=' + aiResult.tokens.input + '+' + aiResult.tokens.output);
+    const data = await response.json();
+    const aiText = data.content?.[0]?.text || '';
+    const tokens = { input: data.usage?.input_tokens || 0, output: data.usage?.output_tokens || 0 };
+    steps.push('tokens=' + tokens.input + '+' + tokens.output);
 
-    if (!aiResult.json && !aiResult.text) {
-      return NextResponse.json({ error: 'Claude empty response', steps }, { status: 500 });
+    if (!aiText) {
+      return NextResponse.json({ error: 'Claude empty response', data, steps }, { status: 500 });
     }
 
     steps.push('parsing JSON');
     let parsed: AiParsedRow[];
     try {
-      const raw = aiResult.json || JSON.parse(aiResult.text.replace(/```json\s*|```\s*/g, '').trim());
-      parsed = Array.isArray(raw) ? raw : [];
+      const cleaned = aiText.replace(/```json\s*|```\s*/g, '').trim();
+      parsed = JSON.parse(cleaned);
+      if (!Array.isArray(parsed)) parsed = [];
     } catch (e: any) {
-      return NextResponse.json({ error: 'JSON parse: ' + e.message, aiText: aiResult.text?.substring(0, 500), steps }, { status: 500 });
+      return NextResponse.json({ error: 'JSON parse: ' + e.message, aiText: aiText.substring(0, 500), steps }, { status: 500 });
     }
 
-    steps.push('parsed rows=' + parsed.length);
+    steps.push('parsed=' + parsed.length);
 
     const productMap = new Map((products as Product[]).map((p) => [p.id, p]));
 
@@ -128,7 +144,8 @@ export async function POST(req: NextRequest) {
       unmatched: results.filter((r) => !r.matched).length,
     };
 
-    return NextResponse.json({ data: results, summary, aiTokens: aiResult.tokens, aiDuration: aiResult.duration, steps });
+    steps.push('done');
+    return NextResponse.json({ data: results, summary, tokens, steps });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || String(err), steps, stack: err.stack?.substring(0, 300) }, { status: 500 });
   }
