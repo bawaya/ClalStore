@@ -14,8 +14,8 @@ type AiParsedRow = {
   confidence: 'exact' | 'fuzzy' | 'none';
 };
 
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-20250514';
+const OPENAI_API = 'https://api.openai.com/v1/chat/completions';
+const MODEL = 'gpt-4o-mini';
 
 export async function POST(req: NextRequest) {
   const steps: string[] = [];
@@ -47,47 +47,59 @@ export async function POST(req: NextRequest) {
       v: (p.variants || []).map((v) => v.storage),
     }));
 
-    const apiKey = process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || '';
+    const apiKey =
+      process.env.OPENAI_API_KEY_PRICES ||
+      process.env.OPENAI_API_KEY_ADMIN ||
+      process.env.OPENAI_API_KEY ||
+      '';
     steps.push('key=' + !!apiKey);
     if (!apiKey) {
-      return NextResponse.json({ error: 'No API key', steps }, { status: 500 });
+      return NextResponse.json({ error: 'No OpenAI API key', steps }, { status: 500 });
     }
 
     const systemPrompt = [
-      'You extract device prices from PDF text and match to a product catalog.',
+      'You extract device prices from PDF text and match them to a product catalog.',
       'CATALOG: [{id,b:brand,n:name,v:[storages]}]',
-      'TASK: From Hebrew PDF price list, extract each device with its 1-18 column price (first numeric column from left, BEFORE VAT).',
-      'Match each to catalog by brand+model+storage. Translate Hebrew to English.',
-      'SKIP headers/totals/notes.',
-      'RULES: priceWithVat=Math.round(price*1.18). One row per storage.',
-      'Return ONLY a JSON array.',
-      'FORMAT: [{"deviceName":"iPhone 16 Pro Max","storage":"256GB","price":4200,"priceWithVat":4956,"productId":"id-or-null","variantStorage":"256GB-or-null","confidence":"exact|fuzzy|none"}]',
-      'Respond with JSON only. No markdown. No explanation.',
+      'TASK: From the Hebrew PDF price list, extract each device with its 1-18 column price (the first numeric price column from the left, BEFORE VAT).',
+      'Translate Hebrew device names to English when possible.',
+      'Match by brand + model + storage.',
+      'SKIP headers, totals, notes, and non-device lines.',
+      'Compute priceWithVat = Math.round(price * 1.18).',
+      'Return ONE LINE per detected device in this exact pipe-separated format:',
+      'deviceName || storage || price || priceWithVat || productId || variantStorage || confidence',
+      'Rules for empty values:',
+      '- If no product match, leave productId empty',
+      '- If no variant match, leave variantStorage empty',
+      '- confidence must be exact or fuzzy or none',
+      'Return ONLY data lines. No JSON. No markdown. No numbering. No explanation.',
+      'Example:',
+      'iPhone 16 Pro Max || 256GB || 4200 || 4956 || prod_123 || 256GB || exact',
     ].join('\n');
 
     const userMsg = 'CATALOG:\n' + JSON.stringify(productList) + '\n\nPDF:\n' + pdfText;
 
     steps.push('prompt=' + userMsg.length);
-    steps.push('calling Anthropic');
+    steps.push('calling OpenAI');
 
-    const anthropicBody = JSON.stringify({
+    const openAiBody = JSON.stringify({
       model: MODEL,
-      max_tokens: 16384,
       temperature: 0.1,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMsg }],
+      max_tokens: 12000,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMsg },
+      ],
     });
 
-    steps.push('reqBody=' + anthropicBody.length);
+    steps.push('reqBody=' + openAiBody.length);
 
-    const response = await fetch(ANTHROPIC_API, {
+    const response = await fetch(OPENAI_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
-      body: anthropicBody,
+      body: openAiBody,
     });
 
     steps.push('status=' + response.status);
@@ -95,38 +107,68 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
       steps.push('err=' + errText.substring(0, 500));
-      return NextResponse.json({ error: 'Claude ' + response.status + ': ' + errText.substring(0, 300), steps }, { status: 500 });
+      return NextResponse.json({ error: 'OpenAI ' + response.status + ': ' + errText.substring(0, 300), steps }, { status: 500 });
     }
 
     const data = await response.json();
-    const aiText = data.content?.[0]?.text || '';
-    const tokens = { input: data.usage?.input_tokens || 0, output: data.usage?.output_tokens || 0 };
-    const stopReason = data.stop_reason || '';
+    const aiText = data.choices?.[0]?.message?.content || '';
+    const tokens = {
+      input: data.usage?.prompt_tokens || 0,
+      output: data.usage?.completion_tokens || 0,
+    };
+    const stopReason = data.choices?.[0]?.finish_reason || '';
     steps.push('tokens=' + tokens.input + '+' + tokens.output + ' stop=' + stopReason);
 
     if (!aiText) {
       return NextResponse.json({ error: 'Empty response', data, steps }, { status: 500 });
     }
 
-    if (stopReason === 'max_tokens') {
-      steps.push('WARNING: output truncated!');
-    }
-
-    steps.push('parsing JSON len=' + aiText.length);
+    steps.push('parsing lines len=' + aiText.length);
     let parsed: AiParsedRow[];
     try {
-      let cleaned = aiText.replace(/```json\s*|```\s*/g, '').trim();
-      if (stopReason === 'max_tokens' && !cleaned.endsWith(']')) {
-        const lastComplete = cleaned.lastIndexOf('},');
-        if (lastComplete > 0) {
-          cleaned = cleaned.substring(0, lastComplete + 1) + ']';
-          steps.push('truncation fixed at ' + lastComplete);
-        }
-      }
-      parsed = JSON.parse(cleaned);
-      if (!Array.isArray(parsed)) parsed = [];
+      const cleaned = aiText
+        .replace(/```[\s\S]*?\n/g, '')
+        .replace(/```/g, '')
+        .trim();
+
+      const lines = cleaned
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .filter((line) => line.includes('||'));
+
+      parsed = lines
+        .map((line) => {
+          const parts = line.split('||').map((part) => part.trim());
+          const [
+            deviceName = '',
+            storage = '',
+            priceText = '',
+            priceWithVatText = '',
+            productIdRaw = '',
+            variantStorageRaw = '',
+            confidenceRaw = 'none',
+          ] = parts;
+
+          const price = Number(priceText.replace(/[^\d.]/g, ''));
+          const priceWithVat = Number(priceWithVatText.replace(/[^\d.]/g, ''));
+          const confidence = /^(exact|fuzzy|none)$/i.test(confidenceRaw)
+            ? confidenceRaw.toLowerCase()
+            : 'none';
+
+          return {
+            deviceName,
+            storage,
+            price: Number.isFinite(price) ? price : 0,
+            priceWithVat: Number.isFinite(priceWithVat) ? priceWithVat : 0,
+            productId: productIdRaw || null,
+            variantStorage: variantStorageRaw || null,
+            confidence: confidence as AiParsedRow['confidence'],
+          };
+        })
+        .filter((row) => row.deviceName && row.price > 0);
     } catch (e: any) {
-      return NextResponse.json({ error: 'JSON: ' + e.message, aiText: aiText.substring(0, 500), steps }, { status: 500 });
+      return NextResponse.json({ error: 'Parse: ' + e.message, aiText: aiText.substring(0, 1000), steps }, { status: 500 });
     }
 
     steps.push('parsed=' + parsed.length);
@@ -165,7 +207,7 @@ export async function POST(req: NextRequest) {
     };
 
     steps.push('done');
-    return NextResponse.json({ data: results, summary, tokens, steps });
+    return NextResponse.json({ data: results, summary, tokens, steps, provider: 'openai' });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || String(err), steps, stack: err.stack?.substring(0, 300) }, { status: 500 });
   }
