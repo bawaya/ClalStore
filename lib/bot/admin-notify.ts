@@ -1,40 +1,45 @@
 // =====================================================
 // ClalMobile — Admin Notification Service
 // Send WhatsApp alerts to admin for key events
-// Uses default yCloud phone (WHATSAPP_PHONE_ID) as sender
+//
+// WHATSAPP_PHONE_ID    = +972533337653 (البوت — رسائل الزبائن)
+// ADMIN_REPORT_PHONE   = +972537777963 (رقم التقارير — يرسل للأدمن)
+// ADMIN_PERSONAL_PHONE = +972502404412 (رقم الأدمن — يستقبل التنبيهات)
 // =====================================================
 
 import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
 
+const REPORT_FROM = () => process.env.ADMIN_REPORT_PHONE || "";
 const ADMIN_TO = () => process.env.ADMIN_PERSONAL_PHONE || "";
 const TEAM_NUMBERS = () => (process.env.TEAM_WHATSAPP_NUMBERS || "").split(",").filter(Boolean);
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
-/** Send message to admin — try template first (always works), text as bonus */
+/** Send message to admin — from the report phone, try template first then text */
 async function sendToAdmin(message: string): Promise<void> {
+  const from = REPORT_FROM();
   const to = ADMIN_TO();
-  if (!to) {
-    console.error("[AdminNotify] SKIP — ADMIN_PERSONAL_PHONE not set");
+  if (!to || !from) {
+    console.error("[AdminNotify] SKIP — missing env:", !to ? "ADMIN_PERSONAL_PHONE" : "ADMIN_REPORT_PHONE");
     return;
   }
 
   const shortMsg = message.slice(0, 1024);
 
-  // Strategy: try template FIRST (no 24h window needed), then text as bonus
+  // Strategy: try template FIRST (no 24h window needed), then text
   try {
     await sendWhatsAppTemplate(to, "clal_admin_alert", [shortMsg]);
-    console.log("[AdminNotify] Template sent successfully to", to);
+    console.log("[AdminNotify] Template sent OK from", from, "to", to);
     return;
   } catch (templateErr: any) {
     console.warn("[AdminNotify] Template failed:", templateErr?.message || templateErr);
   }
 
-  // Fallback: try free-form text (only works within 24h window)
+  // Fallback: free-form text from report phone (only works within 24h window)
   try {
-    await sendWhatsAppText(to, message);
-    console.log("[AdminNotify] Text sent successfully to", to);
+    await sendWhatsAppText(to, message, from);
+    console.log("[AdminNotify] Text sent OK from", from, "to", to);
   } catch (textErr: any) {
-    console.error("[AdminNotify] Both template and text failed for", to, "—", textErr?.message || textErr);
+    console.error("[AdminNotify] Both template and text failed —", textErr?.message || textErr);
   }
 }
 
@@ -47,6 +52,7 @@ export async function notifyAdminPersonal(message: string): Promise<void> {
 }
 
 export async function notifyTeam(message: string): Promise<void> {
+  const from = REPORT_FROM();
   const numbers = TEAM_NUMBERS();
   if (numbers.length === 0) return;
   const shortMsg = message.slice(0, 1024);
@@ -55,7 +61,7 @@ export async function notifyTeam(message: string): Promise<void> {
       await sendWhatsAppTemplate(num.trim(), "clal_admin_alert", [shortMsg]);
     } catch {
       try {
-        await sendWhatsAppText(num.trim(), message);
+        await sendWhatsAppText(num.trim(), message, from);
       } catch (err) {
         console.error(`[AdminNotify] Team notify failed (${num}):`, err);
       }
