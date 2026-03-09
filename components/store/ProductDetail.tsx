@@ -207,12 +207,7 @@ export function ProductDetailClient({
               )}
             </div>
 
-            {/* Type info */}
-            {p.type === "device" && (
-              <div className="bg-state-info/10 rounded-[10px] p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                <span className="text-state-info">{t("detail.deviceNote")}</span>
-              </div>
-            )}
+            {/* Accessory quick-ship note */}
             {p.type === "accessory" && (
               <div className="bg-state-success/10 rounded-[10px] p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
                 <span className="text-state-success">{t("detail.accessoryNote")}</span>
