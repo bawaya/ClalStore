@@ -151,6 +151,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); if (smartResults) setSmartResults(null); }}
                 onKeyDown={handleSearchKeyDown}
+                aria-label="البحث عن منتجات"
               />
               {smartSearching && (
                 <span className="text-purple-400 text-xs animate-pulse">🧠</span>
@@ -201,12 +202,16 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
         {/* Type filter */}
         <div
           className="flex gap-1 mb-2 overflow-x-auto"
+          role="tablist"
+          aria-label="نوع المنتج"
           style={{ flexWrap: scr.desktop ? "wrap" : "nowrap" }}
         >
           {typeCategories.map((c) => (
             <button
               key={c.key}
               onClick={() => setTypeCat(c.key)}
+              role="tab"
+              aria-selected={typeCat === c.key}
               className={`chip whitespace-nowrap ${typeCat === c.key ? "chip-active" : ""}`}
             >
               {c.label}

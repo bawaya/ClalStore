@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
@@ -134,15 +135,14 @@ export function ProductDetailClient({
           <div className="flex-shrink-0" style={{ width: scr.mobile ? "100%" : 380, marginBottom: scr.mobile ? 12 : 0 }}>
             {/* Main Image */}
             <div
-              className="bg-surface-elevated rounded-2xl flex items-center justify-center"
+              className="bg-surface-elevated rounded-2xl flex items-center justify-center relative"
               style={{
                 width: "100%",
                 height: scr.mobile ? 260 : 380,
-                padding: scr.mobile ? 20 : 32,
               }}
             >
               {allImages.length > 0 ? (
-                <img src={allImages[selImage] || allImages[0]} alt={productName} className="w-full h-full object-contain drop-shadow-lg" />
+                <Image src={allImages[selImage] || allImages[0]} alt={productName} fill sizes="(max-width: 768px) 100vw, 380px" className="object-contain drop-shadow-lg p-4" priority />
               ) : (
                 <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
                   {p.type === "device" ? "📱" : "🔌"}
@@ -157,7 +157,7 @@ export function ProductDetailClient({
                   <button
                     key={i}
                     onClick={() => setSelImage(i)}
-                    className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-all border-0 bg-surface-elevated flex items-center justify-center p-1"
+                    className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-all border-0 bg-surface-elevated relative"
                     style={{
                       width: scr.mobile ? 48 : 60,
                       height: scr.mobile ? 48 : 60,
@@ -165,7 +165,7 @@ export function ProductDetailClient({
                       opacity: selImage === i ? 1 : 0.6,
                     }}
                   >
-                    <img src={img} alt="" className="w-full h-full object-contain" />
+                    <Image src={img} alt="" fill sizes="60px" className="object-contain" />
                   </button>
                 ))}
               </div>
@@ -182,7 +182,7 @@ export function ProductDetailClient({
               )}
               <div className="flex items-center gap-1.5">
                 {getBrandLogo(p.brand) && (
-                  <img src={getBrandLogo(p.brand)!} alt={p.brand} style={{ width: scr.mobile ? 18 : 22, height: scr.mobile ? 18 : 22 }} />
+                  <Image src={getBrandLogo(p.brand)!} alt={p.brand} width={scr.mobile ? 18 : 22} height={scr.mobile ? 18 : 22} loading="lazy" />
                 )}
                 <span className="text-white font-extrabold uppercase tracking-wide" style={{ fontSize: scr.mobile ? 14 : 16 }}>{p.brand}</span>
               </div>

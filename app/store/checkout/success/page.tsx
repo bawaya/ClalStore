@@ -21,6 +21,7 @@ function SuccessContent() {
 
   useEffect(() => {
     clearCart();
+    try { sessionStorage.removeItem("clal_pending_order"); } catch {}
   }, [clearCart]);
 
   useEffect(() => {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import type { Hero } from "@/types/database";
@@ -37,6 +39,9 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
   return (
     <div
       className="text-center relative"
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="عروض مميزة"
       style={{
         background: "linear-gradient(135deg, rgba(196,16,64,0.12), rgba(168,85,247,0.08))",
         padding: scr.mobile ? "24px 20px" : "48px 40px",
@@ -45,10 +50,13 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
       }}
     >
       {h.image_url && (
-        <img
+        <Image
           src={h.image_url}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-20 rounded-[inherit]"
+          fill
+          sizes="100vw"
+          className="object-cover opacity-20 rounded-[inherit]"
+          priority={idx === 0}
         />
       )}
       <div className="relative z-10">
@@ -65,24 +73,40 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
           {subtitle}
         </p>
         {ctaText && (
-          <button
-            className="btn-primary"
-            style={{
-              padding: scr.mobile ? "10px 28px" : "12px 36px",
-              fontSize: scr.mobile ? 12 : 14,
-            }}
-          >
-            {ctaText}
-          </button>
+          h.link_url ? (
+            <Link
+              href={h.link_url}
+              className="btn-primary inline-block"
+              style={{
+                padding: scr.mobile ? "10px 28px" : "12px 36px",
+                fontSize: scr.mobile ? 12 : 14,
+              }}
+            >
+              {ctaText}
+            </Link>
+          ) : (
+            <button
+              className="btn-primary"
+              style={{
+                padding: scr.mobile ? "10px 28px" : "12px 36px",
+                fontSize: scr.mobile ? 12 : 14,
+              }}
+            >
+              {ctaText}
+            </button>
+          )
         )}
       </div>
       {items.length > 1 && (
-        <div className="flex justify-center gap-1.5 mt-3 relative z-10">
+        <div className="flex justify-center gap-1.5 mt-3 relative z-10" role="tablist" aria-label="التنقل بين العروض">
           {items.map((_, i) => (
             <button
               key={i}
               onClick={() => setIdx(i)}
               className="rounded-full transition-all"
+              role="tab"
+              aria-selected={idx === i}
+              aria-label={`عرض ${i + 1} من ${items.length}`}
               style={{
                 width: idx === i ? 20 : 6,
                 height: 6,

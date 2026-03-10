@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=David+Libre:wght@400;500;700&family=Heebo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap");
+/* Fonts loaded via next/font in layout.tsx — no external @import needed */
 
 @layer base {
   * {
@@ -17,7 +17,7 @@
   }
 
   body {
-    font-family: "Tajawal", "Heebo", sans-serif;
+    font-family: var(--font-tajawal), var(--font-heebo), sans-serif;
     font-size: 15px;
     line-height: 1.6;
     background: #09090b;
@@ -30,7 +30,7 @@
   /* Hebrew override */
   [lang="he"] body,
   [dir="ltr"] body {
-    font-family: "David Libre", "Heebo", "Tajawal", serif;
+    font-family: var(--font-david-libre), var(--font-heebo), var(--font-tajawal), serif;
   }
 
   /* Scrollbar */

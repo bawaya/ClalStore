@@ -35,7 +35,9 @@ export default async function HomePage() {
       getLinePlans(),
       getWebsiteContent(),
     ]);
-  } catch {}
+  } catch (e) {
+    console.error("[HomePage] Failed to fetch data:", e);
+  }
 
   return <HomeClient products={products} plans={plans} cms={cms} />;
 }

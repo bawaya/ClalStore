@@ -153,6 +153,7 @@ export function WebChatWidget() {
     return (
       <button
         onClick={() => setOpen(true)}
+        aria-label="فتح المحادثة"
         className="fixed z-[9999] rounded-full shadow-2xl flex items-center justify-center cursor-pointer border-0 transition-transform hover:scale-110"
         style={{
           bottom: scr.mobile ? 20 : 24,
@@ -201,6 +202,7 @@ export function WebChatWidget() {
         <button
           onClick={() => setOpen(false)}
           className="w-8 h-8 rounded-full bg-white/10 border-0 text-white cursor-pointer flex items-center justify-center text-sm"
+          aria-label="إغلاق المحادثة"
         >
           ✕
         </button>

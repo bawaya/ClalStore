@@ -6,6 +6,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
@@ -56,7 +57,14 @@ export function Navbar() {
 
         {/* Mobile menu */}
         {scr.mobile && (
-          <button onClick={() => setMenuOpen(!menuOpen)} className="text-white bg-transparent border-0 cursor-pointer text-xl">☰</button>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-white bg-transparent border-0 cursor-pointer text-xl"
+            aria-label={menuOpen ? "إغلاق القائمة" : "فتح القائمة"}
+            aria-expanded={menuOpen}
+          >
+            ☰
+          </button>
         )}
       </div>
 
@@ -87,11 +95,20 @@ export function HeroSection({ cms }: { cms?: WebsiteContent }) {
   return (
     <section className="relative overflow-hidden" style={{ paddingTop: scr.mobile ? 100 : 120, paddingBottom: scr.mobile ? 40 : 80 }}>
       {/* BG gradient */}
-      <div className="absolute inset-0 pointer-events-none" style={{
-        background: c.bg_image
-          ? `url(${c.bg_image}) center/cover no-repeat`
-          : "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(196,16,64,0.15) 0%, transparent 70%)",
-      }} />
+      {c.bg_image ? (
+        <Image
+          src={c.bg_image}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover pointer-events-none"
+          priority
+        />
+      ) : (
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(196,16,64,0.15) 0%, transparent 70%)",
+        }} />
+      )}
 
       <div className="max-w-6xl mx-auto px-4 text-center relative z-10">
         <div className="inline-block bg-brand/10 text-brand text-[10px] font-bold px-3 py-1 rounded-full mb-4">
@@ -294,14 +311,17 @@ export function FAQSection({ faqs, cms }: { faqs?: { q: string; a: string }[]; c
         <div className="text-center mb-6">
           <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("faq.title")}</h2>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5" role="list">
           {defaultFaqs.map((f: { q: string; a: string }, i: number) => (
-            <div key={i} className="card cursor-pointer" onClick={() => setOpenIdx(openIdx === i ? null : i)}
-              style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}>
-              <div className="flex items-center justify-between">
+            <div key={i} className="card" style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}>
+              <button
+                onClick={() => setOpenIdx(openIdx === i ? null : i)}
+                className="w-full flex items-center justify-between cursor-pointer bg-transparent border-0 p-0 text-white"
+                aria-expanded={openIdx === i}
+              >
                 <span className="text-brand transition-transform" style={{ transform: openIdx === i ? "rotate(45deg)" : "rotate(0)", fontSize: 16 }}>+</span>
                 <span className="font-bold text-right flex-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>{f.q}</span>
-              </div>
+              </button>
               {openIdx === i && (
                 <div className="text-muted text-right mt-2 leading-relaxed" style={{ fontSize: scr.mobile ? 11 : 13 }}>{f.a}</div>
               )}

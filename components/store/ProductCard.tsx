@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
@@ -43,12 +44,16 @@ function getWarrantyKey(p: Product): string | null {
   return null;
 }
 
-export function ProductCard({ product: p }: { product: Product }) {
+export const ProductCard = memo(function ProductCard({ product: p }: { product: Product }) {
   const scr = useScreen();
   const { t, lang } = useLang();
   const addItem = useCart((s) => s.addItem);
-  const { addItem: addToCompare, removeItem: removeFromCompare, isInCompare } = useCompare();
-  const { addItem: addToWishlist, removeItem: removeFromWishlist, isInWishlist } = useWishlist();
+  const addToCompare = useCompare((s) => s.addItem);
+  const removeFromCompare = useCompare((s) => s.removeItem);
+  const inCompare = useCompare((s) => s.items.some((i) => i.id === p.id));
+  const addToWishlist = useWishlist((s) => s.addItem);
+  const removeFromWishlist = useWishlist((s) => s.removeItem);
+  const inWishlist = useWishlist((s) => s.items.some((i) => i.id === p.id));
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
   const [selColor, setSelColor] = useState(-1); // -1 = no color selected → show main image
@@ -65,9 +70,6 @@ export function ProductCard({ product: p }: { product: Product }) {
   const activeVariant = getActiveVariant(p, selStorage < 0 ? 0 : selStorage);
   const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
   const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
-
-  const inCompare = isInCompare(p.id);
-  const inWishlist = isInWishlist(p.id);
 
   const warrantyKey = getWarrantyKey(p);
 
@@ -184,16 +186,19 @@ export function ProductCard({ product: p }: { product: Product }) {
       {/* ── Product Image ── */}
       <div
         className="bg-[#1a1a1e] flex items-center justify-center overflow-hidden relative"
-        style={{ height: scr.mobile ? 180 : 230, padding: scr.mobile ? 16 : 24 }}
+        style={{ height: scr.mobile ? 180 : 230 }}
       >
         {(() => {
           const colorImg = selColor >= 0 ? colors[selColor]?.image : undefined;
           const imgSrc = colorImg || p.image_url;
           return imgSrc ? (
-            <img
+            <Image
               src={imgSrc}
               alt={getProductName(p, lang)}
-              className="w-full h-full object-contain drop-shadow-lg"
+              fill
+              sizes="(max-width: 768px) 50vw, 25vw"
+              className="object-contain drop-shadow-lg p-3"
+              loading="lazy"
             />
           ) : (
             <span
@@ -252,11 +257,13 @@ export function ProductCard({ product: p }: { product: Product }) {
         {/* Brand + Name */}
         <div className="flex items-center gap-1.5 mb-0.5">
           {getBrandLogo(p.brand) && (
-            <img
+            <Image
               src={getBrandLogo(p.brand)!}
               alt={p.brand}
+              width={scr.mobile ? 14 : 18}
+              height={scr.mobile ? 14 : 18}
               className="flex-shrink-0"
-              style={{ width: scr.mobile ? 14 : 18, height: scr.mobile ? 14 : 18 }}
+              loading="lazy"
             />
           )}
           <span
@@ -275,16 +282,18 @@ export function ProductCard({ product: p }: { product: Product }) {
         </div>
 
         {/* Description (subtitle) */}
-        {getDescription(p, lang) && (
-          <div
-            className="text-[#71717a] leading-snug mb-1.5"
-            style={{ fontSize: scr.mobile ? 9 : 11 }}
-          >
-            {getDescription(p, lang).length > 60
-              ? getDescription(p, lang).slice(0, 60) + "..."
-              : getDescription(p, lang)}
-          </div>
-        )}
+        {(() => {
+          const desc = getDescription(p, lang);
+          if (!desc) return null;
+          return (
+            <div
+              className="text-[#71717a] leading-snug mb-1.5"
+              style={{ fontSize: scr.mobile ? 9 : 11 }}
+            >
+              {desc.length > 60 ? desc.slice(0, 60) + "..." : desc}
+            </div>
+          );
+        })()}
 
         {/* ── Quick Specs Strip (devices only) ── */}
         {p.type === "device" && p.specs && (() => {
@@ -472,11 +481,11 @@ export function ProductCard({ product: p }: { product: Product }) {
             marginTop: scr.mobile ? 4 : 6,
           }}
           onMouseEnter={(e) => {
-            (e.target as HTMLButtonElement).style.background =
+            (e.currentTarget as HTMLButtonElement).style.background =
               "rgba(196,16,64,0.1)";
           }}
           onMouseLeave={(e) => {
-            (e.target as HTMLButtonElement).style.background = "transparent";
+            (e.currentTarget as HTMLButtonElement).style.background = "transparent";
           }}
         >
           {t("store.addToCart")}
@@ -484,4 +493,4 @@ export function ProductCard({ product: p }: { product: Product }) {
       </div>
     </Link>
   );
-}
+});
