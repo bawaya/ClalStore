@@ -45,8 +45,10 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
       style={{
         background: "transparent",
         padding: scr.mobile ? "24px 20px" : "48px 40px",
+        minHeight: scr.mobile ? 220 : 320,
         borderRadius: scr.mobile ? 0 : 20,
         margin: scr.mobile ? 0 : "0 0 20px",
+        overflow: "hidden",
       }}
     >
       {h.image_url && (

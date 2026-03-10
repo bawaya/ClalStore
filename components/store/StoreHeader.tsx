@@ -39,7 +39,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
   ];
 
   return (
-    <header className="bg-surface-card border-b border-surface-border fixed top-0 left-0 right-0 z-50">
+    <header className="bg-surface-card border-b border-surface-border sticky top-0 z-50">
       <div
         className="max-w-[1200px] mx-auto flex items-center justify-between"
         style={{ padding: scr.mobile ? "10px 14px" : "14px 28px" }}
