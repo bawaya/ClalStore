@@ -13,7 +13,8 @@ import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
 import { ProductCard } from "@/components/store/ProductCard";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ShoppingCart } from "lucide-react";
+import { useCart } from "@/lib/store/cart";
 import type { WebsiteContent } from "@/types/database";
 
 // ===== Navbar =====
@@ -21,6 +22,7 @@ export function Navbar() {
   const scr = useScreen();
   const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useLang();
+  const itemCount = useCart((s) => s.getItemCount());
 
   const links = [
     { href: "/", label: t("nav.home") },
@@ -34,8 +36,31 @@ export function Navbar() {
   return (
     <nav role="navigation" className="fixed top-0 left-0 right-0 z-50 glass-header glass-glow-line">
       <div className="max-w-6xl mx-auto flex items-center justify-between" style={{ padding: scr.mobile ? "10px 16px" : "12px 24px" }}>
-        {/* CTA + Lang */}
+        {/* CTA + Lang + Cart */}
         <div className="flex items-center gap-2">
+          <Link
+            href="/store/cart"
+            className="relative flex items-center justify-center rounded-xl transition-colors hover:bg-white/5"
+            style={{ width: scr.mobile ? 34 : 40, height: scr.mobile ? 34 : 40 }}
+          >
+            <ShoppingCart size={scr.mobile ? 18 : 20} className="text-white" />
+            {itemCount > 0 && (
+              <span
+                className="absolute -top-1 rounded-full font-black flex items-center justify-center"
+                style={{
+                  insetInlineEnd: -4,
+                  width: 18,
+                  height: 18,
+                  fontSize: 9,
+                  background: "linear-gradient(135deg, #c41040, #ff3366)",
+                  color: "#fff",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                }}
+              >
+                {itemCount}
+              </span>
+            )}
+          </Link>
           <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 12 : 14, padding: scr.mobile ? "6px 12px" : "8px 20px" }}>
             {t("nav.shopNow")}
           </Link>

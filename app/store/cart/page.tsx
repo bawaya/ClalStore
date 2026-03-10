@@ -303,7 +303,7 @@ export default function CartPage() {
     }
   };
 
-  const InfoStep = () => (
+  const infoStepJSX = (
     <div>
       <h2 className="font-black text-right mb-3" style={{ fontSize: scr.mobile ? 16 : 20 }}>📝 معلوماتك</h2>
       <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
@@ -329,11 +329,10 @@ export default function CartPage() {
     </div>
   );
 
-  const PayStep = () => {
-    const gateway = detectPaymentGateway(info.city);
-    const gwInfo = getGatewayDisplayInfo(gateway);
+  const gateway = detectPaymentGateway(info.city);
+  const gwInfo = getGatewayDisplayInfo(gateway);
 
-    return (
+  const payStepJSX = (
       <div>
         <h2 className="font-black text-right mb-3" style={{ fontSize: scr.mobile ? 16 : 20 }}>💳 الدفع</h2>
         <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
@@ -442,8 +441,7 @@ export default function CartPage() {
           </button>
         </div>
       </div>
-    );
-  };
+  );
 
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
@@ -458,8 +456,8 @@ export default function CartPage() {
             onNext={() => setStep(1)}
           />
         )}
-        {step === 1 && <InfoStep />}
-        {step === 2 && <PayStep />}
+        {step === 1 && infoStepJSX}
+        {step === 2 && payStepJSX}
         {step === 3 && <ConfirmStep order={order} />}
       </div>
       {toasts.map((t) => (
