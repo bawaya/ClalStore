@@ -108,46 +108,10 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
           (p.name_he && p.name_he.toLowerCase().includes(q))
       );
     }
-    // Sort: آيفون أولاً، جلاكسي ثانياً، بريميوم → متوسط → اقتصادي، ثم الأحدث
-    const getPriceTier = (p: typeof list[0]): number => {
-      const price = p.price || 0;
-      if (price >= 3500) return 0;
-      if (price >= 1500) return 1;
-      return 2;
-    };
-    const getModelGen = (p: typeof list[0]): number => {
-      const name = (p.name_ar + " " + (p.name_he || "")).toLowerCase();
-      const nums = name.match(/(?:iphone|آيفون|galaxy|جالكسي|s|a|z\s*(?:fold|flip|فولد|فليب))\s*(\d+)/gi);
-      if (nums) {
-        const extracted = nums.map(m => { const d = m.match(/(\d+)/); return d ? parseInt(d[1]) : 0; });
-        return Math.max(...extracted);
-      }
-      const yearMatch = name.match(/20(\d{2})/);
-      if (yearMatch) return parseInt(yearMatch[1]);
-      const anyNum = name.match(/(\d+)/);
-      return anyNum ? parseInt(anyNum[1]) : 0;
-    };
-
-    list = [...list].sort((a, b) => {
-      const hasImgA = a.image_url ? 1 : 0;
-      const hasImgB = b.image_url ? 1 : 0;
-      if (hasImgA !== hasImgB) return hasImgB - hasImgA;
-      const brandOrder = (p: typeof a) => {
-        const br = (p.brand || "").toLowerCase();
-        if (br === "apple") return 0;
-        if (br === "samsung") return 1;
-        return 2;
-      };
-      const bo = brandOrder(a) - brandOrder(b);
-      if (bo !== 0) return bo;
-      const ta = getPriceTier(a), tb = getPriceTier(b);
-      if (ta !== tb) return ta - tb;
-      if (a.price !== b.price) return b.price - a.price;
-      const genA = getModelGen(a), genB = getModelGen(b);
-      if (genA !== genB) return genB - genA;
-      if (a.featured !== b.featured) return a.featured ? -1 : 1;
-      return (b.sold || 0) - (a.sold || 0);
-    });
+    // Products come pre-sorted from server (admin sort rules applied in getProducts).
+    // Preserve server order by using original index as tiebreaker after filtering.
+    const indexMap = new Map(items.map((p, idx) => [p.id, idx]));
+    list = [...list].sort((a, b) => (indexMap.get(a.id) ?? 999) - (indexMap.get(b.id) ?? 999));
     return list;
   }, [items, typeCat, brandCat, search, smartResults, isSmartQuery]);
 

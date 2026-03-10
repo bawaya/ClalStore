@@ -6,46 +6,47 @@
 import { createServerSupabase } from "@/lib/supabase";
 import type { Product, Hero, LinePlan, Coupon, Category, WebsiteContent } from "@/types/database";
 
-/** ترتيب: آيفون أولاً، جلاكسي ثانياً، ثم بريميوم → متوسط → اقتصادي */
-export function sortProductsByBrandAndTier(products: Product[]): Product[] {
-  const getPriceTier = (p: Product): number => {
-    const price = p.price || 0;
-    if (price >= 3500) return 0; // بريميوم
-    if (price >= 1500) return 1;  // متوسط
-    return 2;                     // اقتصادي
-  };
-  const getBrandOrder = (p: Product): number => {
-    const br = (p.brand || "").toLowerCase();
-    if (br === "apple") return 0;
-    if (br === "samsung") return 1;
-    return 2;
-  };
-  const getModelGen = (p: Product): number => {
-    const name = ((p.name_ar || "") + " " + (p.name_he || "")).toLowerCase();
-    const nums = name.match(/(?:iphone|آيفون|galaxy|جالكسي|s|a|z\s*(?:fold|flip|فولد|فليب))\s*(\d+)/gi);
-    if (nums) {
-      const extracted = nums.map((m) => { const d = m.match(/(\d+)/); return d ? parseInt(d[1]) : 0; });
-      return Math.max(...extracted);
-    }
-    const yearMatch = name.match(/20(\d{2})/);
-    if (yearMatch) return parseInt(yearMatch[1]);
-    const anyNum = name.match(/(\d+)/);
-    return anyNum ? parseInt(anyNum[1]) : 0;
-  };
+type SortRule = { field: "price" | "brand" | "has_image"; direction: "asc" | "desc" };
+
+const DEFAULT_SORT_RULES: SortRule[] = [
+  { field: "has_image", direction: "desc" },
+  { field: "brand", direction: "asc" },
+  { field: "price", direction: "desc" },
+];
+
+function getBrandRank(p: Product): number {
+  const br = (p.brand || "").toLowerCase();
+  if (br === "apple") return 0;
+  if (br === "samsung") return 1;
+  if (br === "xiaomi") return 2;
+  if (br === "huawei") return 3;
+  return 4;
+}
+
+export function sortProductsByRules(products: Product[], rules?: SortRule[]): Product[] {
+  const sortRules = rules && rules.length === 3 ? rules : DEFAULT_SORT_RULES;
+
   return [...products].sort((a, b) => {
-    const hasImgA = a.image_url ? 1 : 0;
-    const hasImgB = b.image_url ? 1 : 0;
-    if (hasImgA !== hasImgB) return hasImgB - hasImgA;
-    const bo = getBrandOrder(a) - getBrandOrder(b);
-    if (bo !== 0) return bo;
-    const ta = getPriceTier(a), tb = getPriceTier(b);
-    if (ta !== tb) return ta - tb;
-    if (a.price !== b.price) return b.price - a.price;
-    const genA = getModelGen(a), genB = getModelGen(b);
-    if (genA !== genB) return genB - genA;
+    for (const rule of sortRules) {
+      let cmp = 0;
+      if (rule.field === "price") {
+        cmp = (a.price || 0) - (b.price || 0);
+      } else if (rule.field === "brand") {
+        cmp = getBrandRank(a) - getBrandRank(b);
+      } else if (rule.field === "has_image") {
+        cmp = (a.image_url ? 1 : 0) - (b.image_url ? 1 : 0);
+      }
+      if (rule.direction === "desc") cmp = -cmp;
+      if (cmp !== 0) return cmp;
+    }
     if (a.featured !== b.featured) return a.featured ? -1 : 1;
     return (b.sold || 0) - (a.sold || 0);
   });
+}
+
+/** @deprecated Use sortProductsByRules instead */
+export function sortProductsByBrandAndTier(products: Product[]): Product[] {
+  return sortProductsByRules(products);
 }
 
 // ===== Products =====
@@ -74,27 +75,18 @@ export async function getProducts(options?: {
     console.error("Error fetching products:", error);
     return [];
   }
-  let list = (data as Product[]) || [];
-  const sorted = sortProductsByBrandAndTier(list);
+  const products = (data as Product[]) || [];
 
-  const { data: settingsRows } = await supabase.from("settings").select("value").eq("key", "priority_product_ids").single();
-  let priorityIds: string[] = [];
+  const { data: rulesRow } = await supabase.from("settings").select("value").eq("key", "product_sort_rules").single();
+  let sortRules: SortRule[] | undefined;
   try {
-    const raw = settingsRows?.value;
-    if (raw) priorityIds = JSON.parse(raw);
-    if (!Array.isArray(priorityIds)) priorityIds = [];
+    if (rulesRow?.value) {
+      const parsed = JSON.parse(rulesRow.value);
+      if (Array.isArray(parsed) && parsed.length === 3) sortRules = parsed;
+    }
   } catch {}
-  priorityIds = priorityIds.slice(0, 3).filter(Boolean);
 
-  if (priorityIds.length > 0) {
-    const byId = new Map(sorted.map((p) => [p.id, p]));
-    const ordered = priorityIds.map((id) => byId.get(id)).filter(Boolean) as Product[];
-    const rest = sorted.filter((p) => !priorityIds.includes(p.id));
-    list = [...ordered, ...rest];
-  } else {
-    list = sorted;
-  }
-  return list;
+  return sortProductsByRules(products, sortRules);
 }
 
 export async function getProduct(id: string): Promise<Product | null> {
