@@ -267,4 +267,68 @@
       transparent
     );
   }
+
+  /* Hero text shadow for readability over images */
+  .hero-text-shadow {
+    text-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.6),
+      0 0 30px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Hero nav arrows (desktop) */
+  .hero-nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(9, 9, 11, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #fafafa;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .hero-nav-arrow:hover {
+    background: rgba(196, 16, 64, 0.25);
+    border-color: rgba(196, 16, 64, 0.4);
+    transform: translateY(-50%) scale(1.08);
+  }
+
+  /* Sticky Cart Bar */
+  .sticky-cart-bar {
+    position: sticky;
+    top: 64px;
+    z-index: 45;
+    background: rgba(9, 9, 11, 0.85);
+    backdrop-filter: blur(20px) saturate(1.3);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.25),
+      0 0 30px rgba(196, 16, 64, 0.04);
+    animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (max-width: 767px) {
+    .sticky-cart-bar {
+      top: 56px;
+    }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }

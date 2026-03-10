@@ -353,6 +353,10 @@
     "noDeals": "لا توجد عروض حالياً",
     "shopProducts": "تسوق المنتجات"
   },
+  "cartBar": {
+    "item": "منتج",
+    "items": "منتجات"
+  },
   "cookie2": {
     "decline": "رفض"
   },

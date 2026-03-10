@@ -9,6 +9,7 @@ import { calcDiscount, getProductName, getColorName } from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
 import { trackAddToCart, trackViewProduct } from "@/components/shared/Analytics";
 import { StoreHeader } from "./StoreHeader";
+import { StickyCartBar } from "./StickyCartBar";
 import { ProductCard } from "./ProductCard";
 import { ProductReviews } from "./ProductReviews";
 import { Footer } from "@/components/website/sections";
@@ -118,6 +119,7 @@ export function ProductDetailClient({
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
       <StoreHeader showBack />
+      <StickyCartBar />
 
       <div
         className="max-w-[900px] mx-auto"

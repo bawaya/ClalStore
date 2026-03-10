@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "./StoreHeader";
+import { StickyCartBar } from "./StickyCartBar";
 import { HeroCarousel } from "./HeroCarousel";
 import { ProductCard } from "./ProductCard";
 import { LinePlans } from "./LinePlans";
@@ -127,6 +128,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
       <StoreHeader />
+      <StickyCartBar />
       <HeroCarousel heroes={heroes} />
 
       <div

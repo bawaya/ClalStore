@@ -11,6 +11,7 @@ import { useCart } from "@/lib/store/cart";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "@/components/store/StoreHeader";
+import { StickyCartBar } from "@/components/store/StickyCartBar";
 import { getProductName, getColorName } from "@/lib/utils";
 
 export default function ComparePage() {
@@ -96,6 +97,7 @@ export default function ComparePage() {
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
       <StoreHeader showBack />
+      <StickyCartBar />
       <div
         className="max-w-[1200px] mx-auto"
         style={{ padding: scr.mobile ? "16px 10px 100px" : "32px 24px 60px" }}

@@ -353,6 +353,10 @@
     "noDeals": "אין מבצעים כרגע",
     "shopProducts": "לקניית מוצרים"
   },
+  "cartBar": {
+    "item": "פריט",
+    "items": "פריטים"
+  },
   "cookie2": {
     "decline": "דחה"
   },
