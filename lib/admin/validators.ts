@@ -15,7 +15,7 @@ export const productSchema = z.object({
   colors: z.array(z.any()).optional().default([]),
   storage_options: z.array(z.string()).optional().default([]),
   variants: z.array(z.any()).optional().default([]),
-  specs: z.record(z.string()).optional().default({}),
+  specs: z.record(z.string(), z.string()).optional().default({}),
   active: z.boolean().default(true),
   featured: z.boolean().default(false),
   description_ar: z.string().max(5000).optional().nullable(),
