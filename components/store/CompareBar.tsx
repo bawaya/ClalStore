@@ -1,8 +1,3 @@
-// =====================================================
-// ClalMobile — CompareBar (floating bottom bar)
-// Shows selected products for comparison
-// =====================================================
-
 "use client";
 
 import Link from "next/link";
@@ -20,13 +15,10 @@ export function CompareBar() {
 
   return (
     <div
-      className="fixed left-0 right-0 z-[999] border-t shadow-2xl"
+      className="fixed left-0 right-0 z-compare glass-bottom-bar"
       dir="rtl"
       style={{
-        bottom: scr.mobile ? 0 : 0,
-        background: "#18181b",
-        borderColor: "rgba(196,16,64,0.4)",
-        boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+        bottom: 0,
         paddingBottom: scr.mobile ? "env(safe-area-inset-bottom, 0px)" : 0,
       }}
     >
@@ -39,8 +31,7 @@ export function CompareBar() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="relative flex-shrink-0 bg-[#1a1a1e] rounded-lg border border-surface-border overflow-hidden"
-              
+              className="relative flex-shrink-0 glass-elevated rounded-lg overflow-hidden"
               style={{
                 width: scr.mobile ? 44 : 52,
                 height: scr.mobile ? 44 : 52,
@@ -59,7 +50,7 @@ export function CompareBar() {
               )}
               <button
                 onClick={() => removeItem(item.id)}
-                className="absolute -top-0.5 -left-0.5 w-4 h-4 rounded-full bg-red-600 text-white border-0 cursor-pointer flex items-center justify-center"
+                className="absolute -top-0.5 -left-0.5 min-w-5 min-h-5 w-5 h-5 rounded-full bg-red-600 text-white border-0 cursor-pointer flex items-center justify-center"
                 style={{ fontSize: 8, lineHeight: 1 }}
                 aria-label={`إزالة ${item.name_he || item.name_ar} من المقارنة`}
               >
@@ -70,6 +61,7 @@ export function CompareBar() {
           <span
             className="text-muted font-bold flex-shrink-0"
             style={{ fontSize: scr.mobile ? 11 : 13 }}
+            aria-live="polite"
           >
             {items.length}/4
           </span>
@@ -79,7 +71,7 @@ export function CompareBar() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={clearAll}
-            className="border border-surface-border bg-transparent text-muted rounded-lg cursor-pointer font-bold transition-colors hover:text-white"
+            className="btn-ghost rounded-lg font-bold"
             style={{
               fontSize: scr.mobile ? 10 : 12,
               padding: scr.mobile ? "5px 10px" : "6px 14px",
@@ -89,9 +81,8 @@ export function CompareBar() {
           </button>
           <Link
             href="/store/compare"
-            className="rounded-lg font-extrabold cursor-pointer transition-all text-white no-underline"
+            className="btn-primary rounded-lg font-extrabold no-underline"
             style={{
-              background: "#c41040",
               fontSize: scr.mobile ? 11 : 13,
               padding: scr.mobile ? "6px 14px" : "8px 20px",
             }}

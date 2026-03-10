@@ -3,6 +3,7 @@
 import { useState, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Heart, Scale, Smartphone, Plug, Truck, Camera, Battery, Cpu } from "lucide-react";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
@@ -26,7 +27,7 @@ function getDisplayPrice(p: Product, variant: ProductVariant | null): { price: n
   return { price: p.price, old_price: p.old_price };
 }
 
-function getTotalStock(p: Product): number {
+function _getTotalStock(p: Product): number {
   const variants = p.variants || [];
   if (variants.length === 0) return p.stock;
   return variants.reduce((sum, v) => sum + (v.stock ?? p.stock), 0);
@@ -56,17 +57,15 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
   const inWishlist = useWishlist((s) => s.items.some((i) => i.id === p.id));
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
-  const [selColor, setSelColor] = useState(-1); // -1 = no color selected → show main image
-  const [selStorage, setSelStorage] = useState(storage.length > 1 ? -1 : 0); // -1 = not selected yet
+  const [selColor, setSelColor] = useState(-1);
+  const [selStorage, setSelStorage] = useState(storage.length > 1 ? -1 : 0);
   const [wishAnim, setWishAnim] = useState(false);
   const [compareToast, setCompareToast] = useState("");
 
-  // Selection completeness check
   const needsColor = colors.length > 0 && selColor < 0;
   const needsStorage = storage.length > 1 && selStorage < 0;
   const selectionIncomplete = needsColor || needsStorage;
 
-  // Variant-aware pricing (show lowest when no storage selected)
   const activeVariant = getActiveVariant(p, selStorage < 0 ? 0 : selStorage);
   const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
   const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
@@ -121,7 +120,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
   return (
     <Link
       href={`/store/product/${p.id}`}
-      className="card overflow-hidden cursor-pointer hover:border-[#c41040]/40 transition-all relative group flex flex-col"
+      className="glass-card overflow-hidden cursor-pointer relative group flex flex-col"
     >
       {/* ── Warranty / Promo Ribbon (top-right) ── */}
       {warrantyKey && (
@@ -158,19 +157,18 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
       {/* ── Wishlist Heart (top-left corner) ── */}
       <button
         onClick={handleWishlist}
-        className="absolute z-10 flex items-center justify-center rounded-full border-0 cursor-pointer transition-all"
+        className={`glass-icon-btn absolute z-10 transition-all ${inWishlist ? "text-brand" : "text-white"}`}
         title={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
         style={{
           top: scr.mobile ? 6 : 8,
           left: scr.mobile ? 6 : 8,
-          width: scr.mobile ? 28 : 32,
-          height: scr.mobile ? 28 : 32,
-          background: inWishlist ? "rgba(196,16,64,0.15)" : "rgba(0,0,0,0.45)",
-          fontSize: scr.mobile ? 14 : 16,
           transform: wishAnim ? "scale(1.3)" : "scale(1)",
         }}
       >
-        {inWishlist ? "❤️" : "🤍"}
+        <Heart
+          size={scr.mobile ? 14 : 16}
+          {...(inWishlist ? { fill: "currentColor" } : {})}
+        />
       </button>
 
       {/* ── Compare toast ── */}
@@ -201,11 +199,12 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
               loading="lazy"
             />
           ) : (
-            <span
-              className="opacity-15"
-              style={{ fontSize: scr.mobile ? 48 : 64 }}
-            >
-              {p.type === "device" ? "📱" : "🔌"}
+            <span className="flex items-center justify-center">
+              {p.type === "device" ? (
+                <Smartphone size={scr.mobile ? 32 : 48} className="opacity-15" />
+              ) : (
+                <Plug size={scr.mobile ? 32 : 48} className="opacity-15" />
+              )}
             </span>
           );
         })()}
@@ -213,17 +212,19 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
         {/* Free shipping badge */}
         {p.featured && (
           <div
-            className="absolute font-bold text-white rounded-full flex items-center justify-center text-center leading-tight"
+            className="absolute font-bold text-white rounded-full flex items-center justify-center text-center leading-tight gap-0.5"
             style={{
               bottom: scr.mobile ? 4 : 8,
               left: scr.mobile ? 4 : 8,
               width: scr.mobile ? 44 : 56,
               height: scr.mobile ? 44 : 56,
-              background: "linear-gradient(135deg, #c41040 0%, #e91e63 100%)",
+              background: "linear-gradient(135deg, #c41040 0%, #ff3366 100%)",
               fontSize: scr.mobile ? 7 : 8,
               boxShadow: "0 2px 8px rgba(196,16,64,0.5)",
+              flexDirection: "column",
             }}
           >
+            <Truck size={scr.mobile ? 10 : 12} />
             {t("store.freeShipping").split("\n").map((line, i) => (
               <span key={i}>{line}{i === 0 && <br />}</span>
             ))}
@@ -233,19 +234,14 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
         {/* ── Compare button (bottom-right of image) ── */}
         <button
           onClick={handleCompare}
-          className="absolute z-10 flex items-center justify-center rounded-full border-0 cursor-pointer transition-all"
+          className={`glass-icon-btn absolute z-10 ${inCompare ? "glass-icon-btn-active" : ""}`}
           title={inCompare ? t("compare.inCompare") : t("compare.add")}
           style={{
             bottom: scr.mobile ? 4 : 8,
             right: scr.mobile ? 4 : 8,
-            width: scr.mobile ? 30 : 34,
-            height: scr.mobile ? 30 : 34,
-            background: inCompare ? "rgba(196,16,64,0.2)" : "rgba(0,0,0,0.45)",
-            border: inCompare ? "1.5px solid #c41040" : "1.5px solid transparent",
-            fontSize: scr.mobile ? 14 : 16,
           }}
         >
-          ⚖️
+          <Scale size={scr.mobile ? 14 : 16} />
         </button>
       </div>
 
@@ -298,25 +294,25 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
         {/* ── Quick Specs Strip (devices only) ── */}
         {p.type === "device" && p.specs && (() => {
           const s = p.specs as Record<string, string>;
-          const items: { icon: string; val: string }[] = [];
+          const items: { icon: React.ReactNode; val: string }[] = [];
           if (s.screen) {
             const m = s.screen.match(/([\d.]+)\s*inches?/i);
-            if (m) items.push({ icon: "📱", val: `${m[1]}"` });
+            if (m) items.push({ icon: <Smartphone size={10} />, val: `${m[1]}"` });
           }
           if (s.camera) {
             const m = s.camera.match(/([\d.]+)\s*MP/i);
-            if (m) items.push({ icon: "📸", val: `${m[1]}MP` });
+            if (m) items.push({ icon: <Camera size={10} />, val: `${m[1]}MP` });
           }
           if (s.battery) {
             const m = s.battery.match(/([\d,]+)\s*mAh/i);
-            if (m) items.push({ icon: "🔋", val: `${m[1]}` });
+            if (m) items.push({ icon: <Battery size={10} />, val: `${m[1]}` });
           }
-          if (s.ram) items.push({ icon: "⚡", val: s.ram });
+          if (s.ram) items.push({ icon: <Cpu size={10} />, val: s.ram });
           if (items.length === 0) return null;
           return (
             <div className="flex flex-wrap gap-x-2 gap-y-0.5 mb-1.5">
               {items.map((it, i) => (
-                <span key={i} className="text-[#a1a1aa] font-semibold whitespace-nowrap" style={{ fontSize: scr.mobile ? 8 : 10 }}>
+                <span key={i} className="text-[#a1a1aa] font-semibold whitespace-nowrap inline-flex items-center gap-0.5" style={{ fontSize: scr.mobile ? 8 : 10 }}>
                   {it.icon} {it.val}
                 </span>
               ))}
@@ -331,7 +327,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
               className="text-[#a1a1aa] font-bold"
               style={{ fontSize: scr.mobile ? 9 : 11 }}
             >
-              يبدأ من
+              {t("store2.startingFrom")}
             </span>
           )}
           <span
@@ -357,13 +353,12 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
             <span className="text-[#a78bfa] font-semibold">
               ₪{(activeVariant?.monthly_price ?? Math.ceil(displayPrice / 36)).toLocaleString()} × 36
             </span>
-            <span className="text-[#a1a1aa] mr-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>شهري</span>
+            <span className="text-[#a1a1aa] mr-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>{t("store2.monthly")}</span>
           </div>
         )}
 
         {/* ── Stock indicator ── */}
         {(() => {
-          // Show selected variant stock, or product-level stock
           const variantStock = activeVariant?.stock;
           const stockVal = variantStock != null ? variantStock : p.stock;
           if (stockVal === 0) return (
@@ -428,6 +423,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
                   setSelColor(i);
                 }}
                 title={getColorName(c, lang)}
+                aria-label={getColorName(c, lang)}
                 className="rounded-full cursor-pointer transition-all flex-shrink-0"
                 style={{
                   width: scr.mobile ? 18 : 22,
@@ -471,21 +467,13 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
         <button
           onClick={handleAddToCart}
           disabled={selectionIncomplete}
-          className="w-full cursor-pointer transition-all active:scale-[0.97] font-extrabold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full cursor-pointer transition-all active:scale-[0.97] font-extrabold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed border-brand bg-transparent text-brand hover:bg-brand/10"
           style={{
-            border: "1.5px solid #c41040",
-            background: "transparent",
-            color: "#c41040",
+            borderWidth: "1.5px",
+            borderStyle: "solid",
             padding: scr.mobile ? "7px 0" : "9px 0",
             fontSize: scr.mobile ? 12 : 14,
             marginTop: scr.mobile ? 4 : 6,
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background =
-              "rgba(196,16,64,0.1)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = "transparent";
           }}
         >
           {t("store.addToCart")}

@@ -329,6 +329,33 @@
     "tryOtherChannel": "נסה אמצעי אחר",
     "footerNote": "קוד האימות תקף ל-5 דקות"
   },
+  "store2": {
+    "startingFrom": "החל מ-",
+    "monthly": "חודשי",
+    "monthlyInstallment": "תשלום חודשי",
+    "remainingItems": "נשארו {n} יחידות בלבד!",
+    "reviews": "חוות דעת לקוחות",
+    "verifiedPurchase": "רכישה מאומתת",
+    "callNow": "התקשר עכשיו",
+    "whatsapp": "וואטסאפ",
+    "smartSearch": "חיפוש חכם",
+    "searchPlaceholder": "חפש... או כתוב לדוגמה: טלפון טוב מתחת ל-3000",
+    "smartFound": "מצאנו {n} מוצרים",
+    "clearSearch": "נקה",
+    "dealsTitle": "מבצעים מיוחדים",
+    "dealsSubtitle": "מבצעים בלעדיים לזמן מוגבל — אל תפספסו!",
+    "dealExpired": "המבצע הסתיים",
+    "remaining": "נשארו",
+    "sold": "נמכרו",
+    "of": "מתוך",
+    "orderNow": "הזמן עכשיו",
+    "shopNow": "קנה עכשיו",
+    "noDeals": "אין מבצעים כרגע",
+    "shopProducts": "לקניית מוצרים"
+  },
+  "cookie2": {
+    "decline": "דחה"
+  },
   "account": {
     "title": "החשבון שלי",
     "orders": "ההזמנות שלי",

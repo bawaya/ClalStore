@@ -42,7 +42,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
           {items.map((item) => (
             <div
               key={item.cartId}
-              className="card flex justify-between items-center mb-2"
+              className="glass-card-static flex justify-between items-center mb-2"
               style={{ padding: scr.mobile ? "10px 12px" : "14px 18px" }}
             >
               <button
@@ -52,7 +52,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
               >
                 ✕
               </button>
-              <div className="flex-1 text-right mr-2">
+              <div className="flex-1 text-right me-2">
                 <div className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>
                   {lang === "he" ? (item.name_he || item.name) : item.name}
                 </div>
@@ -72,7 +72,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
           <div className="flex gap-1.5 mt-3 mb-2">
             <button
               onClick={onApplyCoupon}
-              className="px-4 py-2.5 rounded-xl border-none bg-state-purple text-white text-xs font-bold cursor-pointer flex-shrink-0"
+              className="btn-primary px-3 py-2 rounded-xl text-xs font-bold cursor-pointer flex-shrink-0"
             >
               تطبيق
             </button>
@@ -87,7 +87,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
           </div>
           {discountAmount > 0 && (
             <div
-              className="bg-state-success/10 rounded-[10px] p-2 mb-2 text-state-success text-right"
+              className="glass-elevated rounded-[10px] p-2 mb-2 text-state-success text-right"
               style={{ fontSize: scr.mobile ? 10 : 12 }}
             >
               🎉 خصم: -₪{discountAmount}
@@ -95,7 +95,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
           )}
           {hasDevices && (
             <div
-              className="bg-state-info/10 rounded-xl p-2.5 mb-2 text-state-info text-right"
+              className="glass-elevated rounded-xl p-2.5 mb-2 text-state-info text-right"
               style={{ fontSize: scr.mobile ? 9 : 11 }}
             >
               📋 سلتك تحتوي جهاز — يخضع لفحص الفريق + ستحتاج هوية وبيانات بنك
@@ -103,7 +103,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
           )}
           {onlyAccessories && (
             <div
-              className="bg-state-success/10 rounded-xl p-2.5 mb-2 text-state-success text-right"
+              className="glass-elevated rounded-xl p-2.5 mb-2 text-state-success text-right"
               style={{ fontSize: scr.mobile ? 9 : 11 }}
             >
               ⚡ إكسسوارات فقط — دفع مباشر بالبطاقة
@@ -111,7 +111,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
           )}
 
           {/* Total */}
-          <div className="card mt-2" style={{ padding: scr.mobile ? 14 : 20 }}>
+          <div className="glass-card-static mt-2" style={{ padding: scr.mobile ? 14 : 20 }}>
             <div className="flex justify-between mb-1">
               <span className="text-muted text-xs">₪{subtotal.toLocaleString()}</span>
               <span className="text-muted text-xs">المنتجات</span>

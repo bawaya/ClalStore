@@ -1,27 +1,31 @@
 "use client";
 
+import { Phone, MessageCircle } from "lucide-react";
+import { useLang } from "@/lib/i18n";
 import { BUSINESS } from "@/lib/constants";
 
 export function FloatingActions() {
+  const { t } = useLang();
+
   return (
-    <div className="fixed bottom-20 left-4 z-40 flex flex-col gap-2" dir="ltr">
+    <div className="fixed bottom-24 z-50 flex flex-col gap-2" style={{ insetInlineStart: 16 }} dir="ltr">
       <a
         href={`tel:${BUSINESS.phone.replace(/-/g, "")}`}
-        className="flex items-center justify-center w-12 h-12 rounded-full bg-state-success shadow-lg hover:scale-110 transition-transform"
-        aria-label="اتصل الآن"
-        title="اتصل الآن"
+        className="glass-icon-btn w-12 h-12 rounded-full shadow-glass hover:scale-110 transition-transform text-state-success"
+        aria-label={t("store2.callNow")}
+        title={t("store2.callNow")}
       >
-        <span className="text-xl">📞</span>
+        <Phone size={20} />
       </a>
       <a
         href={BUSINESS.whatsapp}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center justify-center w-12 h-12 rounded-full bg-[#25D366] shadow-lg hover:scale-110 transition-transform"
-        aria-label="واتساب"
-        title="واتساب"
+        className="glass-icon-btn w-12 h-12 rounded-full shadow-glass hover:scale-110 transition-transform text-state-success"
+        aria-label={t("store2.whatsapp")}
+        title={t("store2.whatsapp")}
       >
-        <span className="text-xl">💬</span>
+        <MessageCircle size={20} />
       </a>
     </div>
   );

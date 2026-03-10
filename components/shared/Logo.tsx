@@ -2,14 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-// =====================================================
-// ClalMobile — Shared Logo Component
-// Fetches logo from settings, caches in localStorage
-// Falls back to gradient "C" icon + text
-// =====================================================
-
 const CACHE_KEY = "clal_logo";
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 const LOGO_CHANGE_EVENT = "clal_logo_change";
 
 interface CachedLogo {
@@ -37,7 +31,6 @@ function getCached(): CachedLogo | null {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const parsed: CachedLogo = JSON.parse(raw);
-    // Only use cache if it has a non-empty URL and hasn't expired
     if (!parsed.url || Date.now() - parsed.ts > CACHE_TTL) {
       localStorage.removeItem(CACHE_KEY);
       return null;
@@ -49,7 +42,6 @@ function getCached(): CachedLogo | null {
 }
 
 function setCache(url: string, size: number) {
-  // Only cache when there's an actual logo URL
   if (!url) return;
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ url, size, ts: Date.now() }));
@@ -60,7 +52,6 @@ function setCache(url: string, size: number) {
 export function invalidateLogoCache() {
   try {
     localStorage.removeItem(CACHE_KEY);
-    // Dispatch custom event so all Logo components in the same tab re-fetch
     window.dispatchEvent(new Event(LOGO_CHANGE_EVENT));
   } catch {}
 }
@@ -68,7 +59,7 @@ export function invalidateLogoCache() {
 export function Logo({ size = 36, showText = false, className = "", label, subtitle }: LogoProps) {
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [logoSize, setLogoSize] = useState<number>(size);
-  const [loaded, setLoaded] = useState(false);
+  const [_loaded, setLoaded] = useState(false);
 
   const fetchLogo = useCallback(() => {
     const cached = getCached();
@@ -79,7 +70,6 @@ export function Logo({ size = 36, showText = false, className = "", label, subti
       return;
     }
 
-    // Fetch from public settings API (no auth required)
     fetch("/api/settings/public")
       .then((r) => r.json())
       .then((data) => {
@@ -96,11 +86,9 @@ export function Logo({ size = 36, showText = false, className = "", label, subti
   useEffect(() => {
     fetchLogo();
 
-    // Listen for logo changes from the same tab (settings page upload/delete)
     const handleLogoChange = () => fetchLogo();
     window.addEventListener(LOGO_CHANGE_EVENT, handleLogoChange);
 
-    // Listen for storage changes from other tabs
     const handleStorage = (e: StorageEvent) => {
       if (e.key === CACHE_KEY) fetchLogo();
     };
@@ -112,14 +100,11 @@ export function Logo({ size = 36, showText = false, className = "", label, subti
     };
   }, [fetchLogo]);
 
-  // When a custom logo is uploaded, use the settings size (slider).
-  // For the fallback icon, use the component's size prop (layout-specific).
   const renderSize = logoUrl ? logoSize : size;
 
-  // Fallback gradient "C" icon
   const fallback = (
     <div
-      className="rounded-xl bg-gradient-to-br from-brand to-[#ff6b6b] flex items-center justify-center font-black text-white shrink-0"
+      className="rounded-xl bg-gradient-to-br from-brand to-brand-light flex items-center justify-center font-black text-white shrink-0"
       style={{
         width: size,
         height: size,
@@ -138,7 +123,6 @@ export function Logo({ size = 36, showText = false, className = "", label, subti
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {/* Icon */}
       {logoUrl ? (
         <img
           src={logoUrl}
@@ -151,7 +135,6 @@ export function Logo({ size = 36, showText = false, className = "", label, subti
         fallback
       )}
 
-      {/* Text */}
       {showText && (
         <div>
           <div className="font-black" style={{ fontSize: Math.max(renderSize * 0.38, 12), lineHeight: 1.2 }}>

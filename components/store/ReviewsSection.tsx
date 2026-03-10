@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Star } from "lucide-react";
 import { useScreen } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 
 interface FeaturedReview {
   id: string;
@@ -16,6 +18,7 @@ interface FeaturedReview {
 
 export function ReviewsSection() {
   const scr = useScreen();
+  const { t } = useLang();
   const [reviews, setReviews] = useState<FeaturedReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
@@ -38,38 +41,47 @@ export function ReviewsSection() {
   return (
     <div className="mb-6">
       <h3 className="font-bold text-right mb-3" style={{ fontSize: scr.mobile ? 14 : 18 }}>
-        ⭐ آراء الزبائن
+        {t("store2.reviews")}
       </h3>
-      <div className="bg-surface-elevated rounded-xl border border-surface-border overflow-hidden" style={{ padding: scr.mobile ? 14 : 20 }}>
+      <div className="glass-elevated overflow-hidden" style={{ padding: scr.mobile ? 14 : 20 }}>
         <div className="text-right">
           <div className="flex items-center gap-1 mb-1">
             {[1, 2, 3, 4, 5].map((s) => (
-              <span key={s} className="text-brand" style={{ fontSize: scr.mobile ? 14 : 18 }}>
-                {s <= review.rating ? "★" : "☆"}
-              </span>
+              <Star
+                key={s}
+                size={scr.mobile ? 14 : 18}
+                className={s <= review.rating ? "text-brand" : "text-dim"}
+                fill={s <= review.rating ? "currentColor" : "none"}
+              />
             ))}
             {review.verified_purchase && (
-              <span className="text-state-success text-[10px] mr-1">✓ شراء موثق</span>
+              <span className="text-state-success text-[10px] me-1">
+                ✓ {t("store2.verifiedPurchase")}
+              </span>
             )}
           </div>
           <div className="font-bold text-sm mb-0.5">{review.customer_name}</div>
           <div className="text-muted text-[10px] mb-1.5">{review.product_name}</div>
           {review.title && <div className="font-semibold text-xs mb-1">{review.title}</div>}
           {review.body && (
-            <p className="text-muted text-xs leading-relaxed" style={{ maxHeight: 60, overflow: "hidden", textOverflow: "ellipsis" }}>
+            <p className="text-muted text-xs leading-relaxed line-clamp-3">
               {review.body}
             </p>
           )}
         </div>
         {showCarousel && (
-          <div className="flex justify-center gap-1 mt-3">
+          <div className="flex justify-center gap-1.5 mt-3">
             {reviews.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setIndex(i)}
-                className="w-2 h-2 rounded-full transition-colors cursor-pointer"
-                style={{ background: i === index ? "#c41040" : "#3f3f46" }}
-                aria-label={`عرض تقييم ${i + 1}`}
+                className="rounded-full transition-all cursor-pointer"
+                style={{
+                  width: i === index ? 20 : 6,
+                  height: 6,
+                  background: i === index ? "var(--color-brand, #c41040)" : "var(--color-dim, #3f3f46)",
+                }}
+                aria-label={`${i + 1} / ${reviews.length}`}
               />
             ))}
           </div>

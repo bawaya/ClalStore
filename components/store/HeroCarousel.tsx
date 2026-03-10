@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useScreen } from "@/lib/hooks";
@@ -24,12 +24,33 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
   const { lang } = useLang();
   const items = heroes && heroes.length > 0 ? heroes : FALLBACK_HEROES;
   const [idx, setIdx] = useState(0);
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
 
   useEffect(() => {
     if (items.length <= 1) return;
     const timer = setInterval(() => setIdx((i) => (i + 1) % items.length), 4000);
     return () => clearInterval(timer);
   }, [items.length]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const delta = touchStartX.current - touchEndX.current;
+    if (Math.abs(delta) > 50) {
+      if (delta > 0) {
+        setIdx((i) => (i + 1) % items.length);
+      } else {
+        setIdx((i) => (i - 1 + items.length) % items.length);
+      }
+    }
+  };
 
   const h = items[idx];
   const title = lang === "he" ? (h.title_he || h.title_ar) : h.title_ar;
@@ -43,6 +64,7 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
       aria-roledescription="carousel"
       aria-label="عروض مميزة"
       style={{
+        position: "relative",
         background: "transparent",
         padding: scr.mobile ? "24px 20px" : "48px 40px",
         minHeight: scr.mobile ? 280 : 400,
@@ -53,6 +75,9 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
         margin: scr.mobile ? 0 : "0 0 20px",
         overflow: "hidden",
       }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {h.image_url && (
         <Image
@@ -64,7 +89,15 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
           priority={idx === 0}
         />
       )}
-      <div className="relative z-10">
+      <div
+        className="glass-card-static relative z-10"
+        style={{
+          padding: scr.mobile ? "20px 16px" : "32px 28px",
+          maxWidth: 600,
+          margin: "0 auto",
+        }}
+        aria-live="polite"
+      >
         <h2
           className="font-black mb-1.5"
           style={{ fontSize: scr.mobile ? 20 : 32 }}
@@ -91,7 +124,8 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
             </Link>
           ) : (
             <button
-              className="btn-primary"
+              className="btn-primary opacity-50 cursor-not-allowed"
+              disabled
               style={{
                 padding: scr.mobile ? "10px 28px" : "12px 36px",
                 fontSize: scr.mobile ? 12 : 14,
@@ -103,7 +137,7 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
         )}
       </div>
       {items.length > 1 && (
-        <div className="flex justify-center gap-1.5 mt-3 relative z-10" role="tablist" aria-label="التنقل بين العروض">
+        <div className="glass flex justify-center gap-1.5 mt-3 relative z-10 rounded-full px-3 py-1.5 w-fit mx-auto" role="tablist" aria-label="التنقل بين العروض">
           {items.map((_, i) => (
             <button
               key={i}

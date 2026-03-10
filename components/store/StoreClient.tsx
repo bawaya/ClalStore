@@ -7,6 +7,7 @@ import { StoreHeader } from "./StoreHeader";
 import { HeroCarousel } from "./HeroCarousel";
 import { ProductCard } from "./ProductCard";
 import { LinePlans } from "./LinePlans";
+import { ReviewsSection } from "./ReviewsSection";
 import { Footer } from "@/components/website/sections";
 import type { Product, Hero, LinePlan } from "@/types/database";
 
@@ -69,7 +70,9 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
         setSmartResults(data.products || []);
         setSmartSuggestion(data.suggestion || "");
       }
-    } catch {}
+    } catch (err) {
+      console.error("Smart search failed:", err);
+    }
     setSmartSearching(false);
   }, [search, smartSearching]);
 
@@ -121,12 +124,6 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
     { key: "accessory", label: t("store.accessories") },
   ];
 
-  const gridCols = scr.mobile
-    ? "repeat(2, 1fr)"
-    : scr.tablet
-      ? "repeat(3, 1fr)"
-      : "repeat(4, 1fr)";
-
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
       <StoreHeader />
@@ -139,8 +136,8 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
         {/* Search */}
         <div className="mb-3" style={{ marginBottom: scr.mobile ? 12 : 20 }}>
           <div className="flex gap-1.5">
-            <div className={`flex-1 flex items-center gap-1.5 rounded-xl border ${
-              isSmartQuery(search) ? "border-purple-500/50 bg-purple-500/5" : "border-surface-border bg-surface-elevated"
+            <div className={`flex-1 flex items-center gap-1.5 rounded-xl ${
+              isSmartQuery(search) ? "glass-brand-glow" : "glass-card-static"
             }`}
               style={{ padding: scr.mobile ? "8px 12px" : "10px 16px" }}>
               <span className="text-sm opacity-30">{isSmartQuery(search) ? "✨" : "⌕"}</span>
@@ -178,7 +175,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
                 <button
                   key={hint}
                   onClick={() => { setSearch(hint); }}
-                  className="whitespace-nowrap text-[11px] px-2.5 py-1 rounded-lg border border-purple-500/20 text-purple-300/70 hover:bg-purple-500/10 transition-colors cursor-pointer"
+                  className="glass whitespace-nowrap text-[11px] px-2.5 py-1 rounded-lg text-purple-300/70 hover:bg-purple-500/10 transition-colors cursor-pointer"
                 >
                   ✨ {hint}
                 </button>
@@ -188,7 +185,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
 
           {/* Smart search results banner */}
           {smartResults !== null && (
-            <div className="flex items-center justify-between mt-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+            <div className="glass-elevated flex items-center justify-between mt-2 px-3 py-2 rounded-lg">
               <span className="text-xs text-purple-300">
                 ✨ {smartSuggestion || `وجدنا ${smartResults.length} منتج`}
               </span>
@@ -246,7 +243,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
 
         {/* Products grid */}
         {filtered.length === 0 ? (
-          <div className="text-center py-12 text-dim">
+          <div className="text-center py-12 text-muted">
             <div className="text-4xl mb-2">🔍</div>
             <div className="text-sm">{t("store.outOfStock")}</div>
           </div>
@@ -257,6 +254,9 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
             ))}
           </div>
         )}
+
+        {/* Reviews */}
+        <ReviewsSection />
 
         {/* Lines */}
         <LinePlans plans={linePlans} />

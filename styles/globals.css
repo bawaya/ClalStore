@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fonts loaded via next/font in layout.tsx — no external @import needed */
-
 @layer base {
   * {
     box-sizing: border-box;
@@ -20,108 +18,253 @@
     font-family: var(--font-tajawal), var(--font-heebo), sans-serif;
     font-size: 15px;
     line-height: 1.6;
-    background: #09090b;
+    background: theme("colors.surface.bg");
     color: #fafafa;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Hebrew override */
   [lang="he"] body,
   [dir="ltr"] body {
     font-family: var(--font-david-libre), var(--font-heebo), var(--font-tajawal), serif;
   }
 
-  /* Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #09090b;
+    background: theme("colors.surface.bg");
   }
   ::-webkit-scrollbar-thumb {
-    background: #27272a;
+    background: theme("colors.surface.border");
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3f3f46;
+    background: theme("colors.dim");
   }
 
-  /* Inputs */
   input,
   select,
   textarea {
     font-family: inherit;
   }
 
-  input:focus,
-  select:focus,
-  textarea:focus {
-    outline: none;
-    border-color: #c41040 !important;
-  }
-
-  /* Selection */
   ::selection {
     background: rgba(196, 16, 64, 0.3);
     color: #fafafa;
   }
+
+  :focus-visible {
+    outline: 2px solid theme("colors.brand.DEFAULT");
+    outline-offset: 2px;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    border-color: theme("colors.brand.DEFAULT");
+    box-shadow: 0 0 0 3px rgba(196, 16, 64, 0.15);
+  }
 }
 
 @layer components {
-  /* Shared card style */
+  /* ── Liquid Glass Foundation ── */
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 4px 30px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: theme("borderRadius.card");
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    transition:
+      border-color 0.3s ease,
+      box-shadow 0.3s ease,
+      transform 0.3s ease;
+  }
+
+  .glass-card:hover {
+    border-color: rgba(196, 16, 64, 0.15);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.25),
+      0 0 20px rgba(196, 16, 64, 0.06);
+  }
+
+  .glass-card-static {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: theme("borderRadius.card");
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+
+  .glass-header {
+    background: rgba(9, 9, 11, 0.75);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .glass-elevated {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: theme("borderRadius.card");
+  }
+
+  .glass-brand-glow {
+    background: rgba(196, 16, 64, 0.04);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1.5px solid rgba(196, 16, 64, 0.2);
+    border-radius: theme("borderRadius.card");
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.2),
+      0 0 30px rgba(196, 16, 64, 0.08);
+  }
+
+  .glass-bottom-bar {
+    background: rgba(9, 9, 11, 0.8);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  /* ── Legacy class aliases (glass versions) ── */
   .card {
-    @apply bg-[#111114] rounded-[14px] border border-[#27272a];
+    @apply glass-card-static;
   }
 
-  /* Shared input style */
   .input {
-    @apply w-full bg-[#09090b] border border-[#27272a] rounded-[10px] text-[#fafafa] outline-none;
-    @apply px-3 py-2.5 text-sm;
-    @apply focus:border-[#c41040];
+    @apply w-full rounded-button text-[#fafafa] outline-none px-3 py-2.5 text-sm;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
-  /* Shared button styles */
+  .input:focus {
+    border-color: theme("colors.brand.DEFAULT");
+    box-shadow: 0 0 0 3px rgba(196, 16, 64, 0.12);
+  }
+
   .btn-primary {
-    @apply px-5 py-2.5 rounded-[10px] border-none bg-[#c41040] text-white font-bold cursor-pointer;
-    @apply hover:bg-[#a30d35] transition-colors;
+    @apply px-5 py-2.5 rounded-button border-none text-white font-bold cursor-pointer transition-all;
+    background: linear-gradient(135deg, theme("colors.brand.DEFAULT"), theme("colors.brand.dark"));
+    box-shadow: 0 4px 15px rgba(196, 16, 64, 0.3);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(196, 16, 64, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0) scale(0.98);
   }
 
   .btn-outline {
-    @apply px-5 py-2.5 rounded-[10px] border border-[#27272a] bg-transparent text-[#fafafa] font-bold cursor-pointer;
-    @apply hover:bg-[#18181b] transition-colors;
+    @apply px-5 py-2.5 rounded-button bg-transparent text-[#fafafa] font-bold cursor-pointer transition-all;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
   }
 
-  /* Badge */
+  .btn-outline:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .btn-ghost {
+    @apply px-3 py-2 rounded-button bg-transparent text-[#fafafa] font-bold cursor-pointer transition-all border-0;
+  }
+
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
   .badge {
     @apply px-2.5 py-1 rounded-md font-bold whitespace-nowrap;
     font-size: 12px;
   }
 
-  /* Chip */
   .chip {
-    @apply px-3 py-1.5 rounded-lg border border-[#27272a] text-xs font-semibold cursor-pointer bg-transparent text-[#71717a];
-    @apply hover:bg-[#18181b] transition-colors;
+    @apply px-3 py-1.5 rounded-chip text-xs font-semibold cursor-pointer bg-transparent transition-all;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: theme("colors.muted");
+  }
+
+  .chip:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .chip-active {
-    @apply bg-[rgba(196,16,64,0.08)] text-[#c41040] border-[#c41040];
+    background: rgba(196, 16, 64, 0.1);
+    color: theme("colors.brand.DEFAULT");
+    border-color: rgba(196, 16, 64, 0.3);
+  }
+
+  /* ── Glass icon button ── */
+  .glass-icon-btn {
+    @apply flex items-center justify-center rounded-xl cursor-pointer transition-all;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .glass-icon-btn-active {
+    background: rgba(196, 16, 64, 0.1);
+    border-color: rgba(196, 16, 64, 0.3);
   }
 }
 
 @layer utilities {
-  /* RTL-aware margin/padding */
   .ms-auto {
     margin-inline-start: auto;
   }
   .me-auto {
     margin-inline-end: auto;
   }
-
-  /* Text utilities */
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Glass glow line (used under headers) */
+  .glass-glow-line {
+    position: relative;
+  }
+  .glass-glow-line::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(196, 16, 64, 0.3),
+      transparent
+    );
   }
 }

@@ -329,6 +329,33 @@
     "tryOtherChannel": "تجربة طريقة أخرى",
     "footerNote": "رمز التحقق صالح لمدة 5 دقائق"
   },
+  "store2": {
+    "startingFrom": "يبدأ من",
+    "monthly": "شهري",
+    "monthlyInstallment": "قسط شهري",
+    "remainingItems": "باقي {n} قطع فقط!",
+    "reviews": "آراء الزبائن",
+    "verifiedPurchase": "شراء موثق",
+    "callNow": "اتصل الآن",
+    "whatsapp": "واتساب",
+    "smartSearch": "بحث ذكي",
+    "searchPlaceholder": "ابحث... أو اكتب مثلاً: أحسن هاتف تحت 3000",
+    "smartFound": "وجدنا {n} منتج",
+    "clearSearch": "مسح",
+    "dealsTitle": "العروض الخاصة",
+    "dealsSubtitle": "عروض حصرية لفترة محدودة — لا تفوّت الفرصة!",
+    "dealExpired": "انتهى العرض",
+    "remaining": "بقي",
+    "sold": "بيع",
+    "of": "من",
+    "orderNow": "اطلب الآن",
+    "shopNow": "تسوق الآن",
+    "noDeals": "لا توجد عروض حالياً",
+    "shopProducts": "تسوق المنتجات"
+  },
+  "cookie2": {
+    "decline": "رفض"
+  },
   "account": {
     "title": "حسابي",
     "orders": "طلباتي",

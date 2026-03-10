@@ -27,13 +27,7 @@ export function ConfirmStep({ order }: { order: OrderResult | null }) {
 
   return (
     <div className="text-center">
-      <div
-        className="rounded-2xl p-6 desktop:p-10 mb-4"
-        style={{
-          background: "linear-gradient(135deg, rgba(34,197,94,0.1), rgba(6,182,212,0.06))",
-          border: "1px solid rgba(34,197,94,0.15)",
-        }}
-      >
+      <div className="glass-brand-glow p-6 desktop:p-10 mb-4">
         <div className="text-5xl mb-2">✅</div>
         <div className="font-black text-state-success mb-1" style={{ fontSize: scr.mobile ? 20 : 28 }}>
           تم إرسال الطلب!
@@ -48,12 +42,12 @@ export function ConfirmStep({ order }: { order: OrderResult | null }) {
         </div>
       </div>
 
-      <div className="card text-right mb-3" style={{ padding: scr.mobile ? 14 : 20 }}>
+      <div className="glass-card-static text-right mb-3" style={{ padding: scr.mobile ? 14 : 20 }}>
         <div className="font-bold mb-2" style={{ fontSize: scr.mobile ? 12 : 14 }}>
           📦 تفاصيل الطلب
         </div>
         {order?.items.map((it, i) => (
-          <div key={i} className="flex justify-between py-1.5 border-b border-surface-border">
+          <div key={i} className="flex justify-between py-1.5 border-b border-glass-border">
             <span className="text-brand" style={{ fontSize: scr.mobile ? 11 : 13 }}>
               ₪{it.price}
             </span>
@@ -69,7 +63,7 @@ export function ConfirmStep({ order }: { order: OrderResult | null }) {
           <span className="font-bold">المجموع</span>
         </div>
         {order?.hasDevice && (
-          <div className="border-t border-surface-border pt-2 mt-2">
+          <div className="border-t border-glass-border pt-2 mt-2">
             <div className="flex justify-between text-muted text-xs">
               <span>{order.bankName}</span>
               <span>🏦 طريقة الدفع: حوالة بنكية</span>
@@ -89,7 +83,7 @@ export function ConfirmStep({ order }: { order: OrderResult | null }) {
         )}
       </div>
 
-      <div className="card text-right mb-3" style={{ padding: scr.mobile ? 14 : 20 }}>
+      <div className="glass-card-static text-right mb-3" style={{ padding: scr.mobile ? 14 : 20 }}>
         <div className="font-bold mb-1.5" style={{ fontSize: scr.mobile ? 12 : 14 }}>
           📍 التوصيل
         </div>
@@ -106,7 +100,7 @@ export function ConfirmStep({ order }: { order: OrderResult | null }) {
 
       {order?.notes && (
         <div
-          className="card text-right mb-3 p-2.5 text-muted"
+          className="glass-card-static text-right mb-3 p-2.5 text-muted"
           style={{ fontSize: scr.mobile ? 10 : 12 }}
         >
           📝 ملاحظاتك: {order.notes}

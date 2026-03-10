@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
@@ -13,6 +12,7 @@ import { StoreHeader } from "./StoreHeader";
 import { ProductCard } from "./ProductCard";
 import { ProductReviews } from "./ProductReviews";
 import { Footer } from "@/components/website/sections";
+import { ToastContainer } from "@/components/ui/Toast";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
 
 /* ── variant helpers ── */
@@ -31,7 +31,6 @@ function getDisplayPrice(p: Product, variant: ProductVariant | null): { price: n
 
 function getVariantStock(p: Product, variant: ProductVariant | null): number {
   if (variant && variant.stock !== undefined && variant.stock !== null) {
-    // If variant has explicit stock, use it; but if it's 0 and product stock > 0, treat as fallback
     if (variant.stock > 0) return variant.stock;
     if (p.stock > 0) return p.stock;
     return 0;
@@ -50,37 +49,32 @@ export function ProductDetailClient({
   const { t, lang } = useLang();
   const addItem = useCart((s) => s.addItem);
   const { toasts, show } = useToast();
-  const [selColor, setSelColor] = useState(-1); // -1 = no color selected → show main image
+  const [selColor, setSelColor] = useState(-1);
   const [selStorage, setSelStorage] = useState((p.storage_options || []).length > 1 ? -1 : 0);
-  const [selImage, setSelImage] = useState(0); // index in allImages array
+  const [selImage, setSelImage] = useState(0);
 
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
   const specs = (p.specs || {}) as Record<string, string>;
 
-  // Variant-aware pricing (show lowest when no storage selected)
   const activeVariant = getActiveVariant(p, selStorage < 0 ? 0 : selStorage);
   const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
   const variantStock = getVariantStock(p, activeVariant);
   const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
 
-  /* Smart bilingual name */
   const productName = getProductName(p, lang);
   const activeColor = selColor >= 0 ? colors[selColor] : undefined;
   const colorName = activeColor ? getColorName(activeColor, lang) : undefined;
 
-  // Selection completeness check
   const needsColor = colors.length > 0 && selColor < 0;
   const needsStorage = storage.length > 1 && selStorage < 0;
   const selectionIncomplete = needsColor || needsStorage;
 
-  // Build all images array: main → gallery → color images
   const allImages: string[] = [];
   if (p.image_url) allImages.push(p.image_url);
   if (p.gallery?.length) allImages.push(...p.gallery.filter(Boolean));
   colors.forEach((c) => { if (c.image && !allImages.includes(c.image)) allImages.push(c.image); });
 
-  // When user selects a color, jump to its image
   const handleColorSelect = (i: number) => {
     setSelColor(i);
     const cImg = colors[i]?.image;
@@ -117,7 +111,6 @@ export function ProductDetailClient({
     show(t("detail.addedToCart"));
   };
 
-  // Track product view
   useEffect(() => {
     trackViewProduct(productName, p.price);
   }, [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -135,7 +128,7 @@ export function ProductDetailClient({
           <div className="flex-shrink-0" style={{ width: scr.mobile ? "100%" : 380, marginBottom: scr.mobile ? 12 : 0 }}>
             {/* Main Image */}
             <div
-              className="bg-surface-elevated rounded-2xl flex items-center justify-center relative"
+              className="glass-elevated flex items-center justify-center relative"
               style={{
                 width: "100%",
                 height: scr.mobile ? 260 : 380,
@@ -157,7 +150,7 @@ export function ProductDetailClient({
                   <button
                     key={i}
                     onClick={() => setSelImage(i)}
-                    className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-all border-0 bg-surface-elevated relative"
+                    className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-all border-0 glass-elevated relative"
                     style={{
                       width: scr.mobile ? 48 : 60,
                       height: scr.mobile ? 48 : 60,
@@ -211,18 +204,18 @@ export function ProductDetailClient({
                 <span className="text-[#a78bfa] font-bold">
                   ₪{(activeVariant?.monthly_price ?? Math.ceil(displayPrice / 36)).toLocaleString()} × 36
                 </span>
-                <span className="text-muted mr-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>قسط شهري</span>
+                <span className="text-muted mr-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t("store2.monthlyInstallment")}</span>
               </div>
             )}
 
             {/* Type info */}
             {p.type === "device" && (
-              <div className="bg-state-info/10 rounded-[10px] p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+              <div className="glass-elevated rounded-button p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
                 <span className="text-state-info">{t("detail.deviceNote")}</span>
               </div>
             )}
             {p.type === "accessory" && (
-              <div className="bg-state-success/10 rounded-[10px] p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+              <div className="glass-elevated rounded-button p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
                 <span className="text-state-success">{t("detail.accessoryNote")}</span>
               </div>
             )}
@@ -284,12 +277,10 @@ export function ProductDetailClient({
             {/* Add to cart */}
             {selectionIncomplete && (
               <div
-                className="text-center font-bold mb-2 rounded-lg"
+                className="glass-elevated rounded-button text-center font-bold mb-2"
                 style={{
                   fontSize: scr.mobile ? 11 : 13,
                   color: "#f59e0b",
-                  background: "rgba(245,158,11,0.08)",
-                  border: "1px solid rgba(245,158,11,0.2)",
                   padding: scr.mobile ? "8px 12px" : "10px 16px",
                 }}
               >
@@ -313,7 +304,7 @@ export function ProductDetailClient({
 
         {/* Specs */}
         {Object.keys(specs).length > 0 && (
-          <div className="card mt-4 p-4" style={{ marginTop: scr.mobile ? 12 : 24 }}>
+          <div className="glass-card-static mt-4 p-4" style={{ marginTop: scr.mobile ? 12 : 24 }}>
             <h3 className="font-extrabold mb-2.5 text-right" style={{ fontSize: scr.mobile ? 12 : 16 }}>
               {t("detail.specs")}
             </h3>
@@ -324,7 +315,7 @@ export function ProductDetailClient({
               {Object.entries(specs)
                 .filter(([, v]) => v)
                 .map(([k, v]) => (
-                  <div key={k} className="flex justify-between p-2 bg-surface-elevated rounded-[10px]">
+                  <div key={k} className="flex justify-between p-2 glass-elevated rounded-button">
                     <span className="font-semibold" style={{ fontSize: scr.mobile ? 11 : 13 }}>{v}</span>
                     <span className="text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
                       {specLabels[k] || k}
@@ -337,7 +328,7 @@ export function ProductDetailClient({
 
         {/* Description */}
         {((lang === "he" && p.description_he) || p.description_ar) && (
-          <div className="card mt-4 p-4">
+          <div className="glass-card-static mt-4 p-4">
             <h3 className="font-extrabold mb-2 text-right" style={{ fontSize: scr.mobile ? 12 : 16 }}>
               {t("detail.description")}
             </h3>
@@ -368,16 +359,7 @@ export function ProductDetailClient({
         )}
       </div>
 
-      {/* Toast */}
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 card border-state-success text-state-success font-bold z-[999] shadow-2xl"
-          style={{ padding: scr.mobile ? "10px 24px" : "12px 32px", fontSize: scr.mobile ? 12 : 14 }}
-        >
-          {t.message}
-        </div>
-      ))}
+      <ToastContainer toasts={toasts} />
 
       <Footer />
     </div>

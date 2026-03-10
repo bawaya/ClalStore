@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { Navbar, Footer } from "@/components/website/sections";
+import { ToastContainer } from "@/components/ui/Toast";
 
 export default function ContactPage() {
   const scr = useScreen();
@@ -20,7 +21,6 @@ export default function ContactPage() {
     }
     setSending(true);
     try {
-      // Send WhatsApp notification to admin (primary notification)
       const notifyRes = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,7 +34,6 @@ export default function ContactPage() {
       });
       if (!notifyRes.ok) throw new Error('Notify failed');
 
-      // Send email (non-blocking, best-effort)
       fetch('/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,7 +52,7 @@ export default function ContactPage() {
             </div>
           `
         })
-      }).catch(() => {}); // fire-and-forget
+      }).catch(() => {});
 
       setSubmitted(true);
       setForm({ name: "", phone: "", email: "", subject: "", message: "" });
@@ -90,7 +89,7 @@ export default function ContactPage() {
         {/* Contact cards */}
         <div className="grid gap-2 mb-6" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr 1fr" }}>
           {contactCards.map((c) => (
-            <a key={c.title} href={c.href} className="card text-center hover:border-brand/30 transition-all" style={{ padding: scr.mobile ? 16 : 24 }}>
+            <a key={c.title} href={c.href} className="glass-card text-center hover:border-brand/30 transition-all" style={{ padding: scr.mobile ? 16 : 24 }}>
               <div className="text-3xl mb-2">{c.icon}</div>
               <div className="font-bold text-sm mb-0.5">{c.title}</div>
               <div className="text-brand text-sm font-bold">{c.value}</div>
@@ -100,7 +99,7 @@ export default function ContactPage() {
 
         {/* Thank you state after submission */}
         {submitted ? (
-          <div className="card text-center" style={{ padding: scr.mobile ? 32 : 48 }}>
+          <div className="glass-card-static text-center" style={{ padding: scr.mobile ? 32 : 48 }}>
             <div className="text-5xl mb-4">✅</div>
             <h2 className="font-black text-xl mb-2">{t("contact.thankYouTitle")}</h2>
             <p className="text-muted mb-6" style={{ fontSize: scr.mobile ? 13 : 15 }}>
@@ -120,7 +119,7 @@ export default function ContactPage() {
         {/* Hours + Form */}
         <div style={{ display: scr.mobile ? "block" : "flex", gap: 16 }}>
           {/* Working hours */}
-          <div className="card mb-3" style={{ padding: scr.mobile ? 16 : 24, flex: scr.desktop ? "0 0 240px" : undefined }}>
+          <div className="glass-card-static mb-3" style={{ padding: scr.mobile ? 16 : 24, flex: scr.desktop ? "0 0 240px" : undefined }}>
             <h3 className="font-bold text-right mb-3" style={{ fontSize: scr.mobile ? 14 : 16 }}>{t("contact.hours")}</h3>
             {days.map((d) => (
               <div key={d.key} className="flex justify-between py-1 border-b border-surface-border last:border-0">
@@ -131,26 +130,26 @@ export default function ContactPage() {
           </div>
 
           {/* Contact form */}
-          <div className="card flex-1 mb-3" style={{ padding: scr.mobile ? 16 : 24 }}>
+          <div className="glass-card-static flex-1 mb-3" style={{ padding: scr.mobile ? 16 : 24 }}>
             <h3 className="font-bold text-right mb-3" style={{ fontSize: scr.mobile ? 14 : 16 }}>{t("contact.sendMsg")}</h3>
 
             <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
               <div>
-                <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.name")} <span className="text-brand">*</span></label>
-                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <label htmlFor="contact-name" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.name")} <span className="text-brand">*</span></label>
+                <input id="contact-name" aria-required="true" className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
-                <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.phone")} <span className="text-brand">*</span></label>
-                <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05X-XXXXXXX" dir="ltr" />
+                <label htmlFor="contact-phone" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.phone")} <span className="text-brand">*</span></label>
+                <input id="contact-phone" aria-required="true" className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05X-XXXXXXX" dir="ltr" />
               </div>
             </div>
             <div className="mt-2">
-              <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.email")}</label>
-              <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" />
+              <label htmlFor="contact-email" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.email")}</label>
+              <input id="contact-email" className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" />
             </div>
             <div className="mt-2">
-              <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.subject")}</label>
-              <select className="input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}>
+              <label htmlFor="contact-subject" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.subject")}</label>
+              <select id="contact-subject" className="input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}>
                 <option value="">{t("contact.choose")}</option>
                 <option value="order">{t("contact.subOrder")}</option>
                 <option value="product">{t("contact.subProduct")}</option>
@@ -161,8 +160,8 @@ export default function ContactPage() {
               </select>
             </div>
             <div className="mt-2">
-              <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.message")} <span className="text-brand">*</span></label>
-              <textarea className="input min-h-[80px] resize-y" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+              <label htmlFor="contact-message" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.message")} <span className="text-brand">*</span></label>
+              <textarea id="contact-message" aria-required="true" className="input min-h-[80px] resize-y" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
             </div>
 
             <button onClick={handleSubmit} disabled={sending} className="btn-primary w-full mt-3" style={{ fontSize: scr.mobile ? 12 : 14 }}>
@@ -175,7 +174,7 @@ export default function ContactPage() {
       </div>
       <Footer />
 
-      {toasts.map((toast) => <div key={toast.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${toast.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>{toast.message}</div>)}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

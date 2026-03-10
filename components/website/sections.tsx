@@ -13,6 +13,7 @@ import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
 import { ProductCard } from "@/components/store/ProductCard";
+import { Menu, X } from "lucide-react";
 import type { WebsiteContent } from "@/types/database";
 
 // ===== Navbar =====
@@ -31,7 +32,7 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-bg/90 backdrop-blur-xl border-b border-surface-border">
+    <nav role="navigation" className="fixed top-0 left-0 right-0 z-50 glass-header glass-glow-line">
       <div className="max-w-6xl mx-auto flex items-center justify-between" style={{ padding: scr.mobile ? "10px 16px" : "12px 24px" }}>
         {/* CTA + Lang */}
         <div className="flex items-center gap-2">
@@ -59,18 +60,19 @@ export function Navbar() {
         {scr.mobile && (
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="text-white bg-transparent border-0 cursor-pointer text-xl"
+            className="text-white bg-transparent border-0 cursor-pointer"
             aria-label={menuOpen ? "إغلاق القائمة" : "فتح القائمة"}
             aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
           >
-            ☰
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         )}
       </div>
 
       {/* Mobile dropdown */}
       {scr.mobile && menuOpen && (
-        <div className="bg-surface-card border-t border-surface-border px-4 py-3 space-y-2">
+        <div id="mobile-nav" className="glass-card-static px-4 py-3 space-y-2">
           {links.map((l) => (
             <Link key={l.href} href={l.href} onClick={() => setMenuOpen(false)}
               className="block text-right text-white font-bold text-sm py-1.5 hover:text-brand">{l.label}</Link>
@@ -137,7 +139,7 @@ export function HeroSection({ cms }: { cms?: WebsiteContent }) {
         {/* Trust badges */}
         <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
           {[t("hero.trust1"), t("hero.trust2"), t("hero.trust3"), t("hero.trust4")].map((b) => (
-            <span key={b} className="text-dim text-[12px] bg-surface-elevated px-3 py-1.5 rounded-full">{b}</span>
+            <span key={b} className="text-dim text-[12px] glass-elevated px-3 py-1.5 rounded-full">{b}</span>
           ))}
         </div>
       </div>
@@ -162,7 +164,7 @@ export function StatsStrip({ cms }: { cms?: WebsiteContent }) {
   ];
 
   return (
-    <section className="bg-surface-card border-y border-surface-border">
+    <section className="glass-card-static border-0">
       <div className="max-w-6xl mx-auto grid gap-0" style={{
         gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr",
         padding: scr.mobile ? "16px" : "24px",
@@ -182,7 +184,7 @@ export function StatsStrip({ cms }: { cms?: WebsiteContent }) {
 // ===== Featured Products =====
 export function FeaturedProducts({ products }: { products: any[] }) {
   const scr = useScreen();
-  const { t, lang } = useLang();
+  const { t } = useLang();
 
   return (
     <section style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
@@ -212,7 +214,7 @@ export function LinePlansSection({ plans }: { plans: any[] }) {
   const { t, lang } = useLang();
 
   return (
-    <section id="plans" className="bg-surface-card border-y border-surface-border" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
+    <section id="plans" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-6">
           <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("plans.title")}</h2>
@@ -221,10 +223,8 @@ export function LinePlansSection({ plans }: { plans: any[] }) {
 
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : plans.length >= 4 ? "1fr 1fr 1fr 1fr" : `repeat(${plans.length}, 1fr)` }}>
           {plans.map((l) => (
-            <div key={l.id} className="card relative text-center transition-all" style={{
+            <div key={l.id} className={`${l.popular ? "glass-brand-glow" : "glass-card-static"} relative text-center transition-all`} style={{
               padding: scr.mobile ? 16 : 24,
-              borderColor: l.popular ? "rgba(196,16,64,0.4)" : undefined,
-              background: l.popular ? "rgba(196,16,64,0.03)" : undefined,
             }}>
               {l.popular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand text-white text-[11px] font-bold px-3 py-0.5 rounded-full">{t("plans.popular")}</div>}
               <div className="font-black" style={{ fontSize: scr.mobile ? 14 : 18 }}>{lang === "he" ? (l.name_he || l.name_ar) : l.name_ar}</div>
@@ -274,7 +274,7 @@ export function FeaturesSection({ cms }: { cms?: WebsiteContent }) {
         </div>
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr" }}>
           {features.map((f: { icon: string; title: string; desc: string }) => (
-            <div key={f.title} className="card text-center" style={{ padding: scr.mobile ? 16 : 24 }}>
+            <div key={f.title} className="glass-card text-center" style={{ padding: scr.mobile ? 16 : 24 }}>
               <div className="text-3xl mb-2">{f.icon}</div>
               <div className="font-bold mb-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>{f.title}</div>
               <div className="text-muted" style={{ fontSize: scr.mobile ? 13 : 14 }}>{f.desc}</div>
@@ -313,17 +313,18 @@ export function FAQSection({ faqs, cms }: { faqs?: { q: string; a: string }[]; c
         </div>
         <div className="space-y-1.5" role="list">
           {defaultFaqs.map((f: { q: string; a: string }, i: number) => (
-            <div key={i} className="card" style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}>
+            <div key={i} className="glass-card-static" style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}>
               <button
                 onClick={() => setOpenIdx(openIdx === i ? null : i)}
                 className="w-full flex items-center justify-between cursor-pointer bg-transparent border-0 p-0 text-white"
                 aria-expanded={openIdx === i}
+                aria-controls={`faq-${i}`}
               >
                 <span className="text-brand transition-transform" style={{ transform: openIdx === i ? "rotate(45deg)" : "rotate(0)", fontSize: 16 }}>+</span>
                 <span className="font-bold text-right flex-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>{f.q}</span>
               </button>
               {openIdx === i && (
-                <div className="text-muted text-right mt-2 leading-relaxed" style={{ fontSize: scr.mobile ? 11 : 13 }}>{f.a}</div>
+                <div id={`faq-${i}`} className="text-muted text-right mt-2 leading-relaxed" style={{ fontSize: scr.mobile ? 11 : 13 }}>{f.a}</div>
               )}
             </div>
           ))}
@@ -350,7 +351,7 @@ export function CTASection({ cms }: { cms?: WebsiteContent }) {
       <div className="absolute inset-0 pointer-events-none" style={{
         background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(196,16,64,0.12) 0%, transparent 70%)",
       }} />
-      <div className="max-w-3xl mx-auto text-center relative z-10">
+      <div className="glass-card-static max-w-3xl mx-auto text-center relative z-10 p-8 md:p-12">
         <h2 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 32 }}>{title}</h2>
         <p className="text-muted mb-5" style={{ fontSize: scr.mobile ? 12 : 15 }}>
           {desc}
@@ -371,7 +372,7 @@ export function CTASection({ cms }: { cms?: WebsiteContent }) {
 // ===== Footer =====
 export function Footer({ cms }: { cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const year = new Date().getFullYear();
   const fc = cms?.content || {};
 
@@ -406,7 +407,7 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
   ];
 
   return (
-    <footer className="bg-surface-card border-t border-surface-border">
+    <footer className="glass-bottom-bar">
       <div className="max-w-6xl mx-auto" style={{ padding: scr.mobile ? "24px 16px" : "48px 24px" }}>
         <div className="grid gap-6" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "2fr 1fr 1fr 1fr" }}>
           {/* Brand */}
@@ -433,7 +434,7 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
         </div>
 
         {/* Bottom */}
-        <div className="border-t border-surface-border mt-6 pt-4 flex items-center justify-between">
+        <div className="border-t border-glass-border mt-6 pt-4 flex items-center justify-between">
           <Link href="/privacy" className="text-dim text-[11px] hover:text-muted">{t("footer.privacy")}</Link>
           <span className="text-dim text-[11px]">© {year} ClalMobile. {t("footer.rights")}.</span>
         </div>
