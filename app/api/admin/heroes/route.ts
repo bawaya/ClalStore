@@ -23,8 +23,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const v = validateBody(body, heroSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const hero = await createHero(v.data);
-    await logAction("مدير", `إضافة بنر: ${v.data.title_ar}`, "hero", hero.id);
+    const data = v.data!;
+    const hero = await createHero(data);
+    await logAction("مدير", `إضافة بنر: ${data.title_ar}`, "hero", hero.id);
     return NextResponse.json({ data: hero });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -40,7 +41,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     const v = validateBody(updates, heroUpdateSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const hero = await updateHero(id, v.data);
+    const hero = await updateHero(id, v.data!);
     await logAction("مدير", `تعديل بنر: ${id}`, "hero", id);
     return NextResponse.json({ data: hero });
   } catch (err: any) {

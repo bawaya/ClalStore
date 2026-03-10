@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const v = validateBody(body, dealSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const { data, error } = await db.from("deals").insert(v.data).select().single();
+    const { data, error } = await db.from("deals").insert(v.data!).select().single();
     if (error) throw error;
     return NextResponse.json({ deal: data });
   } catch (err: any) {
@@ -79,7 +79,7 @@ export async function PUT(req: NextRequest) {
     const v = validateBody(updates, dealUpdateSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
 
-    const toUpdate = { ...v.data, updated_at: new Date().toISOString() };
+    const toUpdate = { ...v.data!, updated_at: new Date().toISOString() };
     const { data, error } = await db.from("deals").update(toUpdate).eq("id", id).select().single();
     if (error) throw error;
     return NextResponse.json({ deal: data });

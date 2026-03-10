@@ -23,8 +23,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const v = validateBody(body, couponSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const coupon = await createCoupon(v.data);
-    await logAction("مدير", `إضافة كوبون: ${v.data.code}`, "coupon", coupon.id);
+    const data = v.data!;
+    const coupon = await createCoupon(data);
+    await logAction("مدير", `إضافة كوبون: ${data.code}`, "coupon", coupon.id);
     return NextResponse.json({ data: coupon });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -40,7 +41,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     const v = validateBody(updates, couponUpdateSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const coupon = await updateCoupon(id, v.data);
+    const coupon = await updateCoupon(id, v.data!);
     await logAction("مدير", `تعديل كوبون: ${id}`, "coupon", id);
     return NextResponse.json({ data: coupon });
   } catch (err: any) {

@@ -23,8 +23,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const v = validateBody(body, lineSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const line = await createLine(v.data);
-    await logAction("مدير", `إضافة باقة: ${v.data.name_ar}`, "line_plan", line.id);
+    const data = v.data!;
+    const line = await createLine(data);
+    await logAction("مدير", `إضافة باقة: ${data.name_ar}`, "line_plan", line.id);
     return NextResponse.json({ data: line });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -40,7 +41,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     const v = validateBody(updates, lineUpdateSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const line = await updateLine(id, v.data);
+    const line = await updateLine(id, v.data!);
     await logAction("مدير", `تعديل باقة: ${id}`, "line_plan", id);
     return NextResponse.json({ data: line });
   } catch (err: any) {
