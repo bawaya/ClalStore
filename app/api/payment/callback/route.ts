@@ -14,7 +14,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    console.log("Rivhit callback received for:", body.custom_field_1 || "unknown");
+    // Basic validation: payment callbacks must have a status and identifiable order
+    if (typeof body.status !== "number" || (!body.custom_field_1 && !body.comment)) {
+      console.warn("Payment callback: invalid payload structure");
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    }
+
+    console.log("Payment callback received for:", body.custom_field_1 || "unknown");
 
     const {
       status,
@@ -40,6 +46,22 @@ export async function POST(req: NextRequest) {
     }
 
     const db = createAdminSupabase();
+
+    // Verify order exists and is in a valid state for payment updates
+    const { data: existingOrder } = await db.from("orders")
+      .select("id, status, payment_status")
+      .eq("id", orderId)
+      .single();
+
+    if (!existingOrder) {
+      console.error("Payment callback: order not found:", orderId);
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    if (existingOrder.payment_status === "paid") {
+      console.warn("Payment callback: order already paid:", orderId);
+      return NextResponse.json({ received: true, note: "already_paid" });
+    }
 
     if (status === 1) {
       // === Payment Successful ===

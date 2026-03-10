@@ -3,8 +3,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, createServerSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
-// GET — Get reviews for a product (public) or all (admin)
+// GET — Get reviews for a product (public) or all (admin with auth)
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
@@ -12,6 +13,8 @@ export async function GET(req: NextRequest) {
     const admin = url.searchParams.get("admin") === "true";
 
     if (admin) {
+      const auth = await requireAdmin(req);
+      if (auth instanceof NextResponse) return auth;
       const db = createAdminSupabase();
       if (!db) return NextResponse.json({ reviews: [] });
       const { data } = await db.from("product_reviews")
@@ -113,8 +116,10 @@ export async function POST(req: NextRequest) {
 // PUT — Admin: approve/reject/reply to review
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!db) return NextResponse.json({ error: "Server error" }, { status: 500 });
 
     const body = await req.json();
     const { id, status, admin_reply } = body;
@@ -141,8 +146,10 @@ export async function PUT(req: NextRequest) {
 // DELETE — Admin: delete review
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!db) return NextResponse.json({ error: "Server error" }, { status: 500 });
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");

@@ -67,6 +67,9 @@ export async function GET(req: NextRequest) {
     if (!q || q.length < 2) {
       return NextResponse.json({ success: false, error: "استعلام قصير جداً" }, { status: 400 });
     }
+    if (q.length > 200) {
+      return NextResponse.json({ success: false, error: "استعلام طويل جداً" }, { status: 400 });
+    }
 
     // Rate limit
     const ip = getClientIP(req);
@@ -191,12 +194,15 @@ export async function GET(req: NextRequest) {
       query = query.gte("price", filters.min_price);
     }
 
-    // Keywords — ILIKE search
+    // Keywords — ILIKE search (sanitized)
     if (filters.keywords?.length) {
+      const sanitize = (s: string) => s.replace(/[%_\\'\"]/g, "");
       const orFilters = filters.keywords
+        .map((k) => sanitize(k))
+        .filter((k) => k.length > 0)
         .map((k) => `name_ar.ilike.%${k}%,name_he.ilike.%${k}%,brand.ilike.%${k}%`)
         .join(",");
-      query = query.or(orFilters);
+      if (orFilters) query = query.or(orFilters);
     }
 
     // Sort

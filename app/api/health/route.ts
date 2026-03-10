@@ -5,10 +5,23 @@ export const runtime = 'edge';
 // GET: System status for monitoring
 // =====================================================
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const secret = req.nextUrl.searchParams.get("secret");
+  const cronSecret = process.env.CRON_SECRET;
+
+  let authorized = false;
+  if (cronSecret && secret === cronSecret) {
+    authorized = true;
+  }
+  if (!authorized) {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+  }
+
   const checks: Record<string, { ok: boolean; ms?: number; error?: string }> = {};
   const start = Date.now();
 
@@ -51,9 +64,9 @@ export async function GET() {
   checks.ai = {
     ok: !!(aiKeys.bot && aiKeys.admin),
     error: [
-      aiKeys.bot   ? `BOT ✓ (${aiKeys.bot.substring(0, 8)}...)`     : "BOT ✗",
-      aiKeys.admin ? `ADMIN ✓ (${aiKeys.admin.substring(0, 8)}...)` : "ADMIN ✗",
-      aiKeys.store ? `STORE ✓ (${aiKeys.store.substring(0, 8)}...)` : "STORE ✗",
+      aiKeys.bot   ? "BOT ✓"   : "BOT ✗",
+      aiKeys.admin ? "ADMIN ✓" : "ADMIN ✗",
+      aiKeys.store ? "STORE ✓" : "STORE ✗",
       aiKeys.openai ? "OPENAI ✓" : "OPENAI ✗",
     ].join(" | "),
   };

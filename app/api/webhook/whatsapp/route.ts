@@ -144,6 +144,15 @@ async function saveToInbox(
 // Receive messages
 export async function POST(req: NextRequest) {
   try {
+    const webhookSecret = process.env.WEBHOOK_VERIFY_TOKEN;
+    if (webhookSecret) {
+      const token = req.headers.get("x-webhook-token") || req.nextUrl.searchParams.get("token") || "";
+      if (token !== webhookSecret) {
+        console.warn("[WhatsApp Webhook] Invalid token — request rejected");
+        return NextResponse.json({ error: "Invalid webhook token" }, { status: 403 });
+      }
+    }
+
     const body = await req.json();
 
     const msg = parseWebhook(body);

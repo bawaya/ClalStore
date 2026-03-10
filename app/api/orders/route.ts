@@ -87,9 +87,24 @@ export async function POST(req: NextRequest) {
       customerId = newCustomer.id;
     }
 
-    // === 2. Create Order ===
+    // === 2. Verify prices from DB ===
     const orderId = generateOrderId();
-    const itemsTotal = items.reduce((s: number, i: any) => s + i.price * (i.quantity || 1), 0);
+    const productIds = items.map((i: any) => i.productId).filter(Boolean);
+    let priceMap: Record<string, number> = {};
+    if (productIds.length > 0) {
+      const { data: dbProducts } = await supabase
+        .from("products")
+        .select("id, price")
+        .in("id", productIds);
+      if (dbProducts) {
+        priceMap = Object.fromEntries(dbProducts.map((p: any) => [p.id, Number(p.price)]));
+      }
+    }
+    const verifiedItems = items.map((i: any) => {
+      const dbPrice = i.productId && priceMap[i.productId];
+      return { ...i, price: dbPrice ?? i.price };
+    });
+    const itemsTotal = verifiedItems.reduce((s: number, i: any) => s + i.price * (i.quantity || 1), 0);
     const discount = discountAmount || 0;
     const total = Math.max(0, itemsTotal - discount);
     const onlyAccessories = !hasDevice && items.length > 0;
@@ -119,7 +134,7 @@ export async function POST(req: NextRequest) {
     }
 
     // === 3. Create Order Items ===
-    const orderItems = items.map((i: any) => ({
+    const orderItems = verifiedItems.map((i: any) => ({
       order_id: orderId,
       product_id: i.productId || null,
       product_name: i.name,
@@ -154,11 +169,11 @@ export async function POST(req: NextRequest) {
       action: `طلب جديد ${orderId} — ₪${total} — ${customer.name}`,
       entity_type: "order",
       entity_id: orderId,
-      details: { source, total, items_count: items.length, has_device: hasDevice },
+      details: { source, total, items_count: verifiedItems.length, has_device: hasDevice },
     });
 
     // === 6. Update Product Stock ===
-    for (const item of items) {
+    for (const item of verifiedItems) {
       if (item.productId) {
         const { error: stockErr } = await (supabase.rpc as any)("decrement_stock", {
           product_id: item.productId,
@@ -188,7 +203,7 @@ export async function POST(req: NextRequest) {
         customerPhone: customer.phone,
         total,
         source: source || "store",
-        items: items.map((i: any) => ({ name: i.name || i.productName, qty: i.quantity || 1, price: i.price })),
+        items: verifiedItems.map((i: any) => ({ name: i.name || i.productName, qty: i.quantity || 1, price: i.price })),
       });
     } catch (adminErr) {
       console.error("Admin notification failed:", adminErr);
@@ -205,7 +220,7 @@ export async function POST(req: NextRequest) {
             orderId,
             customer.name,
             total,
-            items.map((i: any) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
+            verifiedItems.map((i: any) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
             hasDevice ? "bank" : "credit",
             customer.city,
             customer.address,

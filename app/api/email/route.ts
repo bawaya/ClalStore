@@ -33,7 +33,16 @@ export async function POST(req: NextRequest) {
       params = buildStatusUpdateEmail(orderId, customerName, status, statusLabel);
       params.to = customerEmail;
     } else if (body.to && body.subject && body.html) {
-      // Generic / contact form email
+      const ALLOWED_RECIPIENTS = ["info@clalmobile.com", "support@clalmobile.com"];
+      if (!ALLOWED_RECIPIENTS.includes(body.to.toLowerCase())) {
+        return NextResponse.json({ error: "Recipient not allowed", sent: false }, { status: 403 });
+      }
+      if (typeof body.subject !== "string" || body.subject.length > 500) {
+        return NextResponse.json({ error: "Invalid subject", sent: false }, { status: 400 });
+      }
+      if (typeof body.html !== "string" || body.html.length > 10000) {
+        return NextResponse.json({ error: "Content too large", sent: false }, { status: 400 });
+      }
       const result = await email.send({ to: body.to, subject: body.subject, html: body.html });
       return NextResponse.json({ sent: result.success, messageId: result.messageId });
     } else {

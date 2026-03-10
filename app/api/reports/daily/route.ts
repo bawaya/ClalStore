@@ -8,14 +8,20 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret") || "";
   const authHeader = req.headers.get("authorization") || "";
   const cronSecret = process.env.CRON_SECRET;
-  const internalCall = req.headers.get("x-internal-call") === "crm-reports";
-  if (cronSecret && secret !== cronSecret && authHeader !== `Bearer ${cronSecret}` && !internalCall) {
-    return new NextResponse("Unauthorized", { status: 401 });
+
+  let authorized = false;
+  if (cronSecret && (secret === cronSecret || authHeader === `Bearer ${cronSecret}`)) {
+    authorized = true;
+  }
+  if (!authorized) {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
   }
 
   const dateParam = req.nextUrl.searchParams.get("date") || new Date().toISOString().split("T")[0];
