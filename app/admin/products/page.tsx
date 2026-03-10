@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, useMemo } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
-import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
+import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState, ErrorBanner, ToastContainer } from "@/components/admin/shared";
 import { IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import { PRODUCT_TYPES } from "@/lib/constants";
 import { calcMargin, formatCurrency } from "@/lib/utils";
@@ -21,7 +21,7 @@ const EMPTY: Partial<Product> = {
 export default function ProductsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { data: products, loading, create, update, remove } = useAdminApi<Product>({ endpoint: "/api/admin/products" });
+  const { data: products, loading, error, clearError, create, update, remove } = useAdminApi<Product>({ endpoint: "/api/admin/products" });
 
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Partial<Product>>(EMPTY);
@@ -756,6 +756,7 @@ export default function ProductsPage() {
   return (
     <div>
       <PageHeader title="📱 المنتجات" count={products.length} onAdd={openCreate} addLabel="منتج جديد" />
+      <ErrorBanner error={error} onDismiss={clearError} />
 
       {/* Stock Distribution Tool */}
       <div className="mb-3">
@@ -1462,12 +1463,7 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Toast */}
-      {toasts.map((t) => (
-        <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>
-          {t.message}
-        </div>
-      ))}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ export const runtime = 'edge';
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin/auth";
 
 const PAYNGO_API = "https://www.payngo.co.il/rest/V1/products";
 const PAYNGO_MEDIA = "https://www.payngo.co.il/media/catalog/product";
@@ -125,6 +126,8 @@ const AR_TO_EN: Record<string, string[]> = {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { name, brand, colors } = await req.json() as {
       name: string;
       brand: string;

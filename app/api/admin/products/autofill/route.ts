@@ -9,6 +9,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { fetchProductData as fetchFromMobileAPI } from "@/lib/admin/mobileapi";
 import { fetchProductData as fetchFromGSMArena } from "@/lib/admin/gsmarena";
+import { requireAdmin } from "@/lib/admin/auth";
 
 /**
  * Fuzzy-match two color names (handles "Black Titanium" vs "Titanium Black", etc.)
@@ -107,6 +108,8 @@ async function fetchCombined(name: string, brand: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { name, brand, provider } = await req.json();
 
     if (!name || !brand) {

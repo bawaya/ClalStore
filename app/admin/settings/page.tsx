@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminSettings } from "@/lib/admin/hooks";
-import { FormField, Toggle } from "@/components/admin/shared";
+import { FormField, Toggle, ErrorBanner, ToastContainer } from "@/components/admin/shared";
 import { INTEGRATION_TYPES } from "@/lib/constants";
 import { invalidateLogoCache } from "@/components/shared/Logo";
 
@@ -352,7 +352,7 @@ function IntegrationCard({
 export default function SettingsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { settings, integrations, loading, updateSetting, updateIntegration } = useAdminSettings();
+  const { settings, integrations, loading, error, clearError, updateSetting, updateIntegration } = useAdminSettings();
   const [tab, setTab] = useState<"store" | "integrations">("store");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -396,6 +396,7 @@ export default function SettingsPage() {
   return (
     <div>
       <h1 className="font-black mb-4" style={{ fontSize: scr.mobile ? 16 : 22 }}>⚙️ الإعدادات</h1>
+      <ErrorBanner error={error} onDismiss={clearError} />
 
       {/* Tabs */}
       <div className="flex gap-1.5 mb-4">
@@ -546,8 +547,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Toast */}
-      {toasts.map((t) => <div key={t.id} className="fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm border-state-success text-state-success">{t.message}</div>)}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

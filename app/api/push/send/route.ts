@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
 function base64UrlToUint8Array(b64url: string): Uint8Array {
   const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
@@ -147,9 +148,11 @@ async function sendWebPush(
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
   try {
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!db) return NextResponse.json({ error: "Server error" }, { status: 500 });
 
     const body = await req.json();
     const { title, body: notifBody, url, icon } = body;
@@ -238,7 +241,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
   try {
     const db = createAdminSupabase();
     if (!db) return NextResponse.json({ notifications: [] });

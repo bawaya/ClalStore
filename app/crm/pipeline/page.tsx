@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PIPELINE_STAGE } from "@/lib/constants";
 import { formatCurrency, timeAgo } from "@/lib/utils";
-import { Modal, FormField, PageHeader, EmptyState, ConfirmDialog } from "@/components/admin/shared";
+import { Modal, FormField, PageHeader, EmptyState, ConfirmDialog, ToastContainer } from "@/components/admin/shared";
 
 const EMPTY_DEAL = { customer_name: "", product_summary: "", value: 0, stage: "lead", source: "store", notes: "" };
 
@@ -176,7 +176,7 @@ export default function PipelinePage() {
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف الصفقة؟" message="لا يمكن التراجع" />
-      {toasts.map((t) => <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>{t.message}</div>)}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

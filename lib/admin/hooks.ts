@@ -37,37 +37,60 @@ export function useAdminApi<T>({ endpoint, autoFetch = true }: UseAdminApiOption
   }, [autoFetch, fetchData]);
 
   const create = async (item: Partial<T>) => {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(item),
-    });
-    const json = await res.json();
-    if (json.error) throw new Error(json.error);
-    await fetchData();
-    return json.data;
+    setError("");
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      await fetchData();
+      return json.data;
+    } catch (err: any) {
+      const msg = err.message || "خطأ في الإنشاء";
+      setError(msg);
+      throw err;
+    }
   };
 
   const update = async (id: string, updates: Partial<T>) => {
-    const res = await fetch(endpoint, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...updates }),
-    });
-    const json = await res.json();
-    if (json.error) throw new Error(json.error);
-    await fetchData();
-    return json.data;
+    setError("");
+    try {
+      const res = await fetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...updates }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      await fetchData();
+      return json.data;
+    } catch (err: any) {
+      const msg = err.message || "خطأ في التحديث";
+      setError(msg);
+      throw err;
+    }
   };
 
   const remove = async (id: string) => {
-    const res = await fetch(`${endpoint}?id=${id}`, { method: "DELETE" });
-    const json = await res.json();
-    if (json.error) throw new Error(json.error);
-    await fetchData();
+    setError("");
+    try {
+      const res = await fetch(`${endpoint}?id=${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      await fetchData();
+    } catch (err: any) {
+      const msg = err.message || "خطأ في الحذف";
+      setError(msg);
+      throw err;
+    }
   };
 
-  return { data, loading, error, fetchData, create, update, remove };
+  const clearError = useCallback(() => setError(""), []);
+
+  return { data, loading, error, clearError, fetchData, create, update, remove };
 }
 
 // Settings-specific hook
@@ -75,37 +98,61 @@ export function useAdminSettings() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [integrations, setIntegrations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/admin/settings");
       const json = await res.json();
+      if (json.error) throw new Error(json.error);
       setSettings(json.settings || {});
       setIntegrations(json.integrations || []);
-    } catch {}
-    setLoading(false);
+    } catch (err: any) {
+      setError(err.message || "خطأ في جلب الإعدادات");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   const updateSetting = async (key: string, value: string) => {
-    await fetch("/api/admin/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "setting", key, value }),
-    });
-    setSettings((prev) => ({ ...prev, [key]: value }));
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "setting", key, value }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setSettings((prev) => ({ ...prev, [key]: value }));
+    } catch (err: any) {
+      setError(err.message || "خطأ في تحديث الإعداد");
+      throw err;
+    }
   };
 
   const updateIntegration = async (id: string, updates: any) => {
-    await fetch("/api/admin/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "integration", id, updates }),
-    });
-    await fetchSettings();
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "integration", id, updates }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      await fetchSettings();
+    } catch (err: any) {
+      setError(err.message || "خطأ في تحديث التكامل");
+      throw err;
+    }
   };
 
-  return { settings, integrations, loading, fetchSettings, updateSetting, updateIntegration };
+  const clearError = useCallback(() => setError(""), []);
+
+  return { settings, integrations, loading, error, clearError, fetchSettings, updateSetting, updateIntegration };
 }

@@ -1,11 +1,14 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
     if (!db) return NextResponse.json({});
 

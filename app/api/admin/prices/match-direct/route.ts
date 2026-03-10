@@ -7,6 +7,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import type { Product } from "@/types/database";
+import { requireAdmin } from "@/lib/admin/auth";
 
 type StructuredRow = {
   brand: string;
@@ -44,6 +45,8 @@ function extractStorage(model: string): { baseModel: string; storage: string } {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const body = await req.json();
     const rows = (body.rows as StructuredRow[]) || [];
     if (!rows.length) {

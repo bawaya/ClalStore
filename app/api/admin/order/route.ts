@@ -3,11 +3,14 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
 const SETTINGS_KEY = "product_sort_rules";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
     if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 
@@ -32,6 +35,8 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const body = await req.json();
     const config = body.config;
 

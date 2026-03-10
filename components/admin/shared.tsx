@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { useScreen } from "@/lib/hooks";
+import type { Toast } from "@/lib/hooks";
 
 // ===== Modal =====
 export function Modal({
@@ -9,6 +11,18 @@ export function Modal({
   open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean; footer?: React.ReactNode;
 }) {
   const scr = useScreen();
+
+  useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
@@ -148,6 +162,42 @@ export function ConfirmDialog({
           <button onClick={onConfirm} className="flex-1 px-5 py-2.5 rounded-xl bg-state-error text-white font-bold cursor-pointer border-0">حذف</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===== ErrorBanner =====
+export function ErrorBanner({ error, onDismiss }: { error: string; onDismiss?: () => void }) {
+  if (!error) return null;
+  return (
+    <div className="bg-state-error/10 border border-state-error/30 text-state-error rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3 text-sm font-bold">
+      <span>⚠️ {error}</span>
+      {onDismiss && (
+        <button onClick={onDismiss} className="text-state-error/70 hover:text-state-error text-lg leading-none cursor-pointer bg-transparent border-0">✕</button>
+      )}
+    </div>
+  );
+}
+
+// ===== ToastContainer =====
+export function ToastContainer({ toasts }: { toasts: Toast[] }) {
+  if (!toasts.length) return null;
+  return (
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[999] flex flex-col gap-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`card font-bold shadow-2xl px-6 py-3 text-sm ${
+            t.type === "error"
+              ? "border-state-error text-state-error"
+              : t.type === "warning"
+              ? "border-yellow-500 text-yellow-400"
+              : "border-state-success text-state-success"
+          }`}
+        >
+          {t.message}
+        </div>
+      ))}
     </div>
   );
 }

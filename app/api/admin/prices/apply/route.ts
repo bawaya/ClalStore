@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { logAction } from "@/lib/admin/queries";
 import type { ProductVariant } from "@/types/database";
+import { requireAdmin } from "@/lib/admin/auth";
 
 type PriceUpdate = {
   productId: string;
@@ -27,6 +28,8 @@ function baseDeviceName(name: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const body = (await req.json()) as {
       updates?: PriceUpdate[];
       creates?: ProductCreate[];

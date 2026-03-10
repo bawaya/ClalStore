@@ -1,40 +1,35 @@
-export const runtime = "edge";
+export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { notifyAdminContactForm } from "@/lib/bot/admin-notify";
-import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
-    const clientIp =
-      req.headers.get("cf-connecting-ip") ||
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      "unknown";
-
-    const rl = checkRateLimit(getRateLimitKey(clientIp, "contact"), { maxRequests: 3, windowMs: 300_000 });
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { success: false, error: "طلبات كثيرة — حاول بعد 5 دقائق" },
-        { status: 429 }
-      );
-    }
-
     const body = await req.json();
     const { name, phone, email, subject, message } = body;
 
     if (!name || !phone || !message) {
-      return NextResponse.json({ success: false, error: "Missing fields" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    if (typeof name !== "string" || name.length > 100 || typeof message !== "string" || message.length > 2000) {
-      return NextResponse.json({ success: false, error: "Invalid input" }, { status: 400 });
+    if (typeof name !== "string" || name.length > 200) {
+      return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    }
+    if (typeof phone !== "string" || !/^[\d\s\-+()]{7,20}$/.test(phone)) {
+      return NextResponse.json({ error: "Invalid phone" }, { status: 400 });
+    }
+    if (email && (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+    }
+    if (typeof message !== "string" || message.length > 5000) {
+      return NextResponse.json({ error: "Message too long" }, { status: 400 });
     }
 
     await notifyAdminContactForm({ name, phone, email, subject, message });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Contact API error:", err);
-    return NextResponse.json({ success: false, error: "Failed" }, { status: 500 });
+    console.error("Contact notify error:", err);
+    return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
   }
 }

@@ -8,12 +8,15 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { uploadImage } from "@/lib/storage";
+import { requireAdmin } from "@/lib/admin/auth";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const formData = await req.formData();
     const files = formData.getAll("file") as File[];
 

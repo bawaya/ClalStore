@@ -3,6 +3,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase';
 import type { Product } from '@/types/database';
+import { requireAdmin } from "@/lib/admin/auth";
 
 type AiParsedRow = {
   deviceName: string;
@@ -38,6 +39,8 @@ export async function POST(req: NextRequest) {
   const steps: string[] = [];
 
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     steps.push('parsing request');
     const body = await req.json();
     const pdfText = body?.pdfText as string;

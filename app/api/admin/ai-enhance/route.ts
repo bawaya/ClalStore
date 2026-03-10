@@ -6,6 +6,7 @@ export const runtime = 'edge';
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin/auth";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
 
@@ -38,6 +39,8 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     if (!OPENAI_API_KEY) {
       return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 500 });
     }

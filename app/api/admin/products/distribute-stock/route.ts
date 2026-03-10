@@ -8,6 +8,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { logAction } from "@/lib/admin/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 
 type Mode = "scarce" | "medium" | "available" | "abundant";
 
@@ -30,6 +31,8 @@ function weightedRandom(mode: Mode): number {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { mode } = await req.json() as { mode: Mode };
     if (!WEIGHTS[mode]) {
       return NextResponse.json({ error: "Invalid mode" }, { status: 400 });

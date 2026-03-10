@@ -8,6 +8,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude } from "@/lib/ai/claude";
+import { requireAdmin } from "@/lib/admin/auth";
 
 // ── Common Arab Israeli first + last names ──
 const FIRST_NAMES_MALE_AR = [
@@ -96,6 +97,8 @@ function randomDate(): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     if (!process.env.ANTHROPIC_API_KEY_ADMIN && !process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json({ error: "Anthropic Admin API key not configured" }, { status: 500 });
     }

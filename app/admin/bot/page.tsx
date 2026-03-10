@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
+import { ToastContainer } from "@/components/admin/shared";
 import { createBrowserSupabase } from "@/lib/supabase";
 
 type Tab = "analytics" | "templates" | "policies" | "handoffs" | "conversations";
@@ -495,14 +496,7 @@ export default function BotAdminPage() {
         </div>
       )}
 
-      {/* Toasts */}
-      <div className="fixed bottom-4 left-4 z-50 space-y-2">
-        {toasts.map((t) => (
-          <div key={t.id} className="bg-surface-card border border-surface-border rounded-xl px-4 py-2 text-xs shadow-2xl animate-in slide-in-from-bottom-2">
-            {t.message}
-          </div>
-        ))}
-      </div>
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

@@ -8,9 +8,12 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
     const { data, error } = await db
       .from("sub_pages")
@@ -25,6 +28,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
     const body = await req.json();
     const { data, error } = await db
@@ -41,6 +46,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
     const body = await req.json();
     const { id, ...updates } = body;
@@ -61,6 +68,8 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");

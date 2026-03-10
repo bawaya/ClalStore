@@ -9,9 +9,12 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { uploadLogo, deleteLogo } from "@/lib/storage";
 import { updateSetting } from "@/lib/admin/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
@@ -45,6 +48,8 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { url } = await req.json();
     if (url) {
       await deleteLogo(url);

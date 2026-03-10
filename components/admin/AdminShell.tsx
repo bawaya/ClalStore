@@ -23,9 +23,13 @@ const NAV_ITEMS = [
   { key: "settings", href: "/admin/settings", icon: "⚙️", label: "إعدادات" },
 ];
 
+const QUICK_NAV = ["dashboard", "products", "deals", "settings"];
+const MORE_NAV = NAV_ITEMS.filter((n) => !QUICK_NAV.includes(n.key));
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const scr = useScreen();
   const pathname = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
   const active = NAV_ITEMS.find((n) => pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href)))?.key || "dashboard";
 
   if (scr.mobile) {
@@ -42,19 +46,51 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         {/* Content */}
         <div className="p-3 bg-surface-bg min-h-[calc(100vh-44px)]">{children}</div>
 
-        {/* Bottom tabs */}
+        {/* More menu overlay */}
+        {moreOpen && (
+          <div className="fixed inset-0 z-[60]" onClick={() => setMoreOpen(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="absolute bottom-14 left-2 right-2 bg-surface-card border border-surface-border rounded-2xl p-3 grid grid-cols-4 gap-2" onClick={(e) => e.stopPropagation()}>
+              {MORE_NAV.map((n) => (
+                <Link
+                  key={n.key}
+                  href={n.href}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex flex-col items-center py-2 rounded-xl transition-colors"
+                  style={{ color: active === n.key ? "#c41040" : "#a1a1aa", background: active === n.key ? "rgba(196,16,64,0.08)" : "transparent" }}
+                >
+                  <span className="text-lg">{n.icon}</span>
+                  <span className="text-[9px] font-bold mt-1">{n.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bottom tabs - 4 quick items + more */}
         <nav className="fixed bottom-0 left-0 right-0 bg-surface-card border-t border-surface-border flex z-50">
-          {NAV_ITEMS.map((n) => (
-            <Link
-              key={n.key}
-              href={n.href}
-              className="flex-1 flex flex-col items-center py-1.5 transition-colors"
-              style={{ color: active === n.key ? "#c41040" : "#71717a" }}
-            >
-              <span className="text-base">{n.icon}</span>
-              <span className="text-[8px] font-bold mt-0.5">{n.label}</span>
-            </Link>
-          ))}
+          {QUICK_NAV.map((key) => {
+            const n = NAV_ITEMS.find((i) => i.key === key)!;
+            return (
+              <Link
+                key={n.key}
+                href={n.href}
+                className="flex-1 flex flex-col items-center py-2 transition-colors"
+                style={{ color: active === n.key ? "#c41040" : "#71717a" }}
+              >
+                <span className="text-lg">{n.icon}</span>
+                <span className="text-[9px] font-bold mt-0.5">{n.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            onClick={() => setMoreOpen(!moreOpen)}
+            className="flex-1 flex flex-col items-center py-2 transition-colors bg-transparent border-0 cursor-pointer"
+            style={{ color: moreOpen || MORE_NAV.some((n) => n.key === active) ? "#c41040" : "#71717a" }}
+          >
+            <span className="text-lg">☰</span>
+            <span className="text-[9px] font-bold mt-0.5">المزيد</span>
+          </button>
         </nav>
       </div>
     );

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
-import { PageHeader, Modal, FormField, Toggle, EmptyState } from "@/components/admin/shared";
+import { PageHeader, Modal, FormField, Toggle, EmptyState, ToastContainer } from "@/components/admin/shared";
 import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import type { WebsiteContent } from "@/types/database";
 
@@ -183,16 +183,7 @@ export default function WebsiteContentPage() {
         )}
       </Modal>
 
-      {/* Toast container */}
-      {toasts.length > 0 && (
-        <div className="fixed bottom-4 left-4 z-50 space-y-2">
-          {toasts.map((t) => (
-            <div key={t.id} className="bg-surface-elevated text-white text-sm px-4 py-2 rounded-xl shadow-xl border border-surface-border">
-              {t.message}
-            </div>
-          ))}
-        </div>
-      )}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

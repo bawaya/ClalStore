@@ -8,6 +8,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getIntegrations } from "@/lib/admin/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 
 const MASK = "••••••••";
 
@@ -155,6 +156,8 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { type, config } = await req.json();
 
     if (!type || !config) {

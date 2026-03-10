@@ -7,9 +7,12 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { fetchProductData } from "@/lib/admin/gsmarena";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { name, brand, color_en } = await req.json() as {
       name: string;
       brand: string;

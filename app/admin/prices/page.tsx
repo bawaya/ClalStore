@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useState, useRef, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
-import { PageHeader } from "@/components/admin/shared";
+import { PageHeader, ToastContainer } from "@/components/admin/shared";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -456,22 +456,7 @@ export default function PricesPage() {
     <div style={{ padding: pad }}>
       <PageHeader title="تحديث الأسعار من ملف" />
 
-      <div className="fixed top-4 left-4 z-[200] flex flex-col gap-2">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`px-4 py-2 rounded-xl text-sm font-bold shadow-lg animate-fadeIn ${
-              t.type === "error"
-                ? "bg-red-600 text-white"
-                : t.type === "success"
-                ? "bg-green-600 text-white"
-                : "bg-zinc-700 text-white"
-            }`}
-          >
-            {t.message}
-          </div>
-        ))}
-      </div>
+      <ToastContainer toasts={toasts} />
 
       {step === "upload" && (
         <div className="max-w-2xl mx-auto">

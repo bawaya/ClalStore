@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useScreen, useToast, useDebounce } from "@/lib/hooks";
 import { ORDER_STATUS, ORDER_SOURCE, BANKS } from "@/lib/constants";
 import { formatCurrency, formatDateTime, timeAgo } from "@/lib/utils";
-import { Modal, FormField } from "@/components/admin/shared";
+import { Modal, FormField, ToastContainer } from "@/components/admin/shared";
 
 // Bank ID → Arabic name map
 const BANK_NAMES: Record<string, string> = Object.fromEntries(
@@ -421,7 +421,7 @@ export default function OrdersPage() {
         })()}
       </Modal>
 
-      {toasts.map((t) => <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>{t.message}</div>)}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

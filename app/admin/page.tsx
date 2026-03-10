@@ -10,6 +10,10 @@ import { ORDER_STATUS, ORDER_SOURCE } from "@/lib/constants";
 import { formatCurrency, timeAgo } from "@/lib/utils";
 import { exportStatsPDF } from "@/lib/pdf-export";
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 interface Stats {
   totalRevenue: number; totalOrders: number; newOrders: number; noReply: number;
   totalProducts: number; lowStock: number; outOfStock: number;
@@ -98,7 +102,7 @@ export default function AdminDashboard() {
             "تقرير الداشبورد",
             `<h3 style="margin-top:20px;font-weight:700">🏆 أكثر المنتجات مبيعاً</h3>
             <table><thead><tr><th>المنتج</th><th>المبيعات</th><th>السعر</th></tr></thead><tbody>
-            ${stats.topProducts.map((p: any) => `<tr><td>${p.name_ar}</td><td>${p.sold || 0}</td><td>₪${p.price}</td></tr>`).join("")}
+            ${stats.topProducts.map((p: any) => `<tr><td>${escapeHtml(p.name_ar)}</td><td>${p.sold || 0}</td><td>₪${p.price}</td></tr>`).join("")}
             </tbody></table>`
           )}
           className="text-xs font-bold text-brand bg-surface-elevated px-3 py-1.5 rounded-lg hover:bg-brand/10 transition-colors"

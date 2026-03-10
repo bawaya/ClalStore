@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
-import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
+import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState, ErrorBanner, ToastContainer } from "@/components/admin/shared";
 import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import type { WebsiteContent, Hero, SubPage } from "@/types/database";
 
@@ -40,14 +40,14 @@ export default function HomepageAdminPage() {
   const [expanded, setExpanded] = useState<string | null>("hero");
 
   // Heroes (Banners)
-  const { data: heroes, loading: heroesLoading, create: createHero, update: updateHero, remove: removeHero } = useAdminApi<Hero>({ endpoint: "/api/admin/heroes" });
+  const { data: heroes, loading: heroesLoading, error: heroesError, clearError: clearHeroesError, create: createHero, update: updateHero, remove: removeHero } = useAdminApi<Hero>({ endpoint: "/api/admin/heroes" });
   const [heroModal, setHeroModal] = useState(false);
   const [heroForm, setHeroForm] = useState<Partial<Hero>>({});
   const [heroEditId, setHeroEditId] = useState<string | null>(null);
   const [heroConfirm, setHeroConfirm] = useState<string | null>(null);
 
   // Sub Pages
-  const { data: subPages, loading: subPagesLoading, create: createSubPage, update: updateSubPage, remove: removeSubPage } = useAdminApi<SubPage>({ endpoint: "/api/admin/sub-pages" });
+  const { data: subPages, loading: subPagesLoading, error: subPagesError, clearError: clearSubPagesError, create: createSubPage, update: updateSubPage, remove: removeSubPage } = useAdminApi<SubPage>({ endpoint: "/api/admin/sub-pages" });
   const [subPageModal, setSubPageModal] = useState(false);
   const [subPageForm, setSubPageForm] = useState<Partial<SubPage>>({});
   const [subPageEditId, setSubPageEditId] = useState<string | null>(null);
@@ -156,6 +156,8 @@ export default function HomepageAdminPage() {
   return (
     <div>
       <PageHeader title="🏠 الصفحة الرئيسية" count={sections.length} />
+      <ErrorBanner error={heroesError} onDismiss={clearHeroesError} />
+      <ErrorBanner error={subPagesError} onDismiss={clearSubPagesError} />
 
       <p className="text-muted text-right mb-4" style={{ fontSize: scr.mobile ? 11 : 13 }}>
         تحكم كامل بكل أقسام الصفحة الرئيسية — اضغط على أي قسم لتعديله
@@ -280,16 +282,7 @@ export default function HomepageAdminPage() {
       <ConfirmDialog open={!!heroConfirm} onClose={() => setHeroConfirm(null)} onConfirm={handleHeroDelete} title="🗑️ حذف البنر؟" message="سيتم حذف البنر نهائياً ولا يمكن التراجع" />
       <ConfirmDialog open={!!subPageConfirm} onClose={() => setSubPageConfirm(null)} onConfirm={handleSubPageDelete} title="🗑️ حذف الصفحة؟" message="سيتم حذف الصفحة الفرعية نهائياً" />
 
-      {/* Toasts */}
-      {toasts.length > 0 && (
-        <div className="fixed bottom-4 left-4 z-50 space-y-2">
-          {toasts.map((t) => (
-            <div key={t.id} className={`card font-bold shadow-2xl px-5 py-2.5 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>
-              {t.message}
-            </div>
-          ))}
-        </div>
-      )}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

@@ -2,11 +2,14 @@ export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { sendWhatsAppText, sendWhatsAppTemplate } from "@/lib/bot/whatsapp";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = req.headers.get("x-admin-key");
-    if (auth !== process.env.WEBHOOK_VERIFY_TOKEN) {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+    const legacyAuth = req.headers.get("x-admin-key");
+    if (legacyAuth !== process.env.WEBHOOK_VERIFY_TOKEN) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

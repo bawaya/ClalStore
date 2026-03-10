@@ -9,6 +9,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { removeBackgroundFromBuffer } from "@/lib/integrations/removebg";
 import { uploadToR2 } from "@/lib/storage-r2";
+import { requireAdmin } from "@/lib/admin/auth";
 
 /** Detect image MIME type from magic bytes in the buffer */
 function detectImageType(buffer: ArrayBuffer): string {
@@ -36,6 +37,8 @@ function detectImageType(buffer: ArrayBuffer): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     if (!process.env.REMOVEBG_API_KEY) {
       return NextResponse.json({ error: "REMOVEBG_API_KEY not configured" }, { status: 500 });
     }
@@ -53,6 +56,17 @@ export async function POST(req: NextRequest) {
 
       if (!image_url) {
         return NextResponse.json({ error: "image_url is required" }, { status: 400 });
+      }
+
+      try {
+        const parsed = new URL(image_url);
+        const allowedHosts = [".supabase.co", ".cloudinary.com", ".r2.cloudflarestorage.com", "clalmobile.com"];
+        const isAllowed = allowedHosts.some((h) => parsed.hostname.endsWith(h));
+        if (!isAllowed || !["https:", "http:"].includes(parsed.protocol)) {
+          return NextResponse.json({ error: "URL not allowed" }, { status: 400 });
+        }
+      } catch {
+        return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
       }
 
       // Download image first, then send as buffer to Remove.bg

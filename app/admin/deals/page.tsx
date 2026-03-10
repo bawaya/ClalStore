@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
-import { Modal, PageHeader, FormField, Toggle, EmptyState, ConfirmDialog } from "@/components/admin/shared";
+import { Modal, PageHeader, FormField, Toggle, EmptyState, ConfirmDialog, ToastContainer } from "@/components/admin/shared";
 import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 
 interface Deal {
@@ -265,11 +265,7 @@ export default function AdminDealsPage() {
           onClose={() => setDeleteDeal(null)}
         />
 
-      {toasts.map((t) => (
-        <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>
-          {t.message}
-        </div>
-      ))}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

@@ -21,7 +21,7 @@ export default function ContactPage() {
     setSending(true);
     try {
       // Send WhatsApp notification to admin (primary notification)
-      const notifyRes = await fetch('/api/admin/contact-notify', {
+      const notifyRes = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
