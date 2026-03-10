@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface UseAdminApiOptions<T> {
   endpoint: string;
@@ -16,9 +16,10 @@ export function useAdminApi<T>({ endpoint, autoFetch = true }: UseAdminApiOption
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const initialLoadDone = useRef(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
     try {
       const res = await fetch(endpoint);
@@ -29,12 +30,15 @@ export function useAdminApi<T>({ endpoint, autoFetch = true }: UseAdminApiOption
       setError(err.message || "خطأ في جلب البيانات");
     } finally {
       setLoading(false);
+      initialLoadDone.current = true;
     }
   }, [endpoint]);
 
   useEffect(() => {
     if (autoFetch) fetchData();
   }, [autoFetch, fetchData]);
+
+  const silentRefresh = useCallback(() => fetchData(true), [fetchData]);
 
   const create = async (item: Partial<T>) => {
     setError("");
@@ -46,7 +50,7 @@ export function useAdminApi<T>({ endpoint, autoFetch = true }: UseAdminApiOption
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      await fetchData();
+      await silentRefresh();
       return json.data;
     } catch (err: any) {
       const msg = err.message || "خطأ في الإنشاء";
@@ -65,7 +69,7 @@ export function useAdminApi<T>({ endpoint, autoFetch = true }: UseAdminApiOption
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      await fetchData();
+      await silentRefresh();
       return json.data;
     } catch (err: any) {
       const msg = err.message || "خطأ في التحديث";
@@ -80,7 +84,7 @@ export function useAdminApi<T>({ endpoint, autoFetch = true }: UseAdminApiOption
       const res = await fetch(`${endpoint}?id=${id}`, { method: "DELETE" });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      await fetchData();
+      await silentRefresh();
     } catch (err: any) {
       const msg = err.message || "خطأ في الحذف";
       setError(msg);
@@ -94,7 +98,7 @@ export function useAdminApi<T>({ endpoint, autoFetch = true }: UseAdminApiOption
       const res = await fetch(`${endpoint}?ids=${ids.join(",")}`, { method: "DELETE" });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      await fetchData();
+      await silentRefresh();
       return json.deleted as number;
     } catch (err: any) {
       const msg = err.message || "خطأ في الحذف الجماعي";
@@ -115,8 +119,8 @@ export function useAdminSettings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchSettings = useCallback(async () => {
-    setLoading(true);
+  const fetchSettings = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/admin/settings");
@@ -160,7 +164,7 @@ export function useAdminSettings() {
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      await fetchSettings();
+      await fetchSettings(true);
     } catch (err: any) {
       setError(err.message || "خطأ في تحديث التكامل");
       throw err;

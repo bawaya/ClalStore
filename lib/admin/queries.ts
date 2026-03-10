@@ -164,7 +164,36 @@ export async function updateSetting(key: string, value: string) {
 export async function getIntegrations() {
   const supabase = db();
   const { data } = await supabase.from("integrations").select("*");
-  const existing = (data || []) as Integration[];
+  let existing = (data || []) as Integration[];
+
+  // Deduplicate: keep the row with the most config for each type
+  const byType = new Map<string, Integration[]>();
+  for (const row of existing) {
+    const arr = byType.get(row.type) || [];
+    arr.push(row);
+    byType.set(row.type, arr);
+  }
+  const dupeIds: string[] = [];
+  const deduped: Integration[] = [];
+  for (const [, rows] of byType) {
+    if (rows.length > 1) {
+      rows.sort((a, b) => {
+        const aKeys = Object.keys(a.config || {}).filter(k => !k.startsWith("_has_") && (a.config as any)[k]).length;
+        const bKeys = Object.keys(b.config || {}).filter(k => !k.startsWith("_has_") && (b.config as any)[k]).length;
+        return bKeys - aKeys;
+      });
+      deduped.push(rows[0]);
+      for (let i = 1; i < rows.length; i++) dupeIds.push(rows[i].id);
+    } else {
+      deduped.push(rows[0]);
+    }
+  }
+  if (dupeIds.length > 0) {
+    await supabase.from("integrations").delete().in("id", dupeIds);
+  }
+  existing = deduped;
+
+  // Ensure all types exist
   const existingTypes = new Set(existing.map((i) => i.type));
   const allTypes = Object.keys(INTEGRATION_TYPES);
   const missing = allTypes.filter((t) => !existingTypes.has(t));

@@ -155,9 +155,13 @@ function IntegrationCard({
   const selectedProvider = integ?.provider || "";
   const fields = PROVIDER_FIELDS[selectedProvider] || [];
 
-  // Check which sensitive fields are already saved (from _has_ flags)
   const hasSavedKey = (key: string) => !!configDraft[`_has_${key}`];
   const MASK = "••••••••";
+
+  const fieldHasValue = (key: string) => {
+    const val = configDraft[key];
+    return (val && val.length > 0) || hasSavedKey(key);
+  };
 
   const handleSelectProvider = async (provider: string) => {
     const newConfig = provider === selectedProvider ? configDraft : {};
@@ -170,13 +174,10 @@ function IntegrationCard({
   const handleSaveConfig = async () => {
     setSaving(true);
     try {
-      // Send config — API will handle masked values by keeping old ones
       const configToSend = { ...configDraft };
-      // Remove _has_ metadata before sending
       for (const key of Object.keys(configToSend)) {
         if (key.startsWith("_has_")) delete configToSend[key];
       }
-      // Auto-activate: if config has meaningful values, set status to active
       const hasValues = Object.entries(configToSend).some(([, v]) => v && !v.includes(MASK));
       const newStatus = hasValues ? "active" : (integ?.status || "inactive");
       await onUpdate(type, { config: configToSend, status: newStatus });
@@ -205,39 +206,42 @@ function IntegrationCard({
       });
       const data = await res.json();
       setTestResult({ ok: data.ok, message: data.message || data.error || "" });
+      if (data.ok) {
+        await onUpdate(type, { status: "active" });
+      }
     } catch (err: any) {
       setTestResult({ ok: false, message: err.message });
     }
     setTesting(false);
   };
 
-  // Count how many required fields have values (either entered or saved)
-  const configuredCount = fields.filter((f) => {
-    const val = configDraft[f.key];
-    return val && val.length > 0;
-  }).length;
-  const hasRequiredFields = configuredCount > 0;
+  const configuredCount = fields.filter((f) => fieldHasValue(f.key)).length;
+  const allConfigured = fields.length > 0 && configuredCount === fields.length;
+  const hasAnyField = configuredCount > 0;
+
+  const statusColor = integ?.status === "active" ? "#22c55e" : integ?.status === "error" ? "#ef4444" : "#71717a";
+  const statusBg = integ?.status === "active" ? "rgba(34,197,94,0.12)" : integ?.status === "error" ? "rgba(239,68,68,0.12)" : "rgba(63,63,70,0.12)";
+  const statusText = integ?.status === "active" ? "فعّال" : integ?.status === "error" ? "خطأ" : "غير فعّال";
+  const statusIcon = integ?.status === "active" ? "🟢" : integ?.status === "error" ? "🔴" : "⚪";
 
   return (
-    <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
+    <div className="card" style={{ padding: scr.mobile ? 14 : 20, borderRight: `3px solid ${statusColor}` }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
           {integ && (
-            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{
-              background: integ.status === "active" ? "rgba(34,197,94,0.15)" : integ.status === "error" ? "rgba(239,68,68,0.15)" : "rgba(63,63,70,0.15)",
-              color: integ.status === "active" ? "#22c55e" : integ.status === "error" ? "#ef4444" : "#71717a",
-            }}>
-              {integ.status === "active" ? "✅ فعّال" : integ.status === "error" ? "❌ خطأ" : "⏸️ غير فعّال"}
+            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: statusBg, color: statusColor }}>
+              {statusIcon} {statusText}
             </span>
           )}
           {integ?.provider && <Toggle value={integ.status === "active"} onChange={handleToggleStatus} />}
         </div>
         <div className="text-right">
           <div className="font-bold" style={{ fontSize: scr.mobile ? 13 : 15 }}>{info.icon} {info.label}</div>
-          {integ?.last_synced_at && (
-            <div className="text-muted" style={{ fontSize: scr.mobile ? 8 : 9 }}>
-              آخر مزامنة: {new Date(integ.last_synced_at).toLocaleString("ar")}
+          {integ?.provider && (
+            <div className="text-muted" style={{ fontSize: scr.mobile ? 9 : 10 }}>
+              {integ.provider}
+              {integ.last_synced_at && ` — ${new Date(integ.last_synced_at).toLocaleString("ar")}`}
             </div>
           )}
         </div>
@@ -256,31 +260,48 @@ function IntegrationCard({
       {/* Config fields */}
       {selectedProvider && fields.length > 0 && (
         <div className="mt-3 bg-surface-elevated rounded-xl p-3 space-y-2.5">
+          {/* Config header with summary */}
           <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {allConfigured ? (
+                <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
+                  ✅ {fields.length}/{fields.length} مُعد
+                </span>
+              ) : hasAnyField ? (
+                <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>
+                  ⚠️ {configuredCount}/{fields.length} مُعد
+                </span>
+              ) : (
+                <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>
+                  ❌ لم يتم الإعداد
+                </span>
+              )}
+            </div>
             <div className="font-bold text-right text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
               🔑 إعدادات {selectedProvider}
             </div>
-            {configuredCount > 0 && (
-              <span className="text-[9px] px-2 py-0.5 rounded-md font-bold"
-                style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
-                ✅ {configuredCount}/{fields.length} مُعد
-              </span>
-            )}
           </div>
+
           {fields.map((f) => {
             const isSensitive = f.type === "password";
             const isSaved = hasSavedKey(f.key);
             const currentVal = configDraft[f.key] || "";
             const isStillMasked = isSensitive && currentVal.includes(MASK);
+            const hasVal = fieldHasValue(f.key);
 
             return (
               <div key={f.key}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1">
-                    {isSaved && (
+                    {hasVal ? (
                       <span className="text-[8px] px-1.5 py-0.5 rounded font-bold"
                         style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
-                        ✅ محفوظ
+                        {isSaved ? "🔒 محفوظ" : "✓ مُعبأ"}
+                      </span>
+                    ) : (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded font-bold"
+                        style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
+                        فارغ
                       </span>
                     )}
                   </div>
@@ -289,15 +310,16 @@ function IntegrationCard({
                 <div className="flex items-center gap-1.5">
                   <input
                     type={isSensitive && !showSecrets[f.key] ? "password" : "text"}
-                    className="input flex-1" style={{ fontSize: scr.mobile ? 11 : 13 }}
+                    className="input flex-1"
+                    style={{
+                      fontSize: scr.mobile ? 11 : 13,
+                      borderColor: hasVal ? "rgba(34,197,94,0.2)" : undefined,
+                    }}
                     placeholder={isSaved ? "اضغط لتحديث القيمة..." : f.placeholder}
                     value={currentVal}
                     onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
                     onFocus={() => {
-                      // Clear masked value on focus so user can enter new one
-                      if (isStillMasked) {
-                        setConfigDraft((prev) => ({ ...prev, [f.key]: "" }));
-                      }
+                      if (isStillMasked) setConfigDraft((prev) => ({ ...prev, [f.key]: "" }));
                     }}
                     dir="ltr"
                   />
@@ -312,26 +334,46 @@ function IntegrationCard({
               </div>
             );
           })}
+
           {/* Actions */}
           <div className="flex items-center gap-2 mt-3 pt-2 border-t border-surface-border">
             <button onClick={handleSaveConfig} disabled={saving} className="btn-primary flex-1"
               style={{ fontSize: scr.mobile ? 10 : 12, padding: scr.mobile ? "8px 12px" : "10px 16px", opacity: saving ? 0.6 : 1 }}>
-              {saving ? "⏳ جاري الحفظ..." : "💾 حفظ الإعدادات"}
+              {saving ? "⏳ جاري الحفظ..." : "💾 حفظ"}
             </button>
-            <button onClick={handleTest} disabled={testing || !hasRequiredFields} className="btn-outline"
-              style={{ fontSize: scr.mobile ? 10 : 12, padding: scr.mobile ? "8px 12px" : "10px 16px", opacity: testing || !hasRequiredFields ? 0.5 : 1 }}>
-              {testing ? "⏳ جاري..." : "🔍 اختبار"}
+            <button onClick={handleTest} disabled={testing || !hasAnyField} className="btn-outline"
+              style={{
+                fontSize: scr.mobile ? 10 : 12,
+                padding: scr.mobile ? "8px 12px" : "10px 16px",
+                opacity: testing || !hasAnyField ? 0.5 : 1,
+                minWidth: scr.mobile ? 90 : 120,
+              }}>
+              {testing ? (
+                <span className="flex items-center gap-1 justify-center">
+                  <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
+                  جاري الاختبار...
+                </span>
+              ) : "🔌 اختبار الاتصال"}
             </button>
           </div>
-          {/* Test result */}
+
+          {/* Test result with animation */}
           {testResult && (
-            <div className="rounded-lg px-3 py-2 text-center font-bold" style={{
+            <div className="rounded-lg px-3 py-2.5 font-bold animate-fade-in" style={{
               fontSize: scr.mobile ? 10 : 12,
               background: testResult.ok ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
               color: testResult.ok ? "#22c55e" : "#ef4444",
-              border: `1px solid ${testResult.ok ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
+              border: `1px solid ${testResult.ok ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)"}`,
             }}>
-              {testResult.ok ? "✅" : "❌"} {testResult.message}
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: 18 }}>{testResult.ok ? "✅" : "❌"}</span>
+                <div className="flex-1 text-right">
+                  <div>{testResult.ok ? "الاتصال ناجح" : "فشل الاتصال"}</div>
+                  <div style={{ fontSize: scr.mobile ? 9 : 10, opacity: 0.8, fontWeight: 400, marginTop: 2 }}>
+                    {testResult.message}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
