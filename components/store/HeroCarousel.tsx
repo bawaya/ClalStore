@@ -44,7 +44,7 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
       aria-label="عروض مميزة"
       style={{
         background: "transparent",
-        padding: scr.mobile ? "44px 20px 24px" : "64px 40px 48px",
+        padding: scr.mobile ? "24px 20px" : "48px 40px",
         borderRadius: scr.mobile ? 0 : 20,
         margin: scr.mobile ? 0 : "0 0 20px",
       }}

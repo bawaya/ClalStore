@@ -130,6 +130,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
       <StoreHeader />
+      <div style={{ height: scr.mobile ? 46 : 56 }} />
       <HeroCarousel heroes={heroes} />
 
       <div
