@@ -43,8 +43,8 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
       aria-roledescription="carousel"
       aria-label="عروض مميزة"
       style={{
-        background: "linear-gradient(135deg, rgba(196,16,64,0.12), rgba(168,85,247,0.08))",
-        padding: scr.mobile ? "24px 20px" : "48px 40px",
+        background: "transparent",
+        padding: scr.mobile ? "44px 20px 24px" : "64px 40px 48px",
         borderRadius: scr.mobile ? 0 : 20,
         margin: scr.mobile ? 0 : "0 0 20px",
       }}
@@ -55,7 +55,7 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
           alt=""
           fill
           sizes="100vw"
-          className="object-cover opacity-20 rounded-[inherit]"
+          className="object-cover rounded-[inherit]"
           priority={idx === 0}
         />
       )}
