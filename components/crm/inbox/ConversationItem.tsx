@@ -64,7 +64,7 @@ export function ConversationItem({ conversation, isSelected, onClick }: Props) {
         </div>
 
         <div className="flex flex-col items-end gap-0.5 shrink-0">
-          <span className="text-[10px] text-muted">{timeAgo(c.last_message_at)}</span>
+          <span className="text-[10px] text-muted">{c.last_message_at ? timeAgo(c.last_message_at) : ""}</span>
           {hasUnread && (
             <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
               {c.unread_count}
