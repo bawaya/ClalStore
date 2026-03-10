@@ -9,8 +9,10 @@ export const dynamic = "force-dynamic";
 
 /** Sensitive config keys that should be masked when returned to the frontend */
 const SENSITIVE_KEYS = new Set([
-  "api_key", "auth_token", "secret_key", "password", "access_token",
-  "client_secret", "verify_token", "project_token",
+  "api_key", "api_key_bot", "api_key_store", "api_key_admin",
+  "auth_token", "secret_key", "access_key",
+  "password", "access_token", "client_secret",
+  "verify_token", "project_token", "vapid_private",
 ]);
 
 const MASK = "••••••••";

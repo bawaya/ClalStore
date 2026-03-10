@@ -194,7 +194,6 @@ function IntegrationCard({
     setTesting(true);
     setTestResult(null);
     try {
-      // For test, send actual values — masked values will be resolved by API
       const configToTest = { ...configDraft };
       for (const key of Object.keys(configToTest)) {
         if (key.startsWith("_has_")) delete configToTest[key];
@@ -202,7 +201,7 @@ function IntegrationCard({
       const res = await fetch("/api/admin/integrations/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, config: configToTest }),
+        body: JSON.stringify({ type, provider: selectedProvider, config: configToTest }),
       });
       const data = await res.json();
       setTestResult({ ok: data.ok, message: data.message || data.error || "" });
