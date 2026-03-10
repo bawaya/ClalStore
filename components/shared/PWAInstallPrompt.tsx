@@ -41,10 +41,9 @@ export function PWAInstallPrompt() {
               const perm = await Notification.requestPermission();
               if (perm === "granted") {
                 const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-                const appKey = vapidKey ? urlBase64ToUint8Array(vapidKey) : undefined;
                 const sub = await reg.pushManager.subscribe({
                   userVisibleOnly: true,
-                  applicationServerKey: appKey ?? undefined,
+                  applicationServerKey: vapidKey ? urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer : undefined,
                 });
                 await fetch("/api/push/subscribe", {
                   method: "POST",
