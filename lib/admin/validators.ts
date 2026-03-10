@@ -85,14 +85,14 @@ export const idParam = z.string().uuid().or(z.string().min(1).max(100));
 
 /**
  * Validate request body against a Zod schema.
- * Returns { data } on success, { error, response } on failure.
+ * Returns { data, error: null } on success, { data: null, error } on failure.
  */
 export function validateBody<T>(body: unknown, schema: z.ZodSchema<T>): 
-  { data: T; error?: never } | { data?: never; error: string } {
+  { data: T; error: null } | { data: null; error: string } {
   const result = schema.safeParse(body);
   if (!result.success) {
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-    return { error: issues };
+    return { data: null, error: issues };
   }
-  return { data: result.data };
+  return { data: result.data, error: null };
 }
