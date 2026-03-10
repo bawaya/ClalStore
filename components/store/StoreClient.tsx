@@ -134,7 +134,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
 
       <div
         className="max-w-[1200px] mx-auto"
-        style={{ padding: scr.mobile ? "12px 14px 30px" : "20px 28px 40px" }}
+        style={{ padding: scr.mobile ? "12px 14px 80px" : "20px 28px 100px" }}
       >
         {/* Search */}
         <div className="mb-3" style={{ marginBottom: scr.mobile ? 12 : 20 }}>

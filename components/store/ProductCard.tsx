@@ -185,7 +185,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
 
       {/* ── Product Image ── */}
       <div
-        className="bg-[#1a1a1e] flex items-center justify-center overflow-hidden relative"
+        className="flex items-center justify-center overflow-hidden relative"
         style={{ height: scr.mobile ? 180 : 230 }}
       >
         {(() => {
