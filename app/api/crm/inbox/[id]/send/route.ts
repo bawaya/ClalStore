@@ -8,15 +8,31 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { sendWhatsAppText, sendWhatsAppImage, sendWhatsAppDocument } from "@/lib/bot/whatsapp";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 
     const convId = params.id;
     const body = await req.json();
     const { type = "text", content, template_name, template_params, media_url, reply_to } = body;
+
+    if (media_url) {
+      try {
+        const parsed = new URL(media_url);
+        const allowedHosts = [".supabase.co", ".cloudinary.com", ".r2.cloudflarestorage.com", "clalmobile.com"];
+        const isAllowed = allowedHosts.some((h) => parsed.hostname.endsWith(h));
+        if (!isAllowed || !["https:", "http:"].includes(parsed.protocol)) {
+          return NextResponse.json({ success: false, error: "عنوان الملف غير مسموح" }, { status: 400 });
+        }
+      } catch {
+        return NextResponse.json({ success: false, error: "رابط غير صالح" }, { status: 400 });
+      }
+    }
 
     // Get conversation
     const { data: conv } = await supabase
@@ -89,7 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         conversation_id: convId,
         direction: "outbound",
         sender_type: "agent",
-        sender_name: "موظف",
+        sender_name: auth.email?.split("@")[0] || "موظف",
         message_type: type,
         content: messageContent,
         media_url: media_url || null,

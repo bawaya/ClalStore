@@ -2,12 +2,15 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getChatMessages, closeConversation, escalateConversation } from "@/lib/crm/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { id } = params;
     if (!id) {
       return NextResponse.json({ error: "Missing conversation id" }, { status: 400 });
@@ -24,6 +27,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { id } = params;
     if (!id) {
       return NextResponse.json({ error: "Missing conversation id" }, { status: 400 });

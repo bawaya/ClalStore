@@ -7,9 +7,12 @@ export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 
@@ -43,9 +46,12 @@ export async function GET(req: NextRequest) {
       query = query.eq("assigned_to", assigned);
     }
     if (search) {
-      query = query.or(
-        `customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,last_message_text.ilike.%${search}%`
-      );
+      const safe = search.replace(/[%_\\'"]/g, "");
+      if (safe.length > 0) {
+        query = query.or(
+          `customer_name.ilike.%${safe}%,customer_phone.ilike.%${safe}%,last_message_text.ilike.%${safe}%`
+        );
+      }
     }
     if (sentiment) {
       query = query.eq("sentiment", sentiment);

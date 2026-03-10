@@ -7,9 +7,12 @@ export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 
@@ -27,6 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 

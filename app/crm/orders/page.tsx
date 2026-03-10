@@ -36,41 +36,66 @@ export default function OrdersPage() {
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (statusFilter !== "all") params.set("status", statusFilter);
-    if (sourceFilter !== "all") params.set("source", sourceFilter);
-    if (debouncedSearch) params.set("search", debouncedSearch);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    if (amountMin) params.set("amountMin", amountMin);
-    if (amountMax) params.set("amountMax", amountMax);
-    const res = await fetch(`/api/crm/orders?${params}`);
-    const json = await res.json();
-    setOrders(json.data || []);
-    setLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (sourceFilter !== "all") params.set("source", sourceFilter);
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      if (amountMin) params.set("amountMin", amountMin);
+      if (amountMax) params.set("amountMax", amountMax);
+      const res = await fetch(`/api/crm/orders?${params}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في جلب الطلبات");
+      }
+      const json = await res.json();
+      setOrders(json.data || []);
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    } finally {
+      setLoading(false);
+    }
   }, [statusFilter, sourceFilter, debouncedSearch, dateFrom, dateTo, amountMin, amountMax]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const changeStatus = async (orderId: string, status: string) => {
-    await fetch("/api/crm/orders", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "status", orderId, status, userName: "مدير" }),
-    });
-    show(`✅ ${orderId} → ${ORDER_STATUS[status as keyof typeof ORDER_STATUS]?.label || status}`);
-    fetchOrders();
-    if (selected?.id === orderId) setSelected({ ...selected, status });
+    try {
+      const res = await fetch("/api/crm/orders", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "status", orderId, status }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في تحديث الحالة");
+      }
+      show(`✅ ${orderId} → ${ORDER_STATUS[status as keyof typeof ORDER_STATUS]?.label || status}`);
+      fetchOrders();
+      if (selected?.id === orderId) setSelected({ ...selected, status });
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
   };
 
   const addNote = async () => {
     if (!noteText.trim() || !selected) return;
-    await fetch("/api/crm/orders", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "note", orderId: selected.id, userId: "system", userName: "مدير", text: noteText }),
-    });
-    show("📝 تمت إضافة الملاحظة");
-    setNoteText("");
-    fetchOrders();
+    try {
+      const res = await fetch("/api/crm/orders", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "note", orderId: selected.id, text: noteText }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في إضافة الملاحظة");
+      }
+      show("📝 تمت إضافة الملاحظة");
+      setNoteText("");
+      fetchOrders();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
   };
 
   const statusTabs = [
@@ -99,15 +124,23 @@ export default function OrdersPage() {
   };
   const applyBulkStatus = async () => {
     if (!bulkStatus || selectedIds.size === 0) return;
-    await fetch("/api/crm/orders", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: [...selectedIds], status: bulkStatus, userName: "مدير" }),
-    });
-    show(`✅ تم تحديث ${selectedIds.size} طلب`);
-    setSelectedIds(new Set());
-    setBulkStatus("");
-    fetchOrders();
+    try {
+      const res = await fetch("/api/crm/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "bulk_status", ids: [...selectedIds], status: bulkStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في التحديث الجماعي");
+      }
+      show(`✅ تم تحديث ${selectedIds.size} طلب`);
+      setSelectedIds(new Set());
+      setBulkStatus("");
+      fetchOrders();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
   };
   const exportCSV = () => {
     const headers = ["ID", "التاريخ", "الحالة", "المصدر", "المجموع", "الزبون", "الهاتف"];

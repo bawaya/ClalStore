@@ -2,9 +2,12 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCRMCustomers, getCustomerOrders } from "@/lib/crm/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get("customerId");
     if (customerId) {

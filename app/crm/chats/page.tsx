@@ -60,11 +60,13 @@ export default function ChatsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "whatsapp" | "webchat" | "sms">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "closed" | "escalated">("all");
   const [search, setSearch] = useState("");
 
   const fetchData = useCallback(async () => {
+    setError("");
     try {
       const params = new URLSearchParams();
       if (filter !== "all") params.set("channel", filter);
@@ -76,12 +78,20 @@ export default function ChatsPage() {
         fetch(`/api/crm/chats?${params}`),
         fetch("/api/crm/chats?stats=true"),
       ]);
+      if (!convosRes.ok) {
+        const err = await convosRes.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في جلب المحادثات");
+      }
+      if (!statsRes.ok) {
+        const err = await statsRes.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في جلب الإحصائيات");
+      }
       const convosData = await convosRes.json();
       const statsData = await statsRes.json();
       setConversations(convosData.conversations || []);
       setStats(statsData);
-    } catch (err) {
-      console.error("Chats fetch error:", err);
+    } catch (err: any) {
+      setError(err.message || "خطأ في التحميل");
     } finally {
       setLoading(false);
     }
@@ -94,22 +104,32 @@ export default function ChatsPage() {
     setLoadingMsgs(true);
     try {
       const res = await fetch(`/api/crm/chats/${id}/messages`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في جلب الرسائل");
+      }
       const data = await res.json();
       setMessages(data.data || []);
-    } catch { setMessages([]); }
-    finally { setLoadingMsgs(false); }
+    } catch (err: any) {
+      setMessages([]);
+      setError(err.message || "خطأ");
+    } finally { setLoadingMsgs(false); }
   };
 
   const closeChat = async (id: string) => {
     try {
-      await fetch(`/api/crm/chats/${id}/messages`, {
+      const res = await fetch(`/api/crm/chats/${id}/messages`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "close" }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في إغلاق المحادثة");
+      }
       setConversations((prev) => prev.map((c) => c.id === id ? { ...c, status: "closed" as const } : c));
       if (selectedId === id) setSelectedId(null);
-    } catch (err) { console.error("Close error:", err); }
+    } catch (err: any) { setError(err.message || "خطأ"); }
   };
 
   const filtered = conversations;
@@ -120,6 +140,8 @@ export default function ChatsPage() {
   return (
     <div>
       <h1 className="font-black mb-4" style={{ fontSize: scr.mobile ? 16 : 22 }}>💬 المحادثات</h1>
+
+      {error && <div className="text-center py-4 text-red-400 text-sm mb-2">⚠️ {error}</div>}
 
       {/* Stats */}
       <div className="grid gap-2 mb-4" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>

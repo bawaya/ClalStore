@@ -4,12 +4,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { id: conversationId } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) {
@@ -34,7 +37,7 @@ export async function POST(
     const labelNames = (existingLabels || []).map((l: any) => l.name);
 
     const transcript = messages
-      .map((m: any) => `${m.direction === "in" ? "زبون" : "موظف"}: ${m.content || `[${m.message_type}]`}`)
+      .map((m: any) => `${m.direction === "inbound" ? "زبون" : "موظف"}: ${m.content || `[${m.message_type}]`}`)
       .join("\n");
 
     const systemPrompt = `أنت محلل محادثات CRM في متجر ClalMobile (أجهزة ذكية + باقات HOT Mobile).

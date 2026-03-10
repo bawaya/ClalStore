@@ -2,8 +2,12 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
+
   const type = req.nextUrl.searchParams.get("type") || "daily";
   const dateParam = req.nextUrl.searchParams.get("date") || new Date().toISOString().split("T")[0];
 

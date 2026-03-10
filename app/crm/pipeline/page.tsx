@@ -23,10 +23,19 @@ export default function PipelinePage() {
 
   const fetchDeals = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/crm/pipeline");
-    const json = await res.json();
-    setDeals(json.data || []);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/crm/pipeline");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في جلب الصفقات");
+      }
+      const json = await res.json();
+      setDeals(json.data || []);
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchDeals(); }, [fetchDeals]);
@@ -39,10 +48,18 @@ export default function PipelinePage() {
     try {
       if (editId) {
         const { id, customers, created_at, updated_at, ...updates } = form;
-        await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
+        const res = await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "خطأ في تعديل الصفقة");
+        }
         show("✅ تم التعديل");
       } else {
-        await fetch("/api/crm/pipeline", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+        const res = await fetch("/api/crm/pipeline", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "خطأ في إضافة الصفقة");
+        }
         show("✅ تم الإضافة");
       }
       setModal(false); fetchDeals();
@@ -50,15 +67,31 @@ export default function PipelinePage() {
   };
 
   const moveStage = async (dealId: string, stage: string) => {
-    await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: dealId, stage }) });
-    show(`✅ → ${PIPELINE_STAGE[stage as keyof typeof PIPELINE_STAGE]?.label}`);
-    fetchDeals();
+    try {
+      const res = await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: dealId, stage }) });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في نقل الصفقة");
+      }
+      show(`✅ → ${PIPELINE_STAGE[stage as keyof typeof PIPELINE_STAGE]?.label}`);
+      fetchDeals();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
   };
 
   const handleDelete = async () => {
     if (!confirm) return;
-    await fetch(`/api/crm/pipeline?id=${confirm}`, { method: "DELETE" });
-    show("🗑️ تم الحذف"); setConfirm(null); fetchDeals();
+    try {
+      const res = await fetch(`/api/crm/pipeline?id=${confirm}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في حذف الصفقة");
+      }
+      show("🗑️ تم الحذف"); setConfirm(null); fetchDeals();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
   };
 
   const stages = Object.entries(PIPELINE_STAGE);

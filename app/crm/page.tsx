@@ -14,18 +14,35 @@ export default function CRMDashboard() {
   const [data, setData] = useState<any>(null);
   const [inboxStats, setInboxStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/crm/dashboard").then((r) => r.json()),
-      fetch("/api/crm/inbox/stats").then((r) => r.json()).catch(() => null),
-    ]).then(([dashboard, inbox]) => {
-      setData(dashboard);
-      if (inbox?.success) setInboxStats(inbox.stats);
-    }).finally(() => setLoading(false));
+    (async () => {
+      try {
+        const dashRes = await fetch("/api/crm/dashboard");
+        if (!dashRes.ok) {
+          const err = await dashRes.json().catch(() => ({}));
+          throw new Error(err.error || "خطأ في جلب البيانات");
+        }
+        const dashboard = await dashRes.json();
+        setData(dashboard);
+
+        try {
+          const inboxRes = await fetch("/api/crm/inbox/stats");
+          if (!inboxRes.ok) throw new Error("inbox stats failed");
+          const inbox = await inboxRes.json();
+          if (inbox?.success) setInboxStats(inbox.stats);
+        } catch { /* inbox stats are optional */ }
+      } catch (err: any) {
+        setError(err.message || "خطأ في التحميل");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   if (loading) return <div className="text-center py-20 text-muted">⏳ جاري التحميل...</div>;
+  if (error) return <div className="text-center py-20 text-red-400">⚠️ {error}</div>;
   if (!data) return null;
 
   const gridCols = scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr";

@@ -17,25 +17,44 @@ export default function CustomersPage() {
   const debouncedSearch = useDebounce(search, 300);
   const [selected, setSelected] = useState<any>(null);
   const [custOrders, setCustOrders] = useState<any[]>([]);
+  const [error, setError] = useState("");
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (segment !== "all") params.set("segment", segment);
-    if (debouncedSearch) params.set("search", debouncedSearch);
-    const res = await fetch(`/api/crm/customers?${params}`);
-    const json = await res.json();
-    setCustomers(json.data || []);
-    setLoading(false);
+    setError("");
+    try {
+      const params = new URLSearchParams();
+      if (segment !== "all") params.set("segment", segment);
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const res = await fetch(`/api/crm/customers?${params}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في جلب الزبائن");
+      }
+      const json = await res.json();
+      setCustomers(json.data || []);
+    } catch (err: any) {
+      setError(err.message || "خطأ");
+    } finally {
+      setLoading(false);
+    }
   }, [segment, debouncedSearch]);
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
   const openCustomer = async (c: any) => {
     setSelected(c);
-    const res = await fetch(`/api/crm/customers?customerId=${c.id}`);
-    const json = await res.json();
-    setCustOrders(json.orders || []);
+    try {
+      const res = await fetch(`/api/crm/customers?customerId=${c.id}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في جلب طلبات الزبون");
+      }
+      const json = await res.json();
+      setCustOrders(json.orders || []);
+    } catch (err: any) {
+      setError(err.message || "خطأ");
+    }
   };
 
   const segTabs = [
@@ -67,6 +86,9 @@ export default function CustomersPage() {
           </button>
         ))}
       </div>
+
+      {/* Error */}
+      {error && <div className="text-center py-4 text-red-400 text-sm mb-2">⚠️ {error}</div>}
 
       {/* List */}
       {loading ? <div className="text-center py-12 text-muted">⏳</div> :

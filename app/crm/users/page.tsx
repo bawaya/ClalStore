@@ -37,23 +37,44 @@ export default function UsersPage() {
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/crm/users")
-      .then((r) => r.json())
-      .then((res) => { setUsers(res.data || []); })
-      .catch((err) => console.error("Users fetch error:", err))
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        const res = await fetch("/api/crm/users");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "خطأ في جلب المستخدمين");
+        }
+        const json = await res.json();
+        setUsers(json.data || []);
+      } catch (err: any) {
+        setError(err.message || "خطأ");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   useEffect(() => {
     if (tab === "audit" && audit.length === 0) {
       setLoadingAudit(true);
-      fetch("/api/crm/users?audit=true&limit=100")
-        .then((r) => r.json())
-        .then((res) => { setAudit(res.data || []); })
-        .catch((err) => console.error("Audit fetch error:", err))
-        .finally(() => setLoadingAudit(false));
+      (async () => {
+        try {
+          const res = await fetch("/api/crm/users?audit=true&limit=100");
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "خطأ في جلب سجل النشاط");
+          }
+          const json = await res.json();
+          setAudit(json.data || []);
+        } catch (err: any) {
+          setError(err.message || "خطأ");
+        } finally {
+          setLoadingAudit(false);
+        }
+      })();
     }
   }, [tab, audit.length]);
 
@@ -62,6 +83,8 @@ export default function UsersPage() {
   return (
     <div>
       <h1 className="font-black mb-3" style={{ fontSize: scr.mobile ? 16 : 22 }}>🔑 الفريق</h1>
+
+      {error && <div className="text-center py-4 text-red-400 text-sm mb-2">⚠️ {error}</div>}
 
       <div className="flex gap-1.5 mb-4">
         <button onClick={() => setTab("team")} className={`chip ${tab === "team" ? "chip-active" : ""}`}>👥 الأعضاء ({users.length})</button>

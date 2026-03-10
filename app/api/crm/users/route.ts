@@ -2,9 +2,12 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCRMUsers, updateUser, getAuditLog } from "@/lib/crm/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { searchParams } = new URL(req.url);
 
     // Fetch audit log
@@ -24,6 +27,8 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { id, ...updates } = await req.json();
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     await updateUser(id, updates);

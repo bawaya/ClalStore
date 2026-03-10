@@ -25,6 +25,10 @@ async function api<T>(url: string, opts?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...opts?.headers },
     ...opts,
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `Request failed: ${res.status}`);
+  }
   return res.json();
 }
 

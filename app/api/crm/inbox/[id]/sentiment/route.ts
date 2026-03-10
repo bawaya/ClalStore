@@ -4,12 +4,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const { id: conversationId } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) {
@@ -28,7 +31,7 @@ export async function POST(
     }
 
     const customerMsgs = messages
-      .filter((m: any) => m.direction === "in")
+      .filter((m: any) => m.direction === "inbound")
       .slice(0, 5);
 
     if (customerMsgs.length === 0) {

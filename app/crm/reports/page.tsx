@@ -84,6 +84,7 @@ export default function CRMReportsPage() {
         <div className="bg-surface-card rounded-card border border-surface-border overflow-hidden">
           <iframe
             srcDoc={reportHtml}
+            sandbox="allow-same-origin"
             className="w-full border-0"
             style={{ minHeight: 600 }}
             title="تقرير"

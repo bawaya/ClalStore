@@ -29,12 +29,21 @@ export default function TasksPage() {
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (statusFilter !== "all") params.set("status", statusFilter);
-    const res = await fetch(`/api/crm/tasks?${params}`);
-    const json = await res.json();
-    setTasks(json.data || []);
-    setLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      const res = await fetch(`/api/crm/tasks?${params}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في جلب المهام");
+      }
+      const json = await res.json();
+      setTasks(json.data || []);
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    } finally {
+      setLoading(false);
+    }
   }, [statusFilter]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
@@ -49,10 +58,18 @@ export default function TasksPage() {
       if (!payload.due_date) delete payload.due_date;
       if (editId) {
         const { id, customers, orders, created_at, updated_at, ...updates } = payload;
-        await fetch("/api/crm/tasks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
+        const res = await fetch("/api/crm/tasks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "خطأ في تعديل المهمة");
+        }
         show("✅ تم التعديل");
       } else {
-        await fetch("/api/crm/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const res = await fetch("/api/crm/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "خطأ في إضافة المهمة");
+        }
         show("✅ تم الإضافة");
       }
       setModal(false); fetchTasks();
@@ -60,16 +77,32 @@ export default function TasksPage() {
   };
 
   const toggleStatus = async (task: any) => {
-    const next = task.status === "open" ? "in_progress" : task.status === "in_progress" ? "done" : "open";
-    await fetch("/api/crm/tasks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: task.id, status: next }) });
-    show(`${STATUS_MAP[next].icon} ${STATUS_MAP[next].label}`);
-    fetchTasks();
+    try {
+      const next = task.status === "open" ? "in_progress" : task.status === "in_progress" ? "done" : "open";
+      const res = await fetch("/api/crm/tasks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: task.id, status: next }) });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في تحديث الحالة");
+      }
+      show(`${STATUS_MAP[next].icon} ${STATUS_MAP[next].label}`);
+      fetchTasks();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
   };
 
   const handleDelete = async () => {
     if (!confirm) return;
-    await fetch(`/api/crm/tasks?id=${confirm}`, { method: "DELETE" });
-    show("🗑️ تم"); setConfirm(null); fetchTasks();
+    try {
+      const res = await fetch(`/api/crm/tasks?id=${confirm}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في حذف المهمة");
+      }
+      show("🗑️ تم"); setConfirm(null); fetchTasks();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
   };
 
   const filtered = statusFilter === "all" ? tasks : tasks.filter((t) => t.status === statusFilter);

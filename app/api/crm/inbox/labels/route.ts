@@ -2,10 +2,13 @@ export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 
 // GET — all labels
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 
@@ -23,6 +26,8 @@ export async function GET() {
 // POST — attach label to conversation
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 
@@ -52,6 +57,8 @@ export async function POST(req: NextRequest) {
 // PUT — create new label
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 
@@ -74,6 +81,8 @@ export async function PUT(req: NextRequest) {
 // DELETE — remove label from conversation
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 
