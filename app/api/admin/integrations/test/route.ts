@@ -69,6 +69,52 @@ const testPayPlus: TestFn = async (cfg) => {
   return { ok: true, message: "✅ بيانات PayPlus محفوظة — يتم التحقق عند أول عملية دفع" };
 };
 
+const testUPay: TestFn = async (cfg) => {
+  if (!cfg.api_username || !cfg.api_key) return { ok: false, message: "API Username و API Key مطلوبان" };
+  try {
+    const testMode = cfg.test_mode === "true" || cfg.test_mode === true;
+    const language = cfg.language || "HE";
+
+    const sessionRes = await fetch("https://app.upay.co.il/API6/client/json.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        msg: JSON.stringify({
+          header: { refername: "UPAY", livesystem: testMode ? 0 : 1, language },
+          request: { mainaction: "SESSION", minoraction: "GETSESSION", encoding: "json" },
+        }),
+      }).toString(),
+    });
+    const sessionData = await sessionRes.json();
+    if (!sessionData?.success || !sessionData?.result?.sessionid) {
+      return { ok: false, message: "فشل الحصول على جلسة UPay — تأكد من الاتصال بالإنترنت" };
+    }
+
+    const loginRes = await fetch("https://app.upay.co.il/API6/clientsecure/json.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        msg: JSON.stringify({
+          header: { sessionid: sessionData.result.sessionid },
+          request: {
+            mainaction: "CONNECTION",
+            minoraction: "LOGIN",
+            encoding: "json",
+            parameters: { email: cfg.api_username, key: cfg.api_key },
+          },
+        }),
+      }).toString(),
+    });
+    const loginData = await loginRes.json();
+    if (loginData?.success) {
+      return { ok: true, message: `✅ UPay متصل بنجاح — ${testMode ? "وضع اختبار" : "وضع حقيقي"}` };
+    }
+    return { ok: false, message: loginData?.result?.errormessage || "فشل تسجيل الدخول — تأكد من البيانات" };
+  } catch (err: any) {
+    return { ok: false, message: `خطأ في الاتصال: ${err.message}` };
+  }
+};
+
 // ── WhatsApp Tests (provider-aware) ──
 
 const testYCloud: TestFn = async (cfg) => {
@@ -338,6 +384,7 @@ const TESTS: Record<string, TestFn> = {
   "payment:Stripe": testStripe,
   "payment:Tranzila": testTranzila,
   "payment:PayPlus": testPayPlus,
+  "payment_upay:UPay": testUPay,
 
   "whatsapp:yCloud": testYCloud,
   "whatsapp:Meta API": testMetaAPI,

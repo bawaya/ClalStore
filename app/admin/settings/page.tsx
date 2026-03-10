@@ -92,6 +92,14 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
     { key: "api_key", label: "API Key", type: "password", placeholder: "sk-xxxxx" },
     { key: "api_key_admin", label: "API Key — أدمن (اختياري)", type: "password", placeholder: "مفتاح منفصل لترجمة المنتجات" },
   ],
+  // --- Payment UPay ---
+  UPay: [
+    { key: "api_username", label: "API Username (Email)", type: "text", placeholder: "email@example.com" },
+    { key: "api_key", label: "API Key", type: "password", placeholder: "UPay API Key" },
+    { key: "max_payments", label: "عدد التقسيطات الأقصى", type: "text", placeholder: "1" },
+    { key: "language", label: "اللغة", type: "text", placeholder: "HE / EN" },
+    { key: "test_mode", label: "وضع الاختبار (true/false)", type: "text", placeholder: "false" },
+  ],
   // --- Storage ---
   "Cloudflare R2": [
     { key: "account_id", label: "Account ID", type: "text", placeholder: "Cloudflare Account ID" },

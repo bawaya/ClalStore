@@ -16,6 +16,7 @@ import {
 } from "@/lib/validators";
 import { BANKS } from "@/lib/constants";
 import { searchCities, type City } from "@/lib/cities";
+import { detectPaymentGateway, getGatewayDisplayInfo } from "@/lib/payment-gateway";
 
 interface CustomerInfo {
   name: string; phone: string; email: string;
@@ -53,7 +54,9 @@ function CityCombobox({ value, onChange, error }: { value: string; onChange: (v:
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<City[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const selectedRef = useRef(value);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -62,35 +65,67 @@ function CityCombobox({ value, onChange, error }: { value: string; onChange: (v:
   }, [query]);
 
   useEffect(() => {
+    if (value && value !== query) {
+      setQuery(value);
+      selectedRef.current = value;
+    }
+  }, [value]);
+
+  useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        if (!selectedRef.current && query) {
+          setQuery("");
+        }
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [query]);
 
   const select = (city: City) => {
-    onChange(city.ar);
+    selectedRef.current = city.ar;
     setQuery(city.ar);
     setOpen(false);
+    onChange(city.ar);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setQuery(val);
+    setOpen(true);
+    if (selectedRef.current) {
+      selectedRef.current = "";
+      onChange("");
+    }
+  };
+
+  const handleClear = () => {
+    selectedRef.current = "";
+    setQuery("");
+    onChange("");
+    setOpen(true);
+    inputRef.current?.focus();
   };
 
   return (
     <Field label="🏙️ المدينة *" error={error}>
       <div ref={ref} className="relative">
         <input
+          ref={inputRef}
           className="input w-full"
           placeholder="اكتب اسم المدينة للبحث..."
           value={query}
-          onChange={(e) => { setQuery(e.target.value); onChange(""); setOpen(true); }}
+          onChange={handleInputChange}
           onFocus={() => setOpen(true)}
           autoComplete="off"
           aria-label="البحث عن المدينة"
         />
-        {value && (
+        {selectedRef.current && (
           <button
             type="button"
-            onClick={() => { setQuery(""); onChange(""); setOpen(true); }}
+            onClick={handleClear}
             className="absolute left-2 top-1/2 -translate-y-1/2 text-muted text-xs cursor-pointer bg-transparent border-0 p-0.5"
             aria-label="مسح المدينة"
           >✕</button>
@@ -294,68 +329,121 @@ export default function CartPage() {
     </div>
   );
 
-  const PayStep = () => (
-    <div>
-      <h2 className="font-black text-right mb-3" style={{ fontSize: scr.mobile ? 16 : 20 }}>💳 الدفع</h2>
-      <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
-        <div className="bg-surface-elevated rounded-xl p-2.5 mb-4">
-          <div className="flex justify-between mb-1">
-            <span className="font-black text-state-success" style={{ fontSize: scr.mobile ? 16 : 20 }}>₪{total.toLocaleString()}</span>
-            <span className="font-bold" style={{ fontSize: scr.mobile ? 11 : 13 }}>المجموع</span>
-          </div>
-          <div className="text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 11 }}>{items.length} منتج • التوصيل: {info.city}</div>
-        </div>
+  const PayStep = () => {
+    const gateway = detectPaymentGateway(info.city);
+    const gwInfo = getGatewayDisplayInfo(gateway);
 
-        {hasDevices ? (
-          <>
-            <div className="rounded-xl p-3 mb-3 text-right" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.12)" }}>
-              <div className="text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>📋 طلبات الأجهزة تخضع لفحص ومراجعة الفريق — الدفع عبر تحويل بنكي</div>
+    return (
+      <div>
+        <h2 className="font-black text-right mb-3" style={{ fontSize: scr.mobile ? 16 : 20 }}>💳 الدفع</h2>
+        <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
+          <div className="bg-surface-elevated rounded-xl p-2.5 mb-4">
+            <div className="flex justify-between mb-1">
+              <span className="font-black text-state-success" style={{ fontSize: scr.mobile ? 16 : 20 }}>₪{total.toLocaleString()}</span>
+              <span className="font-bold" style={{ fontSize: scr.mobile ? 11 : 13 }}>المجموع</span>
             </div>
-            <Field label="🏦 البنك *" error={errors.bank}><select className="input" value={pay.bank} onChange={(e) => setPay({ ...pay, bank: e.target.value })}><option value="">اختر البنك...</option>{BANKS.map((b) => <option key={b.id} value={b.id}>{b.name_ar} ({b.name_he})</option>)}</select></Field>
-            <div className="flex gap-2.5">
-              <div className="flex-1"><Field label="رقم الفرع (3) *" error={errors.branch}><input className="input" value={pay.branch} onChange={(e) => setPay({ ...pay, branch: e.target.value.replace(/\D/g, "").slice(0, 3) })} maxLength={3} dir="ltr" /></Field></div>
-              <div className="flex-1"><Field label="رقم الحساب (4-9) *" error={errors.account}><input className="input" value={pay.account} onChange={(e) => setPay({ ...pay, account: e.target.value.replace(/\D/g, "").slice(0, 9) })} maxLength={9} dir="ltr" /></Field></div>
-            </div>
-            <Field label="📅 عدد الدفعات">
-              <select className="input" value={pay.installments} onChange={(e) => setPay({ ...pay, installments: Number(e.target.value) })}>
-                {[1, 2, 3, 6, 9, 12, 15, 18].map((n) => (
-                  <option key={n} value={n}>{n === 1 ? "دفعة واحدة (تحويل بنكي)" : `${n} دفعات`}</option>
-                ))}
-              </select>
-            </Field>
-            {pay.installments > 1 && (
-              <div className="rounded-xl p-3 mb-2 text-right" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)" }}>
-                <div className="text-state-success font-bold mb-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>💰 تقسيط بدون فوائد حتى 18 دفعة!</div>
-                <div className="text-white font-black" style={{ fontSize: scr.mobile ? 16 : 20 }}>₪{Math.ceil(total / pay.installments).toLocaleString()} × {pay.installments} شهر</div>
-                <div className="text-muted mt-1" style={{ fontSize: scr.mobile ? 10 : 12 }}>المبلغ الإجمالي: ₪{total.toLocaleString()} — بدون فوائد</div>
+            <div className="text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 11 }}>{items.length} منتج • التوصيل: {info.city}</div>
+          </div>
+
+          {hasDevices ? (
+            <>
+              <div className="rounded-xl p-3 mb-3 text-right" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.12)" }}>
+                <div className="text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>📋 طلبات الأجهزة تخضع لفحص ومراجعة الفريق — الدفع عبر تحويل بنكي</div>
               </div>
-            )}
-          </>
-        ) : (
-          <div className="rounded-xl p-4 text-right" style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.08), rgba(6,182,212,0.06))", border: "1px solid rgba(34,197,94,0.15)" }}>
-            <div className="text-lg mb-2">⚡</div>
-            <div className="font-bold mb-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>دفع مباشر — بوابة آمنة</div>
-            <div className="text-muted mb-2" style={{ fontSize: scr.mobile ? 10 : 12 }}>سيتم تحويلك لصفحة الدفع الآمنة عبر Rivhit لإتمام الشراء</div>
-            <div className="flex items-center gap-2 text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-              <span>💳 Visa</span><span>💳 Mastercard</span><span>💳 Isracard</span><span>📱 Bit</span>
-            </div>
-            <div className="text-state-cyan mt-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>✓ تقسيط حتى 12 دفعة • ✓ PCI-DSS آمن • ✓ חשבונית מס تلقائية</div>
-          </div>
-        )}
+              <Field label="🏦 البنك *" error={errors.bank}><select className="input" value={pay.bank} onChange={(e) => setPay({ ...pay, bank: e.target.value })}><option value="">اختر البنك...</option>{BANKS.map((b) => <option key={b.id} value={b.id}>{b.name_ar} ({b.name_he})</option>)}</select></Field>
+              <div className="flex gap-2.5">
+                <div className="flex-1"><Field label="رقم الفرع (3) *" error={errors.branch}><input className="input" value={pay.branch} onChange={(e) => setPay({ ...pay, branch: e.target.value.replace(/\D/g, "").slice(0, 3) })} maxLength={3} dir="ltr" /></Field></div>
+                <div className="flex-1"><Field label="رقم الحساب (4-9) *" error={errors.account}><input className="input" value={pay.account} onChange={(e) => setPay({ ...pay, account: e.target.value.replace(/\D/g, "").slice(0, 9) })} maxLength={9} dir="ltr" /></Field></div>
+              </div>
+              <Field label="📅 عدد الدفعات">
+                <select className="input" value={pay.installments} onChange={(e) => setPay({ ...pay, installments: Number(e.target.value) })}>
+                  {[1, 2, 3, 6, 9, 12, 15, 18].map((n) => (
+                    <option key={n} value={n}>{n === 1 ? "دفعة واحدة (تحويل بنكي)" : `${n} دفعات`}</option>
+                  ))}
+                </select>
+              </Field>
+              {pay.installments > 1 && (
+                <div className="rounded-xl p-3 mb-2 text-right" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                  <div className="text-state-success font-bold mb-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>💰 تقسيط بدون فوائد حتى 18 دفعة!</div>
+                  <div className="text-white font-black" style={{ fontSize: scr.mobile ? 16 : 20 }}>₪{Math.ceil(total / pay.installments).toLocaleString()} × {pay.installments} شهر</div>
+                  <div className="text-muted mt-1" style={{ fontSize: scr.mobile ? 10 : 12 }}>المبلغ الإجمالي: ₪{total.toLocaleString()} — بدون فوائد</div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="rounded-xl overflow-hidden mb-2" style={{ border: "1px solid rgba(34,197,94,0.15)" }}>
+              {/* Secure payment header */}
+              <div className="flex items-center justify-between px-4 py-3" style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.1), rgba(6,182,212,0.06))" }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "rgba(34,197,94,0.2)" }}>
+                    <span style={{ fontSize: 12 }}>🔒</span>
+                  </div>
+                  <span className="text-state-success font-bold" style={{ fontSize: scr.mobile ? 10 : 12 }}>{gwInfo.securityText}</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>دفع آمن ومشفّر</div>
+                </div>
+              </div>
 
-        <button
-          onClick={() => validatePay() && submitOrder()}
-          disabled={loading}
-          className="btn-primary w-full mt-2 disabled:opacity-50"
-          style={{ fontSize: scr.mobile ? 14 : 16, padding: "14px 20px" }}
-        >
-          {loading ? "⏳ جاري المعالجة..." : hasDevices
-            ? `📋 تأكيد الطلب — ₪${total.toLocaleString()}`
-            : `🔒 متابعة للدفع الآمن — ₪${total.toLocaleString()}`}
-        </button>
+              {/* Gateway logo + info */}
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={gwInfo.logo}
+                      alt={gwInfo.name}
+                      style={{ height: scr.mobile ? 22 : 28 }}
+                      className="object-contain"
+                    />
+                  </div>
+                  <div className="text-muted text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                    سيتم تحويلك لإتمام الدفع بأمان
+                  </div>
+                </div>
+
+                {/* Supported payment methods */}
+                <div className="flex items-center justify-center gap-3 flex-wrap py-2.5 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
+                  {gwInfo.supports.map((method) => (
+                    <div key={method} className="flex items-center gap-1 text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                      <span>{method === "Bit" ? "📱" : method === "Apple Pay" ? "🍎" : method === "Google Pay" ? "🔵" : method === "PayPal" ? "🅿️" : "💳"}</span>
+                      <span>{method}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Security badges */}
+                <div className="flex items-center justify-center gap-4 mt-3 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="flex items-center gap-1 text-muted" style={{ fontSize: scr.mobile ? 8 : 10 }}>
+                    <span>🔐</span>
+                    <span>SSL 256-bit</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-muted" style={{ fontSize: scr.mobile ? 8 : 10 }}>
+                    <span>🛡️</span>
+                    <span>حماية كاملة</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-muted" style={{ fontSize: scr.mobile ? 8 : 10 }}>
+                    <span>✅</span>
+                    <span>بيانات مشفّرة</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => validatePay() && submitOrder()}
+            disabled={loading}
+            className="btn-primary w-full mt-2 disabled:opacity-50"
+            style={{ fontSize: scr.mobile ? 14 : 16, padding: "14px 20px" }}
+          >
+            {loading ? "⏳ جاري المعالجة..." : hasDevices
+              ? `📋 تأكيد الطلب — ₪${total.toLocaleString()}`
+              : `🔒 متابعة للدفع الآمن — ₪${total.toLocaleString()}`}
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">

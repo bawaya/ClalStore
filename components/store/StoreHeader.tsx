@@ -146,32 +146,32 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
             )}
           </Link>
 
-          {/* Cart icon — always visible on desktop, hidden on mobile (replaced by StickyCartBar) */}
-          {!scr.mobile && (
-            <Link
-              href="/store/cart"
-              className={`glass-icon-btn relative ${itemCount > 0 ? "glass-icon-btn-active" : ""}`}
-              style={{ width: 46, height: 46 }}
-            >
-              <ShoppingCart size={20} />
-              {itemCount > 0 && (
-                <span
-                  className="absolute -top-1.5 rounded-full font-black flex items-center justify-center"
-                  style={{
-                    insetInlineEnd: -6,
-                    width: 22,
-                    height: 22,
-                    fontSize: 11,
-                    background: "linear-gradient(135deg, #c41040, #ff3366)",
-                    color: "#fff",
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
-                  }}
-                >
-                  {itemCount}
-                </span>
-              )}
-            </Link>
-          )}
+          <Link
+            href="/store/cart"
+            className={`glass-icon-btn relative ${itemCount > 0 ? "glass-icon-btn-active" : ""}`}
+            style={{
+              width: scr.mobile ? 34 : 46,
+              height: scr.mobile ? 34 : 46,
+            }}
+          >
+            <ShoppingCart size={scr.mobile ? 15 : 20} />
+            {itemCount > 0 && (
+              <span
+                className="absolute -top-1.5 rounded-full font-black flex items-center justify-center"
+                style={{
+                  insetInlineEnd: -6,
+                  width: scr.mobile ? 18 : 22,
+                  height: scr.mobile ? 18 : 22,
+                  fontSize: scr.mobile ? 9 : 11,
+                  background: "linear-gradient(135deg, #c41040, #ff3366)",
+                  color: "#fff",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                }}
+              >
+                {itemCount}
+              </span>
+            )}
+          </Link>
         </div>
       </div>
 

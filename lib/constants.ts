@@ -109,7 +109,8 @@ export const BANKS = [
 export const INTEGRATION_TYPES = {
   whatsapp: { label: "WhatsApp", icon: "💬", providers: ["yCloud", "Meta API", "Twilio"] as readonly string[] },
   sms: { label: "SMS / OTP", icon: "📱", providers: ["Twilio SMS"] as readonly string[] },
-  payment: { label: "الدفع", icon: "💳", providers: ["רווחית (Rivhit)", "Tranzila", "PayPlus", "Stripe"] as readonly string[] },
+  payment: { label: "الدفع — إسرائيل", icon: "💳", providers: ["רווחית (Rivhit)", "Tranzila", "PayPlus", "Stripe"] as readonly string[] },
+  payment_upay: { label: "الدفع — فلسطين والعالم", icon: "💳", providers: ["UPay"] as readonly string[] },
   email: { label: "Email", icon: "📧", providers: ["Resend", "SendGrid", "Mailgun", "Amazon SES", "SMTP"] as readonly string[] },
   ai_chat: { label: "ذكاء اصطناعي (بوت + بحث)", icon: "🤖", providers: ["Anthropic Claude"] as readonly string[] },
   ai_admin: { label: "ذكاء اصطناعي (أدمن)", icon: "🧠", providers: ["OpenAI"] as readonly string[] },
