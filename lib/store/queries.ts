@@ -6,33 +6,33 @@
 import { createServerSupabase } from "@/lib/supabase";
 import type { Product, Hero, LinePlan, Coupon, Category, WebsiteContent } from "@/types/database";
 
-type SortRule = { field: "price" | "brand" | "has_image"; direction: "asc" | "desc" };
+type SortRule = { field: "price" | "brand" | "has_image"; direction: "asc" | "desc"; enabled: boolean };
+type SortConfig = { rules: SortRule[]; brandOrder: string[] };
 
-const DEFAULT_SORT_RULES: SortRule[] = [
-  { field: "has_image", direction: "desc" },
-  { field: "brand", direction: "asc" },
-  { field: "price", direction: "desc" },
-];
+const DEFAULT_CONFIG: SortConfig = {
+  rules: [
+    { field: "brand", direction: "asc", enabled: true },
+    { field: "price", direction: "desc", enabled: true },
+    { field: "has_image", direction: "desc", enabled: true },
+  ],
+  brandOrder: ["Apple", "Samsung", "Xiaomi", "Huawei"],
+};
 
-function getBrandRank(p: Product): number {
-  const br = (p.brand || "").toLowerCase();
-  if (br === "apple") return 0;
-  if (br === "samsung") return 1;
-  if (br === "xiaomi") return 2;
-  if (br === "huawei") return 3;
-  return 4;
-}
-
-export function sortProductsByRules(products: Product[], rules?: SortRule[]): Product[] {
-  const sortRules = rules && rules.length === 3 ? rules : DEFAULT_SORT_RULES;
+export function sortProductsByConfig(products: Product[], config?: SortConfig | null): Product[] {
+  const cfg = config?.rules?.length === 3 ? config : DEFAULT_CONFIG;
+  const brandRankMap = new Map<string, number>();
+  (cfg.brandOrder || []).forEach((b, i) => brandRankMap.set(b.toLowerCase(), i));
 
   return [...products].sort((a, b) => {
-    for (const rule of sortRules) {
+    for (const rule of cfg.rules) {
+      if (!rule.enabled) continue;
       let cmp = 0;
       if (rule.field === "price") {
         cmp = (a.price || 0) - (b.price || 0);
       } else if (rule.field === "brand") {
-        cmp = getBrandRank(a) - getBrandRank(b);
+        const ra = brandRankMap.get((a.brand || "").toLowerCase()) ?? 999;
+        const rb = brandRankMap.get((b.brand || "").toLowerCase()) ?? 999;
+        cmp = ra - rb;
       } else if (rule.field === "has_image") {
         cmp = (a.image_url ? 1 : 0) - (b.image_url ? 1 : 0);
       }
@@ -44,9 +44,9 @@ export function sortProductsByRules(products: Product[], rules?: SortRule[]): Pr
   });
 }
 
-/** @deprecated Use sortProductsByRules instead */
+/** @deprecated Use sortProductsByConfig */
 export function sortProductsByBrandAndTier(products: Product[]): Product[] {
-  return sortProductsByRules(products);
+  return sortProductsByConfig(products);
 }
 
 // ===== Products =====
@@ -77,16 +77,13 @@ export async function getProducts(options?: {
   }
   const products = (data as Product[]) || [];
 
-  const { data: rulesRow } = await supabase.from("settings").select("value").eq("key", "product_sort_rules").single();
-  let sortRules: SortRule[] | undefined;
+  const { data: configRow } = await supabase.from("settings").select("value").eq("key", "product_sort_rules").single();
+  let sortConfig: SortConfig | null = null;
   try {
-    if (rulesRow?.value) {
-      const parsed = JSON.parse(rulesRow.value);
-      if (Array.isArray(parsed) && parsed.length === 3) sortRules = parsed;
-    }
+    if (configRow?.value) sortConfig = JSON.parse(configRow.value);
   } catch {}
 
-  return sortProductsByRules(products, sortRules);
+  return sortProductsByConfig(products, sortConfig);
 }
 
 export async function getProduct(id: string): Promise<Product | null> {

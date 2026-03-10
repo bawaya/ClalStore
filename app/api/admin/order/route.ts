@@ -6,22 +6,24 @@ import { createAdminSupabase } from "@/lib/supabase";
 
 const SETTINGS_KEY = "product_sort_rules";
 
-type SortRule = { field: "price" | "brand" | "has_image"; direction: "asc" | "desc" };
-
 export async function GET() {
   try {
     const db = createAdminSupabase();
     if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 
-    const { data } = await db.from("settings").select("value").eq("key", SETTINGS_KEY).single();
+    const [settingsRes, brandsRes] = await Promise.all([
+      db.from("settings").select("value").eq("key", SETTINGS_KEY).single(),
+      db.from("products").select("brand").eq("active", true).eq("type", "device"),
+    ]);
 
-    let sortRules: SortRule[] = [];
+    const allBrands = [...new Set((brandsRes.data || []).map((r: { brand: string }) => r.brand).filter(Boolean))].sort();
+
+    let config = null;
     try {
-      if (data?.value) sortRules = JSON.parse(data.value);
-      if (!Array.isArray(sortRules) || sortRules.length !== 3) sortRules = [];
-    } catch { sortRules = []; }
+      if (settingsRes.data?.value) config = JSON.parse(settingsRes.data.value);
+    } catch {}
 
-    return NextResponse.json({ sortRules });
+    return NextResponse.json({ config, allBrands });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -31,16 +33,16 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const sortRules = body.sortRules as SortRule[];
+    const config = body.config;
 
-    if (!Array.isArray(sortRules) || sortRules.length !== 3) {
+    if (!config?.rules || !Array.isArray(config.rules) || config.rules.length !== 3) {
       return NextResponse.json({ error: "يجب تحديد 3 معايير ترتيب" }, { status: 400 });
     }
 
     const validFields = new Set(["price", "brand", "has_image"]);
     const validDirs = new Set(["asc", "desc"]);
-    for (const r of sortRules) {
-      if (!validFields.has(r.field) || !validDirs.has(r.direction)) {
+    for (const r of config.rules) {
+      if (!validFields.has(r.field) || !validDirs.has(r.direction) || typeof r.enabled !== "boolean") {
         return NextResponse.json({ error: "معايير غير صالحة" }, { status: 400 });
       }
     }
@@ -48,7 +50,11 @@ export async function PUT(req: NextRequest) {
     const db = createAdminSupabase();
     if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 
-    const value = JSON.stringify(sortRules);
+    const value = JSON.stringify({
+      rules: config.rules,
+      brandOrder: Array.isArray(config.brandOrder) ? config.brandOrder : [],
+    });
+
     const { data: existing } = await db.from("settings").select("key").eq("key", SETTINGS_KEY).single();
 
     if (existing) {
@@ -57,7 +63,7 @@ export async function PUT(req: NextRequest) {
       await db.from("settings").insert({ key: SETTINGS_KEY, value, type: "json" });
     }
 
-    return NextResponse.json({ success: true, sortRules });
+    return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });

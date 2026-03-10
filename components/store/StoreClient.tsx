@@ -93,9 +93,9 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
     if (smartResults !== null) return smartResults;
 
     let list = items;
-    // Type filter
-    if (typeCat === "device") list = list.filter((p) => p.type === "device");
-    else if (typeCat === "accessory") list = list.filter((p) => p.type === "accessory");
+    // Type filter: "all" shows devices only; accessories only via their tab
+    if (typeCat === "accessory") list = list.filter((p) => p.type === "accessory");
+    else list = list.filter((p) => p.type === "device");
     // Brand filter
     if (brandCat !== "all") list = list.filter((p) => p.brand === brandCat);
     // Search (local — for short queries)
