@@ -59,6 +59,25 @@ export async function DELETE(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+    const ids = searchParams.get("ids");
+
+    if (ids) {
+      const idList = ids.split(",").map((s) => s.trim()).filter(Boolean);
+      if (idList.length === 0) return NextResponse.json({ error: "No IDs provided" }, { status: 400 });
+      if (idList.length > 50) return NextResponse.json({ error: "Max 50 items per batch" }, { status: 400 });
+      let deleted = 0;
+      for (const pid of idList) {
+        try {
+          await deleteProduct(pid);
+          deleted++;
+        } catch (e) {
+          console.error(`Failed to delete product ${pid}:`, e);
+        }
+      }
+      await logAction("مدير", `حذف جماعي: ${deleted} منتج`, "product", idList[0]);
+      return NextResponse.json({ success: true, deleted });
+    }
+
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     await deleteProduct(id);
     await logAction("مدير", `حذف منتج: ${id}`, "product", id);

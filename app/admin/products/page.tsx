@@ -21,9 +21,12 @@ const EMPTY: Partial<Product> = {
 export default function ProductsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { data: products, loading, error, clearError, create, update, remove } = useAdminApi<Product>({ endpoint: "/api/admin/products" });
+  const { data: products, loading, error, clearError, create, update, remove, bulkRemove } = useAdminApi<Product>({ endpoint: "/api/admin/products" });
 
   const [modal, setModal] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [form, setForm] = useState<Partial<Product>>(EMPTY);
   const [editId, setEditId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -466,6 +469,36 @@ export default function ProductsPage() {
     setConfirm(null);
   };
 
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((p) => p.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const deleted = await bulkRemove(Array.from(selected));
+      show(`🗑️ تم حذف ${deleted} منتج`);
+      setSelected(new Set());
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+    setBulkDeleting(false);
+    setBulkConfirm(false);
+  };
+
   const searchPaynGo = async () => {
     if (!payngoQuery.trim()) return;
     setPayngoLoading(true);
@@ -810,15 +843,61 @@ export default function ProductsPage() {
         ))}
       </div>
 
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="sticky top-0 z-30 mb-2 card flex items-center justify-between gap-3"
+          style={{ padding: "10px 14px", background: "rgba(229,9,20,0.08)", borderColor: "rgba(229,9,20,0.3)" }}>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBulkConfirm(true)}
+              disabled={bulkDeleting}
+              className="py-1.5 px-4 rounded-lg bg-state-error text-white text-xs font-bold cursor-pointer border-0 flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {bulkDeleting ? "⏳ جاري الحذف..." : `🗑️ حذف ${selected.size} منتج`}
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="py-1.5 px-3 rounded-lg border border-surface-border bg-transparent text-muted text-xs cursor-pointer"
+            >
+              إلغاء التحديد
+            </button>
+          </div>
+          <span className="text-xs font-bold text-brand">{selected.size} محدد</span>
+        </div>
+      )}
+
       {/* Products list */}
       {filtered.length === 0 ? (
         <EmptyState icon="📱" title="لا يوجد منتجات" sub="أضف أول منتج" />
       ) : (
         <div className="space-y-1.5">
+          {/* Select all */}
+          <div className="flex items-center gap-2 px-2 py-1">
+            <input
+              type="checkbox"
+              checked={filtered.length > 0 && selected.size === filtered.length}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded cursor-pointer accent-[#e50914] flex-shrink-0"
+            />
+            <span className="text-[10px] text-muted">تحديد الكل ({filtered.length})</span>
+          </div>
           {filtered.map((p) => (
             <div key={p.id} className="card flex items-center gap-2 cursor-pointer hover:border-brand/30 transition-all"
-              style={{ padding: scr.mobile ? "10px 12px" : "14px 18px" }}
+              style={{
+                padding: scr.mobile ? "10px 12px" : "14px 18px",
+                borderColor: selected.has(p.id) ? "rgba(229,9,20,0.4)" : undefined,
+                background: selected.has(p.id) ? "rgba(229,9,20,0.04)" : undefined,
+              }}
               onClick={() => openEdit(p)}>
+
+              {/* Checkbox */}
+              <input
+                type="checkbox"
+                checked={selected.has(p.id)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleSelect(p.id)}
+                className="w-4 h-4 rounded cursor-pointer accent-[#e50914] flex-shrink-0"
+              />
 
               {/* Actions — left side (RTL) */}
               <div className="flex gap-2 flex-shrink-0">
@@ -1442,6 +1521,13 @@ export default function ProductsPage() {
       <ConfirmDialog
         open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete}
         title="حذف المنتج؟" message="هل أنت متأكد؟ هذا الإجراء لا يمكن التراجع عنه."
+      />
+
+      {/* Bulk delete confirm */}
+      <ConfirmDialog
+        open={bulkConfirm} onClose={() => setBulkConfirm(false)} onConfirm={handleBulkDelete}
+        title={`حذف ${selected.size} منتج؟`}
+        message={`سيتم حذف ${selected.size} منتج نهائياً. هذا الإجراء لا يمكن التراجع عنه.`}
       />
 
       {/* Image Zoom Lightbox */}

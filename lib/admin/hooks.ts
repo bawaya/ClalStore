@@ -88,9 +88,24 @@ export function useAdminApi<T>({ endpoint, autoFetch = true }: UseAdminApiOption
     }
   };
 
+  const bulkRemove = async (ids: string[]) => {
+    setError("");
+    try {
+      const res = await fetch(`${endpoint}?ids=${ids.join(",")}`, { method: "DELETE" });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      await fetchData();
+      return json.deleted as number;
+    } catch (err: any) {
+      const msg = err.message || "خطأ في الحذف الجماعي";
+      setError(msg);
+      throw err;
+    }
+  };
+
   const clearError = useCallback(() => setError(""), []);
 
-  return { data, loading, error, clearError, fetchData, create, update, remove };
+  return { data, loading, error, clearError, fetchData, create, update, remove, bulkRemove };
 }
 
 // Settings-specific hook
