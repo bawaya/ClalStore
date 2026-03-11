@@ -57,8 +57,8 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
   const inWishlist = useWishlist((s) => s.items.some((i) => i.id === p.id));
   const colors = (p.colors || []) as ProductColor[];
   const storage = p.storage_options || [];
-  const [selColor, setSelColor] = useState(-1);
-  const [selStorage, setSelStorage] = useState(storage.length > 1 ? -1 : 0);
+  const [selColor, setSelColor] = useState(colors.length === 1 ? 0 : -1);
+  const [selStorage, setSelStorage] = useState(storage.length <= 1 ? 0 : -1);
   const [wishAnim, setWishAnim] = useState(false);
   const [compareToast, setCompareToast] = useState("");
 

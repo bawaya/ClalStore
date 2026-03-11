@@ -50,8 +50,10 @@ export function ProductDetailClient({
   const { t, lang } = useLang();
   const addItem = useCart((s) => s.addItem);
   const { toasts, show } = useToast();
-  const [selColor, setSelColor] = useState(-1);
-  const [selStorage, setSelStorage] = useState((p.storage_options || []).length > 1 ? -1 : 0);
+  const colors0 = (p.colors || []) as ProductColor[];
+  const storage0 = p.storage_options || [];
+  const [selColor, setSelColor] = useState(colors0.length === 1 ? 0 : -1);
+  const [selStorage, setSelStorage] = useState(storage0.length <= 1 ? 0 : -1);
   const [selImage, setSelImage] = useState(0);
 
   const colors = (p.colors || []) as ProductColor[];
