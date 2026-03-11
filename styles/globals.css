@@ -331,4 +331,62 @@
       transform: translateY(0);
     }
   }
+
+  /* Cart flash toast */
+  @keyframes cartFlashIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-20px) scale(0.85);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+  }
+
+  @keyframes cartCheckPop {
+    from {
+      transform: scale(0);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  /* Floating cart bar slide-up */
+  @keyframes cartBarSlideUp {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(30px) scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+  }
+
+  /* Cart count badge pop */
+  @keyframes cartCountPulse {
+    0% {
+      transform: scale(0.5);
+    }
+    60% {
+      transform: scale(1.3);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  /* Green dot pulse on cart icon */
+  @keyframes cartDotPulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.5);
+      opacity: 0.6;
+    }
+  }
 }
