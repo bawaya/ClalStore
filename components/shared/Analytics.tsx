@@ -9,32 +9,27 @@
 import { useEffect, useState } from "react";
 import Script from "next/script";
 
+const GA_FALLBACK = "G-TEHBT6D11N";
+
 export function Analytics() {
-  const [gaId, setGaId] = useState("");
+  const [gaId, setGaId] = useState(GA_FALLBACK);
   const [pixelId, setPixelId] = useState("");
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
-    const consent = localStorage.getItem("clal_cookie_consent");
-    if (consent !== "accepted") return;
-
     async function loadSettings() {
       try {
         const res = await fetch("/api/admin/settings");
         const json = await res.json();
         const settings = json.settings || {};
 
-        if (settings.feature_analytics !== "true") return;
-
-        setEnabled(true);
         if (settings.ga_measurement_id) setGaId(settings.ga_measurement_id);
         if (settings.meta_pixel_id) setPixelId(settings.meta_pixel_id);
+        if (settings.feature_analytics === "false") setEnabled(false);
       } catch {}
     }
     loadSettings();
   }, []);
-
-  if (!enabled) return null;
 
   return (
     <>
