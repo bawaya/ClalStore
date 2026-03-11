@@ -24,13 +24,6 @@ export function LineChart({ data, color = "#c41040", height = 180, formatValue, 
     return { max: Math.max(...vals, 1), min: Math.min(...vals, 0) };
   }, [data]);
 
-  if (data.length === 0) {
-    return <p className="text-xs text-dim py-6 text-center">لا توجد بيانات</p>;
-  }
-
-  const fmt = formatValue ?? ((v: number) => v.toLocaleString());
-  const showEveryNthLabel = data.length > 15 ? Math.ceil(data.length / 6) : data.length > 8 ? 2 : 1;
-
   const padding = { top: 8, bottom: 4, left: 0, right: 0 };
   const viewW = 500;
   const viewH = height;
@@ -61,6 +54,13 @@ export function LineChart({ data, color = "#c41040", height = 180, formatValue, 
     }
     return d;
   }, [points, linePath]);
+
+  if (data.length === 0) {
+    return <p className="text-xs text-dim py-6 text-center">لا توجد بيانات</p>;
+  }
+
+  const fmt = formatValue ?? ((v: number) => v.toLocaleString());
+  const showEveryNthLabel = data.length > 15 ? Math.ceil(data.length / 6) : data.length > 8 ? 2 : 1;
 
   const areaPath = `${smoothPath} L ${points[points.length - 1].x} ${viewH} L ${points[0].x} ${viewH} Z`;
 

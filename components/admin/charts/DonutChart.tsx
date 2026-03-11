@@ -20,12 +20,6 @@ export function DonutChart({ data, size = 200, formatValue, showLegend = true }:
 
   const total = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
 
-  if (total === 0 || data.length === 0) {
-    return <p className="text-xs text-dim py-6 text-center">لا توجد بيانات</p>;
-  }
-
-  const fmt = formatValue ?? ((v: number) => v.toLocaleString());
-
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size / 2 - 4;
@@ -46,6 +40,12 @@ export function DonutChart({ data, size = 200, formatValue, showLegend = true }:
       return seg;
     });
   }, [data, total, gapAngle]);
+
+  if (total === 0 || data.length === 0) {
+    return <p className="text-xs text-dim py-6 text-center">لا توجد بيانات</p>;
+  }
+
+  const fmt = formatValue ?? ((v: number) => v.toLocaleString());
 
   function arcPath(start: number, end: number, outer: number, inner: number) {
     const largeArc = end - start > Math.PI ? 1 : 0;

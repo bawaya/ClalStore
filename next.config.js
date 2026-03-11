@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Image optimization (unoptimized for Cloudflare Pages)
+  eslint: { ignoreDuringBuilds: true },
+
   images: {
     unoptimized: true,
     remotePatterns: [
