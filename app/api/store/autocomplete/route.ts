@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     const categories = categoriesRes.data || [];
 
     const brandSet = new Set<string>();
-    products.forEach((p) => {
+    products.forEach((p: { brand?: string }) => {
       if (p.brand?.toLowerCase().includes(sanitized.toLowerCase())) {
         brandSet.add(p.brand);
       }
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         .ilike("brand", pattern)
         .limit(5);
 
-      brandRows?.forEach((r) => {
+      brandRows?.forEach((r: { brand?: string }) => {
         if (r.brand) brandSet.add(r.brand);
       });
     }
