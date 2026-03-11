@@ -900,8 +900,8 @@ export default function ProductsPage() {
               />
 
               {/* Actions — left side (RTL) */}
-              <div className="flex gap-2 flex-shrink-0">
-                <button onClick={(e) => { e.stopPropagation(); setConfirm(p.id); }}
+              <div className="flex gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => setConfirm(p.id)}
                   className="w-7 h-7 rounded-lg border border-state-error/30 bg-transparent text-state-error text-xs cursor-pointer flex items-center justify-center flex-shrink-0">🗑</button>
                 <Toggle value={p.active} onChange={async (v) => { await update(p.id, { active: v }); show(v ? "✅ مفعّل" : "⏸️ معطّل"); }} />
               </div>
