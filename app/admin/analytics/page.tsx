@@ -1,200 +1,371 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { BarChart } from "@/components/admin/charts/BarChart";
+import { LineChart } from "@/components/admin/charts/LineChart";
+import { DonutChart } from "@/components/admin/charts/DonutChart";
 
-const FEATURE_LABELS: Record<string, string> = {
-  bot_reply: "رد البوت",
-  smart_reply: "رد ذكي CRM",
-  summary: "ملخص محادثة",
-  sentiment: "تحليل مشاعر",
-  smart_search: "بحث ذكي",
+// ===== Types =====
+
+interface Metrics {
+  totalRevenue: number;
+  prevRevenue: number;
+  revenueChange: number;
+  totalOrders: number;
+  prevOrders: number;
+  ordersChange: number;
+  avgOrderValue: number;
+  newCustomers: number;
+  prevCustomers: number;
+  customersChange: number;
+  conversionRate: number;
+  abandonmentRate: number;
+  recoveredCarts: number;
+  totalCarts: number;
+}
+
+interface ChartDatum {
+  label: string;
+  value: number;
+}
+
+interface DashboardData {
+  metrics: Metrics;
+  dailyRevenue: ChartDatum[];
+  topProducts: ChartDatum[];
+  statusDistribution: Record<string, number>;
+  sourceDistribution: Record<string, number>;
+  customerGrowth: ChartDatum[];
+}
+
+// ===== Color palettes =====
+
+const STATUS_COLORS: Record<string, string> = {
+  new: "#3b82f6",
+  confirmed: "#22c55e",
+  processing: "#f59e0b",
+  shipped: "#8b5cf6",
+  delivered: "#10b981",
+  cancelled: "#ef4444",
+  returned: "#f97316",
+  refunded: "#ec4899",
+  no_reply_1: "#eab308",
+  no_reply_2: "#f97316",
+  no_reply_3: "#ef4444",
 };
 
-interface AIData {
-  totalRequests: number;
-  totalTokens: number;
-  estimatedCost: number;
-  prevMonthCost: number;
-  prevMonthRequests: number;
-  avgDuration: number;
-  byFeature: Record<string, { requests: number; inputTokens: number; outputTokens: number; avgDuration: number }>;
-  daily: { date: string; requests: number; tokens: number; cost: number }[];
-}
+const SOURCE_COLORS: Record<string, string> = {
+  store: "#c41040",
+  whatsapp: "#25d366",
+  facebook: "#1877f2",
+  instagram: "#e4405f",
+  direct: "#a855f7",
+  phone: "#f59e0b",
+  referral: "#06b6d4",
+};
 
-interface SalesData {
-  totalRevenue: number;
-  totalOrders: number;
-  avgOrderValue: number;
-  statusBreakdown: Record<string, number>;
-  sourceBreakdown: Record<string, number>;
-  daily: { date: string; revenue: number; orders: number }[];
-  prevRevenue?: number;
-  prevOrders?: number;
-  revenueChange?: number;
-  ordersChange?: number;
-}
+const DONUT_PALETTE = ["#c41040", "#6366f1", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#ef4444", "#10b981", "#f97316"];
 
-interface BotData {
-  totalConversations: number;
-  totalHandoffs: number;
-  totalStoreClicks: number;
-  avgCsat: number;
-  daily: { date: string; conversations: number; messages: number; handoffs: number }[];
-  prevConversations?: number;
-  prevHandoffs?: number;
-  convChange?: number;
-  handoffChange?: number;
-}
+const STATUS_LABELS: Record<string, string> = {
+  new: "جديد",
+  confirmed: "مؤكد",
+  processing: "قيد المعالجة",
+  shipped: "تم الشحن",
+  delivered: "تم التسليم",
+  cancelled: "ملغي",
+  returned: "مرتجع",
+  refunded: "مسترجع",
+  no_reply_1: "بدون رد 1",
+  no_reply_2: "بدون رد 2",
+  no_reply_3: "بدون رد 3",
+};
 
-export default function AnalyticsPage() {
-  const [tab, setTab] = useState<"sales" | "ai" | "bot">("sales");
-  const [days, setDays] = useState(30);
-  const [ai, setAi] = useState<AIData | null>(null);
-  const [sales, setSales] = useState<SalesData | null>(null);
-  const [bot, setBot] = useState<BotData | null>(null);
+const SOURCE_LABELS: Record<string, string> = {
+  store: "المتجر",
+  whatsapp: "واتساب",
+  facebook: "فيسبوك",
+  instagram: "انستغرام",
+  direct: "مباشر",
+  phone: "هاتف",
+  referral: "إحالة",
+};
+
+// ===== Main page =====
+
+export default function AdvancedAnalyticsPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetch("/api/admin/ai-usage").then((r) => r.json()),
-      fetch(`/api/admin/analytics?days=${days}`).then((r) => r.json()),
-    ])
-      .then(([aiRes, analyticsRes]) => {
-        if (aiRes.success) setAi(aiRes.data);
-        if (analyticsRes.success) {
-          setSales(analyticsRes.data.sales);
-          setBot(analyticsRes.data.bot);
-        }
+    fetch("/api/admin/analytics/dashboard")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success) setData(res.data);
+        else setError(res.error || "فشل تحميل البيانات");
       })
-      .catch(() => {})
+      .catch(() => setError("خطأ في الاتصال بالخادم"))
       .finally(() => setLoading(false));
-  }, [days]);
+  }, []);
 
-  const tabs = [
-    { key: "sales", label: "💰 المبيعات" },
-    { key: "ai", label: "🤖 الذكاء الاصطناعي" },
-    { key: "bot", label: "💬 البوت" },
-  ];
+  if (loading) return <LoadingSkeleton />;
+  if (error) {
+    return (
+      <div className="p-6 text-center" dir="rtl">
+        <p className="text-state-error font-bold">{error}</p>
+      </div>
+    );
+  }
+  if (!data) return null;
 
   return (
     <div className="p-4 desktop:p-6 space-y-6" dir="rtl">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-black">📊 التحليلات والتقارير</h1>
-        <div className="flex gap-2">
-          {[7, 14, 30].map((d) => (
-            <button
-              key={d}
-              onClick={() => setDays(d)}
-              className="px-3 py-1.5 rounded-chip text-xs font-bold transition-colors"
-              style={{
-                background: days === d ? "rgba(196,16,64,0.15)" : "transparent",
-                color: days === d ? "#c41040" : "#71717a",
-                border: `1px solid ${days === d ? "#c41040" : "#27272a"}`,
-              }}
-            >
-              {d} يوم
-            </button>
-          ))}
-        </div>
+      <Header />
+      <MetricsGrid metrics={data.metrics} />
+
+      <div className="grid grid-cols-1 desktop:grid-cols-2 gap-4">
+        <ChartCard title="الإيرادات اليومية" subtitle="آخر 30 يوم">
+          <BarChart
+            data={data.dailyRevenue}
+            color="#c41040"
+            height={200}
+            formatValue={(v) => `₪${v.toLocaleString()}`}
+          />
+        </ChartCard>
+
+        <ChartCard title="نمو العملاء" subtitle="أسبوعي — آخر 90 يوم">
+          <LineChart
+            data={data.customerGrowth}
+            color="#22c55e"
+            height={200}
+            formatValue={(v) => `${v} عميل`}
+          />
+        </ChartCard>
       </div>
 
-      <div className="flex gap-2 border-b border-surface-border pb-2">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key as any)}
-            className="px-4 py-2 rounded-t-lg text-sm font-bold transition-colors"
+      <div className="grid grid-cols-1 desktop:grid-cols-3 gap-4">
+        <ChartCard title="حالات الطلبات" subtitle="هذا الشهر">
+          <StatusDonut distribution={data.statusDistribution} />
+        </ChartCard>
+
+        <ChartCard title="مصادر الطلبات" subtitle="هذا الشهر">
+          <SourceDonut distribution={data.sourceDistribution} />
+        </ChartCard>
+
+        <ChartCard title="أكثر المنتجات مبيعاً" subtitle="إجمالي">
+          <TopProductsBars products={data.topProducts} />
+        </ChartCard>
+      </div>
+    </div>
+  );
+}
+
+// ===== Header =====
+
+function Header() {
+  return (
+    <div className="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h1 className="text-xl font-black">التحليلات المتقدمة</h1>
+        <p className="text-xs text-muted mt-0.5">نظرة شاملة على أداء المتجر</p>
+      </div>
+    </div>
+  );
+}
+
+// ===== Metrics Grid =====
+
+function MetricsGrid({ metrics }: { metrics: Metrics }) {
+  const cards = [
+    {
+      label: "إجمالي الإيرادات",
+      value: `₪${metrics.totalRevenue.toLocaleString()}`,
+      sub: `الشهر الماضي: ₪${metrics.prevRevenue.toLocaleString()}`,
+      change: metrics.revenueChange,
+      icon: "💰",
+      accent: "#22c55e",
+    },
+    {
+      label: "إجمالي الطلبات",
+      value: metrics.totalOrders,
+      sub: `الشهر الماضي: ${metrics.prevOrders}`,
+      change: metrics.ordersChange,
+      icon: "📦",
+      accent: "#6366f1",
+    },
+    {
+      label: "متوسط قيمة الطلب",
+      value: `₪${metrics.avgOrderValue.toLocaleString()}`,
+      icon: "📊",
+      accent: "#f59e0b",
+    },
+    {
+      label: "عملاء جدد",
+      value: metrics.newCustomers,
+      sub: `الشهر الماضي: ${metrics.prevCustomers}`,
+      change: metrics.customersChange,
+      icon: "👥",
+      accent: "#06b6d4",
+    },
+    {
+      label: "معدل التحويل",
+      value: `${metrics.conversionRate}%`,
+      sub: `${metrics.totalOrders} طلب من ${metrics.totalOrders + metrics.totalCarts}`,
+      icon: "🎯",
+      accent: "#a855f7",
+    },
+    {
+      label: "سلال متروكة",
+      value: `${metrics.abandonmentRate}%`,
+      sub: `${metrics.recoveredCarts} مسترجعة من ${metrics.totalCarts}`,
+      icon: "🛒",
+      accent: "#ef4444",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 desktop:grid-cols-3 gap-3">
+      {cards.map((c) => (
+        <MetricCard key={c.label} {...c} />
+      ))}
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  sub,
+  change,
+  icon,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  change?: number;
+  icon: string;
+  accent: string;
+}) {
+  return (
+    <div
+      className="rounded-card border border-surface-border p-4 relative overflow-hidden transition-all hover:border-opacity-50"
+      style={{ background: "linear-gradient(135deg, #111114 0%, #18181b 100%)" }}
+    >
+      <div
+        className="absolute top-0 left-0 w-full h-[2px]"
+        style={{ background: `linear-gradient(90deg, ${accent}00, ${accent}, ${accent}00)` }}
+      />
+
+      <div className="flex items-start justify-between mb-2">
+        <span className="text-[10px] text-muted font-semibold">{label}</span>
+        <span className="text-sm">{icon}</span>
+      </div>
+
+      <p className="text-2xl font-black mb-1">{value}</p>
+
+      {sub && <p className="text-[10px] text-dim">{sub}</p>}
+
+      {change !== undefined && change !== 0 && (
+        <div className="flex items-center gap-1 mt-1.5">
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded-chip"
             style={{
-              background: tab === t.key ? "rgba(196,16,64,0.1)" : "transparent",
-              color: tab === t.key ? "#c41040" : "#71717a",
-              borderBottom: tab === t.key ? "2px solid #c41040" : "2px solid transparent",
+              color: change > 0 ? "#22c55e" : "#ef4444",
+              background: change > 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
             }}
           >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="text-center py-20 text-muted">جاري التحميل...</div>
-      ) : (
-        <>
-          {tab === "sales" && sales && <SalesTab data={sales} />}
-          {tab === "ai" && ai && <AITab data={ai} />}
-          {tab === "bot" && bot && <BotTab data={bot} />}
-        </>
+            {change > 0 ? "↑" : "↓"} {Math.abs(change)}%
+          </span>
+          <span className="text-[9px] text-dim">عن الشهر الماضي</span>
+        </div>
       )}
     </div>
   );
 }
 
-function StatCard({ label, value, sub, change }: { label: string; value: string | number; sub?: string; change?: number }) {
-  return (
-    <div className="bg-surface-card rounded-card border border-surface-border p-4">
-      <p className="text-xs text-muted mb-1">{label}</p>
-      <p className="text-2xl font-black">{value}</p>
-      {sub && <p className="text-[10px] text-muted mt-1">{sub}</p>}
-      {change !== undefined && change !== 0 && (
-        <p className={`text-[10px] mt-1 font-bold ${change > 0 ? "text-green-400" : "text-red-400"}`}>
-          {change > 0 ? "↑" : "↓"} {Math.abs(change)}% عن الفترة السابقة
-        </p>
-      )}
-    </div>
-  );
-}
+// ===== Chart Card wrapper =====
 
-function BarChart({ data, valueKey, label, color = "#c41040", maxBars = 30 }: {
-  data: { date: string; [key: string]: any }[];
-  valueKey: string;
-  label: string;
-  color?: string;
-  maxBars?: number;
+function ChartCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
 }) {
-  const sliced = data.slice(-maxBars);
-  if (sliced.length === 0) return <p className="text-xs text-dim py-4">لا توجد بيانات</p>;
-  const max = Math.max(...sliced.map((d) => d[valueKey] || 0), 1);
-
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-bold text-muted">{label}</p>
-      <div className="flex items-end gap-[2px]" style={{ height: 120 }}>
-        {sliced.map((d, i) => {
-          const val = d[valueKey] || 0;
-          const h = Math.max((val / max) * 100, 2);
-          return (
-            <div
-              key={d.date || i}
-              className="flex-1 rounded-t-sm transition-all hover:opacity-80 group relative"
-              style={{ height: `${h}%`, background: color, minWidth: 4 }}
-              title={`${d.date}: ${typeof val === "number" && val > 100 ? val.toLocaleString() : val}`}
-            />
-          );
-        })}
+    <div
+      className="rounded-card border border-surface-border p-4 desktop:p-5"
+      style={{ background: "linear-gradient(135deg, #111114 0%, #141417 100%)" }}
+    >
+      <div className="mb-4">
+        <h3 className="text-sm font-bold">{title}</h3>
+        {subtitle && <p className="text-[10px] text-muted mt-0.5">{subtitle}</p>}
       </div>
-      <div className="flex justify-between text-[9px] text-dim">
-        <span>{sliced[0]?.date?.split("-").slice(1).join("/")}</span>
-        <span>{sliced[sliced.length - 1]?.date?.split("-").slice(1).join("/")}</span>
-      </div>
+      {children}
     </div>
   );
 }
 
-function BreakdownBars({ data, total }: { data: Record<string, number>; total: number }) {
-  const sorted = Object.entries(data).sort(([, a], [, b]) => b - a);
-  const colors = ["#c41040", "#6366f1", "#f59e0b", "#10b981", "#8b5cf6", "#ef4444", "#06b6d4"];
+// ===== Donut wrappers =====
+
+function StatusDonut({ distribution }: { distribution: Record<string, number> }) {
+  const chartData = useMemo(
+    () =>
+      Object.entries(distribution)
+        .sort(([, a], [, b]) => b - a)
+        .map(([key, value]) => ({
+          label: STATUS_LABELS[key] || key,
+          value,
+          color: STATUS_COLORS[key] || DONUT_PALETTE[Object.keys(distribution).indexOf(key) % DONUT_PALETTE.length],
+        })),
+    [distribution]
+  );
+  return <DonutChart data={chartData} size={180} />;
+}
+
+function SourceDonut({ distribution }: { distribution: Record<string, number> }) {
+  const chartData = useMemo(
+    () =>
+      Object.entries(distribution)
+        .sort(([, a], [, b]) => b - a)
+        .map(([key, value]) => ({
+          label: SOURCE_LABELS[key] || key,
+          value,
+          color: SOURCE_COLORS[key] || DONUT_PALETTE[Object.keys(distribution).indexOf(key) % DONUT_PALETTE.length],
+        })),
+    [distribution]
+  );
+  return <DonutChart data={chartData} size={180} />;
+}
+
+// ===== Top Products horizontal bars =====
+
+function TopProductsBars({ products }: { products: ChartDatum[] }) {
+  const max = Math.max(...products.map((p) => p.value), 1);
+
+  if (products.length === 0) {
+    return <p className="text-xs text-dim py-4 text-center">لا توجد بيانات</p>;
+  }
+
   return (
-    <div className="space-y-2">
-      {sorted.map(([key, count], i) => {
-        const pct = total > 0 ? (count / total) * 100 : 0;
+    <div className="space-y-2.5">
+      {products.map((p, i) => {
+        const pct = (p.value / max) * 100;
+        const color = DONUT_PALETTE[i % DONUT_PALETTE.length];
         return (
-          <div key={key}>
-            <div className="flex justify-between text-xs mb-0.5">
-              <span className="text-muted">{key}</span>
-              <span className="font-bold">{count} ({Math.round(pct)}%)</span>
+          <div key={i}>
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-[10px] text-muted truncate max-w-[60%]">{p.label}</span>
+              <span className="text-[10px] font-bold">{p.value}</span>
             </div>
             <div className="h-2 rounded-full bg-surface-elevated overflow-hidden">
-              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: colors[i % colors.length] }} />
+              <div
+                className="h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${pct}%`, background: color }}
+              />
             </div>
           </div>
         );
@@ -203,108 +374,39 @@ function BreakdownBars({ data, total }: { data: Record<string, number>; total: n
   );
 }
 
-function SalesTab({ data }: { data: SalesData }) {
+// ===== Loading skeleton =====
+
+function LoadingSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
-        <StatCard label="الإيرادات" value={`₪${data.totalRevenue.toLocaleString()}`} change={data.revenueChange} sub={data.prevRevenue != null ? `الفترة السابقة: ₪${data.prevRevenue.toLocaleString()}` : undefined} />
-        <StatCard label="الطلبات" value={data.totalOrders} change={data.ordersChange} sub={data.prevOrders != null ? `الفترة السابقة: ${data.prevOrders}` : undefined} />
-        <StatCard label="متوسط الطلب" value={`₪${data.avgOrderValue.toLocaleString()}`} />
-        <StatCard
-          label="معدل يومي"
-          value={`₪${data.daily.length > 0 ? Math.round(data.totalRevenue / data.daily.length).toLocaleString() : 0}`}
-        />
-      </div>
+    <div className="p-4 desktop:p-6 space-y-6 animate-pulse" dir="rtl">
+      <div className="h-7 w-48 bg-surface-elevated rounded-lg" />
 
-      <div className="bg-surface-card rounded-card border border-surface-border p-4">
-        <BarChart data={data.daily} valueKey="revenue" label="📈 الإيرادات اليومية (₪)" />
-      </div>
-
-      <div className="bg-surface-card rounded-card border border-surface-border p-4">
-        <BarChart data={data.daily} valueKey="orders" label="📦 الطلبات اليومية" color="#6366f1" />
+      <div className="grid grid-cols-2 desktop:grid-cols-3 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="bg-surface-card rounded-card border border-surface-border p-4 h-28">
+            <div className="h-3 w-16 bg-surface-elevated rounded mb-3" />
+            <div className="h-7 w-24 bg-surface-elevated rounded mb-2" />
+            <div className="h-2 w-20 bg-surface-elevated rounded" />
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 desktop:grid-cols-2 gap-4">
-        <div className="bg-surface-card rounded-card border border-surface-border p-4">
-          <p className="text-xs font-bold text-muted mb-3">حالة الطلبات</p>
-          <BreakdownBars data={data.statusBreakdown} total={data.totalOrders} />
-        </div>
-        <div className="bg-surface-card rounded-card border border-surface-border p-4">
-          <p className="text-xs font-bold text-muted mb-3">مصادر الطلبات</p>
-          <BreakdownBars data={data.sourceBreakdown} total={data.totalOrders} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AITab({ data }: { data: AIData }) {
-  const features = Object.entries(data.byFeature).sort(([, a], [, b]) => b.requests - a.requests);
-  const costChange = data.prevMonthCost > 0
-    ? Math.round(((data.estimatedCost - data.prevMonthCost) / data.prevMonthCost) * 100)
-    : 0;
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
-        <StatCard label="الطلبات هذا الشهر" value={data.totalRequests.toLocaleString()} sub={`الشهر الماضي: ${data.prevMonthRequests}`} />
-        <StatCard label="التوكنات" value={(data.totalTokens / 1000).toFixed(1) + "K"} />
-        <StatCard
-          label="التكلفة التقديرية"
-          value={`$${data.estimatedCost}`}
-          sub={costChange !== 0 ? `${costChange > 0 ? "+" : ""}${costChange}% عن الشهر الماضي` : undefined}
-        />
-        <StatCard label="متوسط الاستجابة" value={`${data.avgDuration}ms`} />
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="bg-surface-card rounded-card border border-surface-border p-5 h-64">
+            <div className="h-4 w-28 bg-surface-elevated rounded mb-4" />
+            <div className="h-40 bg-surface-elevated rounded" />
+          </div>
+        ))}
       </div>
 
-      <div className="bg-surface-card rounded-card border border-surface-border p-4">
-        <BarChart data={data.daily} valueKey="requests" label="📊 الطلبات اليومية" color="#8b5cf6" />
-      </div>
-
-      <div className="bg-surface-card rounded-card border border-surface-border p-4">
-        <p className="text-xs font-bold text-muted mb-3">استخدام حسب الميزة</p>
-        <div className="space-y-3">
-          {features.map(([key, val]) => {
-            const pct = data.totalRequests > 0 ? (val.requests / data.totalRequests) * 100 : 0;
-            const cost = ((val.inputTokens / 1_000_000) * 3 + (val.outputTokens / 1_000_000) * 15).toFixed(2);
-            return (
-              <div key={key}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-bold">{FEATURE_LABELS[key] || key}</span>
-                  <span className="text-muted">{val.requests} طلب · ${cost} · {val.avgDuration}ms</span>
-                </div>
-                <div className="h-2 rounded-full bg-surface-elevated overflow-hidden">
-                  <div className="h-full rounded-full bg-purple-500 transition-all" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BotTab({ data }: { data: BotData }) {
-  const handoffRate = data.totalConversations > 0
-    ? Math.round((data.totalHandoffs / data.totalConversations) * 100)
-    : 0;
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
-        <StatCard label="المحادثات" value={data.totalConversations.toLocaleString()} change={data.convChange} sub={data.prevConversations != null ? `الفترة السابقة: ${data.prevConversations}` : undefined} />
-        <StatCard label="التصعيدات" value={data.totalHandoffs} change={data.handoffChange} sub={`${handoffRate}% من المحادثات`} />
-        <StatCard label="نقرات المتجر" value={data.totalStoreClicks} />
-        <StatCard label="تقييم CSAT" value={data.avgCsat > 0 ? `${data.avgCsat}/5` : "—"} />
-      </div>
-
-      <div className="bg-surface-card rounded-card border border-surface-border p-4">
-        <BarChart data={data.daily} valueKey="conversations" label="💬 المحادثات اليومية" color="#10b981" />
-      </div>
-
-      <div className="bg-surface-card rounded-card border border-surface-border p-4">
-        <BarChart data={data.daily} valueKey="handoffs" label="🔔 التصعيدات اليومية" color="#ef4444" />
+      <div className="grid grid-cols-1 desktop:grid-cols-3 gap-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="bg-surface-card rounded-card border border-surface-border p-5 h-72">
+            <div className="h-4 w-28 bg-surface-elevated rounded mb-4" />
+            <div className="h-44 bg-surface-elevated rounded-full mx-auto w-44" />
+          </div>
+        ))}
       </div>
     </div>
   );

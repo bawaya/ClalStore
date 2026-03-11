@@ -180,6 +180,24 @@ export type Database = {
         Update: Partial<Omit<WebsiteContent, "id">>;
         Relationships: [];
       };
+      notifications: {
+        Row: Notification;
+        Insert: Omit<Notification, "id" | "created_at">;
+        Update: Partial<Omit<Notification, "id">>;
+        Relationships: [];
+      };
+      loyalty_points: {
+        Row: LoyaltyPoints;
+        Insert: Omit<LoyaltyPoints, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<LoyaltyPoints, "id">>;
+        Relationships: [];
+      };
+      loyalty_transactions: {
+        Row: LoyaltyTransaction;
+        Insert: Omit<LoyaltyTransaction, "id" | "created_at">;
+        Update: Partial<Omit<LoyaltyTransaction, "id">>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -718,6 +736,18 @@ export type BotHandoff = {
   created_at: string;
 }
 
+export type Notification = {
+  id: string;
+  user_id: string | null;
+  type: "order" | "message" | "alert" | "info" | "task";
+  title: string;
+  body: string | null;
+  link: string | null;
+  icon: string;
+  read: boolean;
+  created_at: string;
+}
+
 export type BotTemplate = {
   id: string;
   key: string;
@@ -728,4 +758,27 @@ export type BotTemplate = {
   active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// ===== Loyalty Program =====
+
+export type LoyaltyPoints = {
+  id: string;
+  customer_id: string;
+  points: number;
+  lifetime_points: number;
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  created_at: string;
+  updated_at: string;
+}
+
+export type LoyaltyTransaction = {
+  id: string;
+  customer_id: string;
+  type: 'earn' | 'redeem' | 'expire' | 'bonus' | 'adjust';
+  points: number;
+  balance_after: number;
+  description: string | null;
+  order_id: string | null;
+  created_at: string;
 }

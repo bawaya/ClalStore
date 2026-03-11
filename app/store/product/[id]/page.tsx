@@ -3,6 +3,7 @@ export const runtime = 'edge';
 import { notFound } from "next/navigation";
 import { getProduct, getProducts } from "@/lib/store/queries";
 import { ProductDetailClient } from "@/components/store/ProductDetail";
+import { getProductMetadata } from "@/lib/seo";
 
 interface Props {
   params: { id: string };
@@ -11,10 +12,7 @@ interface Props {
 export async function generateMetadata({ params }: Props) {
   const product = await getProduct(params.id);
   if (!product) return { title: "منتج غير موجود" };
-  return {
-    title: `${product.name_ar} — ClalMobile`,
-    description: product.description_ar || `${product.brand} ${product.name_ar} — ₪${product.price}`,
-  };
+  return getProductMetadata(product);
 }
 
 export default async function ProductPage({ params }: Props) {

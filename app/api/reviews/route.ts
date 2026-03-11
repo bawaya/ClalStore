@@ -23,9 +23,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ reviews: data || [] });
     }
 
-    // Public: only approved reviews for specific product
     const db = createServerSupabase();
-    if (!db || !productId) return NextResponse.json({ reviews: [], avg: 0, count: 0 });
+    if (!db || !productId) {
+      return NextResponse.json({
+        reviews: [], avg: 0, count: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      });
+    }
 
     const { data } = await db.from("product_reviews")
       .select("*")
@@ -34,13 +37,30 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false });
 
     const reviews = data || [];
-    const avg = reviews.length > 0
-      ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
+    const count = reviews.length;
+    const avg = count > 0
+      ? reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / count
       : 0;
 
-    return NextResponse.json({ reviews, avg: Math.round(avg * 10) / 10, count: reviews.length });
-  } catch (err: any) {
-    return NextResponse.json({ reviews: [], avg: 0, count: 0, error: err.message });
+    const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const r of reviews) {
+      const star = Math.min(5, Math.max(1, Math.round(r.rating)));
+      distribution[star]++;
+    }
+
+    return NextResponse.json({
+      reviews,
+      avg: Math.round(avg * 10) / 10,
+      count,
+      distribution,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({
+      reviews: [], avg: 0, count: 0,
+      distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      error: message,
+    });
   }
 }
 
@@ -50,8 +70,8 @@ export async function POST(req: NextRequest) {
     const db = createServerSupabase();
     if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 
-    // Check if feature is enabled
-    const { data: setting } = await db.from("settings").select("value").eq("key", "feature_reviews").single();
+    const { data: setting } = await db
+      .from("settings").select("value").eq("key", "feature_reviews").single();
     if (setting?.value !== "true") {
       return NextResponse.json({ error: "Reviews disabled" }, { status: 403 });
     }
@@ -63,7 +83,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Check if customer already reviewed this product
     if (customer_phone) {
       const { data: existing } = await db.from("product_reviews")
         .select("id")
@@ -75,7 +94,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check if this was a verified purchase
     let verifiedPurchase = false;
     if (customer_phone) {
       const adminDb = createAdminSupabase();
@@ -107,9 +125,10 @@ export async function POST(req: NextRequest) {
     }).select().single();
 
     if (error) throw error;
-    return NextResponse.json({ review: data, message: "سيتم نشر تقييمك بعد الموافقة" });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ review: data, success: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -126,7 +145,7 @@ export async function PUT(req: NextRequest) {
 
     if (!id) return NextResponse.json({ error: "Missing review ID" }, { status: 400 });
 
-    const updates: any = { updated_at: new Date().toISOString() };
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (status) updates.status = status;
     if (admin_reply !== undefined) updates.admin_reply = admin_reply;
 
@@ -138,8 +157,9 @@ export async function PUT(req: NextRequest) {
 
     if (error) throw error;
     return NextResponse.json({ review: data });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -158,7 +178,8 @@ export async function DELETE(req: NextRequest) {
     const { error } = await db.from("product_reviews").delete().eq("id", id);
     if (error) throw error;
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

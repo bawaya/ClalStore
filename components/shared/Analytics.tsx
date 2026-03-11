@@ -131,3 +131,79 @@ export function trackPurchaseWithItems(orderId: string, value: number, items: { 
     });
   }
 }
+
+export function trackSearch(searchTerm: string, resultsCount: number) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "search", { search_term: searchTerm, results_count: resultsCount });
+  }
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", "Search", { search_string: searchTerm, content_category: "store" });
+  }
+}
+
+export function trackSelectItem(productName: string, price: number, listName?: string) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "select_item", {
+      item_list_name: listName,
+      items: [{ item_name: productName, price, currency: "ILS" }],
+    });
+  }
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", "ViewContent", { content_name: productName, value: price, currency: "ILS" });
+  }
+}
+
+export function trackViewItemList(listName: string, items: { item_name: string; price: number }[]) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "view_item_list", {
+      item_list_name: listName,
+      items: items.map((i) => ({ item_name: i.item_name, price: i.price, currency: "ILS" })),
+    });
+  }
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", "ViewContent", { content_category: listName, content_type: "product_group" });
+  }
+}
+
+export function trackRemoveFromCart(productName: string, price: number) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "remove_from_cart", {
+      items: [{ item_name: productName, price, currency: "ILS" }],
+      value: price,
+      currency: "ILS",
+    });
+  }
+}
+
+export function trackLogin(method: string) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "login", { method });
+  }
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("trackCustom", "Login", { method });
+  }
+}
+
+export function trackSignUp(method: string) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "sign_up", { method });
+  }
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", "CompleteRegistration", { method });
+  }
+}
+
+export function trackShare(method: string, contentType: string, itemId: string) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "share", { method, content_type: contentType, item_id: itemId });
+  }
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("trackCustom", "Share", { method, content_type: contentType, item_id: itemId });
+  }
+}
+
+export function trackException(description: string, fatal: boolean = false) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "exception", { description, fatal });
+  }
+}

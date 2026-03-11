@@ -1,10 +1,5 @@
 export const runtime = 'edge';
 
-// =====================================================
-// ClalMobile — Customer Orders API
-// GET /api/customer/orders — fetch orders for authenticated customer
-// =====================================================
-
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 
@@ -39,7 +34,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
     }
 
-    // Fetch orders by customer_id
     const { data: orders, error } = await supabase
       .from("orders")
       .select("*")
@@ -51,7 +45,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "خطأ في جلب الطلبات" }, { status: 500 });
     }
 
-    // Fetch order items for all orders
     const orderIds = (orders || []).map((o: any) => o.id);
     let items: any[] = [];
 
@@ -63,14 +56,12 @@ export async function GET(req: NextRequest) {
       items = orderItems || [];
     }
 
-    // Group items by order_id
     const itemsByOrder: Record<string, any[]> = {};
     for (const item of items) {
       if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
       itemsByOrder[item.order_id].push(item);
     }
 
-    // Combine
     const result = (orders || []).map((order: any) => ({
       id: order.id,
       status: order.status,
@@ -82,6 +73,7 @@ export async function GET(req: NextRequest) {
       payment_status: order.payment_status,
       shipping_city: order.shipping_city,
       shipping_address: order.shipping_address,
+      customer_notes: order.customer_notes,
       created_at: order.created_at,
       updated_at: order.updated_at,
       items: itemsByOrder[order.id] || [],
