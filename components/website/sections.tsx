@@ -7,174 +7,23 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
 import { ProductCard } from "@/components/store/ProductCard";
-import { Menu, X, ShoppingCart, ChevronLeft, Check } from "lucide-react";
+import { Menu, X, ShoppingCart, ChevronLeft } from "lucide-react";
 import { useCart } from "@/lib/store/cart";
 import type { WebsiteContent } from "@/types/database";
-
-// ===== Cart Added Flash Toast =====
-function CartFlashToast({ show, itemName, onDone }: { show: boolean; itemName: string; onDone: () => void }) {
-  useEffect(() => {
-    if (show) {
-      const t = setTimeout(onDone, 3000);
-      return () => clearTimeout(t);
-    }
-  }, [show, onDone]);
-
-  if (!show) return null;
-
-  return (
-    <div
-      className="fixed z-[9999] flex items-center gap-3 pointer-events-none"
-      style={{
-        top: 80,
-        left: "50%",
-        transform: "translateX(-50%)",
-        animation: "cartFlashIn 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-      }}
-    >
-      <div
-        className="flex items-center gap-2.5 px-5 py-3 rounded-2xl font-bold shadow-2xl pointer-events-auto"
-        style={{
-          background: "linear-gradient(135deg, rgba(34,197,94,0.95), rgba(22,163,74,0.95))",
-          backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          color: "#fff",
-          fontSize: 14,
-          boxShadow: "0 8px 40px rgba(34,197,94,0.4), 0 0 60px rgba(34,197,94,0.15)",
-        }}
-      >
-        <div
-          className="flex items-center justify-center rounded-full"
-          style={{
-            width: 28, height: 28,
-            background: "rgba(255,255,255,0.25)",
-            animation: "cartCheckPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both",
-          }}
-        >
-          <Check size={16} strokeWidth={3} />
-        </div>
-        <span>{itemName}</span>
-        <Link
-          href="/store/cart"
-          className="flex items-center gap-1 rounded-xl px-3 py-1.5 font-black text-xs transition-all hover:scale-105"
-          style={{
-            background: "rgba(255,255,255,0.2)",
-            border: "1px solid rgba(255,255,255,0.3)",
-            color: "#fff",
-            marginInlineStart: 4,
-            textDecoration: "none",
-          }}
-        >
-          🛒 السلة
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// ===== Floating Cart Bar (homepage) =====
-function HomeCartBar() {
-  const scr = useScreen();
-  const { t } = useLang();
-  const itemCount = useCart((s) => s.getItemCount());
-  const total = useCart((s) => s.getTotal());
-
-  if (itemCount === 0) return null;
-
-  return (
-    <div
-      className="fixed z-50"
-      style={{
-        bottom: scr.mobile ? 16 : 24,
-        left: "50%",
-        transform: "translateX(-50%)",
-        animation: "cartBarSlideUp 0.5s cubic-bezier(0.34,1.56,0.64,1)",
-      }}
-    >
-      <Link
-        href="/store/cart"
-        className="flex items-center gap-3 rounded-2xl transition-all hover:scale-[1.03] active:scale-[0.97]"
-        style={{
-          padding: scr.mobile ? "10px 16px 10px 10px" : "12px 24px 12px 14px",
-          background: "linear-gradient(135deg, rgba(196,16,64,0.95), rgba(255,51,102,0.95))",
-          backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255,255,255,0.15)",
-          boxShadow: "0 8px 40px rgba(196,16,64,0.5), 0 0 80px rgba(196,16,64,0.2)",
-          color: "#fff",
-          textDecoration: "none",
-        }}
-      >
-        <div className="relative">
-          <ShoppingCart size={scr.mobile ? 20 : 22} />
-          <span
-            className="absolute -top-2 rounded-full font-black flex items-center justify-center"
-            style={{
-              insetInlineEnd: -10,
-              width: 20,
-              height: 20,
-              fontSize: 11,
-              background: "#fff",
-              color: "#c41040",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-              animation: "cartCountPulse 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-            }}
-          >
-            {itemCount}
-          </span>
-        </div>
-
-        <div className="flex flex-col" style={{ marginInlineStart: 4 }}>
-          <span className="font-black" style={{ fontSize: scr.mobile ? 14 : 16, lineHeight: 1.2 }}>
-            ₪{total.toLocaleString()}
-          </span>
-          <span style={{ fontSize: scr.mobile ? 10 : 11, opacity: 0.85, lineHeight: 1.2 }}>
-            {itemCount} {itemCount === 1 ? t("cartBar.item") : t("cartBar.items")}
-          </span>
-        </div>
-
-        <div
-          className="flex items-center justify-center rounded-xl"
-          style={{
-            width: scr.mobile ? 32 : 36,
-            height: scr.mobile ? 32 : 36,
-            background: "rgba(255,255,255,0.2)",
-            marginInlineStart: 4,
-          }}
-        >
-          <ChevronLeft size={18} />
-        </div>
-      </Link>
-    </div>
-  );
-}
 
 // ===== Navbar =====
 export function Navbar() {
   const scr = useScreen();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const itemCount = useCart((s) => s.getItemCount());
   const total = useCart((s) => s.getTotal());
-  const prevCount = useRef(itemCount);
-  const [flash, setFlash] = useState(false);
-  const [flashName, setFlashName] = useState("");
-  const items = useCart((s) => s.items);
-
-  useEffect(() => {
-    if (itemCount > prevCount.current && items.length > 0) {
-      const last = items[items.length - 1];
-      const name = lang === "he" ? (last.name_he || last.name) : last.name;
-      setFlashName(`✅ ${name}`);
-      setFlash(true);
-    }
-    prevCount.current = itemCount;
-  }, [itemCount, items, lang]);
 
   const links = [
     { href: "/", label: t("nav.home") },
@@ -187,52 +36,36 @@ export function Navbar() {
 
   return (
     <>
-      <CartFlashToast show={flash} itemName={flashName} onDone={() => setFlash(false)} />
-
       <nav role="navigation" className="fixed top-0 left-0 right-0 z-50 glass-header glass-glow-line">
         <div className="max-w-6xl mx-auto flex items-center justify-between" style={{ padding: scr.mobile ? "10px 16px" : "12px 24px" }}>
           {/* CTA + Lang + Cart */}
           <div className="flex items-center gap-2">
-            {/* Cart Button - Enhanced */}
             <Link
               href="/store/cart"
-              className="relative flex items-center gap-1.5 rounded-xl transition-all hover:scale-105 active:scale-95"
+              className={`glass-icon-btn relative ${itemCount > 0 ? "glass-icon-btn-active" : ""}`}
               style={{
-                padding: itemCount > 0 ? (scr.mobile ? "5px 10px" : "6px 14px") : "0",
-                width: itemCount > 0 ? "auto" : (scr.mobile ? 34 : 40),
-                height: scr.mobile ? 34 : 40,
-                justifyContent: "center",
-                background: itemCount > 0 ? "linear-gradient(135deg, rgba(196,16,64,0.2), rgba(255,51,102,0.1))" : "transparent",
-                border: itemCount > 0 ? "1.5px solid rgba(196,16,64,0.4)" : "none",
-                boxShadow: itemCount > 0 ? "0 0 20px rgba(196,16,64,0.15)" : "none",
+                width: scr.mobile ? 34 : 46,
+                height: scr.mobile ? 34 : 46,
               }}
             >
-              <ShoppingCart
-                size={scr.mobile ? 16 : 18}
-                className={itemCount > 0 ? "text-brand" : "text-white"}
-              />
+              <ShoppingCart size={scr.mobile ? 15 : 20} />
               {itemCount > 0 && (
-                <>
-                  <span
-                    className="font-black text-white"
-                    style={{ fontSize: scr.mobile ? 12 : 13, lineHeight: 1 }}
-                  >
-                    {itemCount}
-                  </span>
-                  <span
-                    className="absolute rounded-full"
-                    style={{
-                      top: -2, insetInlineEnd: -2,
-                      width: 8, height: 8,
-                      background: "#22c55e",
-                      boxShadow: "0 0 8px rgba(34,197,94,0.6)",
-                      animation: "cartDotPulse 2s ease-in-out infinite",
-                    }}
-                  />
-                </>
+                <span
+                  className="absolute -top-1.5 rounded-full font-black flex items-center justify-center"
+                  style={{
+                    insetInlineEnd: -6,
+                    width: scr.mobile ? 18 : 22,
+                    height: scr.mobile ? 18 : 22,
+                    fontSize: scr.mobile ? 9 : 11,
+                    background: "linear-gradient(135deg, #c41040, #ff3366)",
+                    color: "#fff",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                  }}
+                >
+                  {itemCount}
+                </span>
               )}
             </Link>
-
             <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 12 : 14, padding: scr.mobile ? "6px 12px" : "8px 20px" }}>
               {t("nav.shopNow")}
             </Link>
@@ -278,7 +111,61 @@ export function Navbar() {
         )}
       </nav>
 
-      <HomeCartBar />
+      {/* Sticky Cart Bar — same as store */}
+      {itemCount > 0 && (
+        <div className="sticky-cart-bar" style={{ position: "fixed", top: scr.mobile ? 56 : 64, left: 0, right: 0, zIndex: 45 }}>
+          <div
+            className="max-w-[1200px] mx-auto flex items-center justify-between"
+            style={{ padding: scr.mobile ? "8px 14px" : "10px 28px" }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <ShoppingCart size={scr.mobile ? 18 : 20} className="text-brand-light" />
+                <span
+                  className="absolute -top-2 rounded-full font-black flex items-center justify-center"
+                  style={{
+                    insetInlineEnd: -8,
+                    width: 18, height: 18, fontSize: 10,
+                    background: "linear-gradient(135deg, #c41040, #ff3366)",
+                    color: "#fff",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                  }}
+                >
+                  {itemCount}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-white" style={{ fontSize: scr.mobile ? 12 : 14, lineHeight: 1.2 }}>
+                  {t("store.cart")}
+                  <span className="text-muted font-normal ms-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                    ({itemCount} {itemCount === 1 ? t("cartBar.item") : t("cartBar.items")})
+                  </span>
+                </span>
+                <span className="font-black text-brand-light" style={{ fontSize: scr.mobile ? 14 : 16, lineHeight: 1.2 }}>
+                  ₪{total.toLocaleString()}
+                </span>
+              </div>
+            </div>
+            <Link
+              href="/store/cart"
+              className="flex items-center gap-1.5 rounded-xl font-bold text-white transition-all hover:scale-[1.03] active:scale-[0.97]"
+              style={{
+                padding: scr.mobile ? "8px 16px" : "10px 24px",
+                fontSize: scr.mobile ? 12 : 14,
+                background: "linear-gradient(135deg, #c41040, #ff3366)",
+                boxShadow: "0 4px 15px rgba(196,16,64,0.3)",
+              }}
+            >
+              {t("store.checkout")}
+              <ChevronLeft size={16} />
+            </Link>
+          </div>
+          <div
+            className="absolute bottom-0 left-[15%] right-[15%] h-px"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(196,16,64,0.2), transparent)" }}
+          />
+        </div>
+      )}
     </>
   );
 }

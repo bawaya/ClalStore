@@ -33,6 +33,7 @@ export async function PUT(req: NextRequest) {
     const db = createAdminSupabase();
     const body = await req.json();
     const { id, ...updates } = body;
+
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const { data, error } = await db
