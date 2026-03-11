@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const unreadCount = (data ?? []).filter((n) => !n.read).length;
+    const unreadCount = (data ?? []).filter((n: { read: boolean }) => !n.read).length;
 
     return NextResponse.json({ data: data ?? [], unreadCount });
   } catch (err: unknown) {
