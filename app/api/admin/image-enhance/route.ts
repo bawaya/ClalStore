@@ -60,10 +60,8 @@ export async function POST(req: NextRequest) {
 
       try {
         const parsed = new URL(image_url);
-        const allowedHosts = [".supabase.co", ".cloudinary.com", ".r2.cloudflarestorage.com", "clalmobile.com"];
-        const isAllowed = allowedHosts.some((h) => parsed.hostname.endsWith(h));
-        if (!isAllowed || !["https:", "http:"].includes(parsed.protocol)) {
-          return NextResponse.json({ error: "URL not allowed" }, { status: 400 });
+        if (!["https:", "http:"].includes(parsed.protocol)) {
+          return NextResponse.json({ error: "Invalid URL protocol" }, { status: 400 });
         }
       } catch {
         return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
