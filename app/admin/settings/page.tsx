@@ -10,20 +10,45 @@ import { INTEGRATION_TYPES } from "@/lib/constants";
 import { invalidateLogoCache } from "@/components/shared/Logo";
 
 // ===== Provider Config Fields =====
-const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string; placeholder: string }[]> = {
+interface ProviderField {
+  key: string;
+  label: string;
+  type: string;
+  placeholder: string;
+  options?: { value: string; label: string }[];
+  hint?: string;
+}
+const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
   // --- Payment ---
   "רווחית (Rivhit)": [
-    { key: "group_private_token", label: "🔑 GroupPrivateToken (מזהה דף תשלום)", type: "password", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
-    { key: "max_payments", label: "📅 أقصى عدد تقسيطات", type: "text", placeholder: "12" },
-    { key: "min_payments", label: "📅 أقل عدد تقسيطات", type: "text", placeholder: "1" },
-    { key: "sale_type", label: "🧾 نوع العملية (1=عادي، 2=J5 معلّق، 3=توكن فقط)", type: "text", placeholder: "1" },
-    { key: "send_mail", label: "📩 إرسال إيصال بالإيميل (true/false)", type: "text", placeholder: "true" },
-    { key: "create_customer", label: "👤 إنشاء زبون تلقائي بـ iCredit (true/false)", type: "text", placeholder: "true" },
-    { key: "document_language", label: "🌐 لغة المستند (he/en/ar)", type: "text", placeholder: "he" },
-    { key: "ipn_url_override", label: "🔗 IPN Callback URL (اختياري)", type: "text", placeholder: "https://clalmobile.com/api/payment/callback" },
-    { key: "success_url_override", label: "🔗 Success Redirect URL (اختياري)", type: "text", placeholder: "https://clalmobile.com/store/checkout/success" },
-    { key: "fail_url_override", label: "🔗 Fail Redirect URL (اختياري)", type: "text", placeholder: "https://clalmobile.com/store/checkout/failed" },
-    { key: "test_mode", label: "🧪 وضع الاختبار (true/false)", type: "text", placeholder: "false" },
+    { key: "group_private_token", label: "🔑 GroupPrivateToken", type: "password", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", hint: "מזהה דף תשלום — من إعدادات صفحة الدفع في iCredit (דפי תשלום > הגדרות הדף)" },
+    { key: "max_payments", label: "📅 أقصى عدد تقسيطات", type: "number", placeholder: "12" },
+    { key: "min_payments", label: "📅 أقل عدد تقسيطات", type: "number", placeholder: "1" },
+    { key: "sale_type", label: "🧾 نوع العملية", type: "select", placeholder: "", options: [
+      { value: "1", label: "1 — عادي (חיוב רגיל)" },
+      { value: "2", label: "2 — J5 معلّق (אישור עסקה בלבד)" },
+      { value: "3", label: "3 — توكن فقط (טוקן בלבד)" },
+    ]},
+    { key: "send_mail", label: "📩 إرسال إيصال بالإيميل", type: "select", placeholder: "", options: [
+      { value: "true", label: "نعم — إرسال إيصال تلقائي" },
+      { value: "false", label: "لا — بدون إيصال" },
+    ]},
+    { key: "create_customer", label: "👤 إنشاء زبون تلقائي بـ iCredit", type: "select", placeholder: "", options: [
+      { value: "true", label: "نعم — إنشاء ملف زبون" },
+      { value: "false", label: "لا — بدون إنشاء" },
+    ]},
+    { key: "document_language", label: "🌐 لغة المستند", type: "select", placeholder: "", options: [
+      { value: "he", label: "עברית (عبري)" },
+      { value: "ar", label: "العربية" },
+      { value: "en", label: "English" },
+    ]},
+    { key: "ipn_url_override", label: "🔗 IPN Callback URL", type: "text", placeholder: "https://clalmobile.com/api/payment/callback", hint: "اتركه فارغ لاستخدام الافتراضي" },
+    { key: "success_url_override", label: "🔗 Success Redirect URL", type: "text", placeholder: "https://clalmobile.com/store/checkout/success", hint: "اتركه فارغ لاستخدام الافتراضي" },
+    { key: "fail_url_override", label: "🔗 Fail Redirect URL", type: "text", placeholder: "https://clalmobile.com/store/checkout/failed", hint: "اتركه فارغ لاستخدام الافتراضي" },
+    { key: "test_mode", label: "🧪 وضع الاختبار", type: "select", placeholder: "", options: [
+      { value: "false", label: "إنتاج — عمليات حقيقية (LIVE)" },
+      { value: "true", label: "اختبار — بدون خصم فعلي (TEST)" },
+    ]},
   ],
   Tranzila: [
     { key: "terminal", label: "Terminal Name", type: "text", placeholder: "اسم الطرفية" },
@@ -103,11 +128,18 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
   ],
   // --- Payment UPay ---
   UPay: [
-    { key: "api_username", label: "API Username (Email)", type: "text", placeholder: "email@example.com" },
-    { key: "api_key", label: "API Key", type: "password", placeholder: "UPay API Key" },
-    { key: "max_payments", label: "عدد التقسيطات الأقصى", type: "text", placeholder: "1" },
-    { key: "language", label: "اللغة", type: "text", placeholder: "HE / EN" },
-    { key: "test_mode", label: "وضع الاختبار (true/false)", type: "text", placeholder: "false" },
+    { key: "api_username", label: "📧 API Username (Email)", type: "text", placeholder: "email@example.com", hint: "البريد الإلكتروني المسجّل في UPay" },
+    { key: "api_key", label: "🔑 API Key", type: "password", placeholder: "UPay API Key" },
+    { key: "max_payments", label: "📅 عدد التقسيطات الأقصى", type: "number", placeholder: "1" },
+    { key: "language", label: "🌐 لغة صفحة الدفع", type: "select", placeholder: "", options: [
+      { value: "HE", label: "עברית (عبري)" },
+      { value: "AR", label: "العربية" },
+      { value: "EN", label: "English" },
+    ]},
+    { key: "test_mode", label: "🧪 وضع الاختبار", type: "select", placeholder: "", options: [
+      { value: "false", label: "إنتاج — عمليات حقيقية (LIVE)" },
+      { value: "true", label: "اختبار — بدون خصم فعلي (TEST)" },
+    ]},
   ],
   // --- Storage ---
   "Cloudflare R2": [
@@ -301,6 +333,7 @@ function IntegrationCard({
 
           {fields.map((f) => {
             const isSensitive = f.type === "password";
+            const isSelect = f.type === "select";
             const isSaved = hasSavedKey(f.key);
             const currentVal = configDraft[f.key] || "";
             const isStillMasked = isSensitive && currentVal.includes(MASK);
@@ -325,21 +358,40 @@ function IntegrationCard({
                   <label className="text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 10 }}>{f.label}</label>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <input
-                    type={isSensitive && !showSecrets[f.key] ? "password" : "text"}
-                    className="input flex-1"
-                    style={{
-                      fontSize: scr.mobile ? 11 : 13,
-                      borderColor: hasVal ? "rgba(34,197,94,0.2)" : undefined,
-                    }}
-                    placeholder={isSaved ? "اضغط لتحديث القيمة..." : f.placeholder}
-                    value={currentVal}
-                    onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                    onFocus={() => {
-                      if (isStillMasked) setConfigDraft((prev) => ({ ...prev, [f.key]: "" }));
-                    }}
-                    dir="ltr"
-                  />
+                  {isSelect && f.options ? (
+                    <select
+                      className="input flex-1"
+                      style={{
+                        fontSize: scr.mobile ? 11 : 13,
+                        borderColor: hasVal ? "rgba(34,197,94,0.2)" : undefined,
+                      }}
+                      value={currentVal}
+                      onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                      dir="rtl"
+                    >
+                      <option value="">— اختر —</option>
+                      {f.options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={isSensitive && !showSecrets[f.key] ? "password" : f.type === "number" ? "number" : "text"}
+                      className="input flex-1"
+                      style={{
+                        fontSize: scr.mobile ? 11 : 13,
+                        borderColor: hasVal ? "rgba(34,197,94,0.2)" : undefined,
+                      }}
+                      placeholder={isSaved ? "اضغط لتحديث القيمة..." : f.placeholder}
+                      value={currentVal}
+                      onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                      onFocus={() => {
+                        if (isStillMasked) setConfigDraft((prev) => ({ ...prev, [f.key]: "" }));
+                      }}
+                      dir="ltr"
+                      {...(f.type === "number" ? { min: "0" } : {})}
+                    />
+                  )}
                   {isSensitive && (
                     <button onClick={() => setShowSecrets((p) => ({ ...p, [f.key]: !p[f.key] }))}
                       className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-xs"
@@ -348,6 +400,9 @@ function IntegrationCard({
                     </button>
                   )}
                 </div>
+                {f.hint && (
+                  <p className="text-dim mt-0.5 text-right" style={{ fontSize: 9, lineHeight: 1.4 }}>{f.hint}</p>
+                )}
               </div>
             );
           })}
