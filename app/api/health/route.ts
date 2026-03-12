@@ -39,8 +39,9 @@ export async function GET(req: NextRequest) {
   const missingEnvs = requiredEnvs.filter((e) => !process.env[e]);
   checks.env = { ok: missingEnvs.length === 0, error: missingEnvs.length > 0 ? `Missing: ${missingEnvs.join(", ")}` : undefined };
 
-  // 3. Payment provider
-  checks.payment = { ok: !!process.env.RIVHIT_API_KEY, error: !process.env.RIVHIT_API_KEY ? "Not configured" : undefined };
+  // 3. Payment provider (iCredit)
+  const hasPayment = !!(process.env.ICREDIT_GROUP_PRIVATE_TOKEN);
+  checks.payment = { ok: hasPayment, error: hasPayment ? "iCredit ✓" : "Not configured (check DB or ICREDIT_GROUP_PRIVATE_TOKEN env)" };
 
   // 4. Email provider
   const hasEmail = !!(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY);

@@ -30,20 +30,27 @@ type TestFn = (cfg: Record<string, any>) => Promise<{ ok: boolean; message: stri
 // ── Payment Tests (provider-aware) ──
 
 const testRivhit: TestFn = async (cfg) => {
-  if (!cfg.api_key || !cfg.business_id) return { ok: false, message: "مفتاح API أو معرف العمل مفقود" };
+  if (!cfg.group_private_token) return { ok: false, message: "GroupPrivateToken مفقود — احصل عليه من إعدادات دف تشلوم في iCredit" };
+  const guidRegex = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+  if (!guidRegex.test(cfg.group_private_token)) return { ok: false, message: "صيغة GroupPrivateToken غير صحيحة — يجب أن تكون GUID" };
   try {
-    const res = await fetch("https://api.rivhit.co.il/online/api/PaymentPageRequest.svc/GetUrl", {
+    const testMode = cfg.test_mode === "true" || cfg.test_mode === true;
+    const baseUrl = testMode
+      ? "https://testicredit.rivhit.co.il/API/PaymentPageRequest.svc"
+      : "https://icredit.rivhit.co.il/API/PaymentPageRequest.svc";
+    const res = await fetch(`${baseUrl}/GetUrl`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        api_token: cfg.api_key, business_id: Number(cfg.business_id),
-        type: 320, description: "Connection Test", sum: 0.01,
-        currency: "ILS", client_name: "Test", client_phone: "0500000000",
+        GroupPrivateToken: cfg.group_private_token,
+        Items: [{ UnitPrice: 1, Quantity: 1, Description: "Connection Test" }],
+        Currency: 1,
+        MaxPayments: 1,
       }),
     });
     const data = await res.json();
-    if (data.status === 1 || data.payment_url) return { ok: true, message: "✅ Rivhit متصل بنجاح" };
-    return { ok: false, message: data.error_message || `Rivhit error: ${data.error_code || "unknown"}` };
+    if (data.Status === 0 && data.URL) return { ok: true, message: `✅ iCredit متصل بنجاح${testMode ? " (وضع اختبار)" : ""}` };
+    return { ok: false, message: data.DebugMessage || `iCredit error (Status: ${data.Status})` };
   } catch (err: any) { return { ok: false, message: `خطأ في الاتصال: ${err.message}` }; }
 };
 

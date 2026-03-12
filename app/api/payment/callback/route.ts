@@ -1,10 +1,12 @@
 export const runtime = 'edge';
 
 // =====================================================
-// ClalMobile — Payment Callback
-// POST: Rivhit calls this after payment on hosted page
-// Fields: status, request_id, document_id, custom_field_1 (orderId),
-//         sum, transaction_id, last_4_digits, number_of_payments
+// ClalMobile — iCredit IPN Callback
+// iCredit sends POST with sale results after payment
+// IPN fields: GroupPrivateToken, SaleId, CustomerTransactionId,
+//   TransactionAmount, TransactionToken, NumberOfPayments,
+//   CardLastFourDigits, Custom1 (orderId), etc.
+// Docs: https://rivhit-api.readme.io/docs/ipn-by-sale-types
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,96 +14,96 @@ import { createAdminSupabase } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    let body: Record<string, any>;
 
-    // Basic validation: payment callbacks must have a status and identifiable order
-    if (typeof body.status !== "number" || (!body.custom_field_1 && !body.comment)) {
-      console.warn("Payment callback: invalid payload structure");
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const text = await req.text();
+      const params = new URLSearchParams(text);
+      body = Object.fromEntries(params.entries());
+    } else {
+      body = await req.json();
     }
 
-    console.log("Payment callback received for:", body.custom_field_1 || "unknown");
+    console.log("iCredit IPN received:", JSON.stringify(body));
 
-    const {
-      status,
-      request_id,
-      document_id,
-      document_number,
-      sum,
-      transaction_id,
-      last_4_digits,
-      number_of_payments,
-      payment_type,
-      custom_field_1, // orderId
-      error_code,
-      error_message,
-    } = body;
-
-    // Extract order ID from custom_field_1 or comment
-    const orderId = custom_field_1 || body.comment?.match(/CLM-\d{5}/)?.[0];
+    const saleId = body.SaleId || body.saleid;
+    const orderId = body.Custom1 || body.custom1;
+    const amount = parseFloat(body.TransactionAmount || body.transactionamount || "0");
+    const token = body.TransactionToken || body.transactiontoken || "";
+    const cardLast4 = body.CardLastFourDigits || body.cardlastfourdigits || "";
+    const numPayments = parseInt(body.NumberOfPayments || body.numberofpayments || "1", 10);
+    const customerTransactionId = body.CustomerTransactionId || body.customertransactionid || "";
+    const paramJ = body.TransactionParamJ || body.transactionparamj;
 
     if (!orderId) {
-      console.error("Payment callback: missing order ID");
+      console.error("iCredit IPN: missing orderId (Custom1)");
       return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
     }
 
     const db = createAdminSupabase();
 
-    // Verify order exists and is in a valid state for payment updates
     const { data: existingOrder } = await db.from("orders")
       .select("id, status, payment_status")
       .eq("id", orderId)
       .single();
 
     if (!existingOrder) {
-      console.error("Payment callback: order not found:", orderId);
+      console.error("iCredit IPN: order not found:", orderId);
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     if (existingOrder.payment_status === "paid") {
-      console.warn("Payment callback: order already paid:", orderId);
+      console.warn("iCredit IPN: order already paid:", orderId);
       return NextResponse.json({ received: true, note: "already_paid" });
     }
 
-    if (status === 1) {
-      // === Payment Successful ===
-      const paymentMethod =
-        payment_type === 10 ? "bit" :
-        payment_type === 11 ? "apple_pay" :
-        payment_type === 4 ? "bank_transfer" : "credit";
+    // Verify IPN with iCredit
+    let verified = false;
+    try {
+      const { verifyIPN } = await import("@/lib/integrations/rivhit");
+      const verifyResult = await verifyIPN(saleId, amount);
+      verified = verifyResult.verified;
+      if (!verified) {
+        console.warn("iCredit IPN verification failed:", verifyResult.status);
+      }
+    } catch (verifyErr) {
+      console.error("iCredit IPN verification error:", verifyErr);
+    }
 
+    const isJ5 = paramJ === "5" || paramJ === 5;
+
+    if (saleId && amount > 0 && !isJ5) {
       await db.from("orders").update({
         payment_status: "paid",
-        payment_transaction_id: String(document_id || transaction_id || request_id),
+        payment_transaction_id: String(customerTransactionId || saleId),
         status: "approved",
         payment_details: {
-          type: paymentMethod,
-          card: last_4_digits || "",
-          installments: number_of_payments || 1,
-          document_id: document_id,
-          document_number: document_number,
-          transaction_id: transaction_id,
-          amount: sum,
-          rivhit_request_id: request_id,
+          type: "credit",
+          provider: "icredit",
+          card: cardLast4,
+          installments: numPayments,
+          sale_id: saleId,
+          customer_transaction_id: customerTransactionId,
+          token: token,
+          amount: amount,
+          verified: verified,
         },
       }).eq("id", orderId);
 
-      // Audit log
       await db.from("audit_log").insert({
-        user_name: "Rivhit",
-        action: `💳 دفع ناجح: ${orderId} — ₪${sum} ${last_4_digits ? `(****${last_4_digits})` : ""} ${number_of_payments > 1 ? `${number_of_payments} תשלומים` : ""}`,
+        user_name: "iCredit",
+        action: `💳 دفع ناجح: ${orderId} — ₪${amount} ${cardLast4 ? `(****${cardLast4})` : ""} ${numPayments > 1 ? `${numPayments} תשלומים` : ""}`,
         entity_type: "payment",
         entity_id: orderId,
         details: {
-          document_id, transaction_id, sum,
-          last_4_digits, number_of_payments, payment_type,
+          sale_id: saleId, customer_transaction_id: customerTransactionId,
+          amount, card: cardLast4, installments: numPayments, verified,
         },
       });
 
-      // WhatsApp notification for successful payment
       try {
         const { notifyNewOrder } = await import("@/lib/bot/notifications");
-        // Re-fetch order to get customer info
         const { data: order } = await db
           .from("orders")
           .select("*, customers(name, phone)")
@@ -113,42 +115,62 @@ export async function POST(req: NextRequest) {
             orderId,
             (order.customers as any).name,
             (order.customers as any).phone,
-            sum,
-            "rivhit_payment"
+            amount,
+            "icredit_payment"
           );
         }
       } catch (notifErr) {
         console.error("Payment notification failed:", notifErr);
       }
-    } else {
-      // === Payment Failed ===
+    } else if (isJ5) {
       await db.from("orders").update({
-        payment_status: "failed",
+        payment_status: "pending_capture",
         payment_details: {
           type: "credit",
-          error_code,
-          error_message,
-          rivhit_request_id: request_id,
+          provider: "icredit",
+          sale_id: saleId,
+          customer_transaction_id: customerTransactionId,
+          token: token,
+          amount: amount,
+          status: "j5_hold",
         },
       }).eq("id", orderId);
 
       await db.from("audit_log").insert({
-        user_name: "Rivhit",
-        action: `❌ فشل الدفع: ${orderId} — ${error_message || "خطأ غير معروف"}`,
+        user_name: "iCredit",
+        action: `⏳ دفع معلّق (J5): ${orderId} — ₪${amount}`,
         entity_type: "payment",
         entity_id: orderId,
-        details: { error_code, error_message, request_id },
+        details: { sale_id: saleId, amount, status: "j5_hold" },
+      });
+    } else {
+      await db.from("orders").update({
+        payment_status: "failed",
+        payment_details: {
+          type: "credit",
+          provider: "icredit",
+          sale_id: saleId,
+          amount: amount,
+          error: "Payment not completed",
+        },
+      }).eq("id", orderId);
+
+      await db.from("audit_log").insert({
+        user_name: "iCredit",
+        action: `❌ فشل الدفع: ${orderId}`,
+        entity_type: "payment",
+        entity_id: orderId,
+        details: { sale_id: saleId, amount },
       });
     }
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
-    console.error("Payment callback error:", err);
+    console.error("iCredit IPN error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-// GET: Rivhit may also send GET for verification
-export async function GET(req: NextRequest) {
+export async function GET() {
   return NextResponse.json({ status: "ok" });
 }

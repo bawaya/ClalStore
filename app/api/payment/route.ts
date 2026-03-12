@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
 
     if (gateway === "rivhit") {
       const rivhitCfg = await getIntegrationConfig("payment");
-      if (!rivhitCfg.api_key && !process.env.RIVHIT_API_KEY) {
-        return NextResponse.json({ error: "بوابة Rivhit غير مهيأة" }, { status: 503 });
+      if (!rivhitCfg.group_private_token && !process.env.ICREDIT_GROUP_PRIVATE_TOKEN) {
+        return NextResponse.json({ error: "بوابة iCredit غير مهيأة — أدخل GroupPrivateToken في الإعدادات" }, { status: 503 });
       }
       const { createPaymentPage } = await import("@/lib/integrations/rivhit");
       const result = await createPaymentPage({
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       if (result.success) {
         return NextResponse.json({
           success: true, paymentUrl: result.paymentUrl,
-          requestId: result.requestId, provider: "rivhit",
+          privateSaleToken: result.privateSaleToken, provider: "icredit",
         });
       }
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });

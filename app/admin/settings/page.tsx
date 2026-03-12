@@ -13,8 +13,17 @@ import { invalidateLogoCache } from "@/components/shared/Logo";
 const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string; placeholder: string }[]> = {
   // --- Payment ---
   "רווחית (Rivhit)": [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "أدخل Rivhit API Key" },
-    { key: "business_id", label: "Business ID", type: "text", placeholder: "رقم العمل" },
+    { key: "group_private_token", label: "🔑 GroupPrivateToken (מזהה דף תשלום)", type: "password", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
+    { key: "max_payments", label: "📅 أقصى عدد تقسيطات", type: "text", placeholder: "12" },
+    { key: "min_payments", label: "📅 أقل عدد تقسيطات", type: "text", placeholder: "1" },
+    { key: "sale_type", label: "🧾 نوع العملية (1=عادي، 2=J5 معلّق، 3=توكن فقط)", type: "text", placeholder: "1" },
+    { key: "send_mail", label: "📩 إرسال إيصال بالإيميل (true/false)", type: "text", placeholder: "true" },
+    { key: "create_customer", label: "👤 إنشاء زبون تلقائي بـ iCredit (true/false)", type: "text", placeholder: "true" },
+    { key: "document_language", label: "🌐 لغة المستند (he/en/ar)", type: "text", placeholder: "he" },
+    { key: "ipn_url_override", label: "🔗 IPN Callback URL (اختياري)", type: "text", placeholder: "https://clalmobile.com/api/payment/callback" },
+    { key: "success_url_override", label: "🔗 Success Redirect URL (اختياري)", type: "text", placeholder: "https://clalmobile.com/store/checkout/success" },
+    { key: "fail_url_override", label: "🔗 Fail Redirect URL (اختياري)", type: "text", placeholder: "https://clalmobile.com/store/checkout/failed" },
+    { key: "test_mode", label: "🧪 وضع الاختبار (true/false)", type: "text", placeholder: "false" },
   ],
   Tranzila: [
     { key: "terminal", label: "Terminal Name", type: "text", placeholder: "اسم الطرفية" },

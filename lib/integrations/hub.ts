@@ -166,10 +166,10 @@ export async function getProvider<T>(type: ProviderType): Promise<T | null> {
 
 // ===== Initialize All Providers =====
 export async function initializeProviders() {
-  // Payment — Rivhit for Israeli customers (default provider for hub)
+  // Payment — iCredit for Israeli customers (default provider for hub)
   // UPay for Palestinian/intl customers is handled directly by /api/payment route
   const paymentCfg = await getIntegrationConfig("payment");
-  if (paymentCfg.api_key || process.env.RIVHIT_API_KEY) {
+  if (paymentCfg.group_private_token || process.env.ICREDIT_GROUP_PRIVATE_TOKEN) {
     const { RivhitProvider } = await import("./rivhit");
     registerProvider("payment", new RivhitProvider());
   }
