@@ -6,7 +6,10 @@ import { createAdminSupabase } from "@/lib/supabase";
 // Public settings endpoint — no auth required
 // Only exposes safe, display-related settings (logo, store name, etc.)
 
-const PUBLIC_KEYS = ["logo_url", "logo_size", "store_name", "store_phone", "store_address"];
+const PUBLIC_KEYS = [
+  "logo_url", "logo_size", "store_name", "store_phone", "store_address",
+  "ga_measurement_id", "meta_pixel_id",
+];
 
 export async function GET() {
   try {

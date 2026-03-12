@@ -520,8 +520,73 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
           ))}
         </div>
 
+        {/* Payment Methods */}
+        <div className="border-t border-glass-border mt-6 pt-4">
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-dim text-[10px] font-medium">{t("footer.securePayment")}</span>
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              {/* Visa */}
+              <svg width="38" height="24" viewBox="0 0 38 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Visa">
+                <rect width="38" height="24" rx="4" fill="#1A1F71"/>
+                <path d="M16.1 16.2h-2.5l1.6-9.4h2.5l-1.6 9.4zM24.5 7c-.5-.2-1.3-.4-2.2-.4-2.4 0-4.1 1.2-4.1 3 0 1.3 1.2 2 2.1 2.5.9.5 1.2.8 1.2 1.2 0 .6-.7 1-1.4 1-.9 0-1.4-.1-2.2-.5l-.3-.1-.3 1.9c.5.2 1.5.4 2.5.4 2.6 0 4.2-1.2 4.2-3.1 0-1-.6-1.8-2-2.5-.8-.4-1.3-.7-1.3-1.1 0-.4.4-.8 1.3-.8.7 0 1.3.1 1.7.3l.2.1.3-1.9zM29.5 6.8h-1.9c-.6 0-1 .2-1.2.7l-3.5 8.7h2.5l.5-1.4h3c.1.3.3 1.4.3 1.4h2.2l-1.9-9.4zm-3 6.1c.2-.5 1-2.6 1-2.6l.3-.9.2.8s.5 2.3.6 2.7h-2.1zM12.3 6.8l-2.4 6.4-.3-1.2c-.4-1.5-1.8-3.1-3.3-3.9l2.1 8h2.6l3.9-9.4h-2.6z" fill="#fff"/>
+                <path d="M7.8 6.8H4l0 .2c3 .8 5 2.6 5.9 4.8l-.8-4.3c-.1-.5-.5-.7-1.3-.7z" fill="#F9A533"/>
+              </svg>
+              {/* Mastercard */}
+              <svg width="38" height="24" viewBox="0 0 38 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Mastercard">
+                <rect width="38" height="24" rx="4" fill="#252525"/>
+                <circle cx="15" cy="12" r="7" fill="#EB001B"/>
+                <circle cx="23" cy="12" r="7" fill="#F79E1B"/>
+                <path d="M19 6.8a7 7 0 0 1 2.6 5.2A7 7 0 0 1 19 17.2a7 7 0 0 1-2.6-5.2A7 7 0 0 1 19 6.8z" fill="#FF5F00"/>
+              </svg>
+              {/* Isracard */}
+              <div className="flex items-center justify-center rounded px-1.5" style={{ background: "#0052CC", height: 24, minWidth: 38 }}>
+                <span className="text-white font-bold" style={{ fontSize: 7, letterSpacing: 0.3 }}>ISRACARD</span>
+              </div>
+              {/* Apple Pay */}
+              <svg width="38" height="24" viewBox="0 0 38 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Apple Pay">
+                <rect width="38" height="24" rx="4" fill="#000"/>
+                <path d="M11.2 8.4c.3-.4.6-1 .5-1.5-.5 0-1.1.3-1.4.7-.3.4-.6 1-.5 1.5.6 0 1.1-.3 1.4-.7zm.5.8c-.8 0-1.5.5-1.8.5-.4 0-1-.5-1.6-.5-.8 0-1.6.5-2 1.3-.9 1.5-.2 3.7.6 5 .4.6.9 1.3 1.5 1.3.6 0 .8-.4 1.6-.4.7 0 .9.4 1.6.4.6 0 1-.7 1.4-1.3.4-.6.6-1.2.6-1.2-1.4-.5-1.6-2.3-.2-3.1-.5-.6-1.1-1-1.7-1zm6.5-.5v6.8h1.1v-2.3h1.6c1.4 0 2.4-1 2.4-2.3s-1-2.2-2.3-2.2h-2.8zm1.1 1h1.3c1 0 1.5.5 1.5 1.3s-.5 1.3-1.5 1.3h-1.3v-2.6zm6.8 5.9c.7 0 1.3-.4 1.6-.9h0v.8h1v-5h-1.1v1.9c0 .9-.6 1.5-1.3 1.5-.7 0-1.1-.4-1.1-1.2v-2.2h-1.1v2.5c0 1.1.5 1.6 1.5 1.6h.5zm4.2.9c.6-1.8 1.1-3.1 2.4-5.8h-1.2l-1 2.8h0l-1-2.8h-1.2l1.8 4.9-.1.3c-.2.4-.4.6-.8.6h-.3v.9h.4c.6 0 .8-.3 1-.9z" fill="#fff"/>
+              </svg>
+              {/* Google Pay */}
+              <svg width="38" height="24" viewBox="0 0 38 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Google Pay">
+                <rect width="38" height="24" rx="4" fill="#fff" stroke="#e5e7eb"/>
+                <path d="M18.3 12.2v2.3h-.7V8.5h1.9c.5 0 .9.2 1.2.5.3.3.5.7.5 1.1 0 .5-.2.8-.5 1.1-.3.3-.7.5-1.2.5h-1.2zm0-3v2.3h1.2c.3 0 .6-.1.8-.3.2-.2.3-.5.3-.8 0-.3-.1-.6-.3-.8-.2-.2-.5-.3-.8-.3h-1.2z" fill="#3C4043"/>
+                <path d="M23.2 10.2c.5 0 .9.1 1.2.4.3.3.4.6.4 1.1v2.8h-.7v-.6h0c-.3.5-.7.7-1.2.7-.4 0-.8-.1-1.1-.4-.3-.2-.4-.6-.4-.9 0-.4.1-.7.4-.9.3-.2.7-.4 1.2-.4.4 0 .8.1 1 .3v0c0-.3-.1-.5-.3-.7-.2-.2-.4-.3-.7-.3-.4 0-.7.2-.9.5l-.6-.4c.3-.5.8-.7 1.4-.7h.3zm-.9 2.6c0 .2.1.4.3.5.2.1.4.2.6.2.3 0 .6-.1.9-.4.2-.2.4-.5.4-.8-.3-.2-.6-.3-1-.3-.3 0-.6.1-.8.2-.2.2-.4.4-.4.6z" fill="#3C4043"/>
+                <path d="M28 10.3l-2.5 5.7h-.7l.9-2-1.6-3.7h.8l1.1 2.8h0l1.1-2.8h.9z" fill="#3C4043"/>
+                <path d="M14.8 11.4c0-.2 0-.5-.1-.7h-3v1.4h1.7c-.1.4-.3.7-.6.9v.8h1c.6-.5.9-1.3.9-2.4z" fill="#4285F4"/>
+                <path d="M11.7 14.5c.8 0 1.5-.3 2-.8l-1-.8c-.3.2-.6.3-1 .3-.8 0-1.4-.5-1.6-1.2H9.1v.8c.5 1 1.5 1.7 2.6 1.7z" fill="#34A853"/>
+                <path d="M10.1 12c-.1-.2-.1-.5-.1-.7s0-.5.1-.7v-.8H9.1c-.2.5-.4 1-.4 1.5s.1 1 .4 1.5l1-.8z" fill="#FBBC04"/>
+                <path d="M11.7 9.3c.4 0 .8.2 1.1.5l.8-.8c-.5-.5-1.1-.7-1.9-.7-1.1 0-2.1.7-2.6 1.7l1 .8c.2-.8.8-1.5 1.6-1.5z" fill="#EA4335"/>
+              </svg>
+              {/* Bit */}
+              <div className="flex items-center justify-center rounded px-1.5" style={{ background: "#00D4AA", height: 24, minWidth: 38 }}>
+                <span className="text-white font-black" style={{ fontSize: 10 }}>bit</span>
+              </div>
+              {/* PayPal */}
+              <svg width="38" height="24" viewBox="0 0 38 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="PayPal">
+                <rect width="38" height="24" rx="4" fill="#fff" stroke="#e5e7eb"/>
+                <path d="M24.3 7.3c.6.7.8 1.6.5 2.8-.7 2.8-2.8 3.8-5.5 3.8h-.4c-.3 0-.6.3-.7.6l-.4 2.4-.1.7c0 .2-.2.4-.4.4h-2.2c-.2 0-.3-.2-.3-.4l.1-.4 1-6.3h.2" fill="#009CDE"/>
+                <path d="M25.3 10.1c-.7 2.8-2.8 3.8-5.5 3.8h-1.4c-.3 0-.6.3-.7.6l-.7 4.2c0 .2.1.4.3.4h2.2c.3 0 .5-.2.6-.5l0-.1.4-2.8 0-.1c.1-.3.3-.5.6-.5h.4c2.4 0 4.3-.9 4.9-3.6.2-1.1.1-2-.5-2.6" fill="#012169"/>
+                <path d="M15.7 7.4c.1-.3.3-.5.6-.6.1 0 .3-.1.4-.1h4.2c.5 0 1 0 1.4.1.1 0 .3.1.4.1.1 0 .3.1.4.2.1 0 .1.1.2.1.6.3.9.8.8 1.5l0 .1c-.7 2.8-2.8 3.8-5.5 3.8h-1.4c-.3 0-.6.3-.7.6l-1.1 7c0 .2.1.3.3.3h2.4l.6-3.8.8-5z" fill="#003087"/>
+              </svg>
+              {/* UPay */}
+              <div className="flex items-center justify-center rounded px-1.5" style={{ background: "#2563EB", height: 24, minWidth: 38 }}>
+                <span className="text-white font-bold" style={{ fontSize: 8 }}>UPay</span>
+              </div>
+              {/* iCredit */}
+              <div className="flex items-center justify-center rounded px-1.5" style={{ background: "#16A34A", height: 24, minWidth: 38 }}>
+                <span className="text-white font-bold" style={{ fontSize: 7 }}>iCredit</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span className="text-[9px] font-medium" style={{ color: "#22c55e" }}>SSL Secured · PCI-DSS Compliant</span>
+            </div>
+          </div>
+        </div>
+
         {/* Bottom */}
-        <div className="border-t border-glass-border mt-6 pt-4 flex items-center justify-between">
+        <div className="border-t border-glass-border mt-4 pt-4 flex items-center justify-between">
           <Link href="/privacy" className="text-dim text-[11px] hover:text-muted">{t("footer.privacy")}</Link>
           <span className="text-dim text-[11px]">© {year} ClalMobile. {t("footer.rights")}.</span>
         </div>

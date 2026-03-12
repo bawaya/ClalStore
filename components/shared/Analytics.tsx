@@ -40,7 +40,8 @@ export function Analytics() {
 
     async function loadSettings() {
       try {
-        const res = await fetch("/api/admin/settings");
+        const res = await fetch("/api/settings/public");
+        if (!res.ok) return;
         const json = await res.json();
         const settings = json.settings || {};
 

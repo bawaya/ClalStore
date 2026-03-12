@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Tajawal, Heebo, David_Libre } from "next/font/google";
 import "@/styles/globals.css";
 import { CookieConsent } from "@/components/shared/CookieConsent";
@@ -27,12 +27,15 @@ const davidLibre = David_Libre({
   variable: "--font-david-libre",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#c41040",
+};
+
 export const metadata: Metadata = {
   title: "ClalMobile — وكيل رسمي لـ HOT Mobile",
   description: "متجر إلكتروني لبيع أجهزة وإكسسوارات وباقات HOT Mobile. توصيل لكل إسرائيل.",
   keywords: ["HOT Mobile", "ClalMobile", "أجهزة", "إكسسوارات", "باقات"],
   manifest: "/manifest.json",
-  themeColor: "#c41040",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
