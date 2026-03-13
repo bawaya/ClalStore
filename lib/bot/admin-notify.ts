@@ -8,18 +8,44 @@
 // =====================================================
 
 import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
-const REPORT_FROM = () => process.env.ADMIN_REPORT_PHONE || "";
-const ADMIN_TO = () => process.env.ADMIN_PERSONAL_PHONE || "";
-const TEAM_NUMBERS = () => (process.env.TEAM_WHATSAPP_NUMBERS || "").split(",").filter(Boolean);
+let _cachedCfg: Record<string, string> | null = null;
+let _cachedAt = 0;
+const CACHE_TTL = 60_000;
+
+async function getWhatsAppCfg(): Promise<Record<string, string>> {
+  if (_cachedCfg && Date.now() - _cachedAt < CACHE_TTL) return _cachedCfg;
+  const cfg = await getIntegrationConfig("whatsapp");
+  _cachedCfg = cfg as Record<string, string>;
+  _cachedAt = Date.now();
+  return _cachedCfg;
+}
+
+async function getReportPhone(): Promise<string> {
+  const cfg = await getWhatsAppCfg();
+  return cfg.reports_phone || process.env.ADMIN_REPORT_PHONE || "";
+}
+
+async function getAdminPhone(): Promise<string> {
+  const cfg = await getWhatsAppCfg();
+  return cfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "";
+}
+
+async function getTeamNumbers(): Promise<string[]> {
+  const cfg = await getWhatsAppCfg();
+  const raw = cfg.team_numbers || process.env.TEAM_WHATSAPP_NUMBERS || "";
+  return raw.split(",").map((n: string) => n.trim()).filter(Boolean);
+}
+
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
 /** Send message to admin — from the report phone, try template first then text */
 async function sendToAdmin(message: string): Promise<void> {
-  const from = REPORT_FROM();
-  const to = ADMIN_TO();
+  const from = await getReportPhone();
+  const to = await getAdminPhone();
   if (!to || !from) {
-    console.error("[AdminNotify] SKIP — missing env:", !to ? "ADMIN_PERSONAL_PHONE" : "ADMIN_REPORT_PHONE");
+    console.error("[AdminNotify] SKIP — missing phone config:", !to ? "admin_phone" : "reports_phone");
     return;
   }
 
@@ -52,8 +78,8 @@ export async function notifyAdminPersonal(message: string): Promise<void> {
 }
 
 export async function notifyTeam(message: string): Promise<void> {
-  const from = REPORT_FROM();
-  const numbers = TEAM_NUMBERS();
+  const from = await getReportPhone();
+  const numbers = await getTeamNumbers();
   if (numbers.length === 0) return;
   const shortMsg = message.slice(0, 1024);
   for (const num of numbers) {

@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminSettings } from "@/lib/admin/hooks";
 import { FormField, Toggle, ErrorBanner, ToastContainer } from "@/components/admin/shared";
@@ -69,6 +69,7 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
     { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
     { key: "admin_phone", label: "📱 رقم الأدمن (إشعارات الطلبات)", type: "text", placeholder: "05X-XXXXXXX" },
     { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX" },
+    { key: "team_numbers", label: "👥 أرقام الفريق (مفصولة بفاصلة)", type: "text", placeholder: "05X-XXXXXXX,05X-XXXXXXX", hint: "أرقام إضافية لتلقي إشعارات الطلبات" },
   ],
   "Meta API": [
     { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
@@ -461,6 +462,203 @@ function IntegrationCard({
   );
 }
 
+// ===== WhatsApp Templates Management =====
+interface TemplateSummary {
+  total: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  requiredReady: number;
+  requiredTotal: number;
+}
+
+interface TemplateEntry {
+  name: string;
+  language: string;
+  category: string;
+  status: string;
+}
+
+function WhatsAppTemplatesSection({ scr, show }: { scr: { mobile: boolean }; show: (msg: string) => void }) {
+  const [templates, setTemplates] = useState<TemplateEntry[]>([]);
+  const [summary, setSummary] = useState<TemplateSummary | null>(null);
+  const [missing, setMissing] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const fetchTemplates = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/whatsapp-templates");
+      if (!res.ok) {
+        const err = await res.json();
+        show(`❌ ${err.error || "خطأ في جلب القوالب"}`);
+        return;
+      }
+      const data = await res.json();
+      setTemplates(data.templates || []);
+      setSummary(data.summary || null);
+      setMissing(data.missing || []);
+      setLoaded(true);
+    } catch {
+      show("❌ خطأ في الاتصال");
+    }
+    setLoading(false);
+  }, [show]);
+
+  const handleProvisionAll = async () => {
+    setProvisioning(true);
+    try {
+      const res = await fetch("/api/admin/whatsapp-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "provision_all" }),
+      });
+      const data = await res.json();
+      if (data.results) {
+        const failed = data.results.filter((r: { status: string }) => r.status === "FAILED");
+        if (failed.length === 0) {
+          show("✅ تم إنشاء جميع القوالب بنجاح");
+        } else {
+          show(`⚠️ ${failed.length} قالب فشل — تحقق من الحالة أدناه`);
+        }
+        await fetchTemplates();
+      } else if (data.error) {
+        show(`❌ ${data.error}`);
+      }
+    } catch {
+      show("❌ خطأ في إنشاء القوالب");
+    }
+    setProvisioning(false);
+  };
+
+  const handleDelete = async (name: string) => {
+    if (!confirm(`هل تريد حذف القالب "${name}"؟`)) return;
+    try {
+      const res = await fetch(`/api/admin/whatsapp-templates?name=${name}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        show(`✅ تم حذف ${name}`);
+        await fetchTemplates();
+      } else {
+        show(`❌ ${data.error || "فشل الحذف"}`);
+      }
+    } catch {
+      show("❌ خطأ");
+    }
+  };
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, { bg: string; color: string; label: string }> = {
+      APPROVED: { bg: "rgba(34,197,94,0.12)", color: "#22c55e", label: "✅ مُعتمد" },
+      PENDING: { bg: "rgba(234,179,8,0.12)", color: "#eab308", label: "⏳ قيد المراجعة" },
+      REJECTED: { bg: "rgba(239,68,68,0.12)", color: "#ef4444", label: "❌ مرفوض" },
+      EXISTS: { bg: "rgba(59,130,246,0.12)", color: "#3b82f6", label: "📄 موجود" },
+    };
+    const s = map[status] || { bg: "rgba(63,63,70,0.12)", color: "#71717a", label: status };
+    return (
+      <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: s.bg, color: s.color }}>
+        {s.label}
+      </span>
+    );
+  };
+
+  useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
+
+  return (
+    <div className="card" style={{ padding: scr.mobile ? 14 : 20, borderRight: "3px solid #8b5cf6" }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {summary && (
+            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{
+              background: summary.requiredReady === summary.requiredTotal
+                ? "rgba(34,197,94,0.12)" : "rgba(234,179,8,0.12)",
+              color: summary.requiredReady === summary.requiredTotal
+                ? "#22c55e" : "#eab308",
+            }}>
+              {summary.requiredReady}/{summary.requiredTotal} جاهز
+            </span>
+          )}
+        </div>
+        <h3 className="font-bold text-right" style={{ fontSize: scr.mobile ? 13 : 15 }}>
+          📋 قوالب واتساب (WhatsApp Templates)
+        </h3>
+      </div>
+
+      <p className="text-muted text-right mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+        القوالب مطلوبة لإرسال إشعارات الواتساب للأدمن والزبائن. اضغط "إعداد تلقائي" لإنشاء جميع القوالب المطلوبة.
+      </p>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 mb-3">
+        <button onClick={handleProvisionAll} disabled={provisioning || (loaded && missing.length === 0)}
+          className="btn-primary" style={{
+            fontSize: scr.mobile ? 10 : 12,
+            padding: scr.mobile ? "8px 12px" : "10px 16px",
+            opacity: provisioning ? 0.6 : 1,
+          }}>
+          {provisioning ? "⏳ جاري الإنشاء..." : missing.length > 0 ? `🚀 إعداد تلقائي (${missing.length} ناقص)` : "✅ جميع القوالب موجودة"}
+        </button>
+        <button onClick={fetchTemplates} disabled={loading} className="btn-outline" style={{
+          fontSize: scr.mobile ? 10 : 12,
+          padding: scr.mobile ? "8px 12px" : "10px 16px",
+          opacity: loading ? 0.5 : 1,
+        }}>
+          {loading ? "⏳" : "🔄 تحديث"}
+        </button>
+      </div>
+
+      {/* Summary */}
+      {summary && (
+        <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))" }}>
+          {[
+            { label: "المجموع", value: summary.total, color: "#a1a1aa" },
+            { label: "مُعتمد", value: summary.approved, color: "#22c55e" },
+            { label: "قيد المراجعة", value: summary.pending, color: "#eab308" },
+            { label: "مرفوض", value: summary.rejected, color: "#ef4444" },
+          ].map((s) => (
+            <div key={s.label} className="bg-surface-elevated rounded-lg p-2 text-center" style={{ borderBottom: `2px solid ${s.color}` }}>
+              <div className="font-black" style={{ fontSize: 18, color: s.color }}>{s.value}</div>
+              <div className="text-muted" style={{ fontSize: 9 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Template list */}
+      {loaded && templates.length > 0 && (
+        <div className="bg-surface-elevated rounded-xl p-3 space-y-2">
+          <div className="font-bold text-right text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+            📑 القوالب المسجّلة ({templates.length})
+          </div>
+          {templates.map((t) => (
+            <div key={`${t.name}-${t.language}`} className="flex items-center justify-between py-1.5 border-b border-surface-border last:border-0">
+              <div className="flex items-center gap-2">
+                {statusBadge(t.status)}
+                <button onClick={() => handleDelete(t.name)} className="text-[9px] text-dim hover:text-red-400 transition-colors">
+                  🗑️
+                </button>
+              </div>
+              <div className="text-right">
+                <div className="font-mono font-bold" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t.name}</div>
+                <div className="text-muted" style={{ fontSize: 9 }}>{t.category} · {t.language}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loaded && templates.length === 0 && !loading && (
+        <div className="bg-surface-elevated rounded-xl p-4 text-center">
+          <div style={{ fontSize: 32 }}>📭</div>
+          <div className="text-muted mt-1" style={{ fontSize: 11 }}>لا توجد قوالب — اضغط "إعداد تلقائي" لإنشائها</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===== Main Settings Page =====
 export default function SettingsPage() {
   const scr = useScreen();
@@ -656,6 +854,9 @@ export default function SettingsPage() {
                   scr={scr} onUpdate={handleUpdateIntegration} show={show} />
               );
             })}
+
+            {/* WhatsApp Templates Management */}
+            <WhatsAppTemplatesSection scr={scr} show={show} />
           </div>
         </div>
       )}
