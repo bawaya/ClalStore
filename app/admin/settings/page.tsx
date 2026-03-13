@@ -664,7 +664,7 @@ export default function SettingsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
   const { settings, integrations, loading, error, clearError, updateSetting, updateIntegration } = useAdminSettings();
-  const [tab, setTab] = useState<"store" | "integrations">("store");
+  const [tab, setTab] = useState<"store" | "integrations" | "whatsapp">("store");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const logoSize = parseInt(settings.logo_size || "48", 10);
@@ -674,6 +674,7 @@ export default function SettingsPage() {
   const tabs = [
     { key: "store" as const, icon: "🏪", label: "المتجر" },
     { key: "integrations" as const, icon: "🔌", label: "التكاملات" },
+    { key: "whatsapp" as const, icon: "📋", label: "قوالب واتساب" },
   ];
 
   const settingFields = [
@@ -855,9 +856,14 @@ export default function SettingsPage() {
               );
             })}
 
-            {/* WhatsApp Templates Management */}
-            <WhatsAppTemplatesSection scr={scr} show={show} />
           </div>
+        </div>
+      )}
+
+      {/* WhatsApp Templates Tab */}
+      {tab === "whatsapp" && (
+        <div className="space-y-3">
+          <WhatsAppTemplatesSection scr={scr} show={show} />
         </div>
       )}
 
