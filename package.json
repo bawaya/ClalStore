@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cf": "npx opennextjs-cloudflare",
+    "preview:cf": "npx wrangler dev",
+    "deploy:cf": "npx opennextjs-cloudflare && npx wrangler pages deploy",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
@@ -25,7 +28,6 @@
     "clsx": "^2.1.0",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.400.0",
-    "mixpanel-browser": "^2.75.0",
     "next": "14.2.35",
     "pdfjs-dist": "^5.5.207",
     "react": "^18.3.0",
@@ -39,6 +41,7 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.0",
+    "@opennextjs/cloudflare": "^1.17.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^20.14.0",
