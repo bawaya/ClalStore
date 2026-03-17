@@ -52,8 +52,14 @@
   /* Inputs */
   input,
   select,
-  textarea {
+  textarea,
+  button,
+  option {
     font-family: inherit;
+  }
+
+  select {
+    color-scheme: dark;
   }
 
   input:focus,

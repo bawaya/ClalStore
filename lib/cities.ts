@@ -6,6 +6,7 @@
 export interface City {
   ar: string;
   he: string;
+  aliases?: string[];
 }
 
 export const ISRAEL_CITIES: City[] = [
@@ -413,27 +414,99 @@ export const ISRAEL_CITIES: City[] = [
   { ar: "المغازي", he: "אל-מגאזי" },
 ];
 
-/**
- * بحث في المدن — يدعم عربي وعبري
- * بحث ذكي: يعمل من أول حرف ويتحمل فروقات الكتابة
- */
-export function searchCities(query: string): City[] {
-  if (!query.trim()) return ISRAEL_CITIES;
-  const q = query.trim().toLowerCase();
-  const normalized = q
+const EXTRA_ISRAELI_LOCALITIES: City[] = [
+  { ar: "نس تسيونا", he: "נס ציונה", aliases: ["نيس تسيونا", "نس صهيونا"] },
+  { ar: "بئر يعقوب", he: "באר יעקב" },
+  { ar: "كريات أونو", he: "קריית אונו" },
+  { ar: "جفعات شموئيل", he: "גבעת שמואל" },
+  { ar: "مفسيرت تسيون", he: "מבשרת ציון" },
+  { ar: "تسور هداسا", he: "צור הדסה" },
+  { ar: "كفار تابور", he: "כפר תבור" },
+  { ar: "رموت منشيه", he: "רמות מנשה" },
+  { ar: "تل شاحر", he: "טל שחר" },
+  { ar: "بيت شِعاريم", he: "בית שערים" },
+  { ar: "موشاف بني عيش", he: "בני עי\"ש" },
+  { ar: "أزور", he: "אזור" },
+  { ar: "بيت يتسحاق", he: "בית יצחק-שער חפר" },
+  { ar: "هار أدار", he: "הר אדר" },
+  { ar: "كفار فراديم", he: "כפר ורדים" },
+  { ar: "مشمار هنيغف", he: "משמר הנגב" },
+  { ar: "نحال عوز", he: "נחל עוז" },
+  { ar: "عتصيون", he: "עציון" },
+  { ar: "معاليه يوسف", he: "מעלה יוסף" },
+  { ar: "كريات يعرِم", he: "קריית יערים" },
+  { ar: "بيتان أهرون", he: "ביתן אהרן" },
+  { ar: "تل يتسحاق", he: "תל יצחק" },
+  { ar: "بيت هاشموناي", he: "בית חשמונאי" },
+  { ar: "شاعر بنيامين", he: "שער בנימין" },
+  { ar: "غفعات برنر", he: "גבעת ברנר" },
+  { ar: "عينات", he: "עינת" },
+  { ar: "ألون شفوت", he: "אלון שבות" },
+  { ar: "ماتيه يهودا", he: "מטה יהודה" },
+  { ar: "بيت يهوشوع", he: "בית יהושע" },
+  { ar: "كفار هارؤيه", he: "כפר הרא\"ה" },
+  { ar: "نحشونيم", he: "נחשונים" },
+  { ar: "تل عدشيم", he: "תל עדשים" },
+  { ar: "جفعات يوشياه", he: "גבעת יואב" },
+  { ar: "كفار بنون", he: "כפר בילו" },
+  { ar: "كفار هعيمك", he: "כפר העמק" },
+  { ar: "كريات إكرون", he: "קריית עקרון" },
+];
+
+export const CITY_SEARCH_MIN_LENGTH = 2;
+
+function normalizeCityText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[\-־'"().]/g, " ")
+    .replace(/\s+/g, " ")
     .replace(/أ|إ|آ/g, "ا")
     .replace(/ة/g, "ه")
     .replace(/ى/g, "ي")
     .replace(/ؤ/g, "و")
     .replace(/ئ/g, "ي");
+}
 
-  return ISRAEL_CITIES.filter((c) => {
-    const arNorm = c.ar.toLowerCase()
-      .replace(/أ|إ|آ/g, "ا")
-      .replace(/ة/g, "ه")
-      .replace(/ى/g, "ي")
-      .replace(/ؤ/g, "و")
-      .replace(/ئ/g, "ي");
-    return arNorm.includes(normalized) || c.he.includes(q);
+function dedupeCities(cities: City[]): City[] {
+  const seen = new Set<string>();
+  return cities.filter((city) => {
+    const key = `${normalizeCityText(city.ar)}|${normalizeCityText(city.he)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
+}
+
+const ALL_CITIES = dedupeCities([...ISRAEL_CITIES, ...EXTRA_ISRAELI_LOCALITIES]);
+
+/**
+ * بحث في المدن — يدعم عربي وعبري
+ * بحث ذكي: يعمل من أول حرف ويتحمل فروقات الكتابة
+ */
+export function searchCities(query: string): City[] {
+  const raw = query.trim();
+  if (normalizeCityText(raw).length < CITY_SEARCH_MIN_LENGTH) return [];
+
+  const normalized = normalizeCityText(raw);
+
+  return ALL_CITIES
+    .map((city) => {
+      const arNorm = normalizeCityText(city.ar);
+      const heNorm = normalizeCityText(city.he);
+      const aliases = (city.aliases || []).map(normalizeCityText);
+
+      let score = 0;
+      if (arNorm.startsWith(normalized) || heNorm.startsWith(normalized)) score = 100;
+      else if (aliases.some((alias) => alias.startsWith(normalized))) score = 95;
+      else if (arNorm.includes(` ${normalized}`) || heNorm.includes(` ${normalized}`)) score = 85;
+      else if (arNorm.includes(normalized) || heNorm.includes(normalized)) score = 70;
+      else if (aliases.some((alias) => alias.includes(normalized))) score = 60;
+
+      return { city, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.city.ar.localeCompare(b.city.ar, "ar"))
+    .slice(0, 12)
+    .map((entry) => entry.city);
 }
