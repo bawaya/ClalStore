@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 // =====================================================
 // ClalMobile — Analytics Script Injection
@@ -19,7 +19,6 @@ const GA4_TO_META: Record<string, string> = {
 };
 
 export function Analytics() {
-  const [gaId, setGaId] = useState("");
   const [pixelId, setPixelId] = useState("");
 
   useEffect(() => {
@@ -30,7 +29,6 @@ export function Analytics() {
         const json = await res.json();
         const settings = json.settings || {};
 
-        if (settings.ga_measurement_id) setGaId(settings.ga_measurement_id);
         if (settings.meta_pixel_id) setPixelId(settings.meta_pixel_id);
       } catch {}
     }
@@ -39,26 +37,7 @@ export function Analytics() {
 
   return (
     <>
-      {/* Google Analytics 4 */}
-      {gaId && (
-        <>
-          <Script
-            src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-            strategy="afterInteractive"
-          />
-          <Script id="ga4-init" strategy="afterInteractive">
-            {`
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', '${gaId}', {
-                page_path: window.location.pathname,
-                send_page_view: true,
-              });
-            `}
-          </Script>
-        </>
-      )}
+      {/* GA4 is loaded server-side in layout.tsx <head> for Google tag detection */}
 
       {/* Meta (Facebook) Pixel */}
       {pixelId && (
