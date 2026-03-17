@@ -17,9 +17,11 @@ export async function GET(req: NextRequest) {
     const filters = {
       segment: searchParams.get("segment") || undefined,
       search: searchParams.get("search") || undefined,
+      limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
+      offset: searchParams.get("offset") ? Number(searchParams.get("offset")) : undefined,
     };
-    const data = await getCRMCustomers(filters);
-    return NextResponse.json({ data });
+    const result = await getCRMCustomers(filters);
+    return NextResponse.json({ data: result.data, total: result.total });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

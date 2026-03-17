@@ -16,7 +16,6 @@ export async function getIntegrationConfig(type: string): Promise<Record<string,
       .select("config, status")
       .eq("type", type)
       .single();
-    console.log(`[IntegrationConfig] type=${type} status=${data?.status} hasConfig=${!!data?.config} keys=${data?.config ? Object.keys(data.config).join(",") : "none"}`);
     if (data && data.status === "active" && data.config) {
       return data.config as Record<string, any>;
     }
@@ -30,7 +29,7 @@ export async function getIntegrationConfig(type: string): Promise<Record<string,
 export interface PaymentProvider {
   name: string;
   createCharge(params: ChargeParams): Promise<ChargeResult>;
-  verifyPayment(transactionId: string): Promise<PaymentStatus>;
+  verifyPayment(transactionId: string, orderId?: string): Promise<PaymentStatus>;
   refund(transactionId: string, amount?: number): Promise<RefundResult>;
 }
 

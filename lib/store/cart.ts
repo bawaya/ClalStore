@@ -74,9 +74,24 @@ export const useCart = create<CartStore>((set, get) => ({
   discountAmount: _initial.discountAmount,
 
   addItem: (item) => {
-    const cartId = `cart_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     set((state) => {
-      const newItems = [...state.items, { ...item, cartId, quantity: 1 }];
+      const existing = state.items.find(
+        (i) =>
+          i.productId === item.productId &&
+          i.color === item.color &&
+          i.storage === item.storage
+      );
+      let newItems: CartItem[];
+      if (existing) {
+        newItems = state.items.map((i) =>
+          i.cartId === existing.cartId
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
+        );
+      } else {
+        const cartId = `cart_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        newItems = [...state.items, { ...item, cartId, quantity: 1 }];
+      }
       saveCartToStorage(newItems, state.couponCode, state.discountAmount);
       _trackAbandonedCart(newItems);
       return { items: newItems };

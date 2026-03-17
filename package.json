@@ -8,9 +8,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:cf": "npx opennextjs-cloudflare",
-    "preview:cf": "npx wrangler dev",
-    "deploy:cf": "npx opennextjs-cloudflare && npx wrangler pages deploy",
+    "build:cf": "npx @cloudflare/next-on-pages",
+    "preview:cf": "npx wrangler pages dev .vercel/output/static",
+    "deploy:cf": "npx @cloudflare/next-on-pages && npx wrangler pages deploy .vercel/output/static",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
@@ -42,7 +42,6 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.0",
-    "@opennextjs/cloudflare": "^1.17.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/mixpanel-browser": "^2.60.0",

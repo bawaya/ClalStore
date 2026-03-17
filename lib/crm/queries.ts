@@ -70,9 +70,14 @@ export async function getCRMOrders(filters?: {
   dateTo?: string;
   amountMin?: number;
   amountMax?: number;
+  limit?: number;
+  offset?: number;
 }) {
   const s = db();
-  let query = s.from("orders").select(`*, order_items(*), order_notes(*), customers(name, phone, segment, id_number)`).order("created_at", { ascending: false });
+  const limit = filters?.limit || 100;
+  const offset = filters?.offset || 0;
+
+  let query = s.from("orders").select(`*, order_items(*), order_notes(*), customers(name, phone, segment, id_number)`, { count: "exact" }).order("created_at", { ascending: false });
   if (filters?.status) {
     if (filters.status === "no_reply_all") query = query.like("status", "no_reply%");
     else query = query.eq("status", filters.status);
@@ -82,15 +87,15 @@ export async function getCRMOrders(filters?: {
   if (filters?.dateTo) query = query.lte("created_at", filters.dateTo + "T23:59:59.999Z");
   if (filters?.amountMin != null) query = query.gte("total", filters.amountMin);
   if (filters?.amountMax != null) query = query.lte("total", filters.amountMax);
-  const { data } = await query;
-  let results = data || [];
+
   if (filters?.search) {
-    const q = filters.search.toLowerCase();
-    results = results.filter((o: any) =>
-      o.id?.toLowerCase().includes(q) || o.customers?.name?.toLowerCase().includes(q) || o.customers?.phone?.includes(q)
-    );
+    const q = filters.search.trim();
+    query = query.or(`id.ilike.%${q}%,customers.name.ilike.%${q}%,customers.phone.ilike.%${q}%`);
   }
-  return results;
+
+  query = query.range(offset, offset + limit - 1);
+  const { data, count } = await query;
+  return { data: data || [], total: count || 0 };
 }
 
 export async function updateOrderStatus(orderId: string, status: string, userName: string) {
@@ -111,17 +116,20 @@ export async function assignOrder(orderId: string, userId: string, userName: str
 }
 
 // ===== Customers =====
-export async function getCRMCustomers(filters?: { segment?: string; search?: string }) {
+export async function getCRMCustomers(filters?: { segment?: string; search?: string; limit?: number; offset?: number }) {
   const s = db();
-  let query = s.from("customers").select("*").order("total_spent", { ascending: false });
+  const limit = filters?.limit || 100;
+  const offset = filters?.offset || 0;
+
+  let query = s.from("customers").select("*", { count: "exact" }).order("total_spent", { ascending: false });
   if (filters?.segment) query = query.eq("segment", filters.segment);
-  const { data } = await query;
-  let results = data || [];
   if (filters?.search) {
-    const q = filters.search.toLowerCase();
-    results = results.filter((c: any) => c.name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.email?.toLowerCase().includes(q));
+    const q = filters.search.trim();
+    query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`);
   }
-  return results;
+  query = query.range(offset, offset + limit - 1);
+  const { data, count } = await query;
+  return { data: data || [], total: count || 0 };
 }
 
 export async function getCustomerOrders(customerId: string) {

@@ -297,8 +297,8 @@ export class UpayProvider implements PaymentProvider {
     return { success: false, error: result.error };
   }
 
-  async verifyPayment(transactionId: string): Promise<PaymentStatus> {
-    const result = await verifyUpayTransaction(transactionId, "");
+  async verifyPayment(transactionId: string, orderId?: string): Promise<PaymentStatus> {
+    const result = await verifyUpayTransaction(transactionId, orderId || "");
 
     if (result.valid) {
       return {

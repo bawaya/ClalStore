@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit";
 
 const PUBLIC_API = ["/api/webhook", "/api/health", "/api/payment/callback", "/api/contact", "/api/auth", "/api/email", "/api/store", "/api/chat", "/api/reports"];
+const WEBHOOK_PATHS = ["/api/webhook", "/api/payment/callback"];
 const WEBHOOK_ORIGINS = [
   "https://api.ycloud.com",
   "https://api.twilio.com",
@@ -99,8 +100,15 @@ export async function middleware(request: NextRequest) {
 
   if (PUBLIC_API.some((p) => pathname.startsWith(p))) {
     const origin = request.headers.get("origin") || "";
-    const allowedOrigin = WEBHOOK_ORIGINS.includes(origin) ? origin : "*";
-    response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+    const isWebhook = WEBHOOK_PATHS.some((p) => pathname.startsWith(p));
+    if (isWebhook) {
+      const allowedOrigin = WEBHOOK_ORIGINS.includes(origin) ? origin : WEBHOOK_ORIGINS[0];
+      response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+    } else {
+      const siteOrigin = process.env.NEXT_PUBLIC_APP_URL || "https://clalmobile.com";
+      const allowedOrigin = origin === siteOrigin ? origin : siteOrigin;
+      response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+    }
     return response;
   }
 

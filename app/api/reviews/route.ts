@@ -77,10 +77,20 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { product_id, customer_name, customer_phone, rating, title, body: reviewBody } = body;
+    const { product_id, customer_phone } = body;
+    let { customer_name, rating, title, body: reviewBody } = body;
 
     if (!product_id || !customer_name || !rating || rating < 1 || rating > 5) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    rating = Math.min(5, Math.max(1, Math.round(Number(rating))));
+    customer_name = String(customer_name).slice(0, 100).replace(/<[^>]*>/g, "").trim();
+    if (title) title = String(title).slice(0, 200).replace(/<[^>]*>/g, "").trim();
+    if (reviewBody) reviewBody = String(reviewBody).slice(0, 2000).replace(/<[^>]*>/g, "").trim();
+
+    if (!customer_name) {
+      return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
 
     if (customer_phone) {
@@ -91,6 +101,17 @@ export async function POST(req: NextRequest) {
         .single();
       if (existing) {
         return NextResponse.json({ error: "Already reviewed" }, { status: 409 });
+      }
+    } else {
+      const ip = req.headers.get("cf-connecting-ip")
+        || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+        || "unknown";
+      const { count } = await db.from("product_reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("product_id", product_id)
+        .eq("customer_name", customer_name);
+      if ((count || 0) >= 3) {
+        return NextResponse.json({ error: "Too many reviews" }, { status: 429 });
       }
     }
 
@@ -103,11 +124,19 @@ export async function POST(req: NextRequest) {
           .eq("phone", customer_phone)
           .single();
         if (customer) {
-          const { data: orderItems } = await adminDb.from("order_items")
-            .select("id, order_id")
-            .eq("product_id", product_id);
-          if (orderItems && orderItems.length > 0) {
-            verifiedPurchase = true;
+          const { data: customerOrders } = await adminDb.from("orders")
+            .select("id")
+            .eq("customer_id", customer.id);
+          if (customerOrders && customerOrders.length > 0) {
+            const orderIds = customerOrders.map((o: any) => o.id);
+            const { data: matchingItems } = await adminDb.from("order_items")
+              .select("id")
+              .eq("product_id", product_id)
+              .in("order_id", orderIds)
+              .limit(1);
+            if (matchingItems && matchingItems.length > 0) {
+              verifiedPurchase = true;
+            }
           }
         }
       }
@@ -116,10 +145,10 @@ export async function POST(req: NextRequest) {
     const { data, error } = await db.from("product_reviews").insert({
       product_id,
       customer_name,
-      customer_phone,
+      customer_phone: customer_phone || null,
       rating,
-      title,
-      body: reviewBody,
+      title: title || null,
+      body: reviewBody || null,
       verified_purchase: verifiedPurchase,
       status: "pending",
     }).select().single();

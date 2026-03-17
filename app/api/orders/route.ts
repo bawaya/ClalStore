@@ -105,7 +105,34 @@ export async function POST(req: NextRequest) {
       return { ...i, price: dbPrice ?? i.price };
     });
     const itemsTotal = verifiedItems.reduce((s: number, i: any) => s + i.price * (i.quantity || 1), 0);
-    const discount = discountAmount || 0;
+
+    let discount = 0;
+    if (couponCode && typeof couponCode === "string") {
+      const { data: coupon } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", couponCode.toUpperCase())
+        .eq("active", true)
+        .single();
+
+      if (coupon) {
+        const notExpired = !coupon.expires_at || new Date(coupon.expires_at) >= new Date();
+        const notExhausted = !coupon.max_uses || coupon.used_count < coupon.max_uses;
+        const meetsMinOrder = itemsTotal >= (coupon.min_order || 0);
+
+        if (notExpired && notExhausted && meetsMinOrder) {
+          discount =
+            coupon.type === "percent"
+              ? Math.round(itemsTotal * (coupon.value / 100))
+              : Math.min(coupon.value, itemsTotal);
+
+          await supabase
+            .from("coupons")
+            .update({ used_count: (coupon.used_count || 0) + 1 })
+            .eq("id", coupon.id);
+        }
+      }
+    }
     const total = Math.max(0, itemsTotal - discount);
     const onlyAccessories = !hasDevice && items.length > 0;
 

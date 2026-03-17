@@ -47,7 +47,7 @@ export function ProductReviews({ productId }: { productId: string }) {
   useEffect(() => {
     async function load() {
       try {
-        const settingsRes = await fetch("/api/admin/settings");
+        const settingsRes = await fetch("/api/settings/public");
         const settingsJson = await settingsRes.json();
         if (settingsJson.settings?.feature_reviews !== "true") {
           setEnabled(false);

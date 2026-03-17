@@ -8,7 +8,7 @@ import { createAdminSupabase } from "@/lib/supabase";
 
 const PUBLIC_KEYS = [
   "logo_url", "logo_size", "store_name", "store_phone", "store_address",
-  "ga_measurement_id", "meta_pixel_id",
+  "ga_measurement_id", "meta_pixel_id", "feature_reviews",
 ];
 
 export async function GET() {

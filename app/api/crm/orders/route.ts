@@ -17,9 +17,11 @@ export async function GET(req: NextRequest) {
       dateTo: searchParams.get("dateTo") || undefined,
       amountMin: searchParams.get("amountMin") ? Number(searchParams.get("amountMin")) : undefined,
       amountMax: searchParams.get("amountMax") ? Number(searchParams.get("amountMax")) : undefined,
+      limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
+      offset: searchParams.get("offset") ? Number(searchParams.get("offset")) : undefined,
     };
-    const data = await getCRMOrders(filters);
-    return NextResponse.json({ data });
+    const result = await getCRMOrders(filters);
+    return NextResponse.json({ data: result.data, total: result.total });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

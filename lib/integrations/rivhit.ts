@@ -215,8 +215,35 @@ export class RivhitProvider implements PaymentProvider {
     return { success: false, error: result.error };
   }
 
-  async verifyPayment(transactionId: string): Promise<PaymentStatus> {
-    return { status: "pending", transactionId, amount: 0 };
+  async verifyPayment(transactionId: string, orderId?: string): Promise<PaymentStatus> {
+    if (!transactionId) {
+      return { status: "failed", transactionId: "", amount: 0 };
+    }
+
+    try {
+      const details = await getSaleDetails(transactionId, transactionId);
+      if (!details) {
+        return { status: "pending", transactionId, amount: 0 };
+      }
+
+      const amount = details.TotalAmount || details.Amount || 0;
+
+      if (details.SaleStatus === "VERIFIED" || details.SaleStatus === "COMPLETED") {
+        return { status: "success", transactionId, amount };
+      }
+
+      if (details.SaleStatus === "REFUNDED") {
+        return { status: "refunded", transactionId, amount };
+      }
+
+      if (details.SaleStatus === "FAILED" || details.SaleStatus === "REJECTED") {
+        return { status: "failed", transactionId, amount };
+      }
+
+      return { status: "pending", transactionId, amount };
+    } catch {
+      return { status: "pending", transactionId, amount: 0 };
+    }
   }
 
   async refund(_transactionId: string, _amount?: number): Promise<RefundResult> {
