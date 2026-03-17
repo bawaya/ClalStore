@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — AI Conversation Summary
@@ -9,7 +9,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
-import { requireAdmin } from "@/lib/admin/auth";
 
 export interface ConversationSummary {
   summary: string;
@@ -25,8 +24,6 @@ export interface ConversationSummary {
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
 

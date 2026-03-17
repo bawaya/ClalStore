@@ -1,4 +1,4 @@
-export const runtime = "edge";
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Smart Search API
@@ -7,7 +7,6 @@ export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { sortProductsByBrandAndTier } from "@/lib/store/queries";
 import { callClaude } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 
@@ -66,9 +65,6 @@ export async function GET(req: NextRequest) {
 
     if (!q || q.length < 2) {
       return NextResponse.json({ success: false, error: "استعلام قصير جداً" }, { status: 400 });
-    }
-    if (q.length > 200) {
-      return NextResponse.json({ success: false, error: "استعلام طويل جداً" }, { status: 400 });
     }
 
     // Rate limit
@@ -194,15 +190,12 @@ export async function GET(req: NextRequest) {
       query = query.gte("price", filters.min_price);
     }
 
-    // Keywords — ILIKE search (sanitized)
+    // Keywords — ILIKE search
     if (filters.keywords?.length) {
-      const sanitize = (s: string) => s.replace(/[%_\\'\"]/g, "");
       const orFilters = filters.keywords
-        .map((k) => sanitize(k))
-        .filter((k) => k.length > 0)
         .map((k) => `name_ar.ilike.%${k}%,name_he.ilike.%${k}%,brand.ilike.%${k}%`)
         .join(",");
-      if (orFilters) query = query.or(orFilters);
+      query = query.or(orFilters);
     }
 
     // Sort
@@ -219,16 +212,11 @@ export async function GET(req: NextRequest) {
 
     query = query.limit(20);
 
-    const { data: rawProducts, error } = await query;
+    const { data: products, error } = await query;
 
     if (error) {
       console.error("Smart search query error:", error);
       return NextResponse.json({ success: false, error: "خطأ في البحث" }, { status: 500 });
-    }
-
-    let products = rawProducts || [];
-    if (products.length > 0 && !["price_asc", "price_desc", "newest"].includes(filters.sort || "")) {
-      products = sortProductsByBrandAndTier(products as any);
     }
 
     const total = products?.length || 0;

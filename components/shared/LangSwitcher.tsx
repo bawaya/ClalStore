@@ -22,12 +22,13 @@ export function LangSwitcher({ size = "md" }: { size?: "sm" | "md" }) {
     <button
       onClick={toggle}
       title={isAr ? "עברית" : "العربية"}
-      className="relative glass flex items-center cursor-pointer transition-all duration-300 active:scale-95 border-brand/35"
+      className="relative flex items-center cursor-pointer transition-all duration-300 active:scale-95"
       style={{
         width: isSmall ? 56 : 68,
         height: isSmall ? 28 : 34,
         borderRadius: 999,
-        borderWidth: 1.5,
+        border: "1.5px solid rgba(196,16,64,0.35)",
+        background: "linear-gradient(135deg, rgba(196,16,64,0.08), rgba(168,85,247,0.06))",
         padding: 2,
       }}
     >
@@ -37,8 +38,8 @@ export function LangSwitcher({ size = "md" }: { size?: "sm" | "md" }) {
         style={{
           width: isSmall ? 22 : 28,
           height: isSmall ? 22 : 28,
-          top: 2,
-          right: isAr ? 2 : (isSmall ? 30 : 36),
+          top: isSmall ? 2 : 2,
+          left: isAr ? (isSmall ? 30 : 36) : 2,
           background: "linear-gradient(135deg, #c41040, #a30d35)",
           boxShadow: "0 2px 8px rgba(196,16,64,0.4)",
           transform: animating ? "scale(0.8)" : "scale(1)",

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
-import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState, ErrorBanner, ToastContainer } from "@/components/admin/shared";
+import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
 import { formatDate } from "@/lib/utils";
 import type { Coupon } from "@/types/database";
 
@@ -14,7 +14,7 @@ const EMPTY: Partial<Coupon> = { code: "", type: "percent", value: 10, min_order
 export default function CouponsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { data: coupons, loading, error, clearError, create, update, remove } = useAdminApi<Coupon>({ endpoint: "/api/admin/coupons" });
+  const { data: coupons, loading, create, update, remove } = useAdminApi<Coupon>({ endpoint: "/api/admin/coupons" });
 
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Partial<Coupon>>(EMPTY);
@@ -41,7 +41,6 @@ export default function CouponsPage() {
   return (
     <div>
       <PageHeader title="🏷️ كوبونات" count={coupons.length} onAdd={openCreate} addLabel="كوبون جديد" />
-      <ErrorBanner error={error} onDismiss={clearError} />
 
       {coupons.length === 0 ? <EmptyState icon="🏷️" title="لا يوجد كوبونات" /> : (
         <div className="space-y-1.5">
@@ -95,7 +94,7 @@ export default function CouponsPage() {
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف الكوبون؟" message="لا يمكن التراجع عن هذا الإجراء" />
-      <ToastContainer toasts={toasts} />
+      {toasts.map((t) => <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>{t.message}</div>)}
     </div>
   );
 }

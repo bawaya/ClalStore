@@ -2,7 +2,6 @@
 
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
-import { ToastContainer } from "@/components/ui/Toast";
 import type { LinePlan } from "@/types/database";
 
 const FALLBACK_PLANS: LinePlan[] = [
@@ -29,11 +28,14 @@ export function LinePlans({ plans }: { plans?: LinePlan[] }) {
         {items.map((l) => (
           <div
             key={l.id}
-            className={`${l.popular ? "glass-brand-glow" : "glass-card-static"} text-center relative`}
-            style={{ padding: scr.mobile ? 14 : 20 }}
+            className="card text-center relative"
+            style={{
+              padding: scr.mobile ? 14 : 20,
+              border: l.popular ? "2px solid #c41040" : undefined,
+            }}
           >
             {l.popular && (
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand text-white shadow-glass-brand text-[8px] font-bold px-2.5 py-0.5 rounded-md">
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand text-white text-[8px] font-bold px-2.5 py-0.5 rounded-md">
                 {t("plans.popular")}
               </div>
             )}
@@ -62,7 +64,14 @@ export function LinePlans({ plans }: { plans?: LinePlan[] }) {
         ))}
       </div>
 
-      <ToastContainer toasts={toasts} />
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="fixed bottom-5 left-1/2 -translate-x-1/2 card border-state-success text-state-success font-bold z-[999] shadow-2xl px-6 py-3 text-sm"
+        >
+          {t.message}
+        </div>
+      ))}
     </div>
   );
 }

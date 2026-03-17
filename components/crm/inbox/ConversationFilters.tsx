@@ -25,7 +25,6 @@ const TABS: { key: string; label: string }[] = [
   { key: "all", label: "الكل" },
   { key: "active", label: "نشطة" },
   { key: "waiting", label: "بانتظار" },
-  { key: "pending", label: "تحتاج متابعة" },
   { key: "bot", label: "بوت" },
   { key: "resolved", label: "محلولة" },
 ];
@@ -50,11 +49,9 @@ export function ConversationFilters({
   const [labels, setLabels] = useState<InboxLabel[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
     fetchAllLabels().then((res) => {
-      if (!cancelled && res.success) setLabels(res.labels);
+      if (res.success) setLabels(res.labels);
     });
-    return () => { cancelled = true; };
   }, []);
 
   return (

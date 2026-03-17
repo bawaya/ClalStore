@@ -4,7 +4,6 @@
 // Free tier: 100 emails/day, 3000/month
 // =====================================================
 
-import { BUSINESS } from "@/lib/constants";
 import type { EmailProvider, EmailParams, EmailResult } from "./hub";
 import { getIntegrationConfig } from "./hub";
 
@@ -109,7 +108,7 @@ export function buildOrderConfirmEmail(
         </div>
         <div style="background:#f8f8f8;padding:16px;text-align:center;font-size:11px;color:#999">
           <p>ClalMobile — وكيل رسمي لـ HOT Mobile</p>
-          <p>📞 ${BUSINESS.phone} | 📧 ${BUSINESS.email}</p>
+          <p>📞 053-3337653 | 📧 info@clalmobile.com</p>
         </div>
       </div>
     `,
@@ -136,7 +135,7 @@ export function buildStatusUpdateEmail(
           <div style="background:#f0f0f0;border-radius:8px;padding:16px;margin:16px 0;text-align:center;font-size:18px">
             ${statusLabel}
           </div>
-          <p style="color:#999;font-size:12px">للاستفسار تواصل معنا عبر واتساب أو اتصل بـ ${BUSINESS.phone}</p>
+          <p style="color:#999;font-size:12px">للاستفسار تواصل معنا عبر واتساب أو اتصل بـ 053-3337653</p>
         </div>
       </div>
     `,
@@ -161,7 +160,7 @@ export function buildWelcomeEmail(customerName: string): EmailParams {
           </div>
         </div>
         <div style="background:#f8f8f8;padding:16px;text-align:center;font-size:11px;color:#999">
-          <p>📞 ${BUSINESS.phone} | 📧 ${BUSINESS.email}</p>
+          <p>📞 053-3337653 | 📧 info@clalmobile.com</p>
         </div>
       </div>
     `,
@@ -175,7 +174,7 @@ export function buildContactFormEmail(
   message: string
 ): EmailParams {
   return {
-    to: BUSINESS.email,
+    to: "info@clalmobile.com",
     subject: `📩 رسالة جديدة من ${name} — نموذج التواصل`,
     replyTo: email,
     html: `

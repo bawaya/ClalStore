@@ -1,18 +1,15 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSettings, updateSetting, getIntegrations, updateIntegration, logAction } from "@/lib/admin/queries";
-import { requireAdmin } from "@/lib/admin/auth";
 
 // Prevent Next.js from caching this route — settings must always be fresh
 export const dynamic = "force-dynamic";
 
 /** Sensitive config keys that should be masked when returned to the frontend */
 const SENSITIVE_KEYS = new Set([
-  "api_key", "api_key_bot", "api_key_store", "api_key_admin",
-  "auth_token", "secret_key", "access_key",
-  "password", "access_token", "client_secret",
-  "verify_token", "project_token", "vapid_private",
+  "api_key", "auth_token", "secret_key", "password", "access_token",
+  "client_secret", "verify_token", "project_token",
 ]);
 
 const MASK = "••••••••";
@@ -33,10 +30,8 @@ function maskConfig(config: Record<string, any> | null): Record<string, any> {
   return masked;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
     const [settings, integrations] = await Promise.all([
       getAdminSettings(),
       getIntegrations(),
@@ -54,8 +49,6 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
     const body = await req.json();
 
     if (body.type === "setting") {

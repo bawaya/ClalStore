@@ -1,10 +1,18 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
+// =====================================================
+// ClalMobile — Deals / Special Offers Page (/deals)
+// Live countdown timers + branded cards
+// =====================================================
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
-import { Navbar, Footer } from "@/components/website/sections";
+import { StoreHeader } from "@/components/store/StoreHeader";
+import { Footer } from "@/components/website/sections";
 
 interface Deal {
   id: string;
@@ -28,7 +36,7 @@ interface Deal {
   active: boolean;
 }
 
-function Countdown({ endsAt, t }: { endsAt: string; t: (k: string) => string }) {
+function Countdown({ endsAt }: { endsAt: string }) {
   const [timeLeft, setTimeLeft] = useState("");
 
   useEffect(() => {
@@ -38,7 +46,7 @@ function Countdown({ endsAt, t }: { endsAt: string; t: (k: string) => string }) 
       const diff = end - now;
 
       if (diff <= 0) {
-        setTimeLeft(t("store2.dealExpired"));
+        setTimeLeft("انتهى العرض");
         return;
       }
 
@@ -57,16 +65,16 @@ function Countdown({ endsAt, t }: { endsAt: string; t: (k: string) => string }) 
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [endsAt, t]);
+  }, [endsAt]);
 
   return (
-    <div className="glass-elevated rounded-lg px-3 py-1.5 font-mono font-bold text-center" style={{ color: "#ef4444" }}>
+    <div className="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1.5 font-mono font-bold text-center" style={{ color: "#ef4444" }}>
       ⏰ {timeLeft}
     </div>
   );
 }
 
-function DealCard({ deal, lang, mobile, t }: { deal: Deal; lang: string; mobile: boolean; t: (k: string) => string }) {
+function DealCard({ deal, lang, mobile }: { deal: Deal; lang: string; mobile: boolean }) {
   const title = lang === "he" ? (deal.title_he || deal.title_ar) : deal.title_ar;
   const desc = lang === "he" ? (deal.description_he || deal.description_ar) : deal.description_ar;
   const badge = lang === "he" ? (deal.badge_text_he || deal.badge_text_ar) : deal.badge_text_ar;
@@ -76,7 +84,7 @@ function DealCard({ deal, lang, mobile, t }: { deal: Deal; lang: string; mobile:
     : 0;
 
   return (
-    <div className="glass-card overflow-hidden group hover:scale-[1.01] transition-transform" style={{ borderColor: "rgba(196,16,64,0.3)" }}>
+    <div className="card overflow-hidden group hover:scale-[1.01] transition-transform" style={{ borderColor: "rgba(196,16,64,0.3)" }}>
       {/* Badge */}
       {badge && (
         <div className="absolute top-2 right-2 z-10 bg-brand text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg">
@@ -92,6 +100,7 @@ function DealCard({ deal, lang, mobile, t }: { deal: Deal; lang: string; mobile:
           <span style={{ fontSize: 48 }}>🔥</span>
         )}
 
+        {/* Discount Badge */}
         {deal.discount_percent > 0 && (
           <div className="absolute top-2 left-2 bg-state-error text-white font-black rounded-full w-12 h-12 flex items-center justify-center text-sm shadow-lg">
             -{deal.discount_percent}%
@@ -104,6 +113,7 @@ function DealCard({ deal, lang, mobile, t }: { deal: Deal; lang: string; mobile:
         <h3 className="font-extrabold text-right" style={{ fontSize: mobile ? 13 : 16 }}>{title}</h3>
         {desc && <p className="text-muted text-right text-xs line-clamp-2">{desc}</p>}
 
+        {/* Pricing */}
         {deal.deal_price !== undefined && deal.deal_price !== null && (
           <div className="flex items-center gap-2 justify-end">
             {deal.original_price && (
@@ -115,15 +125,17 @@ function DealCard({ deal, lang, mobile, t }: { deal: Deal; lang: string; mobile:
           </div>
         )}
 
-        {deal.ends_at && <Countdown endsAt={deal.ends_at} t={t} />}
+        {/* Countdown */}
+        {deal.ends_at && <Countdown endsAt={deal.ends_at} />}
 
+        {/* Progress bar for limited deals */}
         {deal.max_quantity > 0 && (
           <div>
             <div className="flex justify-between text-[9px] text-muted mb-1">
-              <span>{t("store2.remaining")} {deal.max_quantity - deal.sold_count}</span>
-              <span>{t("store2.sold")} {deal.sold_count} {t("store2.of")} {deal.max_quantity}</span>
+              <span>بقي {deal.max_quantity - deal.sold_count}</span>
+              <span>بيع {deal.sold_count} من {deal.max_quantity}</span>
             </div>
-            <div className="h-1.5 bg-glass-border rounded-full overflow-hidden">
+            <div className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
                 style={{ width: `${progress}%`, background: progress > 80 ? "#ef4444" : "#c41040" }}
@@ -132,19 +144,20 @@ function DealCard({ deal, lang, mobile, t }: { deal: Deal; lang: string; mobile:
           </div>
         )}
 
+        {/* CTA */}
         {deal.product_id ? (
           <Link
             href={`/store/product/${deal.product_id}`}
             className="btn-primary w-full text-center text-xs py-2.5 rounded-xl font-bold block"
           >
-            🛒 {t("store2.orderNow")}
+            🛒 اطلب الآن
           </Link>
         ) : (
           <Link
             href="/store"
             className="btn-primary w-full text-center text-xs py-2.5 rounded-xl font-bold block"
           >
-            🛒 {t("store2.shopNow")}
+            🛒 تسوق الآن
           </Link>
         )}
       </div>
@@ -172,28 +185,29 @@ export default function DealsPage() {
 
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
-      <Navbar />
+      <StoreHeader />
 
-      <div className="max-w-[900px] mx-auto" style={{ paddingTop: scr.mobile ? 80 : 100, paddingInline: scr.mobile ? 14 : 28, paddingBottom: scr.mobile ? 30 : 40 }}>
+      <div className="max-w-[900px] mx-auto" style={{ padding: scr.mobile ? "12px 14px 30px" : "20px 28px 40px" }}>
+        {/* Page Header */}
         <div className="text-center mb-6">
           <h1 className="font-black" style={{ fontSize: scr.mobile ? 22 : 32 }}>
-            🔥 {t("store2.dealsTitle")}
+            🔥 العروض الخاصة
           </h1>
           <p className="text-muted mt-1" style={{ fontSize: scr.mobile ? 11 : 14 }}>
-            {t("store2.dealsSubtitle")}
+            عروض حصرية لفترة محدودة — لا تفوّت الفرصة!
           </p>
         </div>
 
         {loading && (
-          <div className="text-center py-20 text-muted">{t("common.loading")}</div>
+          <div className="text-center py-20 text-muted">⏳ جاري التحميل...</div>
         )}
 
         {!loading && deals.length === 0 && (
           <div className="text-center py-20">
             <div style={{ fontSize: 48 }}>🏷️</div>
-            <p className="text-muted mt-2">{t("store2.noDeals")}</p>
+            <p className="text-muted mt-2">لا توجد عروض حالياً</p>
             <Link href="/store" className="btn-primary inline-block mt-3 text-sm px-6 py-2 rounded-xl">
-              {t("store2.shopProducts")}
+              تسوق المنتجات
             </Link>
           </div>
         )}
@@ -201,7 +215,7 @@ export default function DealsPage() {
         {!loading && deals.length > 0 && (
           <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
             {deals.map((deal) => (
-              <DealCard key={deal.id} deal={deal} lang={lang} mobile={scr.mobile} t={t} />
+              <DealCard key={deal.id} deal={deal} lang={lang} mobile={scr.mobile} />
             ))}
           </div>
         )}

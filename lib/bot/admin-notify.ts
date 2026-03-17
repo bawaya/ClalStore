@@ -1,96 +1,63 @@
 // =====================================================
 // ClalMobile — Admin Notification Service
 // Send WhatsApp alerts to admin for key events
-//
-// WHATSAPP_PHONE_ID    = +972533337653 (البوت — رسائل الزبائن)
-// ADMIN_REPORT_PHONE   = +972537777963 (رقم التقارير — يرسل للأدمن)
-// ADMIN_PERSONAL_PHONE = +972502404412 (رقم الأدمن — يستقبل التنبيهات)
 // =====================================================
 
 import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
-import { getIntegrationConfig } from "@/lib/integrations/hub";
 
-let _cachedCfg: Record<string, string> | null = null;
-let _cachedAt = 0;
-const CACHE_TTL = 60_000;
-
-async function getWhatsAppCfg(): Promise<Record<string, string>> {
-  if (_cachedCfg && Date.now() - _cachedAt < CACHE_TTL) return _cachedCfg;
-  const cfg = await getIntegrationConfig("whatsapp");
-  _cachedCfg = cfg as Record<string, string>;
-  _cachedAt = Date.now();
-  return _cachedCfg;
-}
-
-async function getReportPhone(): Promise<string> {
-  const cfg = await getWhatsAppCfg();
-  return cfg.reports_phone || process.env.ADMIN_REPORT_PHONE || "";
-}
-
-async function getAdminPhone(): Promise<string> {
-  const cfg = await getWhatsAppCfg();
-  return cfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "";
-}
-
-async function getTeamNumbers(): Promise<string[]> {
-  const cfg = await getWhatsAppCfg();
-  const raw = cfg.team_numbers || process.env.TEAM_WHATSAPP_NUMBERS || "";
-  return raw.split(",").map((n: string) => n.trim()).filter(Boolean);
-}
-
+// ADMIN_REPORT_PHONE = رقم مُرسِل التقارير (FROM) — +972537777963
+// ADMIN_PERSONAL_PHONE = رقم الأدمن الشخصي (TO) — يستقبل التقارير والإشعارات
+const REPORT_FROM = () => process.env.ADMIN_REPORT_PHONE || "+972537777963";
+const ADMIN_TO = () => process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
+const TEAM_NUMBERS = () => (process.env.TEAM_WHATSAPP_NUMBERS || "").split(",").filter(Boolean);
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
-/** Send message to admin — from the report phone, try template first then text */
-async function sendToAdmin(message: string): Promise<void> {
-  const from = await getReportPhone();
-  const to = await getAdminPhone();
-  if (!to || !from) {
-    console.error("[AdminNotify] SKIP — missing phone config:", !to ? "admin_phone" : "reports_phone");
-    return;
-  }
-
-  const shortMsg = message.slice(0, 1024);
-
-  // Strategy: try template FIRST (no 24h window needed), then text
+/** Send message to admin — try text first, fall back to template if 24h window expired */
+async function sendToAdmin(message: string, fromOverride?: string): Promise<void> {
+  const from = fromOverride || REPORT_FROM();
+  const to = ADMIN_TO();
   try {
-    await sendWhatsAppTemplate(to, "clal_admin_alert", [shortMsg]);
-    console.log("[AdminNotify] Template sent OK from", from, "to", to);
-    return;
-  } catch (templateErr: any) {
-    console.warn("[AdminNotify] Template failed:", templateErr?.message || templateErr);
-  }
-
-  // Fallback: free-form text from report phone (only works within 24h window)
-  try {
-    await sendWhatsAppText(to, message, from);
-    console.log("[AdminNotify] Text sent OK from", from, "to", to);
-  } catch (textErr: any) {
-    console.error("[AdminNotify] Both template and text failed —", textErr?.message || textErr);
+    const res = await sendWhatsAppText(to, message, from);
+    // yCloud returns error for 24h window violations
+    if (res?.error?.code || res?.errorCode) {
+      console.warn("[AdminNotify] Text failed (possibly 24h window), trying template...");
+      // Send via utility template — "clal_admin_alert" with body param
+      const shortMsg = message.slice(0, 1024); // Template body param limit
+      await sendWhatsAppTemplate(to, "clal_admin_alert", [shortMsg]);
+    }
+  } catch (err: any) {
+    console.error("[AdminNotify] Text send error, trying template fallback:", err.message);
+    try {
+      const shortMsg = message.slice(0, 1024);
+      await sendWhatsAppTemplate(to, "clal_admin_alert", [shortMsg]);
+    } catch (templateErr) {
+      console.error("[AdminNotify] Template fallback also failed:", templateErr);
+    }
   }
 }
 
+// ===== Send report/notification TO admin FROM report number =====
 export async function notifyAdmin(message: string): Promise<void> {
-  await sendToAdmin(message);
+  await sendToAdmin(message, REPORT_FROM());
 }
 
+// ===== Send to admin personal number FROM report number =====
 export async function notifyAdminPersonal(message: string): Promise<void> {
-  await sendToAdmin(message);
+  await sendToAdmin(message, REPORT_FROM());
 }
 
+// ===== Send to all team members FROM report number =====
 export async function notifyTeam(message: string): Promise<void> {
-  const from = await getReportPhone();
-  const numbers = await getTeamNumbers();
-  if (numbers.length === 0) return;
-  const shortMsg = message.slice(0, 1024);
+  const numbers = TEAM_NUMBERS();
   for (const num of numbers) {
     try {
-      await sendWhatsAppTemplate(num.trim(), "clal_admin_alert", [shortMsg]);
-    } catch {
+      await sendWhatsAppText(num.trim(), message, REPORT_FROM());
+    } catch (err) {
+      console.error(`Team notify error (${num}):`, err);
+      // Team members — try template as fallback
       try {
-        await sendWhatsAppText(num.trim(), message, from);
-      } catch (err) {
-        console.error(`[AdminNotify] Team notify failed (${num}):`, err);
-      }
+        await sendWhatsAppTemplate(num.trim(), "clal_admin_alert", [message.slice(0, 1024)]);
+      } catch { /* silent */ }
     }
   }
 }

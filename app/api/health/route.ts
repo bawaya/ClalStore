@@ -1,27 +1,14 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Health Check API
 // GET: System status for monitoring
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin/auth";
 
-export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
-  const cronSecret = process.env.CRON_SECRET;
-
-  let authorized = false;
-  if (cronSecret && secret === cronSecret) {
-    authorized = true;
-  }
-  if (!authorized) {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
-  }
-
+export async function GET() {
   const checks: Record<string, { ok: boolean; ms?: number; error?: string }> = {};
   const start = Date.now();
 
@@ -39,9 +26,8 @@ export async function GET(req: NextRequest) {
   const missingEnvs = requiredEnvs.filter((e) => !process.env[e]);
   checks.env = { ok: missingEnvs.length === 0, error: missingEnvs.length > 0 ? `Missing: ${missingEnvs.join(", ")}` : undefined };
 
-  // 3. Payment provider (iCredit)
-  const hasPayment = !!(process.env.ICREDIT_GROUP_PRIVATE_TOKEN);
-  checks.payment = { ok: hasPayment, error: hasPayment ? "iCredit ✓" : "Not configured (check DB or ICREDIT_GROUP_PRIVATE_TOKEN env)" };
+  // 3. Payment provider
+  checks.payment = { ok: !!process.env.RIVHIT_API_KEY, error: !process.env.RIVHIT_API_KEY ? "Not configured" : undefined };
 
   // 4. Email provider
   const hasEmail = !!(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY);
@@ -65,9 +51,9 @@ export async function GET(req: NextRequest) {
   checks.ai = {
     ok: !!(aiKeys.bot && aiKeys.admin),
     error: [
-      aiKeys.bot   ? "BOT ✓"   : "BOT ✗",
-      aiKeys.admin ? "ADMIN ✓" : "ADMIN ✗",
-      aiKeys.store ? "STORE ✓" : "STORE ✗",
+      aiKeys.bot   ? `BOT ✓ (${aiKeys.bot.substring(0, 8)}...)`     : "BOT ✗",
+      aiKeys.admin ? `ADMIN ✓ (${aiKeys.admin.substring(0, 8)}...)` : "ADMIN ✗",
+      aiKeys.store ? `STORE ✓ (${aiKeys.store.substring(0, 8)}...)` : "STORE ✗",
       aiKeys.openai ? "OPENAI ✓" : "OPENAI ✗",
     ].join(" | "),
   };

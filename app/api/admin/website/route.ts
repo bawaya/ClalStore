@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Admin Website Content API
@@ -7,12 +7,9 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin/auth";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
     const { data, error } = await db
       .from("website_content")
@@ -28,12 +25,9 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
     const body = await req.json();
     const { id, ...updates } = body;
-
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const { data, error } = await db

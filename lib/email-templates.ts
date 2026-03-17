@@ -3,8 +3,6 @@
 // Reusable HTML email templates for customer notifications
 // =====================================================
 
-import { BUSINESS } from "@/lib/constants";
-
 const BRAND_COLOR = "#c41040";
 const BG_COLOR = "#f9fafb";
 const CARD_BG = "#ffffff";
@@ -51,7 +49,7 @@ ${content}
 <tr>
 <td style="background:#f3f4f6;padding:20px 24px;text-align:center;border-top:1px solid #e5e7eb">
 <p style="margin:0 0 4px;font-size:12px;color:#6b7280">ClalMobile — وكيل رسمي لـ HOT Mobile</p>
-<p style="margin:0 0 4px;font-size:12px;color:#6b7280">📞 ${BUSINESS.phone} &nbsp; | &nbsp; 💬 <a href="https://wa.me/${BUSINESS.phoneRaw}" style="color:${BRAND_COLOR}">واتساب</a> &nbsp; | &nbsp; 📧 ${BUSINESS.email}</p>
+<p style="margin:0 0 4px;font-size:12px;color:#6b7280">📞 053-3337653 &nbsp; | &nbsp; 💬 <a href="https://wa.me/972533337653" style="color:${BRAND_COLOR}">واتساب</a> &nbsp; | &nbsp; 📧 info@clalmobile.com</p>
 <p style="margin:8px 0 0;font-size:10px;color:#9ca3af">
 <a href="https://clalmobile.com/privacy" style="color:#9ca3af">سياسة الخصوصية</a> &nbsp;|&nbsp;
 <a href="https://clalmobile.com/legal" style="color:#9ca3af">الشروط والأحكام</a>
@@ -185,7 +183,7 @@ export function orderStatusEmail(
   <!-- Contact -->
   <div style="margin-top:20px;padding:14px 18px;background:#f9fafb;border-radius:10px">
     <p style="margin:0;font-size:12px;color:#6b7280">للاستفسار تواصل معنا:</p>
-    <p style="margin:4px 0 0;font-size:13px;color:#374151">📞 ${BUSINESS.phone} &nbsp; | &nbsp; 💬 <a href="https://wa.me/${BUSINESS.phoneRaw}" style="color:${BRAND_COLOR}">واتساب</a></p>
+    <p style="margin:4px 0 0;font-size:13px;color:#374151">📞 053-3337653 &nbsp; | &nbsp; 💬 <a href="https://wa.me/972533337653" style="color:${BRAND_COLOR}">واتساب</a></p>
   </div>
 </div>`;
 

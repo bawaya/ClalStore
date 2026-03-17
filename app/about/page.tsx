@@ -13,7 +13,7 @@ export default function AboutPage() {
       <div className="max-w-3xl mx-auto" style={{ paddingTop: scr.mobile ? 80 : 100, padding: scr.mobile ? "80px 16px 40px" : "100px 24px 64px" }}>
         <h1 className="font-black text-center mb-6" style={{ fontSize: scr.mobile ? 24 : 36 }}>{t("about.title")}</h1>
 
-        <div className="glass-card-static" style={{ padding: scr.mobile ? 20 : 32 }}>
+        <div className="card" style={{ padding: scr.mobile ? 20 : 32 }}>
           <div className="space-y-4 text-muted leading-relaxed" style={{ fontSize: scr.mobile ? 13 : 15 }}>
             <p>
               <strong className="text-white">ClalMobile</strong> {t("about.p1").replace("ClalMobile ", "")}
@@ -32,7 +32,7 @@ export default function AboutPage() {
                 { icon: "⚡", titleKey: "speed", descKey: "speedDesc" },
                 { icon: "💰", titleKey: "value", descKey: "valueDesc" },
               ].map((v) => (
-                <div key={v.titleKey} className="glass-elevated rounded-card p-3">
+                <div key={v.titleKey} className="bg-surface-elevated rounded-xl p-3">
                   <span className="text-lg">{v.icon}</span>
                   <div className="font-bold text-white text-sm mt-1">{t(`about.${v.titleKey}`)}</div>
                   <div className="text-muted text-xs">{t(`about.${v.descKey}`)}</div>

@@ -1,4 +1,10 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
+
+// =====================================================
+// ClalMobile — Customer Profile API
+// GET  /api/customer/profile — fetch profile
+// PUT  /api/customer/profile — update profile
+// =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";

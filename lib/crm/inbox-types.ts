@@ -126,9 +126,6 @@ export interface InboxStats {
   resolved_today: number;
   messages_today: number;
   unread_total: number;
-  resolution_rate?: number;
-  avg_response_time?: number | null;
-  pending_followup?: number;
 }
 
 export interface ConversationDetail {

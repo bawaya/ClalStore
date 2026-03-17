@@ -1,13 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: { ignoreDuringBuilds: true },
-
+  // Image optimization (unoptimized for Cloudflare Pages)
   images: {
     unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },
       { protocol: "https", hostname: "*.cloudinary.com" },
-      { protocol: "https", hostname: "cdn.simpleicons.org" },
     ],
   },
 

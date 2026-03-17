@@ -26,12 +26,10 @@ export function AssignAgent({ conversationId, currentAssignee, onAssigned }: Pro
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
     (async () => {
       try {
         const res = await fetch("/api/crm/users");
         const data = await res.json();
-        if (cancelled) return;
         const list = (data.data || []).map((u: any) => ({
           id: u.id,
           full_name: u.full_name || u.email || "موظف",
@@ -39,10 +37,9 @@ export function AssignAgent({ conversationId, currentAssignee, onAssigned }: Pro
         }));
         setUsers(list);
       } catch {
-        if (!cancelled) setUsers([]);
+        setUsers([]);
       }
     })();
-    return () => { cancelled = true; };
   }, [open]);
 
   const handleAssign = async (userId: string) => {

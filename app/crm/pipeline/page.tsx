@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PIPELINE_STAGE } from "@/lib/constants";
 import { formatCurrency, timeAgo } from "@/lib/utils";
-import { Modal, FormField, PageHeader, EmptyState, ConfirmDialog, ToastContainer } from "@/components/admin/shared";
+import { Modal, FormField, PageHeader, EmptyState, ConfirmDialog } from "@/components/admin/shared";
 
 const EMPTY_DEAL = { customer_name: "", product_summary: "", value: 0, stage: "lead", source: "store", notes: "" };
 
@@ -23,19 +23,10 @@ export default function PipelinePage() {
 
   const fetchDeals = useCallback(async () => {
     setLoading(true);
-    try {
-      const res = await fetch("/api/crm/pipeline");
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "خطأ في جلب الصفقات");
-      }
-      const json = await res.json();
-      setDeals(json.data || []);
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
-    } finally {
-      setLoading(false);
-    }
+    const res = await fetch("/api/crm/pipeline");
+    const json = await res.json();
+    setDeals(json.data || []);
+    setLoading(false);
   }, []);
 
   useEffect(() => { fetchDeals(); }, [fetchDeals]);
@@ -48,18 +39,10 @@ export default function PipelinePage() {
     try {
       if (editId) {
         const { id, customers, created_at, updated_at, ...updates } = form;
-        const res = await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "خطأ في تعديل الصفقة");
-        }
+        await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
         show("✅ تم التعديل");
       } else {
-        const res = await fetch("/api/crm/pipeline", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "خطأ في إضافة الصفقة");
-        }
+        await fetch("/api/crm/pipeline", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
         show("✅ تم الإضافة");
       }
       setModal(false); fetchDeals();
@@ -67,31 +50,15 @@ export default function PipelinePage() {
   };
 
   const moveStage = async (dealId: string, stage: string) => {
-    try {
-      const res = await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: dealId, stage }) });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "خطأ في نقل الصفقة");
-      }
-      show(`✅ → ${PIPELINE_STAGE[stage as keyof typeof PIPELINE_STAGE]?.label}`);
-      fetchDeals();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
-    }
+    await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: dealId, stage }) });
+    show(`✅ → ${PIPELINE_STAGE[stage as keyof typeof PIPELINE_STAGE]?.label}`);
+    fetchDeals();
   };
 
   const handleDelete = async () => {
     if (!confirm) return;
-    try {
-      const res = await fetch(`/api/crm/pipeline?id=${confirm}`, { method: "DELETE" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "خطأ في حذف الصفقة");
-      }
-      show("🗑️ تم الحذف"); setConfirm(null); fetchDeals();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
-    }
+    await fetch(`/api/crm/pipeline?id=${confirm}`, { method: "DELETE" });
+    show("🗑️ تم الحذف"); setConfirm(null); fetchDeals();
   };
 
   const stages = Object.entries(PIPELINE_STAGE);
@@ -209,7 +176,7 @@ export default function PipelinePage() {
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف الصفقة؟" message="لا يمكن التراجع" />
-      <ToastContainer toasts={toasts} />
+      {toasts.map((t) => <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>{t.message}</div>)}
     </div>
   );
 }

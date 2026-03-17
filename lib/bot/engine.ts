@@ -170,7 +170,7 @@ export async function processMessage(
   visitorId: string,
   message: string,
   channel: "webchat" | "whatsapp",
-  opts?: { customerPhone?: string; customerName?: string; source?: string; mediaType?: string }
+  opts?: { customerPhone?: string; customerName?: string; source?: string }
 ): Promise<BotResponse> {
   // 1. Sanitize
   const text = sanitizeInput(message);

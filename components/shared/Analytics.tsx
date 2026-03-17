@@ -9,35 +9,52 @@
 import { useEffect, useState } from "react";
 import Script from "next/script";
 
-// Map GA4 event names to Meta Pixel standard events
-const GA4_TO_META: Record<string, string> = {
-  view_item: "ViewContent",
-  add_to_cart: "AddToCart",
-  begin_checkout: "InitiateCheckout",
-  purchase: "Purchase",
-  search: "Search",
-};
-
 export function Analytics() {
+  const [gaId, setGaId] = useState("");
   const [pixelId, setPixelId] = useState("");
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
     async function loadSettings() {
       try {
-        const res = await fetch("/api/settings/public");
-        if (!res.ok) return;
+        const res = await fetch("/api/admin/settings");
         const json = await res.json();
         const settings = json.settings || {};
 
+        if (settings.feature_analytics !== "true") return;
+
+        setEnabled(true);
+        if (settings.ga_measurement_id) setGaId(settings.ga_measurement_id);
         if (settings.meta_pixel_id) setPixelId(settings.meta_pixel_id);
       } catch {}
     }
     loadSettings();
   }, []);
 
+  if (!enabled) return null;
+
   return (
     <>
-      {/* GA4 is loaded server-side in layout.tsx <head> for Google tag detection */}
+      {/* Google Analytics 4 */}
+      {gaId && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+            strategy="afterInteractive"
+          />
+          <Script id="ga4-init" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${gaId}', {
+                page_path: window.location.pathname,
+                send_page_view: true,
+              });
+            `}
+          </Script>
+        </>
+      )}
 
       {/* Meta (Facebook) Pixel */}
       {pixelId && (
@@ -61,6 +78,14 @@ export function Analytics() {
 }
 
 // ===== Analytics Event Helpers =====
+// Map GA4 event names to Meta Pixel standard events
+const GA4_TO_META: Record<string, string> = {
+  view_item: "ViewContent",
+  add_to_cart: "AddToCart",
+  begin_checkout: "InitiateCheckout",
+  purchase: "Purchase",
+  search: "Search",
+};
 
 export function trackEvent(eventName: string, params?: Record<string, any>) {
   // GA4
@@ -96,100 +121,5 @@ export function trackViewProduct(productName: string, price: number) {
   trackEvent("view_item", { items: [{ item_name: productName, price }], currency: "ILS", value: price });
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "ViewContent", { content_name: productName, value: price, currency: "ILS" });
-  }
-}
-
-export function trackBeginCheckout(value: number, items: { item_name: string; price: number; quantity: number }[]) {
-  trackEvent("begin_checkout", { value, currency: "ILS", items });
-  if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("track", "InitiateCheckout", { value, currency: "ILS" });
-  }
-}
-
-export function trackPurchaseWithItems(orderId: string, value: number, items: { item_name: string; price: number; quantity: number }[]) {
-  trackPurchase(value, "ILS", orderId);
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "purchase", {
-      transaction_id: orderId,
-      value,
-      currency: "ILS",
-      items: items.map((i) => ({ item_name: i.item_name, price: i.price, quantity: i.quantity })),
-    });
-  }
-}
-
-export function trackSearch(searchTerm: string, resultsCount: number) {
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "search", { search_term: searchTerm, results_count: resultsCount });
-  }
-  if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("track", "Search", { search_string: searchTerm, content_category: "store" });
-  }
-}
-
-export function trackSelectItem(productName: string, price: number, listName?: string) {
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "select_item", {
-      item_list_name: listName,
-      items: [{ item_name: productName, price, currency: "ILS" }],
-    });
-  }
-  if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("track", "ViewContent", { content_name: productName, value: price, currency: "ILS" });
-  }
-}
-
-export function trackViewItemList(listName: string, items: { item_name: string; price: number }[]) {
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "view_item_list", {
-      item_list_name: listName,
-      items: items.map((i) => ({ item_name: i.item_name, price: i.price, currency: "ILS" })),
-    });
-  }
-  if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("track", "ViewContent", { content_category: listName, content_type: "product_group" });
-  }
-}
-
-export function trackRemoveFromCart(productName: string, price: number) {
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "remove_from_cart", {
-      items: [{ item_name: productName, price, currency: "ILS" }],
-      value: price,
-      currency: "ILS",
-    });
-  }
-}
-
-export function trackLogin(method: string) {
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "login", { method });
-  }
-  if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("trackCustom", "Login", { method });
-  }
-}
-
-export function trackSignUp(method: string) {
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "sign_up", { method });
-  }
-  if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("track", "CompleteRegistration", { method });
-  }
-}
-
-export function trackShare(method: string, contentType: string, itemId: string) {
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "share", { method, content_type: contentType, item_id: itemId });
-  }
-  if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("trackCustom", "Share", { method, content_type: contentType, item_id: itemId });
-  }
-}
-
-export function trackException(description: string, fatal: boolean = false) {
-  if (typeof window !== "undefined" && (window as any).gtag) {
-    (window as any).gtag("event", "exception", { description, fatal });
   }
 }

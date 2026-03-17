@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
 
+// =====================================================
+// ClalMobile — PWA Install Prompt + SW Registration
+// Shows install banner on mobile/desktop if not installed
+// =====================================================
+
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -16,6 +21,7 @@ export function PWAInstallPrompt() {
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
   useEffect(() => {
+    // Register service worker
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
@@ -27,21 +33,25 @@ export function PWAInstallPrompt() {
         });
     }
 
+    // Check if already installed
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
 
     if (isStandalone) return;
 
+    // Check if dismissed recently
     const dismissed = localStorage.getItem("pwa_dismissed");
     if (dismissed) {
       const ts = parseInt(dismissed, 10);
-      if (Date.now() - ts < 3 * 24 * 60 * 60 * 1000) return;
+      if (Date.now() - ts < 3 * 24 * 60 * 60 * 1000) return; // 3 days
     }
 
+    // Detect iOS
     const iosCheck = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(iosCheck);
 
+    // Listen for beforeinstallprompt (Chrome/Edge/Samsung)
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
@@ -50,6 +60,7 @@ export function PWAInstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", handler);
 
+    // Show iOS banner after 5 seconds
     if (iosCheck) {
       const timer = setTimeout(() => setShowBanner(true), 5000);
       return () => {
@@ -86,8 +97,13 @@ export function PWAInstallPrompt() {
     <>
       {/* Install Banner */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-pwa glass-bottom-bar animate-slide-up"
-        style={{ padding: "14px 16px" }}
+        className="fixed bottom-0 left-0 right-0 z-[9999] animate-slide-up"
+        style={{
+          background: "linear-gradient(135deg, #111114 0%, #1a1a2e 100%)",
+          borderTop: "2px solid #c41040",
+          padding: "14px 16px",
+          boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+        }}
       >
         <div className="max-w-[600px] mx-auto flex items-center gap-3">
           {/* App Icon */}
@@ -96,7 +112,7 @@ export function PWAInstallPrompt() {
             style={{
               width: 48,
               height: 48,
-              background: "linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-light) 100%)",
+              background: "linear-gradient(135deg, #c41040 0%, #e91e63 100%)",
             }}
           >
             <span className="text-white font-black text-xl">C</span>
@@ -118,7 +134,7 @@ export function PWAInstallPrompt() {
               onClick={handleInstall}
               className="px-4 py-2 rounded-lg text-white font-bold text-xs cursor-pointer transition-all active:scale-95"
               style={{
-                background: "linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-light) 100%)",
+                background: "linear-gradient(135deg, #c41040 0%, #e91e63 100%)",
                 boxShadow: "0 2px 8px rgba(196,16,64,0.4)",
               }}
             >
@@ -138,13 +154,17 @@ export function PWAInstallPrompt() {
       {/* iOS Guide Modal */}
       {showIOSGuide && (
         <div
-          className="fixed inset-0 z-[810] flex items-end justify-center"
+          className="fixed inset-0 z-[10000] flex items-end justify-center"
           style={{ background: "rgba(0,0,0,0.7)" }}
           onClick={handleDismiss}
         >
           <div
-            className="w-full max-w-[500px] rounded-t-2xl glass-card-static"
-            style={{ padding: "24px 20px 32px" }}
+            className="w-full max-w-[500px] rounded-t-2xl"
+            style={{
+              background: "#111114",
+              border: "1px solid #27272a",
+              padding: "24px 20px 32px",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center mb-4">
@@ -153,7 +173,7 @@ export function PWAInstallPrompt() {
                 style={{
                   width: 56,
                   height: 56,
-                  background: "linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-light) 100%)",
+                  background: "linear-gradient(135deg, #c41040 0%, #e91e63 100%)",
                 }}
               >
                 <span className="text-white font-black text-2xl">C</span>
@@ -164,19 +184,19 @@ export function PWAInstallPrompt() {
             </div>
 
             <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-3 glass-elevated rounded-xl p-3">
+              <div className="flex items-center gap-3 bg-[#18181b] rounded-xl p-3">
                 <span className="text-2xl">📤</span>
                 <div>
                   <span className="text-white font-bold">{t("pwa.iosStep1")}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-3 glass-elevated rounded-xl p-3">
+              <div className="flex items-center gap-3 bg-[#18181b] rounded-xl p-3">
                 <span className="text-2xl">➕</span>
                 <div>
                   <span className="text-white font-bold">{t("pwa.iosStep2")}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-3 glass-elevated rounded-xl p-3">
+              <div className="flex items-center gap-3 bg-[#18181b] rounded-xl p-3">
                 <span className="text-2xl">✅</span>
                 <div>
                   <span className="text-white font-bold">{t("pwa.iosStep3")}</span>
@@ -186,13 +206,24 @@ export function PWAInstallPrompt() {
 
             <button
               onClick={handleDismiss}
-              className="w-full mt-4 py-2.5 rounded-xl text-[#71717a] font-bold text-sm cursor-pointer border border-surface-border"
+              className="w-full mt-4 py-2.5 rounded-xl text-[#71717a] font-bold text-sm cursor-pointer"
+              style={{ border: "1px solid #27272a" }}
             >
               {t("pwa.later")}
             </button>
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes slide-up {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
+      `}</style>
     </>
   );
 }

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
-import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState, ErrorBanner, ToastContainer } from "@/components/admin/shared";
+import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
 import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import type { Hero } from "@/types/database";
 
@@ -14,7 +14,7 @@ const EMPTY: Partial<Hero> = { title_ar: "", title_he: "", subtitle_ar: "", subt
 export default function HeroesPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { data: heroes, loading, error, clearError, create, update, remove } = useAdminApi<Hero>({ endpoint: "/api/admin/heroes" });
+  const { data: heroes, loading, create, update, remove } = useAdminApi<Hero>({ endpoint: "/api/admin/heroes" });
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Partial<Hero>>(EMPTY);
   const [editId, setEditId] = useState<string | null>(null);
@@ -39,7 +39,6 @@ export default function HeroesPage() {
   return (
     <div>
       <PageHeader title="🖼️ بنرات" count={heroes.length} onAdd={openCreate} addLabel="بنر جديد" />
-      <ErrorBanner error={error} onDismiss={clearError} />
 
       {heroes.length === 0 ? <EmptyState icon="🖼️" title="لا يوجد بنرات" /> : (
         <div className="space-y-1.5">
@@ -89,7 +88,7 @@ export default function HeroesPage() {
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف البنر؟" message="لا يمكن التراجع" />
-      <ToastContainer toasts={toasts} />
+      {toasts.map((t) => <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>{t.message}</div>)}
     </div>
   );
 }

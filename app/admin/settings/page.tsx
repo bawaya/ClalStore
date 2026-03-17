@@ -2,53 +2,18 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminSettings } from "@/lib/admin/hooks";
-import { FormField, Toggle, ErrorBanner, ToastContainer } from "@/components/admin/shared";
+import { FormField, Toggle } from "@/components/admin/shared";
 import { INTEGRATION_TYPES } from "@/lib/constants";
 import { invalidateLogoCache } from "@/components/shared/Logo";
 
 // ===== Provider Config Fields =====
-interface ProviderField {
-  key: string;
-  label: string;
-  type: string;
-  placeholder: string;
-  options?: { value: string; label: string }[];
-  hint?: string;
-}
-const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
-  // --- Payment ---
+const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string; placeholder: string }[]> = {
   "רווחית (Rivhit)": [
-    { key: "group_private_token", label: "🔑 GroupPrivateToken", type: "password", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", hint: "מזהה דף תשלום — من إعدادات صفحة الدفع في iCredit (דפי תשלום > הגדרות הדף)" },
-    { key: "max_payments", label: "📅 أقصى عدد تقسيطات", type: "number", placeholder: "12" },
-    { key: "min_payments", label: "📅 أقل عدد تقسيطات", type: "number", placeholder: "1" },
-    { key: "sale_type", label: "🧾 نوع العملية", type: "select", placeholder: "", options: [
-      { value: "1", label: "1 — عادي (חיוב רגיל)" },
-      { value: "2", label: "2 — J5 معلّق (אישור עסקה בלבד)" },
-      { value: "3", label: "3 — توكن فقط (טוקן בלבד)" },
-    ]},
-    { key: "send_mail", label: "📩 إرسال إيصال بالإيميل", type: "select", placeholder: "", options: [
-      { value: "true", label: "نعم — إرسال إيصال تلقائي" },
-      { value: "false", label: "لا — بدون إيصال" },
-    ]},
-    { key: "create_customer", label: "👤 إنشاء زبون تلقائي بـ iCredit", type: "select", placeholder: "", options: [
-      { value: "true", label: "نعم — إنشاء ملف زبون" },
-      { value: "false", label: "لا — بدون إنشاء" },
-    ]},
-    { key: "document_language", label: "🌐 لغة المستند", type: "select", placeholder: "", options: [
-      { value: "he", label: "עברית (عبري)" },
-      { value: "ar", label: "العربية" },
-      { value: "en", label: "English" },
-    ]},
-    { key: "ipn_url_override", label: "🔗 IPN Callback URL", type: "text", placeholder: "https://clalmobile.com/api/payment/callback", hint: "اتركه فارغ لاستخدام الافتراضي" },
-    { key: "success_url_override", label: "🔗 Success Redirect URL", type: "text", placeholder: "https://clalmobile.com/store/checkout/success", hint: "اتركه فارغ لاستخدام الافتراضي" },
-    { key: "fail_url_override", label: "🔗 Fail Redirect URL", type: "text", placeholder: "https://clalmobile.com/store/checkout/failed", hint: "اتركه فارغ لاستخدام الافتراضي" },
-    { key: "test_mode", label: "🧪 وضع الاختبار", type: "select", placeholder: "", options: [
-      { value: "false", label: "إنتاج — عمليات حقيقية (LIVE)" },
-      { value: "true", label: "اختبار — بدون خصم فعلي (TEST)" },
-    ]},
+    { key: "api_key", label: "API Key", type: "password", placeholder: "أدخل Rivhit API Key" },
+    { key: "business_id", label: "Business ID", type: "text", placeholder: "رقم العمل" },
   ],
   Tranzila: [
     { key: "terminal", label: "Terminal Name", type: "text", placeholder: "اسم الطرفية" },
@@ -61,38 +26,6 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
   Stripe: [
     { key: "api_key", label: "Secret Key", type: "password", placeholder: "sk_live_xxxxx" },
     { key: "publishable_key", label: "Publishable Key", type: "text", placeholder: "pk_live_xxxxx" },
-  ],
-  // --- WhatsApp ---
-  yCloud: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
-    { key: "phone_id", label: "رقم الهاتف المسجّل", type: "text", placeholder: "+972XXXXXXXXX" },
-    { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
-    { key: "admin_phone", label: "📱 رقم الأدمن (إشعارات الطلبات)", type: "text", placeholder: "05X-XXXXXXX" },
-    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX" },
-    { key: "team_numbers", label: "👥 أرقام الفريق (مفصولة بفاصلة)", type: "text", placeholder: "05X-XXXXXXX,05X-XXXXXXX", hint: "أرقام إضافية لتلقي إشعارات الطلبات" },
-  ],
-  "Meta API": [
-    { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
-    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "" },
-    { key: "verify_token", label: "Verify Token", type: "text", placeholder: "" },
-  ],
-  Twilio: [
-    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
-    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
-    { key: "phone_number", label: "From Number", type: "text", placeholder: "+1..." },
-  ],
-  // --- SMS / OTP ---
-  "Twilio SMS": [
-    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
-    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
-    { key: "verify_service_sid", label: "Verify Service SID (OTP)", type: "text", placeholder: "VA..." },
-    { key: "phone_number", label: "From Number (اختياري)", type: "text", placeholder: "+972..." },
-    { key: "messaging_service_sid", label: "Messaging Service SID (اختياري)", type: "text", placeholder: "MG..." },
-  ],
-  // --- Email ---
-  Resend: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "re_xxxxx" },
-    { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "ClalMobile <noreply@clalmobile.com>" },
   ],
   SendGrid: [
     { key: "api_key", label: "API Key", type: "password", placeholder: "SG.xxxxx" },
@@ -116,65 +49,35 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
     { key: "password", label: "Password", type: "password", placeholder: "" },
     { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "noreply@clalmobile.com" },
   ],
-  // --- AI (Bot + Search) ---
-  "Anthropic Claude": [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "sk-ant-xxxxx" },
-    { key: "api_key_bot", label: "API Key — بوت (اختياري)", type: "password", placeholder: "مفتاح منفصل للبوت" },
-    { key: "api_key_store", label: "API Key — متجر (اختياري)", type: "password", placeholder: "مفتاح منفصل للبحث الذكي" },
+  yCloud: [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
+    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "رقم الهاتف" },
+    { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
+    { key: "admin_phone", label: "📱 رقم الأدمن", type: "text", placeholder: "05X-XXXXXXX — يستقبل إشعارات الطلبات" },
+    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },
   ],
-  // --- AI (Admin) ---
-  OpenAI: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "sk-xxxxx" },
-    { key: "api_key_admin", label: "API Key — أدمن (اختياري)", type: "password", placeholder: "مفتاح منفصل لترجمة المنتجات" },
+  "Meta API": [
+    { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
+    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "" },
+    { key: "verify_token", label: "Verify Token", type: "text", placeholder: "" },
   ],
-  // --- Payment UPay ---
-  UPay: [
-    { key: "api_username", label: "📧 API Username (Email)", type: "text", placeholder: "email@example.com", hint: "البريد الإلكتروني المسجّل في UPay" },
-    { key: "api_key", label: "🔑 API Key", type: "password", placeholder: "UPay API Key" },
-    { key: "max_payments", label: "📅 عدد التقسيطات الأقصى", type: "number", placeholder: "1" },
-    { key: "language", label: "🌐 لغة صفحة الدفع", type: "select", placeholder: "", options: [
-      { value: "HE", label: "עברית (عبري)" },
-      { value: "AR", label: "العربية" },
-      { value: "EN", label: "English" },
-    ]},
-    { key: "test_mode", label: "🧪 وضع الاختبار", type: "select", placeholder: "", options: [
-      { value: "false", label: "إنتاج — عمليات حقيقية (LIVE)" },
-      { value: "true", label: "اختبار — بدون خصم فعلي (TEST)" },
-    ]},
+  Twilio: [
+    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
+    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
+    { key: "phone_number", label: "From Number", type: "text", placeholder: "+1..." },
   ],
-  // --- Storage ---
-  "Cloudflare R2": [
-    { key: "account_id", label: "Account ID", type: "text", placeholder: "Cloudflare Account ID" },
-    { key: "access_key", label: "Access Key ID", type: "password", placeholder: "R2 Access Key" },
-    { key: "secret_key", label: "Secret Access Key", type: "password", placeholder: "R2 Secret Key" },
-    { key: "bucket_name", label: "Bucket Name", type: "text", placeholder: "clalmobile-images" },
-    { key: "public_url", label: "Public URL", type: "text", placeholder: "https://your-r2-url.com" },
+  InforUMobile: [
+    { key: "username", label: "اسم المستخدم", type: "text", placeholder: "" },
+    { key: "password", label: "كلمة المرور", type: "password", placeholder: "" },
+    { key: "sender", label: "اسم المرسل", type: "text", placeholder: "ClalMobile" },
   ],
-  // --- Image Processing ---
-  RemoveBG: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "RemoveBG API Key" },
+  "Twilio SMS": [
+    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
+    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
+    { key: "verify_service_sid", label: "Verify Service SID (OTP)", type: "text", placeholder: "VA..." },
+    { key: "phone_number", label: "From Number (اختياري)", type: "text", placeholder: "+1..." },
+    { key: "messaging_service_sid", label: "Messaging Service SID (اختياري)", type: "text", placeholder: "MG..." },
   ],
-  // --- Device Specs ---
-  MobileAPI: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "MobileAPI Token" },
-  ],
-  // --- Image Search ---
-  Pexels: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "Pexels API Key" },
-  ],
-  // --- Push Notifications ---
-  "Web Push (VAPID)": [
-    { key: "vapid_public", label: "VAPID Public Key", type: "text", placeholder: "BKs7L8mH_Z_Ra..." },
-    { key: "vapid_private", label: "VAPID Private Key", type: "password", placeholder: "مفتاح خاص" },
-  ],
-  // --- Analytics ---
-  "Google Analytics": [
-    { key: "measurement_id", label: "Measurement ID", type: "text", placeholder: "G-XXXXXXXX" },
-  ],
-  Mixpanel: [
-    { key: "project_token", label: "Project Token", type: "text", placeholder: "" },
-  ],
-  // --- CRM ---
   HubSpot: [
     { key: "api_key", label: "API Key", type: "password", placeholder: "HubSpot Private App Token" },
   ],
@@ -182,6 +85,12 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
     { key: "client_id", label: "Client ID", type: "text", placeholder: "" },
     { key: "client_secret", label: "Client Secret", type: "password", placeholder: "" },
     { key: "instance_url", label: "Instance URL", type: "text", placeholder: "https://xxx.salesforce.com" },
+  ],
+  "Google Analytics": [
+    { key: "measurement_id", label: "Measurement ID", type: "text", placeholder: "G-XXXXXXXX" },
+  ],
+  Mixpanel: [
+    { key: "project_token", label: "Project Token", type: "text", placeholder: "" },
   ],
 };
 
@@ -205,13 +114,9 @@ function IntegrationCard({
   const selectedProvider = integ?.provider || "";
   const fields = PROVIDER_FIELDS[selectedProvider] || [];
 
+  // Check which sensitive fields are already saved (from _has_ flags)
   const hasSavedKey = (key: string) => !!configDraft[`_has_${key}`];
   const MASK = "••••••••";
-
-  const fieldHasValue = (key: string) => {
-    const val = configDraft[key];
-    return (val && val.length > 0) || hasSavedKey(key);
-  };
 
   const handleSelectProvider = async (provider: string) => {
     const newConfig = provider === selectedProvider ? configDraft : {};
@@ -224,10 +129,13 @@ function IntegrationCard({
   const handleSaveConfig = async () => {
     setSaving(true);
     try {
+      // Send config — API will handle masked values by keeping old ones
       const configToSend = { ...configDraft };
+      // Remove _has_ metadata before sending
       for (const key of Object.keys(configToSend)) {
         if (key.startsWith("_has_")) delete configToSend[key];
       }
+      // Auto-activate: if config has meaningful values, set status to active
       const hasValues = Object.entries(configToSend).some(([, v]) => v && !v.includes(MASK));
       const newStatus = hasValues ? "active" : (integ?.status || "inactive");
       await onUpdate(type, { config: configToSend, status: newStatus });
@@ -245,6 +153,7 @@ function IntegrationCard({
     setTesting(true);
     setTestResult(null);
     try {
+      // For test, send actual values — masked values will be resolved by API
       const configToTest = { ...configDraft };
       for (const key of Object.keys(configToTest)) {
         if (key.startsWith("_has_")) delete configToTest[key];
@@ -252,46 +161,43 @@ function IntegrationCard({
       const res = await fetch("/api/admin/integrations/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, provider: selectedProvider, config: configToTest }),
+        body: JSON.stringify({ type, config: configToTest }),
       });
       const data = await res.json();
       setTestResult({ ok: data.ok, message: data.message || data.error || "" });
-      if (data.ok) {
-        await onUpdate(type, { status: "active" });
-      }
     } catch (err: any) {
       setTestResult({ ok: false, message: err.message });
     }
     setTesting(false);
   };
 
-  const configuredCount = fields.filter((f) => fieldHasValue(f.key)).length;
-  const allConfigured = fields.length > 0 && configuredCount === fields.length;
-  const hasAnyField = configuredCount > 0;
-
-  const statusColor = integ?.status === "active" ? "#22c55e" : integ?.status === "error" ? "#ef4444" : "#71717a";
-  const statusBg = integ?.status === "active" ? "rgba(34,197,94,0.12)" : integ?.status === "error" ? "rgba(239,68,68,0.12)" : "rgba(63,63,70,0.12)";
-  const statusText = integ?.status === "active" ? "فعّال" : integ?.status === "error" ? "خطأ" : "غير فعّال";
-  const statusIcon = integ?.status === "active" ? "🟢" : integ?.status === "error" ? "🔴" : "⚪";
+  // Count how many required fields have values (either entered or saved)
+  const configuredCount = fields.filter((f) => {
+    const val = configDraft[f.key];
+    return val && val.length > 0;
+  }).length;
+  const hasRequiredFields = configuredCount > 0;
 
   return (
-    <div className="card" style={{ padding: scr.mobile ? 14 : 20, borderRight: `3px solid ${statusColor}` }}>
+    <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-2.5">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
           {integ && (
-            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: statusBg, color: statusColor }}>
-              {statusIcon} {statusText}
+            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{
+              background: integ.status === "active" ? "rgba(34,197,94,0.15)" : integ.status === "error" ? "rgba(239,68,68,0.15)" : "rgba(63,63,70,0.15)",
+              color: integ.status === "active" ? "#22c55e" : integ.status === "error" ? "#ef4444" : "#71717a",
+            }}>
+              {integ.status === "active" ? "✅ فعّال" : integ.status === "error" ? "❌ خطأ" : "⏸️ غير فعّال"}
             </span>
           )}
           {integ?.provider && <Toggle value={integ.status === "active"} onChange={handleToggleStatus} />}
         </div>
         <div className="text-right">
           <div className="font-bold" style={{ fontSize: scr.mobile ? 13 : 15 }}>{info.icon} {info.label}</div>
-          {integ?.provider && (
-            <div className="text-muted" style={{ fontSize: scr.mobile ? 9 : 10 }}>
-              {integ.provider}
-              {integ.last_synced_at && ` — ${new Date(integ.last_synced_at).toLocaleString("ar")}`}
+          {integ?.last_synced_at && (
+            <div className="text-muted" style={{ fontSize: scr.mobile ? 8 : 9 }}>
+              آخر مزامنة: {new Date(integ.last_synced_at).toLocaleString("ar")}
             </div>
           )}
         </div>
@@ -310,89 +216,51 @@ function IntegrationCard({
       {/* Config fields */}
       {selectedProvider && fields.length > 0 && (
         <div className="mt-3 bg-surface-elevated rounded-xl p-3 space-y-2.5">
-          {/* Config header with summary */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {allConfigured ? (
-                <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
-                  ✅ {fields.length}/{fields.length} مُعد
-                </span>
-              ) : hasAnyField ? (
-                <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>
-                  ⚠️ {configuredCount}/{fields.length} مُعد
-                </span>
-              ) : (
-                <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>
-                  ❌ لم يتم الإعداد
-                </span>
-              )}
-            </div>
             <div className="font-bold text-right text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
               🔑 إعدادات {selectedProvider}
             </div>
+            {configuredCount > 0 && (
+              <span className="text-[9px] px-2 py-0.5 rounded-md font-bold"
+                style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
+                ✅ {configuredCount}/{fields.length} مُعد
+              </span>
+            )}
           </div>
-
           {fields.map((f) => {
             const isSensitive = f.type === "password";
-            const isSelect = f.type === "select";
             const isSaved = hasSavedKey(f.key);
             const currentVal = configDraft[f.key] || "";
             const isStillMasked = isSensitive && currentVal.includes(MASK);
-            const hasVal = fieldHasValue(f.key);
 
             return (
               <div key={f.key}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1">
-                    {hasVal ? (
+                    {isSaved && (
                       <span className="text-[8px] px-1.5 py-0.5 rounded font-bold"
                         style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
-                        {isSaved ? "🔒 محفوظ" : "✓ مُعبأ"}
-                      </span>
-                    ) : (
-                      <span className="text-[8px] px-1.5 py-0.5 rounded font-bold"
-                        style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
-                        فارغ
+                        ✅ محفوظ
                       </span>
                     )}
                   </div>
                   <label className="text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 10 }}>{f.label}</label>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {isSelect && f.options ? (
-                    <select
-                      className="input flex-1"
-                      style={{
-                        fontSize: scr.mobile ? 11 : 13,
-                        borderColor: hasVal ? "rgba(34,197,94,0.2)" : undefined,
-                      }}
-                      value={currentVal}
-                      onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                      dir="rtl"
-                    >
-                      <option value="">— اختر —</option>
-                      {f.options.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type={isSensitive && !showSecrets[f.key] ? "password" : f.type === "number" ? "number" : "text"}
-                      className="input flex-1"
-                      style={{
-                        fontSize: scr.mobile ? 11 : 13,
-                        borderColor: hasVal ? "rgba(34,197,94,0.2)" : undefined,
-                      }}
-                      placeholder={isSaved ? "اضغط لتحديث القيمة..." : f.placeholder}
-                      value={currentVal}
-                      onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                      onFocus={() => {
-                        if (isStillMasked) setConfigDraft((prev) => ({ ...prev, [f.key]: "" }));
-                      }}
-                      dir="ltr"
-                      {...(f.type === "number" ? { min: "0" } : {})}
-                    />
-                  )}
+                  <input
+                    type={isSensitive && !showSecrets[f.key] ? "password" : "text"}
+                    className="input flex-1" style={{ fontSize: scr.mobile ? 11 : 13 }}
+                    placeholder={isSaved ? "اضغط لتحديث القيمة..." : f.placeholder}
+                    value={currentVal}
+                    onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                    onFocus={() => {
+                      // Clear masked value on focus so user can enter new one
+                      if (isStillMasked) {
+                        setConfigDraft((prev) => ({ ...prev, [f.key]: "" }));
+                      }
+                    }}
+                    dir="ltr"
+                  />
                   {isSensitive && (
                     <button onClick={() => setShowSecrets((p) => ({ ...p, [f.key]: !p[f.key] }))}
                       className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-xs"
@@ -401,52 +269,29 @@ function IntegrationCard({
                     </button>
                   )}
                 </div>
-                {f.hint && (
-                  <p className="text-dim mt-0.5 text-right" style={{ fontSize: 9, lineHeight: 1.4 }}>{f.hint}</p>
-                )}
               </div>
             );
           })}
-
           {/* Actions */}
           <div className="flex items-center gap-2 mt-3 pt-2 border-t border-surface-border">
             <button onClick={handleSaveConfig} disabled={saving} className="btn-primary flex-1"
               style={{ fontSize: scr.mobile ? 10 : 12, padding: scr.mobile ? "8px 12px" : "10px 16px", opacity: saving ? 0.6 : 1 }}>
-              {saving ? "⏳ جاري الحفظ..." : "💾 حفظ"}
+              {saving ? "⏳ جاري الحفظ..." : "💾 حفظ الإعدادات"}
             </button>
-            <button onClick={handleTest} disabled={testing || !hasAnyField} className="btn-outline"
-              style={{
-                fontSize: scr.mobile ? 10 : 12,
-                padding: scr.mobile ? "8px 12px" : "10px 16px",
-                opacity: testing || !hasAnyField ? 0.5 : 1,
-                minWidth: scr.mobile ? 90 : 120,
-              }}>
-              {testing ? (
-                <span className="flex items-center gap-1 justify-center">
-                  <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
-                  جاري الاختبار...
-                </span>
-              ) : "🔌 اختبار الاتصال"}
+            <button onClick={handleTest} disabled={testing || !hasRequiredFields} className="btn-outline"
+              style={{ fontSize: scr.mobile ? 10 : 12, padding: scr.mobile ? "8px 12px" : "10px 16px", opacity: testing || !hasRequiredFields ? 0.5 : 1 }}>
+              {testing ? "⏳ جاري..." : "🔍 اختبار"}
             </button>
           </div>
-
-          {/* Test result with animation */}
+          {/* Test result */}
           {testResult && (
-            <div className="rounded-lg px-3 py-2.5 font-bold animate-fade-in" style={{
+            <div className="rounded-lg px-3 py-2 text-center font-bold" style={{
               fontSize: scr.mobile ? 10 : 12,
               background: testResult.ok ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
               color: testResult.ok ? "#22c55e" : "#ef4444",
-              border: `1px solid ${testResult.ok ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)"}`,
+              border: `1px solid ${testResult.ok ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
             }}>
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: 18 }}>{testResult.ok ? "✅" : "❌"}</span>
-                <div className="flex-1 text-right">
-                  <div>{testResult.ok ? "الاتصال ناجح" : "فشل الاتصال"}</div>
-                  <div style={{ fontSize: scr.mobile ? 9 : 10, opacity: 0.8, fontWeight: 400, marginTop: 2 }}>
-                    {testResult.message}
-                  </div>
-                </div>
-              </div>
+              {testResult.ok ? "✅" : "❌"} {testResult.message}
             </div>
           )}
         </div>
@@ -462,209 +307,12 @@ function IntegrationCard({
   );
 }
 
-// ===== WhatsApp Templates Management =====
-interface TemplateSummary {
-  total: number;
-  approved: number;
-  pending: number;
-  rejected: number;
-  requiredReady: number;
-  requiredTotal: number;
-}
-
-interface TemplateEntry {
-  name: string;
-  language: string;
-  category: string;
-  status: string;
-}
-
-function WhatsAppTemplatesSection({ scr, show }: { scr: { mobile: boolean }; show: (msg: string) => void }) {
-  const [templates, setTemplates] = useState<TemplateEntry[]>([]);
-  const [summary, setSummary] = useState<TemplateSummary | null>(null);
-  const [missing, setMissing] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [provisioning, setProvisioning] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  const fetchTemplates = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/whatsapp-templates");
-      if (!res.ok) {
-        const err = await res.json();
-        show(`❌ ${err.error || "خطأ في جلب القوالب"}`);
-        return;
-      }
-      const data = await res.json();
-      setTemplates(data.templates || []);
-      setSummary(data.summary || null);
-      setMissing(data.missing || []);
-      setLoaded(true);
-    } catch {
-      show("❌ خطأ في الاتصال");
-    }
-    setLoading(false);
-  }, [show]);
-
-  const handleProvisionAll = async () => {
-    setProvisioning(true);
-    try {
-      const res = await fetch("/api/admin/whatsapp-templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "provision_all" }),
-      });
-      const data = await res.json();
-      if (data.results) {
-        const failed = data.results.filter((r: { status: string }) => r.status === "FAILED");
-        if (failed.length === 0) {
-          show("✅ تم إنشاء جميع القوالب بنجاح");
-        } else {
-          show(`⚠️ ${failed.length} قالب فشل — تحقق من الحالة أدناه`);
-        }
-        await fetchTemplates();
-      } else if (data.error) {
-        show(`❌ ${data.error}`);
-      }
-    } catch {
-      show("❌ خطأ في إنشاء القوالب");
-    }
-    setProvisioning(false);
-  };
-
-  const handleDelete = async (name: string) => {
-    if (!confirm(`هل تريد حذف القالب "${name}"؟`)) return;
-    try {
-      const res = await fetch(`/api/admin/whatsapp-templates?name=${name}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        show(`✅ تم حذف ${name}`);
-        await fetchTemplates();
-      } else {
-        show(`❌ ${data.error || "فشل الحذف"}`);
-      }
-    } catch {
-      show("❌ خطأ");
-    }
-  };
-
-  const statusBadge = (status: string) => {
-    const map: Record<string, { bg: string; color: string; label: string }> = {
-      APPROVED: { bg: "rgba(34,197,94,0.12)", color: "#22c55e", label: "✅ مُعتمد" },
-      PENDING: { bg: "rgba(234,179,8,0.12)", color: "#eab308", label: "⏳ قيد المراجعة" },
-      REJECTED: { bg: "rgba(239,68,68,0.12)", color: "#ef4444", label: "❌ مرفوض" },
-      EXISTS: { bg: "rgba(59,130,246,0.12)", color: "#3b82f6", label: "📄 موجود" },
-    };
-    const s = map[status] || { bg: "rgba(63,63,70,0.12)", color: "#71717a", label: status };
-    return (
-      <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{ background: s.bg, color: s.color }}>
-        {s.label}
-      </span>
-    );
-  };
-
-  useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
-
-  return (
-    <div className="card" style={{ padding: scr.mobile ? 14 : 20, borderRight: "3px solid #8b5cf6" }}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          {summary && (
-            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{
-              background: summary.requiredReady === summary.requiredTotal
-                ? "rgba(34,197,94,0.12)" : "rgba(234,179,8,0.12)",
-              color: summary.requiredReady === summary.requiredTotal
-                ? "#22c55e" : "#eab308",
-            }}>
-              {summary.requiredReady}/{summary.requiredTotal} جاهز
-            </span>
-          )}
-        </div>
-        <h3 className="font-bold text-right" style={{ fontSize: scr.mobile ? 13 : 15 }}>
-          📋 قوالب واتساب (WhatsApp Templates)
-        </h3>
-      </div>
-
-      <p className="text-muted text-right mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-        القوالب مطلوبة لإرسال إشعارات الواتساب للأدمن والزبائن. اضغط "إعداد تلقائي" لإنشاء جميع القوالب المطلوبة.
-      </p>
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 mb-3">
-        <button onClick={handleProvisionAll} disabled={provisioning || (loaded && missing.length === 0)}
-          className="btn-primary" style={{
-            fontSize: scr.mobile ? 10 : 12,
-            padding: scr.mobile ? "8px 12px" : "10px 16px",
-            opacity: provisioning ? 0.6 : 1,
-          }}>
-          {provisioning ? "⏳ جاري الإنشاء..." : missing.length > 0 ? `🚀 إعداد تلقائي (${missing.length} ناقص)` : "✅ جميع القوالب موجودة"}
-        </button>
-        <button onClick={fetchTemplates} disabled={loading} className="btn-outline" style={{
-          fontSize: scr.mobile ? 10 : 12,
-          padding: scr.mobile ? "8px 12px" : "10px 16px",
-          opacity: loading ? 0.5 : 1,
-        }}>
-          {loading ? "⏳" : "🔄 تحديث"}
-        </button>
-      </div>
-
-      {/* Summary */}
-      {summary && (
-        <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))" }}>
-          {[
-            { label: "المجموع", value: summary.total, color: "#a1a1aa" },
-            { label: "مُعتمد", value: summary.approved, color: "#22c55e" },
-            { label: "قيد المراجعة", value: summary.pending, color: "#eab308" },
-            { label: "مرفوض", value: summary.rejected, color: "#ef4444" },
-          ].map((s) => (
-            <div key={s.label} className="bg-surface-elevated rounded-lg p-2 text-center" style={{ borderBottom: `2px solid ${s.color}` }}>
-              <div className="font-black" style={{ fontSize: 18, color: s.color }}>{s.value}</div>
-              <div className="text-muted" style={{ fontSize: 9 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Template list */}
-      {loaded && templates.length > 0 && (
-        <div className="bg-surface-elevated rounded-xl p-3 space-y-2">
-          <div className="font-bold text-right text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-            📑 القوالب المسجّلة ({templates.length})
-          </div>
-          {templates.map((t) => (
-            <div key={`${t.name}-${t.language}`} className="flex items-center justify-between py-1.5 border-b border-surface-border last:border-0">
-              <div className="flex items-center gap-2">
-                {statusBadge(t.status)}
-                <button onClick={() => handleDelete(t.name)} className="text-[9px] text-dim hover:text-red-400 transition-colors">
-                  🗑️
-                </button>
-              </div>
-              <div className="text-right">
-                <div className="font-mono font-bold" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t.name}</div>
-                <div className="text-muted" style={{ fontSize: 9 }}>{t.category} · {t.language}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {loaded && templates.length === 0 && !loading && (
-        <div className="bg-surface-elevated rounded-xl p-4 text-center">
-          <div style={{ fontSize: 32 }}>📭</div>
-          <div className="text-muted mt-1" style={{ fontSize: 11 }}>لا توجد قوالب — اضغط "إعداد تلقائي" لإنشائها</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ===== Main Settings Page =====
 export default function SettingsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { settings, integrations, loading, error, clearError, updateSetting, updateIntegration } = useAdminSettings();
-  const [tab, setTab] = useState<"store" | "integrations" | "whatsapp">("store");
+  const { settings, integrations, loading, updateSetting, updateIntegration } = useAdminSettings();
+  const [tab, setTab] = useState<"store" | "integrations">("store");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const logoSize = parseInt(settings.logo_size || "48", 10);
@@ -674,7 +322,6 @@ export default function SettingsPage() {
   const tabs = [
     { key: "store" as const, icon: "🏪", label: "المتجر" },
     { key: "integrations" as const, icon: "🔌", label: "التكاملات" },
-    { key: "whatsapp" as const, icon: "📋", label: "قوالب واتساب" },
   ];
 
   const settingFields = [
@@ -708,7 +355,6 @@ export default function SettingsPage() {
   return (
     <div>
       <h1 className="font-black mb-4" style={{ fontSize: scr.mobile ? 16 : 22 }}>⚙️ الإعدادات</h1>
-      <ErrorBanner error={error} onDismiss={clearError} />
 
       {/* Tabs */}
       <div className="flex gap-1.5 mb-4">
@@ -855,19 +501,12 @@ export default function SettingsPage() {
                   scr={scr} onUpdate={handleUpdateIntegration} show={show} />
               );
             })}
-
           </div>
         </div>
       )}
 
-      {/* WhatsApp Templates Tab */}
-      {tab === "whatsapp" && (
-        <div className="space-y-3">
-          <WhatsAppTemplatesSection scr={scr} show={show} />
-        </div>
-      )}
-
-      <ToastContainer toasts={toasts} />
+      {/* Toast */}
+      {toasts.map((t) => <div key={t.id} className="fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm border-state-success text-state-success">{t.message}</div>)}
     </div>
   );
 }

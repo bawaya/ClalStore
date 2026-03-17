@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
-import { PageHeader, FormField, EmptyState, ToastContainer } from "@/components/admin/shared";
+import { PageHeader, FormField, EmptyState } from "@/components/admin/shared";
 
 interface PushNotification {
   id: string;
@@ -165,7 +165,11 @@ export default function AdminPushPage() {
         </div>
       )}
 
-      <ToastContainer toasts={toasts} />
+      {toasts.map((t) => (
+        <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>
+          {t.message}
+        </div>
+      ))}
     </div>
   );
 }

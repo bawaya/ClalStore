@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
-import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState, ErrorBanner, ToastContainer } from "@/components/admin/shared";
+import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
 import type { LinePlan } from "@/types/database";
 
 const EMPTY: Partial<LinePlan> = { name_ar: "", name_he: "", data_amount: "", price: 0, features_ar: [], features_he: [], popular: false, active: true, sort_order: 0 };
@@ -13,7 +13,7 @@ const EMPTY: Partial<LinePlan> = { name_ar: "", name_he: "", data_amount: "", pr
 export default function LinesPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { data: lines, loading, error, clearError, create, update, remove } = useAdminApi<LinePlan>({ endpoint: "/api/admin/lines" });
+  const { data: lines, loading, create, update, remove } = useAdminApi<LinePlan>({ endpoint: "/api/admin/lines" });
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Partial<LinePlan>>(EMPTY);
   const [editId, setEditId] = useState<string | null>(null);
@@ -48,7 +48,6 @@ export default function LinesPage() {
   return (
     <div>
       <PageHeader title="📡 باقات HOT Mobile" count={lines.length} onAdd={openCreate} addLabel="باقة جديدة" />
-      <ErrorBanner error={error} onDismiss={clearError} />
 
       {lines.length === 0 ? <EmptyState icon="📡" title="لا يوجد باقات" /> : (
         <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
@@ -112,7 +111,7 @@ export default function LinesPage() {
       </Modal>
 
       <ConfirmDialog open={!!confirm} onClose={() => setConfirm(null)} onConfirm={handleDelete} title="حذف الباقة؟" message="لا يمكن التراجع" />
-      <ToastContainer toasts={toasts} />
+      {toasts.map((t) => <div key={t.id} className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}>{t.message}</div>)}
     </div>
   );
 }

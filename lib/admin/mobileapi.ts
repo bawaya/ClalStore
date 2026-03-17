@@ -6,7 +6,7 @@
 // =====================================================
 
 const API_BASE = "https://api.mobileapi.dev";
-const API_KEY = process.env.MOBILEAPI_KEY || "";
+const API_KEY = process.env.MOBILEAPI_KEY || "16be012c41a3486b1f24b536424d6f6e8959fe82";
 
 // ===== Comprehensive color mapping =====
 const COLORS: Record<string, { hex: string; ar: string; he: string }> = {

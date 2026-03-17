@@ -16,6 +16,7 @@ export async function getIntegrationConfig(type: string): Promise<Record<string,
       .select("config, status")
       .eq("type", type)
       .single();
+    console.log(`[IntegrationConfig] type=${type} status=${data?.status} hasConfig=${!!data?.config} keys=${data?.config ? Object.keys(data.config).join(",") : "none"}`);
     if (data && data.status === "active" && data.config) {
       return data.config as Record<string, any>;
     }
@@ -29,7 +30,7 @@ export async function getIntegrationConfig(type: string): Promise<Record<string,
 export interface PaymentProvider {
   name: string;
   createCharge(params: ChargeParams): Promise<ChargeResult>;
-  verifyPayment(transactionId: string, orderId?: string): Promise<PaymentStatus>;
+  verifyPayment(transactionId: string): Promise<PaymentStatus>;
   refund(transactionId: string, amount?: number): Promise<RefundResult>;
 }
 
@@ -165,10 +166,9 @@ export async function getProvider<T>(type: ProviderType): Promise<T | null> {
 
 // ===== Initialize All Providers =====
 export async function initializeProviders() {
-  // Payment — iCredit for Israeli customers (default provider for hub)
-  // UPay for Palestinian/intl customers is handled directly by /api/payment route
+  // Payment — Rivhit (check DB config first, then env)
   const paymentCfg = await getIntegrationConfig("payment");
-  if (paymentCfg.group_private_token || process.env.ICREDIT_GROUP_PRIVATE_TOKEN) {
+  if (paymentCfg.api_key || process.env.RIVHIT_API_KEY) {
     const { RivhitProvider } = await import("./rivhit");
     registerProvider("payment", new RivhitProvider());
   }

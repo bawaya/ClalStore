@@ -121,9 +121,7 @@ export function MessageInput({
       const res = await fetch(`/api/crm/inbox/${conversationId}/suggest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          context: text.trim() || undefined,
-        }),
+        body: JSON.stringify({}),
       });
       const data = await res.json();
       if (data.success && data.suggestion) {

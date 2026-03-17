@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import type {
   InboxConversation,
   InboxLabel,
@@ -62,11 +62,9 @@ export function ContactPanel({
   const [newLabelName, setNewLabelName] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
     fetchAllLabels().then((res) => {
-      if (!cancelled && res.success) setAllLabels(res.labels);
+      if (res.success) setAllLabels(res.labels);
     });
-    return () => { cancelled = true; };
   }, []);
 
   const currentLabelIds = new Set(labels.map((l) => l.id));
@@ -299,9 +297,6 @@ export function ContactPanel({
           </div>
         </div>
 
-        {/* AI Product Recommendations */}
-        <ProductRecommendations conversationId={conversation.id} />
-
         {/* Notes */}
         <NotesPanel
           conversationId={conversation.id}
@@ -309,68 +304,6 @@ export function ContactPanel({
           onNoteAdded={onRefresh}
         />
       </div>
-    </div>
-  );
-}
-
-function ProductRecommendations({ conversationId }: { conversationId: string }) {
-  const [recs, setRecs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  const fetchRecs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/crm/inbox/${conversationId}/recommend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json();
-      if (data.success) setRecs(data.recommendations || []);
-    } catch {}
-    setLoading(false);
-    setLoaded(true);
-  }, [conversationId]);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold text-muted uppercase tracking-wide">
-          🎯 منتجات مقترحة
-        </h4>
-        <button
-          onClick={fetchRecs}
-          disabled={loading}
-          className="text-xs text-brand hover:text-brand-light transition-colors disabled:opacity-50"
-        >
-          {loading ? "جاري..." : loaded ? "تحديث" : "اقتراح بالذكاء الاصطناعي"}
-        </button>
-      </div>
-
-      {recs.length > 0 && (
-        <div className="space-y-2">
-          {recs.map((r: any, i: number) => (
-            <div
-              key={r.id || i}
-              className="p-2 rounded-lg bg-surface-elevated border border-surface-border/50"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-white">
-                  {r.brand} {r.name}
-                </span>
-                <span className="text-xs text-brand font-bold">
-                  {Number(r.price).toLocaleString()}₪
-                </span>
-              </div>
-              <p className="text-[10px] text-muted">{r.reason}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {loaded && recs.length === 0 && !loading && (
-        <p className="text-[10px] text-dim">لا توجد اقتراحات — حاول بعد مزيد من الرسائل</p>
-      )}
     </div>
   );
 }
