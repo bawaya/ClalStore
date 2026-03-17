@@ -55,6 +55,12 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
     { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
     { key: "admin_phone", label: "📱 رقم الأدمن", type: "text", placeholder: "05X-XXXXXXX — يستقبل إشعارات الطلبات" },
     { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },
+    { key: "reports_email", label: "📧 إيميل التقارير", type: "email", placeholder: "bawaya@icloud.com" },
+    { key: "daily_report_time", label: "🕒 وقت التقرير اليومي", type: "text", placeholder: "15:00" },
+    { key: "weekly_report_day", label: "📅 يوم التقرير الأسبوعي", type: "text", placeholder: "thursday" },
+    { key: "weekly_report_time", label: "🕙 وقت التقرير الأسبوعي", type: "text", placeholder: "22:00" },
+    { key: "reports_timezone", label: "🌍 المنطقة الزمنية", type: "text", placeholder: "Asia/Jerusalem" },
+    { key: "completed_orders_email", label: "📧 إيميل الطلبات الجاهزة", type: "email", placeholder: "bawaya@icloud.com" },
   ],
   "Meta API": [
     { key: "access_token", label: "Access Token", type: "password", placeholder: "" },

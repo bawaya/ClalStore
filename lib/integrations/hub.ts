@@ -79,6 +79,7 @@ export interface EmailParams {
   text?: string;
   from?: string;
   replyTo?: string;
+  attachments?: { filename: string; content: string; contentType?: string }[];
 }
 
 export interface EmailResult {

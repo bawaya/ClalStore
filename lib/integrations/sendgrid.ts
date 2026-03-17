@@ -34,6 +34,12 @@ export class SendGridProvider implements EmailProvider {
           content: [
             params.html ? { type: "text/html", value: params.html } : { type: "text/plain", value: params.text || "" },
           ],
+          attachments: params.attachments?.map((a) => ({
+            filename: a.filename,
+            type: a.contentType || "application/octet-stream",
+            content: a.content,
+            disposition: "attachment",
+          })),
         }),
       });
 

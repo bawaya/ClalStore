@@ -4,18 +4,37 @@
 // =====================================================
 
 import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
+import { getIntegrationConfig, getProvider, type EmailProvider } from "@/lib/integrations/hub";
+import {
+  buildDailyReportHtml,
+  buildDailyReportPdf,
+  buildWeeklyReportHtml,
+  buildWeeklyReportPdf,
+  getDailyReportData,
+  getWeeklyReportData,
+} from "@/lib/reports/service";
 
 // ADMIN_REPORT_PHONE = رقم مُرسِل التقارير (FROM) — +972537777963
 // ADMIN_PERSONAL_PHONE = رقم الأدمن الشخصي (TO) — يستقبل التقارير والإشعارات
-const REPORT_FROM = () => process.env.ADMIN_REPORT_PHONE || "+972537777963";
-const ADMIN_TO = () => process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
-const TEAM_NUMBERS = () => (process.env.TEAM_WHATSAPP_NUMBERS || "").split(",").filter(Boolean);
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
+
+async function getNotifyTargets() {
+  const waCfg = await getIntegrationConfig("whatsapp");
+  const reportFrom = waCfg.reports_phone || process.env.ADMIN_REPORT_PHONE || "+972537777963";
+  const adminTo = waCfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
+  const teamRaw = waCfg.team_whatsapp_numbers || process.env.TEAM_WHATSAPP_NUMBERS || "";
+  const teamNumbers = String(teamRaw)
+    .split(",")
+    .map((n) => n.trim())
+    .filter(Boolean);
+  return { reportFrom, adminTo, teamNumbers };
+}
 
 /** Send message to admin — try text first, fall back to template if 24h window expired */
 async function sendToAdmin(message: string, fromOverride?: string): Promise<void> {
-  const from = fromOverride || REPORT_FROM();
-  const to = ADMIN_TO();
+  const targets = await getNotifyTargets();
+  const from = fromOverride || targets.reportFrom;
+  const to = targets.adminTo;
   try {
     const res = await sendWhatsAppText(to, message, from);
     // yCloud returns error for 24h window violations
@@ -38,20 +57,23 @@ async function sendToAdmin(message: string, fromOverride?: string): Promise<void
 
 // ===== Send report/notification TO admin FROM report number =====
 export async function notifyAdmin(message: string): Promise<void> {
-  await sendToAdmin(message, REPORT_FROM());
+  const { reportFrom } = await getNotifyTargets();
+  await sendToAdmin(message, reportFrom);
 }
 
 // ===== Send to admin personal number FROM report number =====
 export async function notifyAdminPersonal(message: string): Promise<void> {
-  await sendToAdmin(message, REPORT_FROM());
+  const { reportFrom } = await getNotifyTargets();
+  await sendToAdmin(message, reportFrom);
 }
 
 // ===== Send to all team members FROM report number =====
 export async function notifyTeam(message: string): Promise<void> {
-  const numbers = TEAM_NUMBERS();
+  const { teamNumbers, reportFrom } = await getNotifyTargets();
+  const numbers = teamNumbers;
   for (const num of numbers) {
     try {
-      await sendWhatsAppText(num.trim(), message, REPORT_FROM());
+      await sendWhatsAppText(num.trim(), message, reportFrom);
     } catch (err) {
       console.error(`Team notify error (${num}):`, err);
       // Team members — try template as fallback
@@ -83,6 +105,26 @@ export async function notifyAdminNewOrder(order: {
     `💰 المبلغ: *₪${order.total.toLocaleString()}*\n` +
     `📡 المصدر: ${order.source}\n\n` +
     `📋 المنتجات:\n${itemsList}\n\n` +
+    `🔗 ${BASE_URL}/crm/orders?search=${order.orderId}`;
+
+  await notifyAdmin(msg);
+}
+
+// ===== Order Completed Alert =====
+export async function notifyAdminOrderCompleted(order: {
+  orderId: string;
+  customerName: string;
+  customerPhone?: string;
+  total: number;
+  status: string;
+}): Promise<void> {
+  const msg =
+    `✅ *طلب مكتمل*\n\n` +
+    `📦 رقم الطلب: *${order.orderId}*\n` +
+    `👤 الزبون: ${order.customerName}\n` +
+    (order.customerPhone ? `📞 الهاتف: ${order.customerPhone}\n` : "") +
+    `💰 المبلغ: *₪${order.total.toLocaleString()}*\n` +
+    `📌 الحالة: ${order.status}\n\n` +
     `🔗 ${BASE_URL}/crm/orders?search=${order.orderId}`;
 
   await notifyAdmin(msg);
@@ -192,10 +234,33 @@ export async function sendDailyReportLink(): Promise<void> {
   const msg =
     `📊 *التقرير اليومي — ${today}*\n\n` +
     `اضغط على الرابط لعرض التقرير المفصل:\n\n` +
-    `🔗 ${BASE_URL}/api/reports/daily?date=${today}\n\n` +
+    `🔗 ${BASE_URL}/api/reports/daily?date=${today}\n` +
+    `📄 PDF: ${BASE_URL}/api/reports/daily?date=${today}&format=pdf\n\n` +
     `صباح الخير! ☀️`;
 
   await notifyAdmin(msg);
+
+  try {
+    const email = await getProvider<EmailProvider>("email");
+    if (!email) return;
+    const waCfg = await getIntegrationConfig("whatsapp");
+    const to = waCfg.reports_email || waCfg.completed_orders_email || "bawaya@icloud.com";
+    const data = await getDailyReportData(today);
+    const html = buildDailyReportHtml(data);
+    const pdf = await buildDailyReportPdf(data);
+    await email.send({
+      to,
+      subject: `📊 التقرير اليومي - ${today}`,
+      html,
+      attachments: [{
+        filename: `daily-report-${today}.pdf`,
+        content: Buffer.from(pdf).toString("base64"),
+        contentType: "application/pdf",
+      }],
+    });
+  } catch (err) {
+    console.error("Daily report email failed:", err);
+  }
 }
 
 // ===== Weekly Report Link =====
@@ -204,8 +269,31 @@ export async function sendWeeklyReportLink(): Promise<void> {
   const msg =
     `📈 *التقرير الأسبوعي — ${today}*\n\n` +
     `اضغط على الرابط لعرض التقرير المفصل:\n\n` +
-    `🔗 ${BASE_URL}/api/reports/weekly?date=${today}\n\n` +
+    `🔗 ${BASE_URL}/api/reports/weekly?date=${today}\n` +
+    `📄 PDF: ${BASE_URL}/api/reports/weekly?date=${today}&format=pdf\n\n` +
     `أسبوع موفق! 🚀`;
 
   await notifyAdmin(msg);
+
+  try {
+    const email = await getProvider<EmailProvider>("email");
+    if (!email) return;
+    const waCfg = await getIntegrationConfig("whatsapp");
+    const to = waCfg.reports_email || waCfg.completed_orders_email || "bawaya@icloud.com";
+    const data = await getWeeklyReportData(today);
+    const html = buildWeeklyReportHtml(data);
+    const pdf = await buildWeeklyReportPdf(data);
+    await email.send({
+      to,
+      subject: `📈 التقرير الأسبوعي - ${data.startDate} إلى ${data.endDate}`,
+      html,
+      attachments: [{
+        filename: `weekly-report-${data.startDate}-to-${data.endDate}.pdf`,
+        content: Buffer.from(pdf).toString("base64"),
+        contentType: "application/pdf",
+      }],
+    });
+  } catch (err) {
+    console.error("Weekly report email failed:", err);
+  }
 }

@@ -1,0 +1,36 @@
+name: Scheduled Reports
+
+on:
+  schedule:
+    # Every 5 minutes. The API route decides when to send
+    # based on configured local schedule (Asia/Jerusalem).
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-reports:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger reports auto scheduler
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing CRON_SECRET GitHub secret"
+            exit 1
+          fi
+
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST "https://clalmobile.com/api/cron/reports" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{"type":"auto"}')
+
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          CODE=$(echo "$RESPONSE" | tail -n1)
+          echo "HTTP: $CODE"
+          echo "$BODY"
+
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            exit 1
+          fi

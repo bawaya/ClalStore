@@ -30,6 +30,7 @@
     "lucide-react": "^0.400.0",
     "mixpanel-browser": "^2.75.0",
     "next": "14.2.35",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.5.207",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
