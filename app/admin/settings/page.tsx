@@ -52,6 +52,7 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
   yCloud: [
     { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
     { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "رقم الهاتف" },
+    { key: "reports_phone_id", label: "📊 Reports Phone ID", type: "text", placeholder: "phone_xxxxx (رقم التقارير المُرسل)" },
     { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
     { key: "admin_phone", label: "📱 رقم الأدمن", type: "text", placeholder: "05X-XXXXXXX — يستقبل إشعارات الطلبات" },
     { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },

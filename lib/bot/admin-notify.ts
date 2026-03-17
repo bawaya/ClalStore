@@ -20,14 +20,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
 async function getNotifyTargets() {
   const waCfg = await getIntegrationConfig("whatsapp");
-  const reportFrom = waCfg.reports_phone || process.env.ADMIN_REPORT_PHONE || "+972537777963";
+  const reportFromId = waCfg.reports_phone_id || process.env.ADMIN_REPORT_PHONE_ID || "";
   const adminTo = waCfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
   const teamRaw = waCfg.team_whatsapp_numbers || process.env.TEAM_WHATSAPP_NUMBERS || "";
   const teamNumbers = String(teamRaw)
     .split(",")
     .map((n) => n.trim())
     .filter(Boolean);
-  return { reportFrom, adminTo, teamNumbers };
+  return { reportFromId, adminTo, teamNumbers };
 }
 
 /** Send message to admin — try text first, fall back to template if 24h window expired */
@@ -35,9 +35,8 @@ async function sendToAdmin(message: string): Promise<void> {
   const targets = await getNotifyTargets();
   const to = targets.adminTo;
   try {
-    // Important: yCloud "from" must be the configured phone_id (handled by sendWhatsAppText).
-    // reports_phone is a business number label and is not valid as yCloud sender id.
-    const res = await sendWhatsAppText(to, message);
+    // Force admin/report notifications to use reports sender id when configured.
+    const res = await sendWhatsAppText(to, message, targets.reportFromId || undefined);
     // yCloud returns error for 24h window violations
     if (res?.error?.code || res?.errorCode) {
       console.warn("[AdminNotify] Text failed (possibly 24h window), trying template...");
@@ -68,11 +67,11 @@ export async function notifyAdminPersonal(message: string): Promise<void> {
 
 // ===== Send to all team members FROM report number =====
 export async function notifyTeam(message: string): Promise<void> {
-  const { teamNumbers } = await getNotifyTargets();
+  const { teamNumbers, reportFromId } = await getNotifyTargets();
   const numbers = teamNumbers;
   for (const num of numbers) {
     try {
-      await sendWhatsAppText(num.trim(), message);
+      await sendWhatsAppText(num.trim(), message, reportFromId || undefined);
     } catch (err) {
       console.error(`Team notify error (${num}):`, err);
       // Team members — try template as fallback
