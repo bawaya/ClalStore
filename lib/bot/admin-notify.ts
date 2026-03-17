@@ -31,12 +31,13 @@ async function getNotifyTargets() {
 }
 
 /** Send message to admin — try text first, fall back to template if 24h window expired */
-async function sendToAdmin(message: string, fromOverride?: string): Promise<void> {
+async function sendToAdmin(message: string): Promise<void> {
   const targets = await getNotifyTargets();
-  const from = fromOverride || targets.reportFrom;
   const to = targets.adminTo;
   try {
-    const res = await sendWhatsAppText(to, message, from);
+    // Important: yCloud "from" must be the configured phone_id (handled by sendWhatsAppText).
+    // reports_phone is a business number label and is not valid as yCloud sender id.
+    const res = await sendWhatsAppText(to, message);
     // yCloud returns error for 24h window violations
     if (res?.error?.code || res?.errorCode) {
       console.warn("[AdminNotify] Text failed (possibly 24h window), trying template...");
@@ -57,23 +58,21 @@ async function sendToAdmin(message: string, fromOverride?: string): Promise<void
 
 // ===== Send report/notification TO admin FROM report number =====
 export async function notifyAdmin(message: string): Promise<void> {
-  const { reportFrom } = await getNotifyTargets();
-  await sendToAdmin(message, reportFrom);
+  await sendToAdmin(message);
 }
 
 // ===== Send to admin personal number FROM report number =====
 export async function notifyAdminPersonal(message: string): Promise<void> {
-  const { reportFrom } = await getNotifyTargets();
-  await sendToAdmin(message, reportFrom);
+  await sendToAdmin(message);
 }
 
 // ===== Send to all team members FROM report number =====
 export async function notifyTeam(message: string): Promise<void> {
-  const { teamNumbers, reportFrom } = await getNotifyTargets();
+  const { teamNumbers } = await getNotifyTargets();
   const numbers = teamNumbers;
   for (const num of numbers) {
     try {
-      await sendWhatsAppText(num.trim(), message, reportFrom);
+      await sendWhatsAppText(num.trim(), message);
     } catch (err) {
       console.error(`Team notify error (${num}):`, err);
       // Team members — try template as fallback
