@@ -162,7 +162,13 @@ export async function POST(req: NextRequest) {
     // For text/button messages or media with caption, process through bot
     let response = { text: "" } as { text: string; quickReplies?: string[] };
     if (hasText) {
-      response = await handleWhatsAppMessage(msg);
+      try {
+        response = await handleWhatsAppMessage(msg);
+        console.log("Bot response for", msg.from, ":", JSON.stringify({ intent: response.text?.substring(0, 80), hasQuickReplies: !!response.quickReplies }));
+      } catch (err) {
+        console.error("handleWhatsAppMessage error:", err);
+        response.text = "عذراً، حدث خطأ. حاول مرة ثانية 🙏";
+      }
     } else if (isMedia) {
       // Media without caption — acknowledge receipt
       const { getTemplate } = await import("@/lib/bot/templates");

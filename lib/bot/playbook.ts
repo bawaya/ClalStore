@@ -138,6 +138,7 @@ export interface ProductSearchParams {
 
 export async function searchProducts(params: ProductSearchParams): Promise<Product[]> {
   const s = db();
+  if (!s) return [];
   let q = s.from("products").select("*").eq("active", true).eq("type", "device");
 
   if (params.inStockOnly !== false) q = q.gt("stock", 0);
@@ -145,7 +146,8 @@ export async function searchProducts(params: ProductSearchParams): Promise<Produ
   if (params.minPrice) q = q.gte("price", params.minPrice);
   if (params.maxPrice) q = q.lte("price", params.maxPrice);
   if (params.model) {
-    q = q.ilike("name_ar", `%${params.model}%`);
+    // Search across all name columns
+    q = q.or(`name_ar.ilike.%${params.model}%,name_he.ilike.%${params.model}%,name_en.ilike.%${params.model}%`);
   }
 
   const { data } = await q
@@ -159,32 +161,27 @@ export async function searchProducts(params: ProductSearchParams): Promise<Produ
 // ===== Search by model name (flexible) =====
 export async function searchByModel(model: string, storage?: string): Promise<Product[]> {
   const s = db();
-  // Try exact name_ar match first
-  let q = s.from("products").select("*").eq("active", true).gt("stock", 0);
+  if (!s) return [];
 
-  // Use name_ar ilike for Arabic model names
-  q = q.ilike("name_ar", `%${model}%`);
+  // Try name_ar, name_he, then name_en — covers all language variants
+  for (const field of ["name_ar", "name_he", "name_en"] as const) {
+    const { data } = await s.from("products").select("*")
+      .eq("active", true).gt("stock", 0)
+      .ilike(field, `%${model}%`)
+      .order("price", { ascending: true }).limit(5);
 
-  const { data } = await q.order("price", { ascending: true }).limit(5);
-
-  if (data && data.length > 0) {
-    // If storage specified, prefer exact match
-    if (storage) {
-      const exact = (data as Product[]).filter(p =>
-        p.name_he?.toLowerCase().includes(storage.toLowerCase())
-      );
-      if (exact.length > 0) return exact;
+    if (data && data.length > 0) {
+      if (storage) {
+        const exact = (data as Product[]).filter(p =>
+          (p.name_he || p.name_ar || "").toLowerCase().includes(storage.toLowerCase())
+        );
+        if (exact.length > 0) return exact;
+      }
+      return data as Product[];
     }
-    return data as Product[];
   }
 
-  // Fallback: try name_he
-  const { data: data2 } = await s.from("products").select("*")
-    .eq("active", true).gt("stock", 0)
-    .ilike("name_he", `%${model}%`)
-    .order("price", { ascending: true }).limit(5);
-
-  return (data2 as Product[]) || [];
+  return [];
 }
 
 // ===== Recommend based on qualification =====
