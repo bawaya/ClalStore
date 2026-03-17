@@ -203,8 +203,19 @@ function CityCombobox({ value, onChange, error }: { value: string; onChange: (v:
           </div>
         )}
         {trimmedQuery.length >= CITY_SEARCH_MIN_LENGTH && open && results.length === 0 && (
-          <div className="absolute z-50 w-full mt-1 bg-surface-elevated border border-surface-border rounded-xl shadow-2xl p-3 text-center text-muted text-xs">
-            لم يتم العثور على مدينة
+          <div className="absolute z-50 w-full mt-1 overflow-hidden rounded-xl border border-surface-border bg-surface-elevated shadow-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                onChange(trimmedQuery);
+                setQuery(trimmedQuery);
+                setOpen(false);
+              }}
+              className="w-full border-0 bg-transparent px-3 py-2 text-right text-white transition-colors hover:bg-brand/10"
+            >
+              <div className="font-arabic text-sm font-medium">استخدم النص كما أدخلته</div>
+              <div className="mt-0.5 text-[11px] text-dim">{trimmedQuery}</div>
+            </button>
           </div>
         )}
       </div>
