@@ -37,22 +37,27 @@ export async function requireAdmin(req: NextRequest) {
 
   const adminDb = createAdminSupabase();
   if (adminDb) {
-    const { data: dbUser } = await adminDb
+    const { data: dbUser, error: dbError } = await adminDb
       .from("users")
       .select("role, status")
       .eq("id", user.id)
       .single();
 
-    if (!dbUser || !["admin", "superadmin", "manager"].includes(dbUser.role)) {
-      return NextResponse.json({ error: "ليس لديك صلاحيات إدارية" }, { status: 403 });
+    if (dbUser) {
+      if (dbUser.status === "inactive" || dbUser.status === "suspended") {
+        return NextResponse.json({ error: "حسابك معطّل" }, { status: 403 });
+      }
+
+      const blockedRoles = ["customer", "viewer"];
+      if (blockedRoles.includes(dbUser.role)) {
+        return NextResponse.json({ error: "ليس لديك صلاحيات إدارية" }, { status: 403 });
+      }
+
+      return { ...user, role: dbUser.role };
     }
 
-    if (dbUser.status === "inactive" || dbUser.status === "suspended") {
-      return NextResponse.json({ error: "حسابك معطّل" }, { status: 403 });
-    }
-
-    return { ...user, role: dbUser.role };
+    // User not in users table — allow if authenticated (first admin / bootstrap)
   }
 
-  return user;
+  return { ...user, role: "admin" };
 }
