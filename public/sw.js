@@ -3,7 +3,7 @@
 // Cache-first for static assets, network-first for API
 // =====================================================
 
-const CACHE_NAME = "clalmobile-v1";
+const CACHE_NAME = "clalmobile-v2";
 const STATIC_ASSETS = [
   "/",
   "/store",
@@ -19,35 +19,6 @@ self.addEventListener("install", (event) => {
     })
   );
   self.skipWaiting();
-});
-
-// Push — show notification with event.data
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
-  let data = { title: "ClalMobile", body: "" };
-  try {
-    const parsed = event.data.json();
-    data = { title: parsed.title || data.title, body: parsed.body || parsed.message || data.body, url: parsed.url };
-  } catch {
-    data.body = event.data.text();
-  }
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-72.png",
-      data: { url: data.url },
-    })
-  );
-});
-
-// Notification click — open URL if provided
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const url = event.notification.data?.url;
-  if (url) {
-    event.waitUntil(self.clients.openWindow(url));
-  }
 });
 
 // Activate — clean up old caches
