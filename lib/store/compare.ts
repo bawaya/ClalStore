@@ -51,8 +51,19 @@ function saveToStorage(items: CompareProduct[]) {
   } catch {}
 }
 
+// Hydrate store from localStorage — call this in component useEffect
+export function hydrateCompareStore() {
+  const items = loadFromStorage();
+  if (items.length > 0) {
+    useCompare.setState({ items });
+  }
+}
+
+// NOTE on hydration: We start with empty array for SSR consistency
+// and hydrate from localStorage via hydrateCompareStore() in component useEffect.
+
 export const useCompare = create<CompareStore>((set, get) => ({
-  items: loadFromStorage(),
+  items: [], // Start empty for SSR — hydrate on mount
 
   addItem: (product: Product) => {
     const current = get().items;

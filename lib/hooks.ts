@@ -21,11 +21,12 @@ export interface ScreenInfo {
 }
 
 export function useScreen(): ScreenInfo {
-  const [width, setWidth] = useState(
-    typeof window !== "undefined" ? window.innerWidth : 1024
-  );
+  // Always start with 1024 (desktop) — matches SSR to avoid hydration mismatch
+  const [width, setWidth] = useState(1024);
 
   useEffect(() => {
+    // Set actual width after mount
+    setWidth(window.innerWidth);
     const handleResize = () => setWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -81,21 +82,27 @@ export function useDebounce<T>(value: T, delay: number = 300): T {
 
 // ===== useLocalStorage =====
 export function useLocalStorage<T>(key: string, initialValue: T) {
-  const [value, setValue] = useState<T>(() => {
-    if (typeof window === "undefined") return initialValue;
+  // Always start with initialValue for SSR/hydration consistency
+  const [value, setValue] = useState<T>(initialValue);
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  // Hydrate from localStorage after mount
+  useEffect(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
+      if (item) setValue(JSON.parse(item));
+    } catch {}
+    setHasHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
+  // Persist changes after hydration
   useEffect(() => {
+    if (!hasHydrated) return;
     try {
       window.localStorage.setItem(key, JSON.stringify(value));
     } catch {}
-  }, [key, value]);
+  }, [key, value, hasHydrated]);
 
   return [value, setValue] as const;
 }
