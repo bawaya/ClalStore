@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Homepage (Landing Page)
@@ -35,9 +35,7 @@ export default async function HomePage() {
       getLinePlans(),
       getWebsiteContent(),
     ]);
-  } catch (e) {
-    console.error("[HomePage] Failed to fetch data:", e);
-  }
+  } catch {}
 
   return <HomeClient products={products} plans={plans} cms={cms} />;
 }

@@ -1,41 +1,21 @@
-import type { Metadata, Viewport } from "next";
-import { Tajawal, Heebo, David_Libre } from "next/font/google";
+import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { CookieConsent } from "@/components/shared/CookieConsent";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
 import { Analytics } from "@/components/shared/Analytics";
 import { Providers } from "@/components/shared/Providers";
 
-const tajawal = Tajawal({
-  subsets: ["arabic", "latin"],
-  weight: ["400", "500", "700", "800", "900"],
-  display: "swap",
-  variable: "--font-tajawal",
-});
-
-const heebo = Heebo({
-  subsets: ["hebrew", "latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  display: "swap",
-  variable: "--font-heebo",
-});
-
-const davidLibre = David_Libre({
-  subsets: ["hebrew", "latin"],
-  weight: ["400", "500", "700"],
-  display: "swap",
-  variable: "--font-david-libre",
-});
-
-export const viewport: Viewport = {
-  themeColor: "#c41040",
-};
-
 export const metadata: Metadata = {
   title: "ClalMobile — وكيل رسمي لـ HOT Mobile",
   description: "متجر إلكتروني لبيع أجهزة وإكسسوارات وباقات HOT Mobile. توصيل لكل إسرائيل.",
   keywords: ["HOT Mobile", "ClalMobile", "أجهزة", "إكسسوارات", "باقات"],
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/favicon.svg",
+    apple: "/icons/apple-touch-icon.svg",
+    shortcut: "/icons/favicon.svg",
+  },
+  themeColor: "#c41040",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -57,12 +37,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning style={{ backgroundColor: '#09090b', colorScheme: 'dark' }} className={`${tajawal.variable} ${heebo.variable} ${davidLibre.variable}`}>
+    <html lang="ar" dir="rtl" suppressHydrationWarning style={{ backgroundColor: '#09090b', colorScheme: 'dark' }}>
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ClalMobile" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap"
+          rel="stylesheet"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
