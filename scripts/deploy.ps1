@@ -2,7 +2,7 @@
 # Usage: .\scripts\deploy.ps1
 
 Write-Host "=== Building with OpenNext ===" -ForegroundColor Cyan
-npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
+npx @opennextjs/cloudflare build --dangerouslyUseUnsupportedNextVersion
 if ($LASTEXITCODE -ne 0) { Write-Host "Build failed!" -ForegroundColor Red; exit 1 }
 
 Write-Host "`n=== Preparing for Pages deployment ===" -ForegroundColor Cyan

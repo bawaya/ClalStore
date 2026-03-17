@@ -16,33 +16,38 @@ export function WebChatWidget() {
   const scr = useScreen();
   const { t } = useLang();
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState<Message[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const stored = sessionStorage.getItem("clal_webchat_msgs");
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  });
+  const [msgs, setMsgs] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [escalated, setEscalated] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return sessionStorage.getItem("clal_webchat_escalated") === "true";
-  });
+  const [escalated, setEscalated] = useState(false);
   const [unread, setUnread] = useState(0);
-  const [sessionId] = useState(() => {
-    if (typeof window === "undefined") return `wc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const stored = sessionStorage.getItem("clal_webchat_session");
-    if (stored) return stored;
-    const id = `wc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    sessionStorage.setItem("clal_webchat_session", id);
-    return id;
-  });
+  const [sessionId, setSessionId] = useState("");
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate from sessionStorage after mount (prevents SSR mismatch)
+  useEffect(() => {
+    try {
+      const storedMsgs = sessionStorage.getItem("clal_webchat_msgs");
+      if (storedMsgs) setMsgs(JSON.parse(storedMsgs));
+    } catch {}
+    setEscalated(sessionStorage.getItem("clal_webchat_escalated") === "true");
+    const storedSession = sessionStorage.getItem("clal_webchat_session");
+    if (storedSession) {
+      setSessionId(storedSession);
+    } else {
+      const id = `wc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      sessionStorage.setItem("clal_webchat_session", id);
+      setSessionId(id);
+    }
+    setHydrated(true);
+  }, []);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-scroll
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
+  // Persist messages and escalation state
   useEffect(() => {
     try {
       sessionStorage.setItem("clal_webchat_msgs", JSON.stringify(msgs.slice(-50)));
@@ -53,6 +58,7 @@ export function WebChatWidget() {
     try { sessionStorage.setItem("clal_webchat_escalated", String(escalated)); } catch {}
   }, [escalated]);
 
+  // Welcome message on first open
   useEffect(() => {
     if (open && msgs.length === 0) {
       setMsgs([{
@@ -64,8 +70,9 @@ export function WebChatWidget() {
       }]);
     }
     if (open) setUnread(0);
-  }, [open, msgs.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, msgs.length]);
 
+  // Focus input when opened
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 200); }, [open]);
 
   const send = useCallback(async (text: string) => {
@@ -112,12 +119,14 @@ export function WebChatWidget() {
     }
   }, [loading, escalated, sessionId, open]);
 
+  // === Render formatted text (bold, links, phone numbers) ===
   const renderText = (text: string) => {
     const parts = text.split(/(\*[^*]+\*|https?:\/\/[^\s]+|0\d{1,2}[- ]?\d{3}[- ]?\d{4})/g);
     return parts.map((part, i) => {
       if (part.startsWith("*") && part.endsWith("*")) {
         return <strong key={i} className="font-bold">{part.slice(1, -1)}</strong>;
       }
+      // Phone numbers → clickable tel: and wa.me links
       if (/^0\d{1,2}[- ]?\d{3}[- ]?\d{4}$/.test(part)) {
         const clean = part.replace(/[-\s]/g, "");
         const intl = "972" + clean.slice(1);
@@ -125,7 +134,7 @@ export function WebChatWidget() {
           <span key={i} className="inline-flex gap-1.5 flex-wrap">
             <a href={`tel:${clean}`} className="text-brand underline" onClick={(e) => e.stopPropagation()}>📞 {part}</a>
             <a href={`https://wa.me/${intl}`} target="_blank" rel="noopener noreferrer"
-              className="text-state-success underline" onClick={(e) => e.stopPropagation()}>💬 واتساب</a>
+              className="text-green-400 underline" onClick={(e) => e.stopPropagation()}>💬 واتساب</a>
           </span>
         );
       }
@@ -147,20 +156,19 @@ export function WebChatWidget() {
     return (
       <button
         onClick={() => setOpen(true)}
-        aria-label="فتح المحادثة"
-        className="fixed z-chat rounded-full shadow-2xl flex items-center justify-center cursor-pointer border-0 transition-transform hover:scale-110"
+        className="fixed z-[9999] rounded-full shadow-2xl flex items-center justify-center cursor-pointer border-0 transition-transform hover:scale-110"
         style={{
           bottom: scr.mobile ? 20 : 24,
           left: scr.mobile ? 14 : 24,
           width: scr.mobile ? 56 : 60,
           height: scr.mobile ? 56 : 60,
-          background: "linear-gradient(135deg, var(--color-brand), var(--color-brand-light))",
+          background: "linear-gradient(135deg, #c41040, #ff3366)",
           marginBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
         <span style={{ fontSize: scr.mobile ? 24 : 26 }}>💬</span>
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 bg-brand text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
             {unread}
           </span>
         )}
@@ -173,7 +181,7 @@ export function WebChatWidget() {
 
   return (
     <div
-      className="fixed z-chat flex flex-col glass-card-static text-white overflow-hidden"
+      className="fixed z-[9999] flex flex-col bg-surface-bg text-white overflow-hidden"
       dir="rtl"
       style={{
         width: w,
@@ -181,6 +189,7 @@ export function WebChatWidget() {
         bottom: scr.mobile ? 0 : 24,
         left: scr.mobile ? 0 : 24,
         borderRadius: scr.mobile ? 0 : 20,
+        border: scr.mobile ? "none" : "1px solid #27272a",
         boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
       }}
     >
@@ -195,7 +204,6 @@ export function WebChatWidget() {
         <button
           onClick={() => setOpen(false)}
           className="w-8 h-8 rounded-full bg-white/10 border-0 text-white cursor-pointer flex items-center justify-center text-sm"
-          aria-label="إغلاق المحادثة"
         >
           ✕
         </button>
@@ -211,16 +219,20 @@ export function WebChatWidget() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 bg-transparent">
+      <div
+        className="flex-1 overflow-y-auto px-3 py-3 space-y-2"
+        style={{ background: "#0a0a0c" }}
+      >
         {msgs.map((m) => (
           <div key={m.id}>
             <div className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}>
               <div
-                className={`max-w-[85%] rounded-2xl px-3 py-2 whitespace-pre-wrap ${m.role === "bot" ? "glass-elevated" : ""}`}
+                className="max-w-[85%] rounded-2xl px-3 py-2 whitespace-pre-wrap"
                 style={{
                   fontSize: scr.mobile ? 12 : 13,
                   lineHeight: 1.6,
-                  background: m.role === "user" ? "#c41040" : undefined,
+                  background: m.role === "user" ? "#c41040" : "#18181b",
+                  border: m.role === "bot" ? "1px solid #27272a" : "none",
                   borderTopLeftRadius: m.role === "user" ? 4 : 20,
                   borderTopRightRadius: m.role === "bot" ? 4 : 20,
                 }}
@@ -232,6 +244,7 @@ export function WebChatWidget() {
               {m.time}
             </div>
 
+            {/* Quick Replies */}
             {m.quickReplies && m.quickReplies.length > 0 && (
               <div className="flex gap-1 mt-1.5 flex-wrap justify-end">
                 {m.quickReplies.map((qr, i) => (
@@ -249,9 +262,10 @@ export function WebChatWidget() {
           </div>
         ))}
 
+        {/* Typing indicator */}
         {loading && (
           <div className="flex justify-end">
-            <div className="glass-elevated rounded-2xl px-4 py-2.5 flex gap-1.5 items-center">
+            <div className="bg-surface-card border border-surface-border rounded-2xl px-4 py-2.5 flex gap-1.5 items-center">
               <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
               <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
               <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -264,14 +278,14 @@ export function WebChatWidget() {
 
       {/* Escalation Banner */}
       {escalated && (
-        <div className="px-4 py-2 glass-elevated border-t border-yellow-600/30 text-center text-[11px] text-yellow-300">
+        <div className="px-4 py-2 bg-yellow-600/20 border-t border-yellow-600/30 text-center text-[11px] text-yellow-300">
           {t("chat.escalatedBanner")}
         </div>
       )}
 
       {/* Input */}
       <div
-        className="flex items-center gap-2 border-t border-surface-border flex-shrink-0 glass-bottom-bar"
+        className="flex items-center gap-2 border-t border-surface-border flex-shrink-0 bg-surface-card"
         style={{ padding: scr.mobile ? "10px 12px" : "10px 14px", paddingBottom: scr.mobile ? "calc(10px + env(safe-area-inset-bottom, 0px))" : "10px" }}
       >
         <button
@@ -283,7 +297,7 @@ export function WebChatWidget() {
         </button>
         <input
           ref={inputRef}
-          className="input flex-1 rounded-full text-right"
+          className="flex-1 bg-surface-elevated rounded-full border border-surface-border text-white outline-none text-right"
           style={{ padding: "8px 14px", fontSize: scr.mobile ? 12 : 13 }}
           placeholder={escalated ? t("chat.waitingAgent") : t("chat.placeholder")}
           value={input}

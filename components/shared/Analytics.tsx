@@ -1,43 +1,28 @@
-"use client";
+﻿"use client";
 
 // =====================================================
 // ClalMobile — Analytics Script Injection
-// Google Analytics 4 + Meta Pixel + Mixpanel
+// Google Analytics 4 + Meta (Facebook) Pixel
+// Reads settings from DB — no hardcoded IDs
 // =====================================================
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Script from "next/script";
-import mixpanel from "mixpanel-browser";
 
-const GA_FALLBACK = "G-TEHBT6D11N";
-const MIXPANEL_TOKEN = "af2deab5f9f5b17175d0c6b69b1f59";
-
-let mixpanelReady = false;
-
-function initMixpanel() {
-  if (mixpanelReady) return;
-  try {
-    mixpanel.init(MIXPANEL_TOKEN, {
-      autocapture: true,
-      record_sessions_percent: 100,
-      track_pageview: true,
-      persistence: "localStorage",
-    });
-    mixpanelReady = true;
-  } catch {}
-}
+// Map GA4 event names to Meta Pixel standard events
+const GA4_TO_META: Record<string, string> = {
+  view_item: "ViewContent",
+  add_to_cart: "AddToCart",
+  begin_checkout: "InitiateCheckout",
+  purchase: "Purchase",
+  search: "Search",
+};
 
 export function Analytics() {
-  const [gaId, setGaId] = useState(GA_FALLBACK);
+  const [gaId, setGaId] = useState("");
   const [pixelId, setPixelId] = useState("");
-  const mixpanelInit = useRef(false);
 
   useEffect(() => {
-    if (!mixpanelInit.current) {
-      initMixpanel();
-      mixpanelInit.current = true;
-    }
-
     async function loadSettings() {
       try {
         const res = await fetch("/api/settings/public");
@@ -96,22 +81,22 @@ export function Analytics() {
   );
 }
 
-// ===== Mixpanel helper =====
-function mp(eventName: string, props?: Record<string, any>) {
-  if (mixpanelReady) {
-    try { mixpanel.track(eventName, props); } catch {}
-  }
-}
-
 // ===== Analytics Event Helpers =====
+
 export function trackEvent(eventName: string, params?: Record<string, any>) {
+  // GA4
   if (typeof window !== "undefined" && (window as any).gtag) {
     (window as any).gtag("event", eventName, params);
   }
+  // Meta Pixel — use standard event name
   if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("track", eventName, params);
+    const metaEvent = GA4_TO_META[eventName];
+    if (metaEvent) {
+      (window as any).fbq("track", metaEvent, params);
+    } else {
+      (window as any).fbq("trackCustom", eventName, params);
+    }
   }
-  mp(eventName, params);
 }
 
 export function trackPurchase(value: number, currency: string = "ILS", orderId?: string) {
@@ -119,7 +104,6 @@ export function trackPurchase(value: number, currency: string = "ILS", orderId?:
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "Purchase", { value, currency });
   }
-  mp("Purchase", { value, currency, order_id: orderId });
 }
 
 export function trackAddToCart(productName: string, price: number) {
@@ -127,7 +111,6 @@ export function trackAddToCart(productName: string, price: number) {
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "AddToCart", { content_name: productName, value: price, currency: "ILS" });
   }
-  mp("Add to Cart", { product: productName, price, currency: "ILS" });
 }
 
 export function trackViewProduct(productName: string, price: number) {
@@ -135,7 +118,6 @@ export function trackViewProduct(productName: string, price: number) {
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "ViewContent", { content_name: productName, value: price, currency: "ILS" });
   }
-  mp("View Product", { product: productName, price, currency: "ILS" });
 }
 
 export function trackBeginCheckout(value: number, items: { item_name: string; price: number; quantity: number }[]) {
@@ -143,7 +125,6 @@ export function trackBeginCheckout(value: number, items: { item_name: string; pr
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "InitiateCheckout", { value, currency: "ILS" });
   }
-  mp("Begin Checkout", { value, currency: "ILS", item_count: items.length });
 }
 
 export function trackPurchaseWithItems(orderId: string, value: number, items: { item_name: string; price: number; quantity: number }[]) {
@@ -156,7 +137,6 @@ export function trackPurchaseWithItems(orderId: string, value: number, items: { 
       items: items.map((i) => ({ item_name: i.item_name, price: i.price, quantity: i.quantity })),
     });
   }
-  mp("Purchase Complete", { order_id: orderId, value, currency: "ILS", items: items.map((i) => i.item_name) });
 }
 
 export function trackSearch(searchTerm: string, resultsCount: number) {
@@ -166,7 +146,6 @@ export function trackSearch(searchTerm: string, resultsCount: number) {
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "Search", { search_string: searchTerm, content_category: "store" });
   }
-  mp("Search", { query: searchTerm, results_count: resultsCount });
 }
 
 export function trackSelectItem(productName: string, price: number, listName?: string) {
@@ -179,7 +158,6 @@ export function trackSelectItem(productName: string, price: number, listName?: s
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "ViewContent", { content_name: productName, value: price, currency: "ILS" });
   }
-  mp("Select Item", { product: productName, price, list: listName });
 }
 
 export function trackViewItemList(listName: string, items: { item_name: string; price: number }[]) {
@@ -192,7 +170,6 @@ export function trackViewItemList(listName: string, items: { item_name: string; 
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "ViewContent", { content_category: listName, content_type: "product_group" });
   }
-  mp("View Item List", { list: listName, item_count: items.length });
 }
 
 export function trackRemoveFromCart(productName: string, price: number) {
@@ -203,7 +180,6 @@ export function trackRemoveFromCart(productName: string, price: number) {
       currency: "ILS",
     });
   }
-  mp("Remove from Cart", { product: productName, price });
 }
 
 export function trackLogin(method: string) {
@@ -213,7 +189,6 @@ export function trackLogin(method: string) {
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("trackCustom", "Login", { method });
   }
-  mp("Login", { method });
 }
 
 export function trackSignUp(method: string) {
@@ -223,7 +198,6 @@ export function trackSignUp(method: string) {
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("track", "CompleteRegistration", { method });
   }
-  mp("Sign Up", { method });
 }
 
 export function trackShare(method: string, contentType: string, itemId: string) {
@@ -233,12 +207,10 @@ export function trackShare(method: string, contentType: string, itemId: string) 
   if (typeof window !== "undefined" && (window as any).fbq) {
     (window as any).fbq("trackCustom", "Share", { method, content_type: contentType, item_id: itemId });
   }
-  mp("Share", { method, content_type: contentType, item_id: itemId });
 }
 
 export function trackException(description: string, fatal: boolean = false) {
   if (typeof window !== "undefined" && (window as any).gtag) {
     (window as any).gtag("event", "exception", { description, fatal });
   }
-  mp("Exception", { description, fatal });
 }

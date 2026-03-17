@@ -1,4 +1,4 @@
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 /**
  * مطابقة مباشرة بدون AI — لملفات Excel/CSV

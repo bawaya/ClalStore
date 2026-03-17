@@ -1,4 +1,4 @@
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Search Pexels for phone color images

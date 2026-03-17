@@ -1,4 +1,4 @@
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCRMTasks, createTask, updateTask, deleteTask } from "@/lib/crm/queries";

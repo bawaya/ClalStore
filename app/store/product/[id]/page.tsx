@@ -1,4 +1,4 @@
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 import { notFound } from "next/navigation";
 import { getProduct, getProducts } from "@/lib/store/queries";

@@ -1,4 +1,4 @@
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSettings, updateSetting, getIntegrations, updateIntegration, logAction } from "@/lib/admin/queries";
