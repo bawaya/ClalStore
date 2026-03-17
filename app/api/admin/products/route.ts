@@ -10,6 +10,60 @@ import { getAdminProducts, createProduct, updateProduct, deleteProduct, logActio
 import { requireAdmin } from "@/lib/admin/auth";
 import { productSchema, productUpdateSchema, validateBody } from "@/lib/admin/validators";
 
+function parseStorageRank(storage: string): number {
+  const s = String(storage || "").toUpperCase().replace(/\s/g, "");
+  const m = s.match(/(\d+)(GB|TB)/);
+  if (!m) return Number.MAX_SAFE_INTEGER;
+  const value = Number(m[1]);
+  return m[2] === "TB" ? value * 1024 : value;
+}
+
+function normalizePricingPayload(input: Record<string, any>) {
+  const data: Record<string, any> = { ...input };
+  const rawVariants = Array.isArray(data.variants) ? data.variants : null;
+
+  if (rawVariants) {
+    const normalized = rawVariants
+      .map((v: any) => {
+        const storage = String(v?.storage || "").trim();
+        if (!storage) return null;
+        const price = Math.max(0, Number(v?.price || 0));
+        const oldRaw = v?.old_price == null || v?.old_price === "" ? undefined : Math.max(0, Number(v.old_price));
+        const oldPrice =
+          oldRaw == null
+            ? undefined
+            : oldRaw < price
+              ? price
+              : oldRaw === price
+                ? undefined
+                : oldRaw;
+
+        return {
+          ...v,
+          storage,
+          price,
+          old_price: oldPrice,
+        };
+      })
+      .filter(Boolean);
+
+    normalized.sort((a: any, b: any) => parseStorageRank(a.storage) - parseStorageRank(b.storage));
+    data.variants = normalized;
+    data.storage_options = [...new Set(normalized.map((v: any) => v.storage))];
+
+    const prices = normalized.map((v: any) => Number(v.price)).filter((p: number) => p > 0);
+    if (prices.length > 0) data.price = Math.min(...prices);
+  }
+
+  if (data.price != null) data.price = Math.max(0, Number(data.price));
+  if (data.old_price != null) {
+    const old = Math.max(0, Number(data.old_price));
+    data.old_price = old > data.price ? old : undefined;
+  }
+
+  return data;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
@@ -28,7 +82,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const v = validateBody(body, productSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const data = v.data!;
+    const data = normalizePricingPayload(v.data!);
     const product = await createProduct(data);
     await logAction("مدير", `إضافة منتج: ${data.name_ar}`, "product", product.id);
     return NextResponse.json({ data: product });
@@ -46,7 +100,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     const v = validateBody(updates, productUpdateSchema);
     if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-    const data = v.data!;
+    const data = normalizePricingPayload(v.data!);
     const product = await updateProduct(id, data);
     await logAction("مدير", `تعديل منتج: ${data.name_ar || id}`, "product", id);
     return NextResponse.json({ data: product });

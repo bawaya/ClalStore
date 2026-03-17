@@ -296,30 +296,16 @@ const PRODUCT_PRICES = {
   // ──── ZTE ────
 };
 
-// Variants that were WRONGLY set by v2 and need reverting to old_price
-const REVERT_VARIANTS = {
-  "abc93db3-ebd8-45ca-86e5-ffc8803852ee": ["512GB"],   // S25+ 512GB was untouched but wrong from earlier
-  "dba567d0-67f5-4d3b-9a5d-eec4d05d3dcc": ["512GB"],   // S25 FE 512GB wrongly set
-  "b24c8fe4-bb30-4fc6-bab4-2bd275e6521c": ["1TB"],     // S24 Ultra 1TB wrongly set to S26 Ultra
-  "32e94455-9769-474c-9642-13ec165cc58c": ["1TB"],     // S24 Ultra dup 1TB
-  "4960bfb4-e86a-4845-af88-270ed9b8a101": ["512GB"],   // S24 FE 512GB
-  "042fe66a-7cb1-4b1f-b365-444267ee3c9a": ["256GB"],   // A26 256GB wrongly set to S26
-  "2ae692bc-7913-44af-9516-8634479e66f0": ["256GB"],   // Pixel 9 256GB wrongly set
-  "4c89a46a-fc14-4577-94f9-38f577594e06": ["128GB"],   // Pixel 9 Pro XL 128GB wrongly set
-  "212ed2e3-dad2-4933-8231-f5e1b3c8c328": ["256GB"],   // Poco X7 Pro 256GB wrongly set
-  "c5da21af-1ce2-4bd5-8fa8-f1c3eae0ce12": ["256GB"],   // A36 256GB wrongly set
-  "887759b6-b30e-4c11-ae76-9179adc37f2f": ["256GB"],   // A53 256GB wrongly set
-  "21d6e78b-83b9-46e4-81d3-faeedb2b29fb": ["256GB"],   // A54 256GB wrongly set
-  "92580c49-ecc5-48a9-b1b6-97319fc467b4": ["256GB"],   // Reno 6 256GB wrongly set
-  "36ef24dc-17de-4d73-902b-44fe787f5b1d": ["128GB"],   // Reno 7 128GB wrongly set
-  "bc837e6a-817e-40dc-b063-cf652e5691f9": ["256GB"],   // 15T Pro 256GB wrongly set
-  "5edc6689-0940-4ec7-9fd7-b08c6164f8f9": ["1TB"],     // Z Fold7 1TB (no entry in price list)
-};
-
 function norm(s) { return (s||"").toUpperCase().replace(/\s/g,""); }
+function storageRank(storage) {
+  const m = String(storage || "").toUpperCase().replace(/\s/g, "").match(/(\d+)(GB|TB)/);
+  if (!m) return Number.MAX_SAFE_INTEGER;
+  const n = Number(m[1]);
+  return m[2] === "TB" ? n * 1024 : n;
+}
 
 async function main() {
-  console.log("=== FINAL price correction (explicit ID mapping) ===\n");
+  console.log("=== FINAL price correction (authoritative VAT list) ===\n");
   let updated = 0, errors = 0;
 
   for (const [pid, storageMap] of Object.entries(PRODUCT_PRICES)) {
@@ -332,34 +318,48 @@ async function main() {
     let variants = [...(product.variants || [])];
     let changed = false;
 
-    // 1) Set correct prices from price list
+    // 1) Set authoritative prices from price list
     for (const [storage, { price, monthly }] of Object.entries(storageMap)) {
       const idx = variants.findIndex(v => norm(v.storage) === norm(storage));
       if (idx >= 0) {
-        if (variants[idx].price !== price || variants[idx].monthly_price !== monthly) {
-          const old = variants[idx].price;
-          variants[idx] = { ...variants[idx], old_price: old, price, monthly_price: monthly };
-          console.log(`  ${name} ${storage}: ₪${old} → ₪${price} (×36: ₪${monthly})`);
+        const prevPrice = Number(variants[idx].price || 0);
+        const prevMonthly = Number(variants[idx].monthly_price || 0);
+        const prevOld = Number(variants[idx].old_price || 0);
+        const normalizedOld = prevOld > price ? prevOld : undefined;
+        variants[idx] = { ...variants[idx], price, monthly_price: monthly, old_price: normalizedOld };
+        if (prevPrice !== price || prevMonthly !== monthly) {
+          console.log(`  ${name} ${storage}: ₪${prevPrice} → ₪${price} (×36: ₪${monthly})`);
           changed = true;
         }
       } else {
-        variants.push({ storage, price, monthly_price: monthly, old_price: 0 });
+        variants.push({ storage, price, monthly_price: monthly, old_price: undefined });
         console.log(`  ${name} ${storage}: NEW variant → ₪${price} (×36: ₪${monthly})`);
         changed = true;
       }
     }
 
-    // 2) Revert wrongly-set variants
-    const reverts = REVERT_VARIANTS[pid] || [];
-    for (const storage of reverts) {
-      const idx = variants.findIndex(v => norm(v.storage) === norm(storage));
-      if (idx >= 0 && variants[idx].old_price && variants[idx].old_price !== variants[idx].price) {
-        const cur = variants[idx].price;
-        const old = variants[idx].old_price;
-        variants[idx] = { ...variants[idx], price: old, old_price: undefined };
-        console.log(`  ${name} ${storage}: REVERT ₪${cur} → ₪${old}`);
-        changed = true;
+    // 2) Normalize all variants (fix reversed old/new and clean invalid discounts)
+    variants = variants.map((v) => {
+      const p = Number(v.price || 0);
+      const o = v.old_price == null ? undefined : Number(v.old_price);
+      let fixedOld = o;
+
+      if (fixedOld != null && fixedOld < p) {
+        // reversed values entered by mistake
+        return { ...v, price: fixedOld, old_price: p };
       }
+      if (fixedOld != null && fixedOld === p) {
+        fixedOld = undefined;
+      }
+      return { ...v, old_price: fixedOld };
+    });
+
+    // 3) Keep storage options in sync with variants (important for showing 256GB in store)
+    variants.sort((a, b) => storageRank(a.storage) - storageRank(b.storage));
+    const storageOptions = [...new Set(variants.map((v) => String(v.storage || "").trim()).filter(Boolean))];
+
+    if (storageOptions.join("|") !== (product.storage_options || []).join("|")) {
+      changed = true;
     }
 
     if (!changed) continue;
@@ -369,7 +369,8 @@ async function main() {
 
     const { error: upErr } = await db.from("products").update({
       variants,
-      old_price: product.price !== minPrice ? product.price : product.old_price,
+      storage_options: storageOptions,
+      old_price: product.old_price && product.old_price > minPrice ? product.old_price : undefined,
       price: minPrice,
       updated_at: new Date().toISOString(),
     }).eq("id", pid);
