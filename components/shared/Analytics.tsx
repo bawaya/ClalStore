@@ -123,3 +123,48 @@ export function trackViewProduct(productName: string, price: number) {
     (window as any).fbq("track", "ViewContent", { content_name: productName, value: price, currency: "ILS" });
   }
 }
+
+export function trackBeginCheckout(
+  value: number,
+  items: { item_name: string; price: number; quantity: number }[],
+) {
+  trackEvent("begin_checkout", { value, currency: "ILS", items });
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", "InitiateCheckout", { value, currency: "ILS" });
+  }
+}
+
+export function trackPurchaseWithItems(
+  orderId: string,
+  value: number,
+  items: { item_name: string; price: number; quantity: number }[],
+) {
+  trackPurchase(value, "ILS", orderId);
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "purchase", {
+      transaction_id: orderId,
+      value,
+      currency: "ILS",
+      items: items.map((i) => ({ item_name: i.item_name, price: i.price, quantity: i.quantity })),
+    });
+  }
+}
+
+export function trackSearch(searchTerm: string, resultsCount: number) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "search", { search_term: searchTerm, results_count: resultsCount });
+  }
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", "Search", { search_string: searchTerm, content_category: "store" });
+  }
+}
+
+export function trackRemoveFromCart(productName: string, price: number) {
+  if (typeof window !== "undefined" && (window as any).gtag) {
+    (window as any).gtag("event", "remove_from_cart", {
+      items: [{ item_name: productName, price, currency: "ILS" }],
+      value: price,
+      currency: "ILS",
+    });
+  }
+}

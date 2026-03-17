@@ -30,7 +30,9 @@ export async function GET(req: NextRequest) {
 
   if (format === "pdf") {
     const pdf = await buildDailyReportPdf(data);
-    return new NextResponse(pdf, {
+    const body = new Uint8Array(pdf.byteLength);
+    body.set(pdf);
+    return new Response(body, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="daily-report-${dateParam}.pdf"`,
