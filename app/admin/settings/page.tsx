@@ -51,11 +51,11 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
   ],
   yCloud: [
     { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
-    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "رقم الهاتف" },
-    { key: "reports_phone_id", label: "📊 Reports Phone ID", type: "text", placeholder: "phone_xxxxx (رقم التقارير المُرسل)" },
+    { key: "phone_id", label: "🤖 Bot Sender ID", type: "text", placeholder: "+9725XXXXXXX أو sender id" },
+    { key: "reports_phone_id", label: "📊 Reports Sender ID", type: "text", placeholder: "+9725XXXXXXX أو sender id" },
     { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
-    { key: "admin_phone", label: "📱 رقم الأدمن", type: "text", placeholder: "05X-XXXXXXX — يستقبل إشعارات الطلبات" },
-    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },
+    { key: "admin_phone", label: "📱 رقم الأدمن المستلم", type: "text", placeholder: "05X-XXXXXXX" },
+    { key: "team_whatsapp_numbers", label: "👥 أرقام الفريق", type: "text", placeholder: "0500000000,0520000000" },
     { key: "reports_email", label: "📧 إيميل التقارير", type: "email", placeholder: "bawaya@icloud.com" },
     { key: "daily_report_time", label: "🕒 وقت التقرير اليومي", type: "text", placeholder: "15:00" },
     { key: "weekly_report_day", label: "📅 يوم التقرير الأسبوعي", type: "text", placeholder: "thursday" },
@@ -339,7 +339,6 @@ export default function SettingsPage() {
     { key: "whatsapp_number", label: "💬 رقم الواتساب", type: "text" },
     { key: "email", label: "📧 البريد الإلكتروني", type: "text" },
     { key: "admin_phone", label: "👨‍💼 رقم الأدمن (الإشعارات)", type: "text", hint: "يستقبل تنبيهات الطلبات الجديدة والمشاكل" },
-    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", hint: "يستقبل التقارير اليومية والأسبوعية عبر واتساب" },
     { key: "delivery_note_ar", label: "ملاحظة التوصيل (عربي)", type: "text" },
     { key: "delivery_note_he", label: "הערת משלוח (עברית)", type: "text" },
     { key: "accent_color", label: "🎨 اللون الرئيسي", type: "color" },
@@ -481,7 +480,7 @@ export default function SettingsPage() {
                     onChange={(e) => updateSetting(f.key, e.target.value)}
                     onBlur={() => show("✅ تم الحفظ")}
                     dir={f.key.endsWith("_he") ? "rtl" : "auto"}
-                    placeholder={f.key === "admin_phone" || f.key === "reports_phone" ? "05X-XXXXXXX" : undefined}
+                    placeholder={f.key === "admin_phone" ? "05X-XXXXXXX" : undefined}
                   />
                   {"hint" in f && f.hint && (
                     <p className="text-dim mt-0.5" style={{ fontSize: 9, lineHeight: 1.4 }}>{f.hint}</p>

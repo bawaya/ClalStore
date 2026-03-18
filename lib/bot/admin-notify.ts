@@ -30,25 +30,38 @@ async function getNotifyTargets() {
   return { reportFromId, adminTo, teamNumbers };
 }
 
+async function sendAdminTemplate(
+  to: string,
+  templateName: string,
+  params: string[],
+  reportFromId?: string
+): Promise<void> {
+  await sendWhatsAppTemplate(to, templateName, params, reportFromId || undefined);
+}
+
 /** Send message to admin — try text first, fall back to template if 24h window expired */
-async function sendToAdmin(message: string): Promise<void> {
+async function sendToAdmin(
+  message: string,
+  templateName = "clal_admin_alert",
+  templateParams?: string[],
+): Promise<void> {
   const targets = await getNotifyTargets();
   const to = targets.adminTo;
+  const fallbackParams = templateParams && templateParams.length > 0
+    ? templateParams
+    : [message.slice(0, 1024)];
   try {
     // Force admin/report notifications to use reports sender id when configured.
     const res = await sendWhatsAppText(to, message, targets.reportFromId || undefined);
     // yCloud returns error for 24h window violations
     if (res?.error?.code || res?.errorCode) {
       console.warn("[AdminNotify] Text failed (possibly 24h window), trying template...");
-      // Send via utility template — "clal_admin_alert" with body param
-      const shortMsg = message.slice(0, 1024); // Template body param limit
-      await sendWhatsAppTemplate(to, "clal_admin_alert", [shortMsg]);
+      await sendAdminTemplate(to, templateName, fallbackParams, targets.reportFromId);
     }
   } catch (err: any) {
     console.error("[AdminNotify] Text send error, trying template fallback:", err.message);
     try {
-      const shortMsg = message.slice(0, 1024);
-      await sendWhatsAppTemplate(to, "clal_admin_alert", [shortMsg]);
+      await sendAdminTemplate(to, templateName, fallbackParams, targets.reportFromId);
     } catch (templateErr) {
       console.error("[AdminNotify] Template fallback also failed:", templateErr);
     }
@@ -76,7 +89,7 @@ export async function notifyTeam(message: string): Promise<void> {
       console.error(`Team notify error (${num}):`, err);
       // Team members — try template as fallback
       try {
-        await sendWhatsAppTemplate(num.trim(), "clal_admin_alert", [message.slice(0, 1024)]);
+        await sendAdminTemplate(num.trim(), "clal_admin_alert", [message.slice(0, 1024)], reportFromId);
       } catch { /* silent */ }
     }
   }
@@ -105,7 +118,12 @@ export async function notifyAdminNewOrder(order: {
     `📋 المنتجات:\n${itemsList}\n\n` +
     `🔗 ${BASE_URL}/crm/orders?search=${order.orderId}`;
 
-  await notifyAdmin(msg);
+  await sendToAdmin(msg, "clal_admin_new_order", [
+    order.orderId,
+    order.customerName,
+    `₪${order.total.toLocaleString()}`,
+    order.source,
+  ]);
 }
 
 // ===== Order Completed Alert =====
@@ -125,7 +143,12 @@ export async function notifyAdminOrderCompleted(order: {
     `📌 الحالة: ${order.status}\n\n` +
     `🔗 ${BASE_URL}/crm/orders?search=${order.orderId}`;
 
-  await notifyAdmin(msg);
+  await sendToAdmin(msg, "clal_admin_order_completed", [
+    order.orderId,
+    order.customerName,
+    `₪${order.total.toLocaleString()}`,
+    order.status,
+  ]);
 }
 
 // ===== Contact Form Alert =====
@@ -145,7 +168,11 @@ export async function notifyAdminContactForm(contact: {
     `\n💬 الرسالة:\n${contact.message.slice(0, 500)}\n\n` +
     `🔗 ${BASE_URL}/crm/customers`;
 
-  await notifyAdmin(msg);
+  await sendToAdmin(msg, "clal_admin_contact", [
+    contact.name,
+    contact.phone,
+    (contact.subject || "بدون موضوع").slice(0, 60),
+  ]);
 }
 
 // ===== Muhammad Handoff Alert =====
@@ -163,9 +190,11 @@ export async function notifyAdminMuhammadHandoff(details: {
     `💬 محتوى الطلب:\n${details.message.slice(0, 500)}\n\n` +
     `⏰ الوقت: ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}`;
 
-  // Send to admin (Muhammad)
-  await notifyAdmin(msg);
-  await notifyAdminPersonal(msg);
+  await sendToAdmin(msg, "clal_admin_handoff", [
+    details.name,
+    details.phone,
+    details.channel === "whatsapp" ? "واتساب" : "شات الموقع",
+  ]);
 }
 
 // ===== Angry Customer Alert =====
@@ -186,7 +215,11 @@ export async function notifyAdminAngryCustomer(details: {
     `⚠️ يُنصح بالتواصل الفوري مع الزبون!\n` +
     `⏰ الوقت: ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}`;
 
-  await notifyAdmin(msg);
+  await sendToAdmin(msg, "clal_admin_angry_customer", [
+    details.name,
+    details.phone,
+    details.channel === "whatsapp" ? "واتساب" : "شات الموقع",
+  ]);
 }
 
 // ===== New Incoming Message Alert =====
@@ -223,7 +256,11 @@ export async function notifyAdminNewMessage(details: {
     `⏰ ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}\n` +
     `🔗 ${BASE_URL}/crm/inbox`;
 
-  await notifyAdmin(msg);
+  await sendToAdmin(msg, "clal_admin_new_message", [
+    (details.name || "مجهول").slice(0, 60),
+    details.phone,
+    details.isMedia ? "وسائط" : "نص",
+  ]);
 }
 
 // ===== Daily Report Link =====
@@ -236,7 +273,11 @@ export async function sendDailyReportLink(): Promise<void> {
     `📄 PDF: ${BASE_URL}/api/reports/daily?date=${today}&format=pdf\n\n` +
     `صباح الخير! ☀️`;
 
-  await notifyAdmin(msg);
+  await sendToAdmin(msg, "clal_admin_daily_report", [
+    today,
+    `${BASE_URL}/api/reports/daily?date=${today}`,
+    `${BASE_URL}/api/reports/daily?date=${today}&format=pdf`,
+  ]);
 
   try {
     const email = await getProvider<EmailProvider>("email");
@@ -271,7 +312,11 @@ export async function sendWeeklyReportLink(): Promise<void> {
     `📄 PDF: ${BASE_URL}/api/reports/weekly?date=${today}&format=pdf\n\n` +
     `أسبوع موفق! 🚀`;
 
-  await notifyAdmin(msg);
+  await sendToAdmin(msg, "clal_admin_weekly_report", [
+    today,
+    `${BASE_URL}/api/reports/weekly?date=${today}`,
+    `${BASE_URL}/api/reports/weekly?date=${today}&format=pdf`,
+  ]);
 
   try {
     const email = await getProvider<EmailProvider>("email");

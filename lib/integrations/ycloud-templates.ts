@@ -125,6 +125,102 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
+    name: "clal_admin_new_order",
+    category: "UTILITY",
+    language: "ar",
+    components: [
+      {
+        type: "BODY",
+        text: "🆕 طلب جديد\n\nرقم الطلب: {{1}}\nالزبون: {{2}}\nالمبلغ: {{3}}\nالمصدر: {{4}}\n\nراجع الطلب في لوحة التحكم.",
+        example: { body_text: [["ORD-1234", "محمد أحمد", "₪500", "store"]] },
+      },
+    ],
+  },
+  {
+    name: "clal_admin_order_completed",
+    category: "UTILITY",
+    language: "ar",
+    components: [
+      {
+        type: "BODY",
+        text: "✅ طلب مكتمل\n\nرقم الطلب: {{1}}\nالزبون: {{2}}\nالمبلغ: {{3}}\nالحالة: {{4}}\n\nراجع الطلب في CRM.",
+        example: { body_text: [["ORD-1234", "محمد أحمد", "₪500", "delivered"]] },
+      },
+    ],
+  },
+  {
+    name: "clal_admin_contact",
+    category: "UTILITY",
+    language: "ar",
+    components: [
+      {
+        type: "BODY",
+        text: "📩 رسالة تواصل جديدة\n\nالاسم: {{1}}\nالهاتف: {{2}}\nالموضوع: {{3}}\n\nافتح لوحة العملاء لمراجعة التفاصيل.",
+        example: { body_text: [["محمد أحمد", "0501234567", "استفسار عن جهاز"]] },
+      },
+    ],
+  },
+  {
+    name: "clal_admin_handoff",
+    category: "UTILITY",
+    language: "ar",
+    components: [
+      {
+        type: "BODY",
+        text: "👤 طلب تحدث مع محمد\n\nالاسم: {{1}}\nالهاتف: {{2}}\nالقناة: {{3}}\n\nيرجى المتابعة سريعاً.",
+        example: { body_text: [["محمد أحمد", "0501234567", "واتساب"]] },
+      },
+    ],
+  },
+  {
+    name: "clal_admin_angry_customer",
+    category: "UTILITY",
+    language: "ar",
+    components: [
+      {
+        type: "BODY",
+        text: "⚠️ تنبيه زبون غاضب\n\nالاسم: {{1}}\nالهاتف: {{2}}\nالقناة: {{3}}\n\nيفضل التواصل الفوري.",
+        example: { body_text: [["محمد أحمد", "0501234567", "واتساب"]] },
+      },
+    ],
+  },
+  {
+    name: "clal_admin_new_message",
+    category: "UTILITY",
+    language: "ar",
+    components: [
+      {
+        type: "BODY",
+        text: "💬 رسالة جديدة\n\nالاسم: {{1}}\nالهاتف: {{2}}\nالنوع: {{3}}\n\nافتح CRM Inbox للمتابعة.",
+        example: { body_text: [["محمد أحمد", "0501234567", "نص"]] },
+      },
+    ],
+  },
+  {
+    name: "clal_admin_daily_report",
+    category: "UTILITY",
+    language: "ar",
+    components: [
+      {
+        type: "BODY",
+        text: "📊 التقرير اليومي {{1}}\n\nعرض التقرير: {{2}}\nPDF: {{3}}\n\nيوم موفق.",
+        example: { body_text: [["2026-03-12", "https://clalmobile.com/api/reports/daily?date=2026-03-12", "https://clalmobile.com/api/reports/daily?date=2026-03-12&format=pdf"]] },
+      },
+    ],
+  },
+  {
+    name: "clal_admin_weekly_report",
+    category: "UTILITY",
+    language: "ar",
+    components: [
+      {
+        type: "BODY",
+        text: "📈 التقرير الأسبوعي {{1}}\n\nعرض التقرير: {{2}}\nPDF: {{3}}\n\nأسبوع موفق.",
+        example: { body_text: [["2026-03-12", "https://clalmobile.com/api/reports/weekly?date=2026-03-12", "https://clalmobile.com/api/reports/weekly?date=2026-03-12&format=pdf"]] },
+      },
+    ],
+  },
+  {
     name: "clal_order_confirmation",
     category: "UTILITY",
     language: "ar",
