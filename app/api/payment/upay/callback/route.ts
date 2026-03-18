@@ -147,6 +147,16 @@ export async function GET(req: NextRequest) {
           parsedAmount,
           "upay_payment"
         );
+
+        const { notifyAdminNewOrder } = await import("@/lib/bot/admin-notify");
+        await notifyAdminNewOrder({
+          orderId,
+          customerName: (order.customers as any).name || "زبون",
+          customerPhone: (order.customers as any).phone || "",
+          total: Number(parsedAmount || 0),
+          source: "upay_payment",
+          items: [{ name: "Payment callback", qty: 1, price: Number(parsedAmount || 0) }],
+        });
       }
     } catch (notifErr) {
       console.error("[UPay] Notification error:", notifErr);

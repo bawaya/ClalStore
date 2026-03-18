@@ -98,9 +98,9 @@ export async function notifyAdminNewOrder(order: {
   source: string;
   items: { name: string; qty: number; price: number }[];
 }): Promise<void> {
-  const itemsList = order.items
-    .map((i) => `  • ${i.name} × ${i.qty} — ₪${i.price.toLocaleString()}`)
-    .join("\n");
+  const itemsList = order.items.length > 0
+    ? order.items.map((i) => `  • ${i.name} × ${i.qty} — ₪${i.price.toLocaleString()}`).join("\n")
+    : "  • (لا توجد تفاصيل منتجات في هذا المصدر)";
 
   const msg =
     `🆕 *طلب جديد!*\n\n` +
@@ -113,6 +113,33 @@ export async function notifyAdminNewOrder(order: {
     `🔗 ${BASE_URL}/crm/orders?search=${order.orderId}`;
 
   await notifyAdmin(msg);
+
+  try {
+    const email = await getProvider<EmailProvider>("email");
+    if (!email) return;
+    const waCfg = await getIntegrationConfig("whatsapp");
+    const to = waCfg.reports_email || waCfg.completed_orders_email || "bawaya@icloud.com";
+    await email.send({
+      to,
+      subject: `🆕 طلب جديد ${order.orderId}`,
+      html: `
+        <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;padding:18px">
+          <h2 style="margin:0 0 12px;color:#111">🆕 إشعار طلب جديد</h2>
+          <p style="margin:6px 0"><strong>رقم الطلب:</strong> ${order.orderId}</p>
+          <p style="margin:6px 0"><strong>اسم الزبون:</strong> ${order.customerName}</p>
+          <p style="margin:6px 0"><strong>الهاتف:</strong> ${order.customerPhone}</p>
+          <p style="margin:6px 0"><strong>المبلغ:</strong> ₪${order.total.toLocaleString()}</p>
+          <p style="margin:6px 0"><strong>المصدر:</strong> ${order.source}</p>
+          <pre style="white-space:pre-wrap;background:#f8f8f8;border-radius:8px;padding:10px;margin:12px 0">${itemsList}</pre>
+          <p style="margin:14px 0 0">
+            <a href="${BASE_URL}/crm/orders?search=${order.orderId}" style="color:#c41040;text-decoration:none">فتح الطلب في CRM</a>
+          </p>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.error("New order admin email failed:", err);
+  }
 }
 
 // ===== Order Completed Alert =====

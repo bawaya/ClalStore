@@ -221,6 +221,25 @@ export async function POST(req: NextRequest) {
       console.error("WhatsApp notification failed:", notifErr);
     }
 
+    // === 7b. Admin Notifications (WhatsApp + email) ===
+    try {
+      const { notifyAdminNewOrder } = await import("@/lib/bot/admin-notify");
+      await notifyAdminNewOrder({
+        orderId,
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        total,
+        source: source || "store",
+        items: verifiedItems.map((i: any) => ({
+          name: i.name || i.productName || "منتج",
+          qty: i.quantity || 1,
+          price: Number(i.price || 0),
+        })),
+      });
+    } catch (adminErr) {
+      console.error("Admin new-order notification failed:", adminErr);
+    }
+
     // === 8. Email Confirmation (enhanced templates) ===
     if (customer.email) {
       try {
