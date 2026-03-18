@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCRMOrders, updateOrderStatus, addOrderNote, assignOrder } from "@/lib/crm/queries";
+import { getCRMOrders, updateOrderStatus, addOrderNote, assignOrder, deleteOrderCompletely } from "@/lib/crm/queries";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase";
 
@@ -150,6 +150,9 @@ export async function PUT(req: NextRequest) {
       await addOrderNote(body.orderId, auth.id, userName, body.text);
     } else if (body.action === "assign") {
       await assignOrder(body.orderId, body.userId, userName);
+    } else if (body.action === "delete") {
+      await deleteOrderCompletely(body.orderId, userName);
+      return NextResponse.json({ success: true, deleted: body.orderId });
     }
     return NextResponse.json({ success: true });
   } catch (err: any) {

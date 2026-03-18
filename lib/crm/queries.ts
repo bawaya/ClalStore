@@ -115,6 +115,58 @@ export async function assignOrder(orderId: string, userId: string, userName: str
   await s.from("audit_log").insert({ user_name: userName, action: `تعيين ${orderId} لـ ${userName}`, entity_type: "order", entity_id: orderId });
 }
 
+export async function deleteOrderCompletely(orderId: string, userName: string) {
+  const s = db();
+
+  const { data: order, error: orderErr } = await s
+    .from("orders")
+    .select("id, customer_id")
+    .eq("id", orderId)
+    .single();
+  if (orderErr || !order) throw new Error("الطلب غير موجود");
+
+  // Keep audit history clean when removing an order entirely.
+  await s.from("audit_log").delete().eq("entity_id", orderId);
+
+  // Loyalty transactions may reference order_id. Ignore missing-table setups.
+  try {
+    await s.from("loyalty_transactions").delete().eq("order_id", orderId);
+  } catch {
+    // no-op
+  }
+
+  const { error: delErr } = await s.from("orders").delete().eq("id", orderId);
+  if (delErr) throw delErr;
+
+  // Recalculate customer KPIs because current trigger only handles INSERT/UPDATE.
+  const { data: remaining } = await s
+    .from("orders")
+    .select("total, status, created_at")
+    .eq("customer_id", order.customer_id);
+  const rows = remaining || [];
+  const nonRejected = rows.filter((r: any) => r.status !== "rejected");
+  const billable = rows.filter((r: any) => !["rejected", "new"].includes(r.status));
+  const totalSpent = billable.reduce((sum: number, r: any) => sum + Number(r.total || 0), 0);
+  const avg = billable.length > 0 ? totalSpent / billable.length : 0;
+  const last = rows.length > 0
+    ? rows.map((r: any) => r.created_at).sort().at(-1) || null
+    : null;
+  await s.from("customers").update({
+    total_orders: nonRejected.length,
+    total_spent: totalSpent,
+    avg_order_value: avg,
+    last_order_at: last,
+  }).eq("id", order.customer_id);
+
+  await s.from("audit_log").insert({
+    user_name: userName,
+    action: `🗑️ حذف نهائي للطلب ${orderId}`,
+    entity_type: "order_delete",
+    entity_id: orderId,
+    details: { deleted: true },
+  });
+}
+
 // ===== Customers =====
 export async function getCRMCustomers(filters?: { segment?: string; search?: string; limit?: number; offset?: number }) {
   const s = db();

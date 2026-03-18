@@ -98,6 +98,27 @@ export default function OrdersPage() {
     }
   };
 
+  const deleteOrder = async (orderId: string) => {
+    const ok = window.confirm(`⚠️ حذف نهائي للطلب ${orderId}؟\nهذا الإجراء لا يمكن التراجع عنه.`);
+    if (!ok) return;
+    try {
+      const res = await fetch("/api/crm/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", orderId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "خطأ في حذف الطلب");
+      }
+      show(`🗑️ تم حذف الطلب ${orderId}`, "success");
+      if (selected?.id === orderId) setSelected(null);
+      fetchOrders();
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
+    }
+  };
+
   const statusTabs = [
     { k: "all", l: "الكل", c: orders.length },
     ...Object.entries(ORDER_STATUS).map(([k, v]) => ({
@@ -305,7 +326,17 @@ export default function OrdersPage() {
                     );
                   })}
                 </div>
-                {st && <span className="badge text-[10px] px-3 py-1" style={{ background: `${st.color}15`, color: st.color }}>{st.icon} {st.label}</span>}
+                <div className="flex items-center gap-1.5">
+                  {st && <span className="badge text-[10px] px-3 py-1" style={{ background: `${st.color}15`, color: st.color }}>{st.icon} {st.label}</span>}
+                  <button
+                    onClick={() => deleteOrder(selected.id)}
+                    className="text-[10px] px-2.5 py-1.5 rounded-lg border cursor-pointer font-bold"
+                    style={{ borderColor: "rgba(239,68,68,0.35)", color: "#ef4444", background: "rgba(239,68,68,0.08)" }}
+                    title="حذف نهائي"
+                  >
+                    🗑️ حذف نهائي
+                  </button>
+                </div>
               </div>
 
               {/* Info grid */}
