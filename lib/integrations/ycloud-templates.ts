@@ -15,6 +15,10 @@ async function getApiKey(): Promise<string> {
   return key;
 }
 
+function normalizePhoneLike(value: string): string {
+  return String(value || "").replace(/[^\d+]/g, "");
+}
+
 function headers(apiKey: string) {
   return { "Content-Type": "application/json", "X-API-Key": apiKey };
 }
@@ -22,7 +26,8 @@ function headers(apiKey: string) {
 /** Fetch WABA ID from yCloud phone numbers endpoint */
 export async function getWabaId(): Promise<string> {
   const apiKey = await getApiKey();
-  const res = await fetch(`${YCLOUD_API}/whatsapp/phoneNumbers?limit=1`, {
+  const cfg = await getIntegrationConfig("whatsapp");
+  const res = await fetch(`${YCLOUD_API}/whatsapp/phoneNumbers?limit=100`, {
     headers: headers(apiKey),
   });
   if (!res.ok) {
@@ -30,7 +35,23 @@ export async function getWabaId(): Promise<string> {
     throw new Error(`Failed to fetch WABA ID: ${res.status} — ${err}`);
   }
   const data = await res.json();
-  const wabaId = data?.items?.[0]?.wabaId;
+  const items = (data?.items || []) as Array<Record<string, unknown>>;
+  const preferredIds = [
+    cfg.reports_phone_id,
+    cfg.phone_id,
+    cfg.reports_phone,
+  ]
+    .map((v) => normalizePhoneLike(String(v || "")))
+    .filter(Boolean);
+
+  const matched =
+    items.find((item) => {
+      const phoneNumber = normalizePhoneLike(String(item.phoneNumber || ""));
+      const id = normalizePhoneLike(String(item.id || ""));
+      return preferredIds.some((preferred) => preferred === phoneNumber || preferred === id);
+    }) || items[0];
+
+  const wabaId = matched?.wabaId as string | undefined;
   if (!wabaId) throw new Error("No WABA ID found — verify yCloud WhatsApp account setup");
   return wabaId;
 }
