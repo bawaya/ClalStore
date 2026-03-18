@@ -5,14 +5,6 @@
 
 import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
 import { getIntegrationConfig, getProvider, type EmailProvider } from "@/lib/integrations/hub";
-import {
-  buildDailyReportHtml,
-  buildDailyReportPdf,
-  buildWeeklyReportHtml,
-  buildWeeklyReportPdf,
-  getDailyReportData,
-  getWeeklyReportData,
-} from "@/lib/reports/service";
 
 // ADMIN_REPORT_PHONE = رقم مُرسِل التقارير (FROM) — +972537777963
 // ADMIN_PERSONAL_PHONE = رقم الأدمن الشخصي (TO) — يستقبل التقارير والإشعارات
@@ -275,6 +267,7 @@ export async function sendDailyReportLink(): Promise<void> {
     if (!email) return;
     const waCfg = await getIntegrationConfig("whatsapp");
     const to = waCfg.reports_email || waCfg.completed_orders_email || "bawaya@icloud.com";
+    const { getDailyReportData, buildDailyReportHtml, buildDailyReportPdf } = await import("@/lib/reports/service");
     const data = await getDailyReportData(today);
     const html = buildDailyReportHtml(data);
     const pdf = await buildDailyReportPdf(data);
@@ -310,6 +303,7 @@ export async function sendWeeklyReportLink(): Promise<void> {
     if (!email) return;
     const waCfg = await getIntegrationConfig("whatsapp");
     const to = waCfg.reports_email || waCfg.completed_orders_email || "bawaya@icloud.com";
+    const { getWeeklyReportData, buildWeeklyReportHtml, buildWeeklyReportPdf } = await import("@/lib/reports/service");
     const data = await getWeeklyReportData(today);
     const html = buildWeeklyReportHtml(data);
     const pdf = await buildWeeklyReportPdf(data);
