@@ -127,6 +127,24 @@ export async function GET() {
     push(`FAIL: email send error: ${err.message}`);
   }
 
+  // 9. Full notifyAdminNewOrder test
+  try {
+    const { notifyAdminNewOrder } = await import("@/lib/bot/admin-notify");
+    push("Calling notifyAdminNewOrder with test data...");
+    await notifyAdminNewOrder({
+      orderId: "DEBUG-001",
+      customerName: "اختبار نظام",
+      customerPhone: "0501234567",
+      total: 99,
+      source: "debug_test",
+      items: [{ name: "منتج اختبار", qty: 1, price: 99 }],
+    });
+    push("OK: notifyAdminNewOrder completed without error");
+  } catch (err: any) {
+    push(`FAIL: notifyAdminNewOrder error: ${err.message}`);
+    push(`  Stack: ${err.stack?.split("\n").slice(0, 5).join(" | ")}`);
+  }
+
   push("=== END DEBUG NOTIFY ===");
 
   return NextResponse.json({ log }, { headers: { "Cache-Control": "no-store" } });
