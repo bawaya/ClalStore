@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Email API
@@ -22,6 +22,13 @@ export async function POST(req: NextRequest) {
 
     let params;
 
+    // Transactional emails require admin auth
+    if (type === "order_confirm" || type === "status_update") {
+      const { requireAdmin } = await import("@/lib/admin/auth");
+      const auth = await requireAdmin(req);
+      if (auth instanceof NextResponse) return auth;
+    }
+
     if (type === "order_confirm") {
       const { orderId, customerName, customerEmail, total, items } = body;
       if (!customerEmail) return NextResponse.json({ sent: false, reason: "No email" });
@@ -33,7 +40,16 @@ export async function POST(req: NextRequest) {
       params = buildStatusUpdateEmail(orderId, customerName, status, statusLabel);
       params.to = customerEmail;
     } else if (body.to && body.subject && body.html) {
-      // Generic / contact form email
+      // Contact form — only allow sending to the store's own email
+      const allowedRecipients = [
+        process.env.CONTACT_EMAIL || "info@clalmobile.com",
+        process.env.SENDGRID_FROM,
+        process.env.RESEND_FROM,
+      ].filter(Boolean).map(e => e!.toLowerCase());
+      const targetEmail = String(body.to).toLowerCase();
+      if (!allowedRecipients.includes(targetEmail)) {
+        return NextResponse.json({ error: "Unauthorized recipient", sent: false }, { status: 403 });
+      }
       const result = await email.send({ to: body.to, subject: body.subject, html: body.html });
       return NextResponse.json({ sent: result.success, messageId: result.messageId });
     } else {
@@ -42,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const result = await email.send(params);
     return NextResponse.json({ sent: result.success, messageId: result.messageId });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message, sent: false }, { status: 200 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: "Email sending failed", sent: false }, { status: 200 });
   }
 }

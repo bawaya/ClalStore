@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       body = await req.json();
     }
 
-    console.log("iCredit IPN received:", JSON.stringify(body));
+    // IPN received — only log order ID
 
     const saleId = body.SaleId || body.saleid;
     const orderId = body.Custom1 || body.custom1;
@@ -58,20 +58,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true, note: "already_paid" });
     }
 
-    // Verify IPN with iCredit
+    // Verify IPN with iCredit — mandatory
     let verified = false;
     try {
       const { verifyIPN } = await import("@/lib/integrations/rivhit");
       const verifyResult = await verifyIPN(saleId, amount);
       verified = verifyResult.verified;
       if (!verified) {
-        console.warn("iCredit IPN verification failed:", verifyResult.status);
+        console.warn("iCredit IPN verification failed for order:", orderId);
       }
     } catch (verifyErr) {
-      console.error("iCredit IPN verification error:", verifyErr);
+      console.error("iCredit IPN verification error for order:", orderId);
     }
 
     const isJ5 = paramJ === "5" || paramJ === 5;
+
+    // Block unverified payments (except J5 holds)
+    if (!verified && !isJ5) {
+      await db.from("orders").update({
+        payment_status: "pending",
+        payment_details: {
+          type: "credit",
+          provider: "icredit",
+          sale_id: saleId,
+          amount,
+          verified: false,
+          error: "IPN verification failed",
+        },
+      }).eq("id", orderId);
+
+      await db.from("audit_log").insert({
+        user_name: "iCredit",
+        action: `⚠️ دفع غير مُتحقق: ${orderId} — ₪${amount}`,
+        entity_type: "payment",
+        entity_id: orderId,
+        details: { sale_id: saleId, amount, verified: false },
+      });
+
+      return NextResponse.json({ received: true, verified: false });
+    }
 
     if (saleId && amount > 0 && !isJ5) {
       await db.from("orders").update({
@@ -130,7 +155,7 @@ export async function POST(req: NextRequest) {
           });
         }
       } catch (notifErr) {
-        console.error("Payment notification failed:", notifErr);
+        console.error("Payment notification failed for order:", orderId);
       }
     } else if (isJ5) {
       await db.from("orders").update({
@@ -176,8 +201,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
-    console.error("iCredit IPN error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("iCredit IPN processing error");
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 

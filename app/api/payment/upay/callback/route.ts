@@ -21,14 +21,6 @@ export async function GET(req: NextRequest) {
   const errorDescription = params.get("errordescription");
   const amount = params.get("amount");
 
-  console.log("[UPay Callback]", {
-    orderId,
-    transactionId,
-    status,
-    amount,
-    errorMessage,
-  });
-
   if (!orderId) {
     return NextResponse.redirect(`${appUrl}/store/cart?error=missing_order`);
   }
@@ -38,7 +30,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data: existingOrder } = await db
       .from("orders")
-      .select("id, status, payment_status")
+      .select("id, status, payment_status, total")
       .eq("id", orderId)
       .single();
 
@@ -56,7 +48,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (errorMessage) {
-      console.error("[UPay Callback] Error:", errorMessage, errorDescription);
+      console.error("[UPay Callback] Payment error for order:", orderId);
       await db
         .from("orders")
         .update({
@@ -71,7 +63,7 @@ export async function GET(req: NextRequest) {
 
       await db.from("audit_log").insert({
         user_name: "UPay",
-        action: `❌ فشل الدفع: ${orderId} — ${errorMessage}`,
+        action: `❌ فشل الدفع: ${orderId}`,
         entity_type: "payment",
         entity_id: orderId,
         details: { errorMessage, errorDescription },
@@ -86,7 +78,7 @@ export async function GET(req: NextRequest) {
       !transactionId ||
       (status !== "SUCCESS" && status !== "APPROVED")
     ) {
-      console.error("[UPay Callback] Invalid response:", { transactionId, status });
+      console.error("[UPay Callback] Invalid status for order:", orderId);
       await db
         .from("orders")
         .update({
@@ -104,8 +96,64 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Payment successful
-    const parsedAmount = amount ? parseFloat(amount) : 0;
+    // --- Server-side verification with UPay API ---
+    const { verifyUpayTransaction } = await import("@/lib/integrations/upay");
+    const verification = await verifyUpayTransaction(transactionId, orderId);
+
+    if (!verification.valid) {
+      console.error("[UPay Callback] Verification failed for order:", orderId, verification.error);
+      await db.from("orders").update({
+        payment_status: "failed",
+        payment_details: {
+          provider: "upay",
+          transaction_id: transactionId,
+          verification_error: verification.error,
+        },
+      }).eq("id", orderId);
+
+      await db.from("audit_log").insert({
+        user_name: "UPay",
+        action: `❌ فشل التحقق من الدفع: ${orderId}`,
+        entity_type: "payment",
+        entity_id: orderId,
+        details: { transactionId, error: verification.error },
+      });
+
+      return NextResponse.redirect(
+        `${appUrl}/store/checkout/failed?order=${orderId}&error=verification_failed`
+      );
+    }
+
+    // Use server-verified amount, not the query param
+    const parsedAmount = verification.amount || (amount ? parseFloat(amount) : 0);
+
+    // Validate amount matches order total (allow small rounding diff)
+    const orderTotal = Number(existingOrder.total || 0);
+    if (orderTotal > 0 && Math.abs(parsedAmount - orderTotal) > 1) {
+      console.error("[UPay Callback] Amount mismatch for order:", orderId);
+      await db.from("orders").update({
+        payment_status: "failed",
+        payment_details: {
+          provider: "upay",
+          transaction_id: transactionId,
+          error: "amount_mismatch",
+          paid: parsedAmount,
+          expected: orderTotal,
+        },
+      }).eq("id", orderId);
+
+      await db.from("audit_log").insert({
+        user_name: "UPay",
+        action: `❌ مبلغ الدفع لا يطابق الطلب: ${orderId} — دفع ₪${parsedAmount} بدل ₪${orderTotal}`,
+        entity_type: "payment",
+        entity_id: orderId,
+        details: { transactionId, paid: parsedAmount, expected: orderTotal },
+      });
+
+      return NextResponse.redirect(
+        `${appUrl}/store/checkout/failed?order=${orderId}&error=amount_mismatch`
+      );
+    }
 
     await db
       .from("orders")
@@ -119,6 +167,7 @@ export async function GET(req: NextRequest) {
           transaction_id: transactionId,
           amount: parsedAmount,
           upay_status: status,
+          verified: true,
         },
       })
       .eq("id", orderId);
@@ -159,14 +208,14 @@ export async function GET(req: NextRequest) {
         });
       }
     } catch (notifErr) {
-      console.error("[UPay] Notification error:", notifErr);
+      console.error("[UPay] Notification error for order:", orderId);
     }
 
     return NextResponse.redirect(
       `${appUrl}/store/checkout/success?order=${orderId}&value=${parsedAmount}`
     );
-  } catch (err: any) {
-    console.error("[UPay Callback] Error:", err);
+  } catch (err: unknown) {
+    console.error("[UPay Callback] Internal error for order:", orderId);
     return NextResponse.redirect(
       `${appUrl}/store/checkout/failed?order=${orderId}&error=internal`
     );

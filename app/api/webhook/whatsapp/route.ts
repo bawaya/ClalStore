@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     if (hasText) {
       try {
         response = await handleWhatsAppMessage(msg);
-        console.log("Bot response for", msg.from, ":", JSON.stringify({ intent: response.text?.substring(0, 80), hasQuickReplies: !!response.quickReplies }));
+        // Response processed successfully
       } catch (err) {
         console.error("handleWhatsAppMessage error:", err);
         response.text = "عذراً، حدث خطأ. حاول مرة ثانية 🙏";

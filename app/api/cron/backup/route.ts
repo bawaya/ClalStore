@@ -3,22 +3,22 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 
-// POST /api/cron/backup — Data backup (structure only for now)
-// Cron can call this to trigger backup. Full implementation: export to JSON, store in Supabase storage or email.
+// POST /api/cron/backup — Data backup placeholder
+// Not yet implemented — returns 501 to avoid false confidence
 export async function POST(req: NextRequest) {
-  try {
-    // Verify cron secret if configured
-    const auth = req.headers.get("authorization") || req.headers.get("x-cron-secret");
-    const secret = process.env.CRON_SECRET;
-    if (secret && auth !== `Bearer ${secret}` && auth !== secret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    console.log("Backup started");
-    // TODO: Export orders, customers, products to JSON; store in Supabase storage or send via email
-    return NextResponse.json({ success: true, message: "Backup started" });
-  } catch (err: any) {
-    console.error("Backup error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  // Verify cron secret
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 });
   }
+  const auth = req.headers.get("authorization") || req.headers.get("x-cron-secret");
+  if (auth !== `Bearer ${cronSecret}` && auth !== cronSecret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Backup not yet implemented — return 501 so monitoring tools catch it
+  return NextResponse.json(
+    { success: false, error: "Backup not implemented yet. Use Supabase dashboard for manual backups." },
+    { status: 501 }
+  );
 }

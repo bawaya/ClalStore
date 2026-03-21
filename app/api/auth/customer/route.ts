@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Customer Auth API (OTP via SMS or WhatsApp)
@@ -75,7 +75,7 @@ async function sendViaTwilioVerify(phone: string, channel: "sms" | "whatsapp"): 
       }
     );
     const data = await res.json();
-    console.log(`[OTP] Twilio Verify (${channel}):`, res.ok, data.status);
+    // OTP send result checked
     return res.ok && data.status === "pending";
   } catch (err) {
     console.error("[OTP] Twilio Verify error:", err);

@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Admin Product Auto-Fill (MobileAPI / GSMArena / Combined)
@@ -96,10 +96,10 @@ async function fetchCombined(name: string, brand: string) {
       data.image_url = gsma.image_url;
     }
 
-    console.log(`[Combined] MobileAPI data + GSMArena color images merged successfully`);
-  } catch (e) {
+    // MobileAPI + GSMArena merged successfully
+  } catch {
     // GSMArena failed (CloudFlare block, etc.) — continue with MobileAPI data only
-    console.log(`[Combined] GSMArena enrichment failed, using MobileAPI only:`, e);
+    console.warn("[Combined] GSMArena enrichment failed, using MobileAPI only");
   }
 
   return data;

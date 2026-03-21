@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     const gateway = forceGateway || detectPaymentGateway(customerCity || "");
-    console.log(`[Payment] city="${customerCity}" → gateway=${gateway}`);
+    // Payment gateway selected
 
     if (gateway === "rivhit") {
       const rivhitCfg = await getIntegrationConfig("payment");

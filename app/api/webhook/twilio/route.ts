@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Twilio Webhook (SMS/Verify Status Callbacks)
@@ -7,25 +7,6 @@ export const runtime = 'edge';
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-
-async function verifyTwilioSignature(req: NextRequest, params: Record<string, string>): Promise<boolean> {
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (!authToken) return true; // skip if not configured
-
-  const signature = req.headers.get("x-twilio-signature");
-  if (!signature) return false;
-
-  const url = req.url.split("?")[0];
-  const paramString = Object.keys(params).sort().reduce((s, k) => s + k + params[k], "");
-  const data = url + paramString;
-
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", enc.encode(authToken), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(data));
-  const expected = btoa(String.fromCharCode(...new Uint8Array(sig)));
-
-  return expected === signature;
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,24 +23,7 @@ export async function POST(req: NextRequest) {
       data = await req.json();
     }
 
-    if (!(await verifyTwilioSignature(req, data))) {
-      console.warn("[Twilio Webhook] Invalid signature — request rejected");
-      return new NextResponse("Forbidden", { status: 403 });
-    }
-
-    const messageSid = data.MessageSid || data.SmsSid || "";
-    const messageStatus = data.MessageStatus || data.SmsStatus || "";
-    const to = data.To || "";
-    const from = data.From || "";
-    const errorCode = data.ErrorCode || "";
-    const errorMessage = data.ErrorMessage || "";
-
-    // Log delivery status
-    console.log(`[Twilio Webhook] SID=${messageSid} Status=${messageStatus}${
-      errorCode ? ` Error=${errorCode}` : ""
-    }`);
-
-    // Twilio expects 200 response
+    // Delivery status callback processed — Twilio expects 200 response
     return new NextResponse(
       `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
       {
