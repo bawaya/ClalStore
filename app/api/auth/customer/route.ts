@@ -1,4 +1,4 @@
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Customer Auth API (OTP via SMS or WhatsApp)
