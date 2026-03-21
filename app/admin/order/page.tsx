@@ -24,7 +24,7 @@ export default function OrderPage() {
   const scr = useScreen();
   const { show } = useToast();
   const [config, setConfig] = useState<SortConfig>(DEFAULT_CONFIG);
-  const [allBrands, setAllBrands] = useState<string[]>([]);
+  const [_allBrands, setAllBrands] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 

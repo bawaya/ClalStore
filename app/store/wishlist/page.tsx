@@ -11,32 +11,26 @@ import { useCart } from "@/lib/store/cart";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "@/components/store/StoreHeader";
-import { StickyCartBar } from "@/components/store/StickyCartBar";
 import { ProductCard } from "@/components/store/ProductCard";
-import { getProductName } from "@/lib/utils";
+
 import type { Product } from "@/types/database";
 
 export default function WishlistPage() {
   const scr = useScreen();
   const { t } = useLang();
-  const { items, removeItem, clearAll } = useWishlist();
+  const { items, removeItem: _removeItem, clearAll } = useWishlist();
   const addToCart = useCart((s) => s.addItem);
 
   const handleAddAllToCart = () => {
-    items.forEach((item: any) => {
-      const variants = item.variants || [];
-      const defaultVariant = variants[0];
+    items.forEach((item) => {
       addToCart({
         productId: item.id,
         name: item.name_ar,
         name_he: item.name_he || undefined,
         brand: item.brand,
         type: item.type,
-        price: defaultVariant?.price || item.price,
+        price: item.price,
         image: item.image_url || undefined,
-        color: defaultVariant?.color || (item.colors?.[0]?.name_ar) || undefined,
-        color_he: defaultVariant?.color_he || (item.colors?.[0]?.name_he) || undefined,
-        storage: defaultVariant?.storage || undefined,
       });
     });
   };
@@ -68,7 +62,6 @@ export default function WishlistPage() {
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
       <StoreHeader showBack />
-      <StickyCartBar />
       <div
         className="max-w-[1200px] mx-auto"
         style={{ padding: scr.mobile ? "16px 10px 100px" : "32px 24px 60px" }}

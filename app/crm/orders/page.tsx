@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useScreen, useToast, useDebounce } from "@/lib/hooks";
 import { ORDER_STATUS, ORDER_SOURCE, BANKS } from "@/lib/constants";
 import { formatCurrency, formatDateTime, timeAgo } from "@/lib/utils";
-import { Modal, FormField, ToastContainer } from "@/components/admin/shared";
+import { Modal, ToastContainer } from "@/components/admin/shared";
 
 // Bank ID → Arabic name map
 const BANK_NAMES: Record<string, string> = Object.fromEntries(
@@ -57,7 +57,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, sourceFilter, debouncedSearch, dateFrom, dateTo, amountMin, amountMax]);
+  }, [statusFilter, sourceFilter, debouncedSearch, dateFrom, dateTo, amountMin, amountMax, show]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 

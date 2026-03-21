@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PIPELINE_STAGE } from "@/lib/constants";
 import { formatCurrency, timeAgo } from "@/lib/utils";
-import { Modal, FormField, PageHeader, EmptyState, ConfirmDialog } from "@/components/admin/shared";
+import { Modal, FormField, EmptyState, ConfirmDialog } from "@/components/admin/shared";
 
 const EMPTY_DEAL = { customer_name: "", product_summary: "", value: 0, stage: "lead", source: "store", notes: "" };
 
@@ -38,7 +38,7 @@ export default function PipelinePage() {
     if (!form.customer_name || !form.value) { show("❌ عبّي الحقول", "error"); return; }
     try {
       if (editId) {
-        const { id, customers, created_at, updated_at, ...updates } = form;
+        const { id: _id, customers: _customers, created_at: _created_at, updated_at: _updated_at, ...updates } = form;
         await fetch("/api/crm/pipeline", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
         show("✅ تم التعديل");
       } else {

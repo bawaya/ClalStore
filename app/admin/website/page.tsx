@@ -40,7 +40,7 @@ export default function WebsiteContentPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [show]);
 
   useEffect(() => { fetchSections(); }, [fetchSections]);
 

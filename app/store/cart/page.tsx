@@ -10,7 +10,6 @@ import { Footer } from "@/components/website/sections";
 import {
   validatePhone, validateIsraeliID, validateEmail,
   validateBranch, validateAccount,
-  generateOrderId,
 } from "@/lib/validators";
 import { BANKS } from "@/lib/constants";
 import { CITY_SEARCH_MIN_LENGTH, searchCities, type City } from "@/lib/cities";

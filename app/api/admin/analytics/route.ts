@@ -78,9 +78,9 @@ export async function GET(req: NextRequest) {
     let csatCount = 0;
     let prevConversations = 0;
     let prevHandoffs = 0;
-    let prevStoreClicks = 0;
-    let prevCsatSum = 0;
-    let prevCsatCount = 0;
+    let _prevStoreClicks = 0;
+    let _prevCsatSum = 0;
+    let _prevCsatCount = 0;
 
     for (const d of botDays) {
       totalConversations += d.conversations || 0;
@@ -91,8 +91,8 @@ export async function GET(req: NextRequest) {
     for (const d of prevBotDays) {
       prevConversations += d.conversations || 0;
       prevHandoffs += d.handoffs || 0;
-      prevStoreClicks += d.store_clicks || 0;
-      if (d.csat_avg) { prevCsatSum += d.csat_avg; prevCsatCount++; }
+      _prevStoreClicks += d.store_clicks || 0;
+      if (d.csat_avg) { _prevCsatSum += d.csat_avg; _prevCsatCount++; }
     }
 
     const prevRevenue = prevOrders.reduce((s: number, o: any) => s + (Number(o.total) || 0), 0);

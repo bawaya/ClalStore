@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Inbox Templates & Quick Replies
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       templates: templates || [],
       quick_replies: quick_replies || [],
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
   }
 }
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     return NextResponse.json({ success: true, template: data });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
   }
 }
@@ -118,7 +118,7 @@ export async function PUT(req: NextRequest) {
 
     await supabase.from("inbox_templates").update(updates).eq("id", id);
     return NextResponse.json({ success: true });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
   }
 }
@@ -140,7 +140,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
   }
 }

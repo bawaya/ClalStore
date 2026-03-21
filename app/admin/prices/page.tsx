@@ -30,7 +30,7 @@ type MatchResult = {
 };
 
 /** Strip storage suffix (e.g. "256GB", "512GB") to get base device name */
-function baseDeviceName(name: string): string {
+function _baseDeviceName(name: string): string {
   return name.replace(/\s*(?:128|256|512|64|32|1)\s*(?:GB|TB)\s*$/i, "").trim() || name;
 }
 

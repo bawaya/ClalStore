@@ -10,23 +10,23 @@ import { getPolicy, detectPolicyType, formatPolicyResponse } from "./policies";
 import {
   searchProducts, searchByModel, recommendProducts, lookupOrder,
   formatProductCards, calculateInstallments, formatComparison,
-  getLinePlans, formatLinePlans, upsertCustomer,
+  getLinePlans, formatLinePlans,
   type QualificationState, getNextQualificationQuestion, parseQualificationAnswer,
 } from "./playbook";
 import {
   checkRateLimit, checkBlockedPatterns, getBlockedResponse,
-  sanitizeInput, shouldEscalate, getMessageCount, isWithinWorkingHours,
+  sanitizeInput, shouldEscalate,
 } from "./guardrails";
 import {
   getOrCreateConversation, saveMessage, closeConversation,
-  saveCsatScore, addProductDiscussed, linkCustomer,
-  trackAnalytics, logBotInteraction,
+  saveCsatScore, addProductDiscussed,
+  trackAnalytics,
 } from "./analytics";
 import { createHandoff, generateConversationSummary } from "./handoff";
 import { createAdminSupabase } from "@/lib/supabase";
 import { getAIResponse } from "./ai";
 import { notifyAdminMuhammadHandoff, notifyAdminAngryCustomer } from "./admin-notify";
-import { analyzeSentiment, type Sentiment } from "@/lib/crm/sentiment";
+import { analyzeSentiment } from "@/lib/crm/sentiment";
 
 export { type BotIntent, type DetectedIntent } from "./intents";
 export { logBotInteraction } from "./analytics";
@@ -170,7 +170,7 @@ export async function processMessage(
   visitorId: string,
   message: string,
   channel: "webchat" | "whatsapp",
-  opts?: { customerPhone?: string; customerName?: string; source?: string; mediaType?: string }
+  opts?: { customerPhone?: string; customerName?: string; source?: string }
 ): Promise<BotResponse> {
   // 1. Sanitize
   const text = sanitizeInput(message);
@@ -337,7 +337,7 @@ async function routeIntent(
   channel: "webchat" | "whatsapp"
 ): Promise<BotResponse> {
   const lang = session.language;
-  const isAr = lang !== "he";
+  const _isAr = lang !== "he";
 
   // For very low confidence keyword matches, prefer AI
   if (detected.intent !== "unknown" && detected.confidence < 0.5) {
@@ -634,7 +634,7 @@ async function handleCompare(session: SessionState, detected: DetectedIntent): P
   };
 }
 
-async function handleInstallments(session: SessionState, detected: DetectedIntent): Promise<BotResponse> {
+async function handleInstallments(session: SessionState, _detected: DetectedIntent): Promise<BotResponse> {
   const isAr = session.language !== "he";
 
   // If we have last discussed products
@@ -669,7 +669,7 @@ async function handleInstallments(session: SessionState, detected: DetectedInten
   };
 }
 
-async function handleSpecs(session: SessionState, detected: DetectedIntent): Promise<BotResponse> {
+async function handleSpecs(session: SessionState, _detected: DetectedIntent): Promise<BotResponse> {
   const isAr = session.language !== "he";
   return {
     text: isAr

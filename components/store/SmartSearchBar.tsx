@@ -323,7 +323,7 @@ export function SmartSearchBar({ value, onChange, onBrandSelect, onSubmit }: Pro
           )}
 
           {/* Brand suggestions */}
-          {results?.brands.map((brand, i) => {
+          {results?.brands.map((brand, _i) => {
             const idx = items.findIndex(
               (it) => it.type === "brand" && it.label === brand
             );

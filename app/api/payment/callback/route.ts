@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       if (!verified) {
         console.warn("iCredit IPN verification failed for order:", orderId);
       }
-    } catch (verifyErr) {
+    } catch {
       console.error("iCredit IPN verification error for order:", orderId);
     }
 
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
             items: [{ name: "Payment callback", qty: 1, price: Number(amount || 0) }],
           });
         }
-      } catch (notifErr) {
+      } catch {
         console.error("Payment notification failed for order:", orderId);
       }
     } else if (isJ5) {
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (err: any) {
+  } catch {
     console.error("iCredit IPN processing error");
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

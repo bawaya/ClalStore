@@ -8,7 +8,7 @@ import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState, ErrorBanner, ToastContainer } from "@/components/admin/shared";
 import { IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import { PRODUCT_TYPES } from "@/lib/constants";
-import { calcMargin, formatCurrency } from "@/lib/utils";
+import { calcMargin } from "@/lib/utils";
 import { aiEnhanceProduct, translateProductName, detectProductType, findDuplicates } from "@/lib/admin/ai-tools";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
 
@@ -345,7 +345,7 @@ export default function ProductsPage() {
   };
 
   // Sync storage_options from variants
-  const syncStorageFromVariants = () => {
+  const _syncStorageFromVariants = () => {
     const variants = form.variants || [];
     if (variants.length > 0) {
       const storageLabels = variants.map((v) => v.storage).filter(Boolean);
@@ -604,7 +604,7 @@ export default function ProductsPage() {
 
       // Match by Arabic→English: find matching color by name
       const colorAr = color.name_ar?.trim() || "";
-      const colorHe = color.name_he?.trim() || "";
+      const _colorHe = color.name_he?.trim() || "";
 
       // Build reverse map (Arabic → possible English names)
       const arToEn: Record<string, string[]> = {};

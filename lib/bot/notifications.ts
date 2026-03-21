@@ -5,7 +5,8 @@
 // =====================================================
 
 import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
-import { buildStatusNotification } from "./engine";
+import { notifyAdmin, notifyTeam } from "./admin-notify";
+import { buildOrderNotification, buildStatusNotification } from "./engine";
 
 /** Send text to customer — fall back to template if 24h window expired */
 async function sendToCustomer(phone: string, text: string, templateName?: string, templateParams?: string[]): Promise<void> {
@@ -16,7 +17,7 @@ async function sendToCustomer(phone: string, text: string, templateName?: string
     if (templateName && templateParams) {
       try {
         await sendWhatsAppTemplate(phone, templateName, templateParams);
-      } catch (tmplErr) {
+      } catch {
         console.error(`[Notification] Template ${templateName} also failed for ${phone}`);
       }
     }
@@ -26,13 +27,18 @@ async function sendToCustomer(phone: string, text: string, templateName?: string
 // ===== New Order: Notify Team =====
 export async function notifyNewOrder(
   orderId: string,
-  _customerName: string,
+  customerName: string,
   customerPhone: string,
   total: number,
-  _source: string
+  source: string
 ) {
   try {
-    // Customer confirmation (with template fallback)
+    // 1. Notify admin + team (from report phone)
+    const teamMsg = buildOrderNotification(orderId, customerName, total, source);
+    await notifyAdmin(teamMsg);
+    await notifyTeam(teamMsg);
+
+    // 2. Confirm to customer (with template fallback)
     const custMsg = `✅ *تم استلام طلبك!*\n\n📦 رقم الطلب: ${orderId}\n💰 المبلغ: ₪${total.toLocaleString()}\n\nالفريق سيتواصل معك قريباً.\nللاستفسار أرسل رقم طلبك في أي وقت.`;
     await sendToCustomer(customerPhone, custMsg, "clal_order_confirmation", [orderId, `₪${total.toLocaleString()}`]);
   } catch (err) {

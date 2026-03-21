@@ -82,7 +82,7 @@ export default function AuthPage() {
     } finally {
       setLoading(false);
     }
-  }, [channel, phone, t]);
+  }, [channel, phone, t, otpRefs]);
 
   // ===== Verify OTP =====
   const handleVerifyOtp = useCallback(async (codeOverride?: string) => {

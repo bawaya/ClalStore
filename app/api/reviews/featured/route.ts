@@ -36,7 +36,7 @@ export async function GET() {
     }));
 
     return NextResponse.json({ reviews: enriched });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ reviews: [] }, { status: 500 });
   }
 }

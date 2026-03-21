@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from "react";
 import { useScreen } from "@/lib/hooks";
 import { USER_ROLE } from "@/lib/constants";
-import { formatDateTime, timeAgo } from "@/lib/utils";
+import { timeAgo } from "@/lib/utils";
 
 interface UserData {
   id: string;

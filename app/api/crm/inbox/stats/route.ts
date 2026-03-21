@@ -8,7 +8,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const supabase = createAdminSupabase();
     if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     stats.messages_today = msgCount || 0;
 
     return NextResponse.json({ success: true, stats });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
   }
 }

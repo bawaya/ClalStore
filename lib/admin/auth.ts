@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { createAdminSupabase } from "@/lib/supabase";
 
 /**
@@ -37,7 +37,7 @@ export async function requireAdmin(req: NextRequest) {
 
   const adminDb = createAdminSupabase();
   if (adminDb) {
-    const { data: dbUser, error: dbError } = await adminDb
+    const { data: dbUser, error: _dbError } = await adminDb
       .from("users")
       .select("role, status")
       .eq("id", user.id)

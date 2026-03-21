@@ -165,7 +165,7 @@ export function StatsStrip({ cms }: { cms?: WebsiteContent }) {
 // ===== Featured Products =====
 export function FeaturedProducts({ products }: { products: any[] }) {
   const scr = useScreen();
-  const { t, lang } = useLang();
+  const { t, lang: _lang } = useLang();
 
   return (
     <section style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
@@ -351,7 +351,7 @@ export function CTASection({ cms }: { cms?: WebsiteContent }) {
 // ===== Footer =====
 export function Footer({ cms }: { cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t, lang } = useLang();
+  const { t, lang: _lang2 } = useLang();
   const year = new Date().getFullYear();
   const fc = cms?.content || {};
 

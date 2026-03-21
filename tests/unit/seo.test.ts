@@ -31,7 +31,7 @@ describe("SEO Utilities", () => {
 
     it("includes twitter card metadata", () => {
       expect(meta.twitter).toBeDefined();
-      expect(meta.twitter!.card).toBe("summary");
+      expect((meta.twitter as any).card).toBe("summary");
     });
   });
 
@@ -71,12 +71,12 @@ describe("SEO Utilities", () => {
     });
 
     it("uses summary_large_image twitter card when image present", () => {
-      expect(meta.twitter!.card).toBe("summary_large_image");
+      expect((meta.twitter as any).card).toBe("summary_large_image");
     });
 
     it("uses summary twitter card when no image", () => {
       const noImage = getProductMetadata({ ...product, image_url: undefined });
-      expect(noImage.twitter!.card).toBe("summary");
+      expect((noImage.twitter as any).card).toBe("summary");
     });
 
     it("includes brand and product names in keywords", () => {
@@ -106,7 +106,7 @@ describe("SEO Utilities", () => {
     it("includes openGraph for known pages", () => {
       const meta = getPageMetadata("cart");
       expect(meta.openGraph).toBeDefined();
-      expect(meta.openGraph!.type).toBe("website");
+      expect((meta.openGraph as any).type).toBe("website");
     });
 
     it("includes alternates with canonical URL", () => {

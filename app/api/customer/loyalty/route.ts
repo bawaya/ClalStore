@@ -7,7 +7,6 @@ import {
   getLoyaltyTransactions,
   redeemPoints,
   LOYALTY_CONFIG,
-  calculateTier,
   calculatePointsValue,
   getNextTier,
   pointsToNextTier,

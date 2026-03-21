@@ -167,7 +167,7 @@ function DealCard({ deal, lang, mobile }: { deal: Deal; lang: string; mobile: bo
 
 export default function DealsPage() {
   const scr = useScreen();
-  const { t, lang } = useLang();
+  const { lang } = useLang();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
 

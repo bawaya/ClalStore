@@ -215,7 +215,7 @@ export class RivhitProvider implements PaymentProvider {
     return { success: false, error: result.error };
   }
 
-  async verifyPayment(transactionId: string, orderId?: string): Promise<PaymentStatus> {
+  async verifyPayment(transactionId: string, _orderId?: string): Promise<PaymentStatus> {
     if (!transactionId) {
       return { status: "failed", transactionId: "", amount: 0 };
     }

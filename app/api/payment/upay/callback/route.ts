@@ -207,14 +207,14 @@ export async function GET(req: NextRequest) {
           items: [{ name: "Payment callback", qty: 1, price: Number(parsedAmount || 0) }],
         });
       }
-    } catch (notifErr) {
+    } catch {
       console.error("[UPay] Notification error for order:", orderId);
     }
 
     return NextResponse.redirect(
       `${appUrl}/store/checkout/success?order=${orderId}&value=${parsedAmount}`
     );
-  } catch (err: unknown) {
+  } catch {
     console.error("[UPay Callback] Internal error for order:", orderId);
     return NextResponse.redirect(
       `${appUrl}/store/checkout/failed?order=${orderId}&error=internal`

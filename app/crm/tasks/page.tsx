@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { TASK_PRIORITY } from "@/lib/constants";
-import { formatDate, timeAgo } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { Modal, FormField, PageHeader, EmptyState, ConfirmDialog } from "@/components/admin/shared";
 
 const STATUS_MAP: Record<string, { icon: string; label: string; color: string }> = {
@@ -48,7 +48,7 @@ export default function TasksPage() {
       const payload = { ...form };
       if (!payload.due_date) delete payload.due_date;
       if (editId) {
-        const { id, customers, orders, created_at, updated_at, ...updates } = payload;
+        const { id: _id, customers: _customers, orders: _orders, created_at: _created_at, updated_at: _updated_at, ...updates } = payload;
         await fetch("/api/crm/tasks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
         show("✅ تم التعديل");
       } else {

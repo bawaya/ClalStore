@@ -59,7 +59,7 @@ const STATUS_CONFIG: Record<string, { label_ar: string; label_he: string; color:
 
 export default function AccountPage() {
   const scr = useScreen();
-  const { lang, t } = useLang();
+  const { lang } = useLang();
   const router = useRouter();
   const wishlist = useWishlist();
   const cart = useCart();
@@ -104,6 +104,12 @@ export default function AccountPage() {
     }
   }, [router]);
 
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("clal_customer_token");
+    localStorage.removeItem("clal_customer");
+    router.replace("/store/auth");
+  }, [router]);
+
   // Fetch orders
   const fetchOrders = useCallback(async () => {
     if (!token) return;
@@ -120,7 +126,7 @@ export default function AccountPage() {
       }
     } catch {}
     setLoadingOrders(false);
-  }, [token]);
+  }, [token, handleLogout]);
 
   // Fetch profile
   const fetchProfile = useCallback(async () => {
@@ -143,18 +149,12 @@ export default function AccountPage() {
       }
     } catch {}
     setLoadingProfile(false);
-  }, [token]);
+  }, [token, handleLogout]);
 
   useEffect(() => {
     if (token && tab === "orders") fetchOrders();
     if (token && tab === "profile") fetchProfile();
   }, [token, tab, fetchOrders, fetchProfile]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("clal_customer_token");
-    localStorage.removeItem("clal_customer");
-    router.replace("/store/auth");
-  };
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);
@@ -201,7 +201,7 @@ export default function AccountPage() {
     });
   };
 
-  const isRTL = true;
+  const _isRTL = true;
   const isMob = scr.mobile;
 
   const tabs: { key: TabKey; label_ar: string; label_he: string; icon: string }[] = [

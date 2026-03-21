@@ -22,7 +22,7 @@ export function WebChatWidget() {
   const [escalated, setEscalated] = useState(false);
   const [unread, setUnread] = useState(0);
   const [sessionId, setSessionId] = useState("");
-  const [hydrated, setHydrated] = useState(false);
+  const [_hydrated, setHydrated] = useState(false);
 
   // Hydrate from sessionStorage after mount (prevents SSR mismatch)
   useEffect(() => {
@@ -70,7 +70,7 @@ export function WebChatWidget() {
       }]);
     }
     if (open) setUnread(0);
-  }, [open, msgs.length]);
+  }, [open, msgs.length, t]);
 
   // Focus input when opened
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 200); }, [open]);

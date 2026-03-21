@@ -7,7 +7,7 @@
 import type { Product } from "@/types/database";
 
 // ── Phone Term Dictionaries ──────────────────────────
-const BRAND_MAP: Record<string, { ar: string; he: string }> = {
+const _BRAND_MAP: Record<string, { ar: string; he: string }> = {
   apple: { ar: "Apple", he: "Apple" },
   samsung: { ar: "Samsung", he: "Samsung" },
   xiaomi: { ar: "شاومي", he: "שיאומי" },
@@ -87,7 +87,7 @@ const KEEP_AS_IS = /^(\d+\w*|[A-Z]\d+\w*|[A-Z]{1,3}|\d+GB|\d+TB|\d+W|NFC|5G|4G|L
 /**
  * Translate a single word from English to Arabic/Hebrew
  */
-function translateWord(word: string, lang: "ar" | "he"): string {
+function _translateWord(word: string, lang: "ar" | "he"): string {
   if (KEEP_AS_IS.test(word)) return word;
   const lower = word.toLowerCase();
   if (WORD_MAP[lower]) return WORD_MAP[lower][lang];

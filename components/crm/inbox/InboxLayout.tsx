@@ -6,7 +6,7 @@
 
 import { useState, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
-import { useInboxMessages, fetchTemplates } from "@/lib/crm/inbox";
+import { useInboxMessages } from "@/lib/crm/inbox";
 import type { InboxConversation } from "@/lib/crm/inbox-types";
 import { ConversationList } from "./ConversationList";
 import { ChatPanel } from "./ChatPanel";
@@ -21,7 +21,7 @@ export function InboxLayout() {
   const [mobileView, setMobileView] = useState<MobileView>("list");
 
   /* Fetch messages for selected conversation */
-  const { detail, loading: messagesLoading, refresh: refreshMessages } = useInboxMessages(
+  const { detail, loading: _messagesLoading, refresh: refreshMessages } = useInboxMessages(
     selectedConv?.id || null
   );
 

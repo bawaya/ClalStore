@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-interface UseAdminApiOptions<T> {
+interface UseAdminApiOptions<_T> {
   endpoint: string;
   autoFetch?: boolean;
 }

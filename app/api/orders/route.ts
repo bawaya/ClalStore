@@ -14,7 +14,7 @@ import { generateOrderId, validatePhone, validateIsraeliID } from "@/lib/validat
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { customer, items, payment, couponCode, discountAmount, source } = body;
+    const { customer, items, payment, couponCode, discountAmount: _discountAmount, source } = body;
 
     // === Validation ===
     if (!customer?.name || !customer?.phone || !customer?.city || !customer?.address) {
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       }
     }
     const total = Math.max(0, itemsTotal - discount);
-    const onlyAccessories = !hasDevice && items.length > 0;
+    const _onlyAccessories = !hasDevice && items.length > 0;
 
     const { error: orderErr } = await supabase.from("orders").insert({
       id: orderId,

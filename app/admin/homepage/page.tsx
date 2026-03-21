@@ -66,7 +66,7 @@ export default function HomepageAdminPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [show]);
 
   useEffect(() => { fetchSections(); }, [fetchSections]);
 
@@ -707,13 +707,13 @@ function FAQSectionEditor({ section, onSave, saving, scr }: EditorProps) {
 
 // ===== 6. CTA Section Editor =====
 function CTASectionEditor({ section, onSave, saving, scr }: EditorProps) {
-  const [titleAr, setTitleAr] = useState(section?.title_ar || "");
-  const [titleHe, setTitleHe] = useState(section?.title_he || "");
+  const [_titleAr, _setTitleAr] = useState(section?.title_ar || "");
+  const [_titleHe, _setTitleHe] = useState(section?.title_he || "");
   const [c, setC] = useState<Record<string, any>>(section?.content || {});
 
   const updateC = (key: string, val: any) => setC((prev) => ({ ...prev, [key]: val }));
 
-  const handleSave = () => onSave({ title_ar: titleAr, title_he: titleHe, content: c });
+  const handleSave = () => onSave({ title_ar: _titleAr, title_he: _titleHe, content: c });
 
   return (
     <div className="space-y-3">
@@ -758,8 +758,8 @@ function CTASectionEditor({ section, onSave, saving, scr }: EditorProps) {
 
 // ===== 7. Footer Section Editor (Enhanced) =====
 function FooterSectionEditor({ section, onSave, saving, scr }: EditorProps) {
-  const [titleAr, setTitleAr] = useState(section?.title_ar || "");
-  const [titleHe, setTitleHe] = useState(section?.title_he || "");
+  const [titleAr, _setTitleAr] = useState(section?.title_ar || "");
+  const [titleHe, _setTitleHe] = useState(section?.title_he || "");
   const [c, setC] = useState<Record<string, any>>(section?.content || {});
 
   const updateC = (key: string, val: any) => setC((prev) => ({ ...prev, [key]: val }));

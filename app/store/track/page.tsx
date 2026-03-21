@@ -16,7 +16,7 @@ const STATUS_LABELS: Record<string, { ar: string; he: string }> = {
 };
 
 export default function TrackPage() {
-  const { t, lang } = useLang();
+  const { lang } = useLang();
   const [orderId, setOrderId] = useState("");
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<{

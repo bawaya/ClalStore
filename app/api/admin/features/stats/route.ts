@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from "next/server";
@@ -36,7 +36,7 @@ export async function GET() {
     } catch {}
 
     return NextResponse.json(stats);
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({});
   }
 }

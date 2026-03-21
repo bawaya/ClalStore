@@ -39,7 +39,7 @@ export function ImageUpload({
   rounded = false,
   enableEnhance = false,
 }: ImageUploadProps) {
-  const scr = useScreen();
+  const _scr = useScreen();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);

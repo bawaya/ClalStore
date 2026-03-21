@@ -6,7 +6,6 @@
 
 import { useState, useEffect } from "react";
 import type { Sentiment } from "@/lib/crm/sentiment";
-import { SENTIMENT_CONFIG } from "@/lib/crm/sentiment";
 import type { InboxLabel } from "@/lib/crm/inbox-types";
 import { fetchAllLabels } from "@/lib/crm/inbox";
 

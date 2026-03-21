@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Conversation Notes
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .order("created_at", { ascending: true });
 
     return NextResponse.json({ success: true, notes: notes || [] });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
   }
 }
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     } as any);
 
     return NextResponse.json({ success: true, note });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
   }
 }

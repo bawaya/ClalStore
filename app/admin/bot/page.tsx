@@ -62,7 +62,7 @@ interface Conversation {
 }
 
 export default function BotAdminPage() {
-  const scr = useScreen();
+  const _scr = useScreen();
   const { toasts, show } = useToast();
   const [tab, setTab] = useState<Tab>("analytics");
   const [loading, setLoading] = useState(true);
@@ -116,7 +116,7 @@ export default function BotAdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, [tab, sb]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

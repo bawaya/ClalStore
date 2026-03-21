@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const result = await email.send(params);
     return NextResponse.json({ sent: result.success, messageId: result.messageId });
-  } catch (err: unknown) {
+  } catch {
     return NextResponse.json({ error: "Email sending failed", sent: false }, { status: 200 });
   }
 }

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 const SITE_NAME = "ClalMobile";
 const SITE_URL = "https://clalmobile.com";
 const DEFAULT_LOCALE = "ar_IL";
-const DEFAULT_CURRENCY = "ILS";
+const _DEFAULT_CURRENCY = "ILS";
 
 interface ProductSEO {
   name_ar: string;
