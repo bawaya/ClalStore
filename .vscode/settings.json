@@ -1,0 +1,8 @@
+{
+  "css.customData": [],
+  "css.validate": true,
+  "css.lint.unknownAtRules": "ignore",
+  "files.associations": {
+    "*.sql": "sql"
+  }
+}
