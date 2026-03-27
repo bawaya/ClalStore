@@ -18,6 +18,9 @@
 npm install
 ```
 
+> **Note:** This project uses [Git LFS](https://git-lfs.github.com/) to track large OCR data files (`*.traineddata`).
+> Make sure Git LFS is installed before cloning: `git lfs install`
+
 ### 2. Set up Supabase
 1. Create a project at [supabase.com](https://supabase.com)
 2. Go to SQL Editor → run `supabase/migrations/001_initial_schema.sql`
