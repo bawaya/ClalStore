@@ -9,15 +9,16 @@ import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
     const { data: notes } = await supabase
       .from("inbox_notes")
       .select("*")
-      .eq("conversation_id", params.id)
+      .eq("conversation_id", id)
       .order("created_at", { ascending: true });
 
     return apiSuccess({ notes: notes || [] });
@@ -26,8 +27,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const { data: note, error } = await supabase
       .from("inbox_notes")
       .insert({
-        conversation_id: params.id,
+        conversation_id: id,
         author_name: author_name || "موظف",
         content: content.trim(),
       } as any)
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // Also save as note-type message so it appears in chat
     await supabase.from("inbox_messages").insert({
-      conversation_id: params.id,
+      conversation_id: id,
       direction: "outbound",
       sender_type: "agent",
       sender_name: author_name || "موظف",

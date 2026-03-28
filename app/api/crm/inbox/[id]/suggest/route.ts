@@ -12,12 +12,13 @@ import { getProductByQuery } from "@/lib/ai/product-context";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
-    const convId = params.id;
+    const convId = id;
     const body = await req.json().catch(() => ({}));
     const agentContext = (body as { context?: string }).context || "";
 

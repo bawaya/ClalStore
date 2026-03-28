@@ -23,12 +23,13 @@ export interface ConversationSummary {
   message_count_at_generation: number;
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
-    const convId = params.id;
+    const convId = id;
     const body = await req.json().catch(() => ({}));
     const forceRefresh = (body as { force?: boolean }).force === true;
 

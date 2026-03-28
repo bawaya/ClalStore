@@ -7,12 +7,12 @@ import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-    const { id } = params;
+    const { id } = await params;
     if (!id) {
       return apiError("Missing conversation id", 400);
     }
@@ -25,12 +25,12 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-    const { id } = params;
+    const { id } = await params;
     if (!id) {
       return apiError("Missing conversation id", 400);
     }

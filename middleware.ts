@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { checkRateLimitDb, getRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit-db";
+import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit";
 import { generateCsrfToken, setCsrfCookie, validateCsrf } from "@/lib/csrf";
 
 const PUBLIC_API = ["/api/webhook", "/api/health", "/api/payment/callback", "/api/contact", "/api/auth", "/api/email", "/api/store", "/api/chat", "/api/reports"];
@@ -67,7 +67,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (rlConfig) {
-    const rl = await checkRateLimitDb(getRateLimitKey(clientIp, rlPrefix), rlConfig);
+    const rl = checkRateLimit(getRateLimitKey(clientIp, rlPrefix), rlConfig);
     if (!rl.allowed) {
       return NextResponse.json(
         { success: false, error: "طلبات كثيرة — حاول بعد قليل" },

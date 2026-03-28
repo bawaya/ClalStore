@@ -9,12 +9,13 @@ import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
-    const convId = params.id;
+    const convId = id;
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before");
     const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);

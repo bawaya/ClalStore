@@ -9,13 +9,14 @@ import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
     const { status } = await req.json();
-    const convId = params.id;
+    const convId = id;
 
     const validStatuses = ["active", "waiting", "bot", "resolved", "archived"];
     if (!validStatuses.includes(status)) {

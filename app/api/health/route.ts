@@ -92,7 +92,7 @@ export async function GET() {
   return apiSuccess(
     {
       status: criticalOk ? (allOk ? "healthy" : "degraded") : "unhealthy",
-      uptime: process.uptime?.() || 0,
+      uptime: 0,
       totalMs: Date.now() - start,
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || "1.0.0",

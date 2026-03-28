@@ -10,12 +10,13 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { sendWhatsAppText, sendWhatsAppImage, sendWhatsAppDocument } from "@/lib/bot/whatsapp";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
-    const convId = params.id;
+    const convId = id;
     const body = await req.json();
     const { type = "text", content, template_name, template_params, media_url, reply_to } = body;
 
