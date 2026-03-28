@@ -49,3 +49,4 @@ supabase/.temp/
 scripts/check-stock-fn.js
 scripts/update-fn.js
 node_modules
+.wrangler/

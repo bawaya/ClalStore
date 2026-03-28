@@ -1,4 +1,3 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { createAdminSupabase } from "@/lib/supabase";
 
 type OrderRow = {
@@ -215,6 +214,7 @@ export function buildWeeklyReportHtml(data: WeeklyReportData): string {
 }
 
 async function createPdfFromRows(title: string, subtitle: string, rows: string[]): Promise<Uint8Array> {
+  const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   let page = doc.addPage([595.28, 841.89]);

@@ -14,6 +14,9 @@ const nextConfig = {
   compress: true,
   reactStrictMode: true,
 
+  // Prevent heavy libraries from being bundled into the Cloudflare Worker
+  serverExternalPackages: ["pdfjs-dist", "xlsx", "web-push"],
+
   // Redirects
   async redirects() {
     return [
