@@ -116,7 +116,6 @@ const removals = [
   ),
 ];
 
-let totalSaved = 0;
 for (const p of removals) {
   if (existsSync(p)) {
     rmSync(p, { recursive: true, force: true });
