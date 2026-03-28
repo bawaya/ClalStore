@@ -11,7 +11,7 @@ const config: OpenNextConfig = {
       queue: "dummy",
     },
   },
-  edgeExternals: ["node:crypto", "pdfjs-dist", "xlsx", "web-push", "recharts"],
+  edgeExternals: ["node:crypto", "pdfjs-dist", "xlsx", "web-push"],
   middleware: {
     external: true,
     override: {
