@@ -1,4 +1,4 @@
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCRMUsers, updateUser, getAuditLog } from "@/lib/crm/queries";
@@ -6,12 +6,12 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase";
 import { logAction } from "@/lib/admin/queries";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
-import crypto from "crypto";
 
 /** Generate a secure random temporary password (16 chars) */
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
-  const bytes = crypto.randomBytes(16);
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
   return Array.from(bytes).map(b => chars[b % chars.length]).join("");
 }
 
