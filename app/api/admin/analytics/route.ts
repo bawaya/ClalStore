@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+      return apiError("DB error", 500);
     }
 
     const days = Number(req.nextUrl.searchParams.get("days") || "30");
@@ -110,9 +111,7 @@ export async function GET(req: NextRequest) {
     const convChange = prevConversations > 0 ? Math.round(((totalConversations - prevConversations) / prevConversations) * 100) : 0;
     const handoffChange = prevHandoffs > 0 ? Math.round(((totalHandoffs - prevHandoffs) / prevHandoffs) * 100) : 0;
 
-    return NextResponse.json({
-      success: true,
-      data: {
+    return apiSuccess({
         sales: {
           totalRevenue: Math.round(totalRevenue),
           totalOrders: orders.length,
@@ -141,10 +140,9 @@ export async function GET(req: NextRequest) {
           sentimentBreakdown: sentimentCount,
           statusBreakdown: inboxStatusCount,
         },
-      },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Analytics API error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return apiError(errMsg(err, "Unknown error"), 500);
   }
 }

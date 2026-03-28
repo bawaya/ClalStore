@@ -8,19 +8,17 @@ export const runtime = 'edge';
 // Body: { "type": "daily" } or { "type": "weekly" }
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { sendDailyReportLink, sendWeeklyReportLink } from "@/lib/bot/admin-notify";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   // Verify cron secret — reject if not configured
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 });
-  }
+  if (!cronSecret) return apiError("CRON_SECRET not configured", 503);
+
   const authHeader = req.headers.get("authorization") || "";
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (authHeader !== `Bearer ${cronSecret}`) return apiError("Unauthorized", 401);
 
   try {
     const body = await req.json();
@@ -28,14 +26,14 @@ export async function POST(req: NextRequest) {
 
     if (type === "weekly") {
       await sendWeeklyReportLink();
-      return NextResponse.json({ success: true, type: "weekly", sent: true });
+      return apiSuccess({ type: "weekly", sent: true });
     }
 
     await sendDailyReportLink();
-    return NextResponse.json({ success: true, type: "daily", sent: true });
-  } catch (err: any) {
+    return apiSuccess({ type: "daily", sent: true });
+  } catch (err: unknown) {
     console.error("Cron report error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -43,13 +41,10 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type") || "daily";
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 });
-  }
+  if (!cronSecret) return apiError("CRON_SECRET not configured", 503);
+
   const secret = req.nextUrl.searchParams.get("secret") || "";
-  if (secret !== cronSecret) {
-    return NextResponse.json({ error: "Provide ?secret= parameter" }, { status: 401 });
-  }
+  if (secret !== cronSecret) return apiError("Provide ?secret= parameter", 401);
 
   try {
     if (type === "weekly") {
@@ -57,9 +52,9 @@ export async function GET(req: NextRequest) {
     } else {
       await sendDailyReportLink();
     }
-    return NextResponse.json({ success: true, type, sent: true });
-  } catch (err: any) {
+    return apiSuccess({ type, sent: true });
+  } catch (err: unknown) {
     console.error("Cron report error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(errMsg(err), 500);
   }
 }

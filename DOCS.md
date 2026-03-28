@@ -713,7 +713,7 @@ NEXT_PUBLIC_MIXPANEL_TOKEN=       # Mixpanel analytics token
 
 **Build command:**
 ```bash
-npx @cloudflare/next-on-pages
+npx opennextjs-cloudflare build
 ```
 
 **Output directory:**

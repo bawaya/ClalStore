@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
 import { StatCard } from "@/components/admin/shared";
 import { formatDateTime, timeAgo } from "@/lib/utils";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface Conversation {
   id: string;
@@ -90,8 +91,8 @@ export default function ChatsPage() {
       const statsData = await statsRes.json();
       setConversations(convosData.conversations || []);
       setStats(statsData);
-    } catch (err: any) {
-      setError(err.message || "خطأ في التحميل");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطأ في التحميل");
     } finally {
       setLoading(false);
     }
@@ -110,9 +111,9 @@ export default function ChatsPage() {
       }
       const data = await res.json();
       setMessages(data.data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessages([]);
-      setError(err.message || "خطأ");
+      setError(err instanceof Error ? err.message : "خطأ");
     } finally { setLoadingMsgs(false); }
   };
 
@@ -120,7 +121,7 @@ export default function ChatsPage() {
     try {
       const res = await fetch(`/api/crm/chats/${id}/messages`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ action: "close" }),
       });
       if (!res.ok) {
@@ -129,7 +130,7 @@ export default function ChatsPage() {
       }
       setConversations((prev) => prev.map((c) => c.id === id ? { ...c, status: "closed" as const } : c));
       if (selectedId === id) setSelectedId(null);
-    } catch (err: any) { setError(err.message || "خطأ"); }
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : "خطأ"); }
   };
 
   const filtered = conversations;

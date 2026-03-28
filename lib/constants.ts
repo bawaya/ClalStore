@@ -91,23 +91,21 @@ export const TASK_PRIORITY = {
 } as const;
 
 export const BANKS = [
-  // Israeli banks + digital banks.
-  // Intentionally excludes Postal Bank (Bank code 09) per business request.
-  { id: "yahav", name_ar: "بنك يهاف", name_he: "בנק יהב", code: "04" },
+  { id: "hapoalim", name_ar: "بنك هبوعليم", name_he: "בנק הפועלים", code: "12" },
   { id: "leumi", name_ar: "بنك لئومي", name_he: "בנק לאומי", code: "10" },
   { id: "discount", name_ar: "بنك ديسكونت", name_he: "בנק דיסקונט", code: "11" },
-  { id: "hapoalim", name_ar: "بنك هبوعليم", name_he: "בנק הפועלים", code: "12" },
-  { id: "union", name_ar: "بنك الاتحاد (إيغود)", name_he: "בנק איגוד", code: "13" },
-  { id: "otsar", name_ar: "بنك أوتسار هحيال", name_he: "אוצר החייל", code: "14" },
-  { id: "mercantile", name_ar: "بنك مركنتيل", name_he: "מרכנתיל", code: "17" },
-  { id: "one_zero", name_ar: "وان زيرو (رقمي)", name_he: "ONE ZERO", code: "18" },
   { id: "mizrahi", name_ar: "بنك مزراحي طفحوت", name_he: "בנק מזרחי טפחות", code: "20" },
-  { id: "benleumi", name_ar: "البنك الدولي الأول", name_he: "הבנק הבינלאומי", code: "31" },
-  { id: "arab_israeli", name_ar: "البنك العربي الإسرائيلي", name_he: "הבנק הערבי הישראלי", code: "34" },
+  { id: "benleumi", name_ar: "البنك الدولي الأول", name_he: "הבינלאומי", code: "31" },
+  { id: "one_zero", name_ar: "وان زيرو", name_he: "One Zero", code: "18" },
+  { id: "yahav", name_ar: "بنك يهاف", name_he: "בנק יהב", code: "04" },
+  { id: "mercantile", name_ar: "بنك مركنتيل", name_he: "מרקנטיל", code: "17" },
+  { id: "otsar", name_ar: "بنك أوتسار هحيال", name_he: "אוצר החייל", code: "14" },
+  { id: "union", name_ar: "بنك الاتحاد", name_he: "בנק איגוד", code: "13" },
   { id: "masad", name_ar: "بنك مساد", name_he: "בנק מסד", code: "46" },
-  { id: "poalei_agudat", name_ar: "بنك פועלי אגודת ישראל", name_he: "בנק פועלי אגודת ישראל", code: "52" },
   { id: "jerusalem", name_ar: "بنك القدس", name_he: "בנק ירושלים", code: "54" },
-  { id: "dexia", name_ar: "بنك دكسيا (بلدي)", name_he: "דקסיה", code: "68" },
+  { id: "poalei_agudat", name_ar: "بنك بوعلي أغودات", name_he: "בנק פועלי אגודת ישראל", code: "52" },
+  { id: "dexia", name_ar: "بنك دكسيا", name_he: "דקסיה", code: "68" },
+  { id: "arab_israeli", name_ar: "البنك العربي الإسرائيلي", name_he: "הבנק הערבי הישראלי", code: "34" },
 ] as const;
 
 export const INTEGRATION_TYPES = {

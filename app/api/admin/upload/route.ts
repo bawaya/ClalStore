@@ -9,6 +9,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { uploadImage } from "@/lib/storage";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
@@ -21,17 +22,17 @@ export async function POST(req: NextRequest) {
     const files = formData.getAll("file") as File[];
 
     if (!files.length) {
-      return NextResponse.json({ error: "لم يتم اختيار صورة" }, { status: 400 });
+      return apiError("لم يتم اختيار صورة", 400);
     }
 
     const results: { url: string; name: string }[] = [];
 
     for (const file of files) {
       if (!ALLOWED.includes(file.type)) {
-        return NextResponse.json({ error: `نوع غير مدعوم: ${file.name} (JPG, PNG, WebP فقط)` }, { status: 400 });
+        return apiError(`نوع غير مدعوم: ${file.name} (JPG, PNG, WebP فقط)`, 400);
       }
       if (file.size > MAX_SIZE) {
-        return NextResponse.json({ error: `${file.name} أكبر من 5MB` }, { status: 400 });
+        return apiError(`${file.name} أكبر من 5MB`, 400);
       }
 
       // Try Supabase Storage first, fallback to base64
@@ -56,12 +57,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (results.length === 1) {
-      return NextResponse.json({ success: true, url: results[0].url });
+      return apiSuccess({ url: results[0].url });
     }
 
-    return NextResponse.json({ success: true, urls: results.map((r) => r.url), results });
-  } catch (err: any) {
+    return apiSuccess({ urls: results.map((r) => r.url), results });
+  } catch (err: unknown) {
     console.error("Upload error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(errMsg(err, "Unknown error"));
   }
 }

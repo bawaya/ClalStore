@@ -15,6 +15,7 @@ import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
 import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import type { WebsiteContent, Hero, SubPage } from "@/types/database";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 // ===== Section Meta =====
 const SECTIONS: { key: string; icon: string; label: string; desc: string }[] = [
@@ -61,8 +62,8 @@ export default function HomepageAdminPage() {
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setSections(json.data || []);
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     } finally {
       setLoading(false);
     }
@@ -83,15 +84,15 @@ export default function HomepageAdminPage() {
         : { section: sectionKey, ...updates };
       const res = await fetch("/api/admin/website", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify(body),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       show("✅ تم الحفظ بنجاح");
       await fetchSections();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     } finally {
       setSaving(null);
     }
@@ -119,7 +120,7 @@ export default function HomepageAdminPage() {
       if (heroEditId) { await updateHero(heroEditId, heroForm); show("✅ تم التعديل"); }
       else { await createHero(heroForm); show("✅ تم الإضافة"); }
       setHeroModal(false);
-    } catch (err: any) { show(`❌ ${err.message}`, "error"); }
+    } catch (err: unknown) { show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error"); }
   };
 
   const handleHeroDelete = async () => {
@@ -141,7 +142,7 @@ export default function HomepageAdminPage() {
       if (subPageEditId) { await updateSubPage(subPageEditId, subPageForm); show("✅ تم التعديل"); }
       else { await createSubPage(subPageForm); show("✅ تم الإضافة"); }
       setSubPageModal(false);
-    } catch (err: any) { show(`❌ ${err.message}`, "error"); }
+    } catch (err: unknown) { show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error"); }
   };
 
   const handleSubPageDelete = async () => {

@@ -5,8 +5,9 @@ export const runtime = 'edge';
 // GET: list all | PUT: update section
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function GET() {
   try {
@@ -17,9 +18,9 @@ export async function GET() {
       .order("sort_order");
 
     if (error) throw error;
-    return NextResponse.json({ data: data || [] });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(data || []);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }
 
@@ -28,7 +29,7 @@ export async function PUT(req: NextRequest) {
     const db = createAdminSupabase();
     const body = await req.json();
     const { id, ...updates } = body;
-    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    if (!id) return apiError("Missing id", 400);
 
     const { data, error } = await db
       .from("website_content")
@@ -38,8 +39,8 @@ export async function PUT(req: NextRequest) {
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ data });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(data);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase';
 import type { Product } from '@/types/database';
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 type AiParsedRow = {
   deviceName: string;
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const pdfText = body?.pdfText as string;
     if (!pdfText?.trim()) {
-      return NextResponse.json({ error: 'No PDF text', steps }, { status: 400 });
+      return apiError('No PDF text', 400);
     }
     steps.push('pdfText=' + pdfText.length);
 
@@ -53,10 +54,10 @@ export async function POST(req: NextRequest) {
     const db = createAdminSupabase();
     const { data: products, error: dbErr } = await db.from('products').select('*').eq('type', 'device');
     if (dbErr) {
-      return NextResponse.json({ error: 'DB: ' + dbErr.message, steps }, { status: 500 });
+      return apiError('DB: ' + dbErr.message, 500);
     }
     if (!products?.length) {
-      return NextResponse.json({ error: 'No products in DB', steps }, { status: 404 });
+      return apiError('No products in DB', 404);
     }
     steps.push('products=' + products.length);
 
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
       '';
     steps.push('key=' + !!apiKey);
     if (!apiKey) {
-      return NextResponse.json({ error: 'No OpenAI API key', steps }, { status: 500 });
+      return apiError('No OpenAI API key', 500);
     }
 
     const systemPrompt = [
@@ -132,7 +133,7 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
       steps.push('err=' + errText.substring(0, 500));
-      return NextResponse.json({ error: 'OpenAI ' + response.status + ': ' + errText.substring(0, 300), steps }, { status: 500 });
+      return apiError('OpenAI ' + response.status + ': ' + errText.substring(0, 300), 500);
     }
 
     const data = await response.json();
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
     steps.push('tokens=' + tokens.input + '+' + tokens.output + ' stop=' + stopReason);
 
     if (!aiText) {
-      return NextResponse.json({ error: 'Empty response', data, steps }, { status: 500 });
+      return apiError('Empty response', 500);
     }
 
     steps.push('parsing lines len=' + aiText.length);
@@ -198,8 +199,8 @@ export async function POST(req: NextRequest) {
           };
         })
         .filter((row: AiParsedRow) => row.deviceName && row.price > 0);
-    } catch (e: any) {
-      return NextResponse.json({ error: 'Parse: ' + e.message, aiText: aiText.substring(0, 1000), steps }, { status: 500 });
+    } catch (e: unknown) {
+      return apiError('Parse: ' + errMsg(e, "Unknown error"), 500);
     }
 
     steps.push('parsed=' + parsed.length);
@@ -293,9 +294,9 @@ export async function POST(req: NextRequest) {
     };
 
     steps.push('done');
-    return NextResponse.json({ data: results, summary, tokens, steps, provider: 'openai' });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || String(err), steps, stack: err.stack?.substring(0, 300) }, { status: 500 });
+    return apiSuccess({ rows: results, summary, tokens, steps, provider: 'openai' });
+  } catch (err: unknown) {
+    return apiError(errMsg(err, String(err)));
   }
 }
 

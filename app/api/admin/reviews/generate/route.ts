@@ -5,9 +5,10 @@ export const runtime = 'edge';
 // Generates realistic product reviews with Arab + Jewish Israeli names
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude } from "@/lib/ai/claude";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 // ── Common Arab Israeli first + last names ──
 const FIRST_NAMES_MALE_AR = [
@@ -97,12 +98,12 @@ function randomDate(): string {
 export async function POST(req: NextRequest) {
   try {
     if (!process.env.ANTHROPIC_API_KEY_ADMIN && !process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "Anthropic Admin API key not configured" }, { status: 500 });
+      return apiError("Anthropic Admin API key not configured", 500);
     }
     const aiKey = process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || "";
 
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
+    if (!db) return apiError("DB unavailable", 500);
 
     const body = await req.json();
     const { product_id, count, distribution } = body as {
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!product_id || !count || count < 1 || count > 50) {
-      return NextResponse.json({ error: "product_id and count (1-50) required" }, { status: 400 });
+      return apiError("product_id and count (1-50) required", 400);
     }
 
     // Fetch product details
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return apiError("Product not found", 404);
     }
 
     // Fetch existing reviews to avoid duplication
@@ -282,13 +283,12 @@ ${reviewRequests}`;
 
     if (error) throw error;
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       count: inserted?.length || 0,
       message: `✅ تم توليد ${inserted?.length || 0} تقييم لـ ${product.name_ar}`,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[Review Generator Error]", err);
-    return NextResponse.json({ error: err.message || "Generation failed" }, { status: 500 });
+    return apiError(errMsg(err, "Generation failed"));
   }
 }

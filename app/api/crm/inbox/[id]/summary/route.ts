@@ -5,10 +5,11 @@ export const runtime = 'edge';
 // POST /api/crm/inbox/[id]/summary
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export interface ConversationSummary {
   summary: string;
@@ -22,12 +23,13 @@ export interface ConversationSummary {
   message_count_at_generation: number;
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
-    const convId = params.id;
+    const convId = id;
     const body = await req.json().catch(() => ({}));
     const forceRefresh = (body as { force?: boolean }).force === true;
 
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .single();
 
     if (convErr || !conversation) {
-      return NextResponse.json({ success: false, error: "المحادثة غير موجودة" }, { status: 404 });
+      return apiError("المحادثة غير موجودة", 404);
     }
 
     // 2. Check cached summary
@@ -60,11 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       !forceRefresh &&
       currentMsgCount - (cachedSummary.message_count_at_generation || 0) < 3
     ) {
-      return NextResponse.json({
-        success: true,
-        summary: cachedSummary,
-        cached: true,
-      });
+      return apiSuccess({ summary: cachedSummary, cached: true });
     }
 
     // 4. Fetch all messages (up to 50)
@@ -76,10 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .limit(50);
 
     if (!messages || messages.length < 3) {
-      return NextResponse.json({
-        success: false,
-        error: "المحادثة قصيرة جداً للتلخيص",
-      }, { status: 400 });
+      return apiError("المحادثة قصيرة جداً للتلخيص", 400);
     }
 
     // 5. Fetch customer
@@ -146,7 +141,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
 
     if (!result) {
-      return NextResponse.json({ success: false, error: "تعذر تلخيص المحادثة" }, { status: 500 });
+      return apiError("تعذر تلخيص المحادثة", 500);
     }
 
     // 9. Track usage
@@ -182,13 +177,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       })
       .eq("id", convId);
 
-    return NextResponse.json({
-      success: true,
-      summary,
-      cached: false,
-    });
-  } catch (err: any) {
+    return apiSuccess({ summary, cached: false });
+  } catch (err: unknown) {
     console.error("Summary error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

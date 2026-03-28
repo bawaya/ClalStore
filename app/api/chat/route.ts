@@ -5,16 +5,17 @@ export const runtime = 'edge';
 // POST: Process chat message via new engine
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { handleWebChatMessage, formatWebChatResponse } from "@/lib/bot/webchat";
 import { logBotInteraction } from "@/lib/bot/engine";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
     const { message, sessionId } = await req.json();
 
     if (!message || typeof message !== "string") {
-      return NextResponse.json({ error: "Message required" }, { status: 400 });
+      return apiError("Message required", 400);
     }
 
     const sid = sessionId || `anon_${Date.now()}`;
@@ -24,12 +25,13 @@ export async function POST(req: NextRequest) {
     // Legacy log
     await logBotInteraction("webchat", sid, message, response.text, "processed");
 
-    return NextResponse.json(formatted);
+    return apiSuccess(formatted);
   } catch (err: unknown) {
     console.error("Chat API error:", err);
-    return NextResponse.json(
-      { text: "عذراً حصل خطأ. حاول مرة ثانية أو تواصل معنا:\n📞 053-3337653", quickReplies: [], escalate: false },
-      { status: 200 }
-    );
+    return apiSuccess({
+      text: "عذراً حصل خطأ. حاول مرة ثانية أو تواصل معنا:\n📞 053-3337653",
+      quickReplies: [],
+      escalate: false,
+    });
   }
 }

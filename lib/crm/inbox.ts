@@ -1,6 +1,7 @@
 // =====================================================
 // ClalMobile — Inbox API Calls + Hooks
-// Polling-based live inbox for CRM
+// Realtime-first live inbox for CRM (Supabase Realtime)
+// Falls back to polling if Realtime is unavailable
 // =====================================================
 
 "use client";
@@ -17,18 +18,16 @@ import type {
   ConversationDetail,
   ConversationStatus,
 } from "./inbox-types";
+import { useInboxRealtime, type RealtimeEvent } from "./realtime";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 // ===== API Helpers =====
 
 async function api<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...opts?.headers },
+    headers: { ...csrfHeaders(), ...opts?.headers },
     ...opts,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(err.error || `Request failed: ${res.status}`);
-  }
   return res.json();
 }
 
@@ -140,14 +139,21 @@ export async function createLabel(name: string, color: string) {
 
 // ===== Hooks =====
 
-/** Poll conversations list every interval ms */
+// Fallback polling interval when Realtime is not connected (ms)
+const FALLBACK_POLL_MS = 15_000;
+
+/**
+ * Realtime-first conversations list.
+ * Subscribes to Supabase Realtime for instant updates.
+ * Falls back to slow polling if Realtime is unavailable.
+ */
 export function useInboxConversations(params: {
   status?: string;
   search?: string;
   assigned?: string;
   label?: string;
   sentiment?: string;
-}, pollInterval = 3000) {
+}, pollInterval = FALLBACK_POLL_MS) {
   const [conversations, setConversations] = useState<InboxConversation[]>([]);
   const [stats, setStats] = useState<InboxStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,27 +172,51 @@ export function useInboxConversations(params: {
     setLoading(false);
   }, []);
 
+  // Realtime: refresh on any conversation/message change
+  const handleRealtime = useCallback(
+    (event: RealtimeEvent) => {
+      if (
+        event.table === "inbox_conversations" ||
+        event.table === "inbox_messages"
+      ) {
+        load(false);
+      }
+    },
+    [load]
+  );
+
+  const { connected } = useInboxRealtime(handleRealtime);
+
+  // Initial fetch + fallback polling when Realtime is not connected
   useEffect(() => {
     load(true);
-    const interval = setInterval(() => load(false), pollInterval);
-    return () => clearInterval(interval);
-  }, [load, pollInterval, params.status, params.search, params.assigned, params.label, params.sentiment]);
+    if (!connected) {
+      const interval = setInterval(() => load(false), pollInterval);
+      return () => clearInterval(interval);
+    }
+  }, [load, pollInterval, connected, params.status, params.search, params.assigned, params.label, params.sentiment]);
 
-  return { conversations, stats, loading, refresh: () => load(true) };
+  return { conversations, stats, loading, refresh: () => load(true), realtimeConnected: connected };
 }
 
-/** Poll messages for a single conversation */
-export function useInboxMessages(conversationId: string | null, pollInterval = 3000) {
+/**
+ * Realtime-first messages for a single conversation.
+ * Subscribes to Supabase Realtime for instant message delivery.
+ * Falls back to slow polling if Realtime is unavailable.
+ */
+export function useInboxMessages(conversationId: string | null, pollInterval = FALLBACK_POLL_MS) {
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const lastMsgCount = useRef(0);
   const [newMessageArrived, setNewMessageArrived] = useState(false);
+  const convIdRef = useRef(conversationId);
+  convIdRef.current = conversationId;
 
   const load = useCallback(async (showLoading = false) => {
-    if (!conversationId) return;
+    if (!convIdRef.current) return;
     if (showLoading) setLoading(true);
     try {
-      const data = await fetchConversation(conversationId);
+      const data = await fetchConversation(convIdRef.current);
       if (data.success) {
         const newCount = data.messages?.length || 0;
         if (newCount > lastMsgCount.current && lastMsgCount.current > 0) {
@@ -205,34 +235,86 @@ export function useInboxMessages(conversationId: string | null, pollInterval = 3
       }
     } catch {}
     setLoading(false);
-  }, [conversationId]);
+  }, []);
+
+  // Realtime: refresh when a message arrives for the current conversation
+  const handleRealtime = useCallback(
+    (event: RealtimeEvent) => {
+      if (!convIdRef.current) return;
+      const convId = convIdRef.current;
+
+      if (event.table === "inbox_messages") {
+        const msgConvId =
+          (event.new as Record<string, unknown>)?.conversation_id ||
+          (event.old as Record<string, unknown>)?.conversation_id;
+        if (msgConvId === convId) {
+          load(false);
+        }
+      }
+
+      if (event.table === "inbox_conversations") {
+        const eventConvId =
+          (event.new as Record<string, unknown>)?.id ||
+          (event.old as Record<string, unknown>)?.id;
+        if (eventConvId === convId) {
+          load(false);
+        }
+      }
+    },
+    [load]
+  );
+
+  const { connected } = useInboxRealtime(handleRealtime);
 
   useEffect(() => {
     if (!conversationId) { setDetail(null); return; }
     lastMsgCount.current = 0;
     load(true);
-    const interval = setInterval(() => load(false), pollInterval);
-    return () => clearInterval(interval);
-  }, [conversationId, load, pollInterval]);
+    if (!connected) {
+      const interval = setInterval(() => load(false), pollInterval);
+      return () => clearInterval(interval);
+    }
+  }, [conversationId, load, pollInterval, connected]);
 
-  return { detail, loading, newMessageArrived, refresh: () => load(true) };
+  return { detail, loading, newMessageArrived, refresh: () => load(true), realtimeConnected: connected };
 }
 
-/** Fetch inbox stats for badge count */
-export function useInboxBadge(pollInterval = 10000) {
+/**
+ * Realtime-first inbox badge count.
+ * Uses Realtime for instant unread updates, falls back to polling.
+ */
+export function useInboxBadge(pollInterval = 30_000) {
   const [unread, setUnread] = useState(0);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await fetchStats();
+      if (data.success) setUnread(data.stats.unread_total);
+    } catch {}
+  }, []);
+
+  // Realtime: refresh badge on any conversation change
+  const handleRealtime = useCallback(
+    (event: RealtimeEvent) => {
+      if (
+        event.table === "inbox_conversations" ||
+        event.table === "inbox_messages"
+      ) {
+        loadStats();
+      }
+    },
+    [loadStats]
+  );
+
+  const { connected } = useInboxRealtime(handleRealtime);
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await fetchStats();
-        if (data.success) setUnread(data.stats.unread_total);
-      } catch {}
-    };
-    load();
-    const interval = setInterval(load, pollInterval);
-    return () => clearInterval(interval);
-  }, [pollInterval]);
+    loadStats();
+    if (!connected) {
+      const interval = setInterval(loadStats, pollInterval);
+      return () => clearInterval(interval);
+    }
+  }, [loadStats, pollInterval, connected]);
 
   return unread;
 }

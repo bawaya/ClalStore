@@ -3,6 +3,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { getCRMChats, getChatStats } from "@/lib/crm/queries";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
     // Fetch stats
     if (searchParams.get("stats") === "true") {
       const stats = await getChatStats();
-      return NextResponse.json(stats);
+      return apiSuccess(stats);
     }
 
     // Fetch conversations list (with last_message, customer join, total count)
@@ -25,8 +26,8 @@ export async function GET(req: NextRequest) {
       offset: searchParams.get("offset") ? Number(searchParams.get("offset")) : 0,
     };
     const result = await getCRMChats(filters);
-    return NextResponse.json({ conversations: result.data, total: result.total });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return apiSuccess({ conversations: result.data, total: result.total });
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }

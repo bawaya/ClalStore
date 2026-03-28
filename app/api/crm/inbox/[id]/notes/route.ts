@@ -1,44 +1,47 @@
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Conversation Notes
 // GET/POST /api/crm/inbox/[id]/notes
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { data: notes } = await supabase
       .from("inbox_notes")
       .select("*")
-      .eq("conversation_id", params.id)
+      .eq("conversation_id", id)
       .order("created_at", { ascending: true });
 
-    return NextResponse.json({ success: true, notes: notes || [] });
+    return apiSuccess({ notes: notes || [] });
   } catch {
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { content, author_name } = await req.json();
     if (!content?.trim()) {
-      return NextResponse.json({ success: false, error: "المحتوى مطلوب" }, { status: 400 });
+      return apiError("المحتوى مطلوب", 400);
     }
 
     const { data: note, error } = await supabase
       .from("inbox_notes")
       .insert({
-        conversation_id: params.id,
+        conversation_id: id,
         author_name: author_name || "موظف",
         content: content.trim(),
       } as any)
@@ -46,12 +49,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .single();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return apiError(error.message, 500);
     }
 
     // Also save as note-type message so it appears in chat
     await supabase.from("inbox_messages").insert({
-      conversation_id: params.id,
+      conversation_id: id,
       direction: "outbound",
       sender_type: "agent",
       sender_name: author_name || "موظف",
@@ -60,8 +63,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       status: "sent",
     } as any);
 
-    return NextResponse.json({ success: true, note });
+    return apiSuccess({ note });
   } catch {
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

@@ -1,87 +1,71 @@
 // =====================================================
 // ClalMobile — Admin Notification Service
-// Send WhatsApp alerts to admin for key events
+// Always sends via approved WhatsApp templates to bypass
+// the 24-hour session window restriction.
+//
+// Templates required in yCloud (see bottom of file):
+//   clal_new_order, clal_contact_form, clal_handoff,
+//   clal_angry_cust, clal_new_msg, clal_order_done,
+//   clal_daily_report, clal_weekly_report, clal_admin_alert
 // =====================================================
 
-import { sendWhatsAppText, sendWhatsAppTemplate } from "./whatsapp";
-import { getIntegrationConfig, getProvider, type EmailProvider } from "@/lib/integrations/hub";
+import { sendWhatsAppTemplate } from "./whatsapp";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
-// ADMIN_REPORT_PHONE = رقم مُرسِل التقارير (FROM) — +972537777963
-// ADMIN_PERSONAL_PHONE = رقم الأدمن الشخصي (TO) — يستقبل التقارير والإشعارات
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
 async function getNotifyTargets() {
   const waCfg = await getIntegrationConfig("whatsapp");
-  const reportFromId = waCfg.reports_phone_id || process.env.ADMIN_REPORT_PHONE_ID || "";
-  const adminTo = waCfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
+  const reportFrom = waCfg.reports_phone || process.env.ADMIN_REPORT_PHONE || "";
+  const adminTo = waCfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "";
   const teamRaw = waCfg.team_whatsapp_numbers || process.env.TEAM_WHATSAPP_NUMBERS || "";
-  const teamNumbers = String(teamRaw)
-    .split(",")
-    .map((n) => n.trim())
-    .filter(Boolean);
-  return { reportFromId, adminTo, teamNumbers };
+  const teamNumbers = String(teamRaw).split(",").map((n) => n.trim()).filter(Boolean);
+  return { reportFrom, adminTo, teamNumbers };
 }
 
-async function sendAdminTemplate(
-  to: string,
+/** Send a template to admin — always uses template (no 24h window issue) */
+async function sendTemplateToAdmin(
   templateName: string,
-  params: string[],
-  reportFromId?: string
+  params: string[]
 ): Promise<void> {
-  await sendWhatsAppTemplate(to, templateName, params, reportFromId || undefined);
-}
-
-/** Send message to admin — try text first, fall back to template if 24h window expired */
-async function sendToAdmin(message: string): Promise<void> {
-  const targets = await getNotifyTargets();
-  const to = targets.adminTo;
-  const fallbackParams = [message.slice(0, 1024)];
+  const { adminTo } = await getNotifyTargets();
+  if (!adminTo) return;
   try {
-    // Force admin/report notifications to use reports sender id when configured.
-    const res = await sendWhatsAppText(to, message, targets.reportFromId || undefined);
-    // yCloud returns error for 24h window violations
-    if (res?.error?.code || res?.errorCode) {
-      console.warn("[AdminNotify] Text failed (possibly 24h window), trying template...");
-      await sendAdminTemplate(to, "clal_admin_alert", fallbackParams, targets.reportFromId);
-    }
-  } catch (err: any) {
-    console.error("[AdminNotify] Text send error, trying template fallback:", err.message);
-    try {
-      await sendAdminTemplate(to, "clal_admin_alert", fallbackParams, targets.reportFromId);
-    } catch (templateErr) {
-      console.error("[AdminNotify] Template fallback also failed:", templateErr);
-    }
+    await sendWhatsAppTemplate(adminTo, templateName, params);
+  } catch (err) {
+    console.error(`[AdminNotify] Template "${templateName}" failed:`, err);
   }
 }
 
-// ===== Send report/notification TO admin FROM report number =====
-export async function notifyAdmin(message: string): Promise<void> {
-  await sendToAdmin(message);
-}
-
-// ===== Send to admin personal number FROM report number =====
-export async function notifyAdminPersonal(message: string): Promise<void> {
-  await sendToAdmin(message);
-}
-
-// ===== Send to all team members FROM report number =====
-export async function notifyTeam(message: string): Promise<void> {
-  const { teamNumbers, reportFromId } = await getNotifyTargets();
-  const numbers = teamNumbers;
-  for (const num of numbers) {
+/** Send a template to all team members */
+async function sendTemplateToTeam(
+  templateName: string,
+  params: string[]
+): Promise<void> {
+  const { teamNumbers } = await getNotifyTargets();
+  if (teamNumbers.length === 0) return;
+  for (const num of teamNumbers) {
     try {
-      await sendWhatsAppText(num.trim(), message, reportFromId || undefined);
+      await sendWhatsAppTemplate(num, templateName, params);
     } catch (err) {
-      console.error(`Team notify error (${num}):`, err);
-      // Team members — try template as fallback
-      try {
-        await sendAdminTemplate(num.trim(), "clal_admin_alert", [message.slice(0, 1024)], reportFromId);
-      } catch { /* silent */ }
+      console.error(`[AdminNotify] Team template "${templateName}" failed for ${num}:`, err);
     }
   }
+}
+
+// ===== Generic admin alert (for backward compat) =====
+export async function notifyAdmin(message: string): Promise<void> {
+  await sendTemplateToAdmin("clal_admin_alert", [message.slice(0, 1024)]);
+}
+
+export const notifyAdminPersonal = notifyAdmin;
+
+export async function notifyTeam(message: string): Promise<void> {
+  await sendTemplateToTeam("clal_admin_alert", [message.slice(0, 1024)]);
 }
 
 // ===== New Order Alert =====
+// Template: clal_new_order  (4 params)
 export async function notifyAdminNewOrder(order: {
   orderId: string;
   customerName: string;
@@ -90,51 +74,21 @@ export async function notifyAdminNewOrder(order: {
   source: string;
   items: { name: string; qty: number; price: number }[];
 }): Promise<void> {
-  const itemsList = order.items.length > 0
-    ? order.items.map((i) => `  • ${i.name} × ${i.qty} — ₪${i.price.toLocaleString()}`).join("\n")
-    : "  • (لا توجد تفاصيل منتجات في هذا المصدر)";
+  const itemsList = order.items
+    .map((i) => `• ${i.name} × ${i.qty} — ₪${i.price.toLocaleString()}`)
+    .join("\n")
+    .slice(0, 500);
 
-  const msg =
-    `🆕 *طلب جديد!*\n\n` +
-    `📦 رقم الطلب: *${order.orderId}*\n` +
-    `👤 الزبون: ${order.customerName}\n` +
-    `📞 الهاتف: ${order.customerPhone}\n` +
-    `💰 المبلغ: *₪${order.total.toLocaleString()}*\n` +
-    `📡 المصدر: ${order.source}\n\n` +
-    `📋 المنتجات:\n${itemsList}\n\n` +
-    `🔗 ${BASE_URL}/crm/orders?search=${order.orderId}`;
-
-  await notifyAdmin(msg);
-
-  try {
-    const email = await getProvider<EmailProvider>("email");
-    if (!email) return;
-    const waCfg = await getIntegrationConfig("whatsapp");
-    const to = waCfg.reports_email || waCfg.completed_orders_email || "bawaya@icloud.com";
-    await email.send({
-      to,
-      subject: `🆕 طلب جديد ${order.orderId}`,
-      html: `
-        <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:12px;padding:18px">
-          <h2 style="margin:0 0 12px;color:#111">🆕 إشعار طلب جديد</h2>
-          <p style="margin:6px 0"><strong>رقم الطلب:</strong> ${order.orderId}</p>
-          <p style="margin:6px 0"><strong>اسم الزبون:</strong> ${order.customerName}</p>
-          <p style="margin:6px 0"><strong>الهاتف:</strong> ${order.customerPhone}</p>
-          <p style="margin:6px 0"><strong>المبلغ:</strong> ₪${order.total.toLocaleString()}</p>
-          <p style="margin:6px 0"><strong>المصدر:</strong> ${order.source}</p>
-          <pre style="white-space:pre-wrap;background:#f8f8f8;border-radius:8px;padding:10px;margin:12px 0">${itemsList}</pre>
-          <p style="margin:14px 0 0">
-            <a href="${BASE_URL}/crm/orders?search=${order.orderId}" style="color:#c41040;text-decoration:none">فتح الطلب في CRM</a>
-          </p>
-        </div>
-      `,
-    });
-  } catch (err) {
-    console.error("New order admin email failed:", err);
-  }
+  await sendTemplateToAdmin("clal_new_order", [
+    order.orderId,
+    `${order.customerName} | ${order.customerPhone}\nالمبلغ: ₪${order.total.toLocaleString()} | المصدر: ${order.source}`,
+    itemsList,
+    `${BASE_URL}/crm/orders?search=${order.orderId}`,
+  ]);
 }
 
 // ===== Order Completed Alert =====
+// Template: clal_order_done  (3 params)
 export async function notifyAdminOrderCompleted(order: {
   orderId: string;
   customerName: string;
@@ -142,19 +96,19 @@ export async function notifyAdminOrderCompleted(order: {
   total: number;
   status: string;
 }): Promise<void> {
-  const msg =
-    `✅ *طلب مكتمل*\n\n` +
-    `📦 رقم الطلب: *${order.orderId}*\n` +
-    `👤 الزبون: ${order.customerName}\n` +
-    (order.customerPhone ? `📞 الهاتف: ${order.customerPhone}\n` : "") +
-    `💰 المبلغ: *₪${order.total.toLocaleString()}*\n` +
-    `📌 الحالة: ${order.status}\n\n` +
-    `🔗 ${BASE_URL}/crm/orders?search=${order.orderId}`;
+  const customerLine = order.customerPhone
+    ? `${order.customerName} | ${order.customerPhone}`
+    : order.customerName;
 
-  await notifyAdmin(msg);
+  await sendTemplateToAdmin("clal_order_done", [
+    `رقم الطلب: ${order.orderId}\nالزبون: ${customerLine}`,
+    `₪${order.total.toLocaleString()} | ${order.status}`,
+    `${BASE_URL}/crm/orders?search=${order.orderId}`,
+  ]);
 }
 
 // ===== Contact Form Alert =====
+// Template: clal_contact_form  (3 params)
 export async function notifyAdminContactForm(contact: {
   name: string;
   phone: string;
@@ -162,37 +116,38 @@ export async function notifyAdminContactForm(contact: {
   subject?: string;
   message: string;
 }): Promise<void> {
-  const msg =
-    `📩 *رسالة تواصل جديدة!*\n\n` +
-    `👤 الاسم: ${contact.name}\n` +
-    `📞 الهاتف: ${contact.phone}\n` +
-    (contact.email ? `📧 الإيميل: ${contact.email}\n` : "") +
-    (contact.subject ? `📝 الموضوع: ${contact.subject}\n` : "") +
-    `\n💬 الرسالة:\n${contact.message.slice(0, 500)}\n\n` +
-    `🔗 ${BASE_URL}/crm/customers`;
+  const senderInfo = [contact.name, contact.phone, contact.email].filter(Boolean).join(" | ");
+  const msgContent = contact.subject
+    ? `الموضوع: ${contact.subject}\n${contact.message.slice(0, 400)}`
+    : contact.message.slice(0, 450);
 
-  await notifyAdmin(msg);
+  await sendTemplateToAdmin("clal_contact_form", [
+    senderInfo,
+    msgContent,
+    `${BASE_URL}/crm/customers`,
+  ]);
 }
 
 // ===== Muhammad Handoff Alert =====
+// Template: clal_handoff  (3 params)
 export async function notifyAdminMuhammadHandoff(details: {
   name: string;
   phone: string;
   message: string;
   channel: "webchat" | "whatsapp";
 }): Promise<void> {
-  const msg =
-    `👤 *طلب تحدث مع محمد*\n\n` +
-    `🏷️ الاسم: ${details.name}\n` +
-    `📞 الهاتف: ${details.phone}\n` +
-    `📡 القناة: ${details.channel === "whatsapp" ? "واتساب" : "شات الموقع"}\n\n` +
-    `💬 محتوى الطلب:\n${details.message.slice(0, 500)}\n\n` +
-    `⏰ الوقت: ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}`;
+  const time = new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" });
+  const channel = details.channel === "whatsapp" ? "واتساب" : "شات الموقع";
 
-  await notifyAdmin(msg);
+  await sendTemplateToAdmin("clal_handoff", [
+    `${details.name} | ${details.phone} | ${channel}`,
+    details.message.slice(0, 500),
+    time,
+  ]);
 }
 
 // ===== Angry Customer Alert =====
+// Template: clal_angry_cust  (3 params)
 export async function notifyAdminAngryCustomer(details: {
   phone: string;
   name: string;
@@ -200,23 +155,21 @@ export async function notifyAdminAngryCustomer(details: {
   sentiment: string;
   channel: "webchat" | "whatsapp";
 }): Promise<void> {
-  const sentimentEmoji = details.sentiment === "angry" ? "😡🔴" : "😟🟡";
-  const msg =
-    `${sentimentEmoji} *تنبيه: زبون غاضب!*\n\n` +
-    `👤 الاسم: ${details.name}\n` +
-    `📞 الهاتف: ${details.phone}\n` +
-    `📡 القناة: ${details.channel === "whatsapp" ? "واتساب" : "شات الموقع"}\n\n` +
-    `💬 رسالة الزبون:\n"${details.message.slice(0, 500)}"\n\n` +
-    `⚠️ يُنصح بالتواصل الفوري مع الزبون!\n` +
-    `⏰ الوقت: ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}`;
+  const time = new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" });
+  const channel = details.channel === "whatsapp" ? "واتساب" : "شات الموقع";
 
-  await notifyAdmin(msg);
+  await sendTemplateToAdmin("clal_angry_cust", [
+    `${details.name} | ${details.phone} | ${channel}`,
+    details.message.slice(0, 500),
+    time,
+  ]);
 }
 
-// ===== New Incoming Message Alert =====
+// ===== New Incoming WhatsApp Message Alert =====
+// Template: clal_new_msg  (3 params)
 // Rate-limited: max 1 notification per phone per 10 minutes
 const _msgNotifyCache = new Map<string, number>();
-const MSG_NOTIFY_COOLDOWN = 10 * 60 * 1000; // 10 minutes
+const MSG_NOTIFY_COOLDOWN = 10 * 60 * 1000;
 
 export async function notifyAdminNewMessage(details: {
   phone: string;
@@ -230,7 +183,6 @@ export async function notifyAdminNewMessage(details: {
   if (Date.now() - lastNotified < MSG_NOTIFY_COOLDOWN) return;
   _msgNotifyCache.set(cacheKey, Date.now());
 
-  // Cleanup old entries (keep cache small)
   if (_msgNotifyCache.size > 200) {
     const cutoff = Date.now() - MSG_NOTIFY_COOLDOWN;
     for (const [k, v] of _msgNotifyCache) {
@@ -238,86 +190,124 @@ export async function notifyAdminNewMessage(details: {
     }
   }
 
-  const mediaLabel = details.isMedia ? " 📎" : "";
-  const msg =
-    `💬 *رسالة واتساب جديدة!*${mediaLabel}\n\n` +
-    `👤 ${details.name || "مجهول"}\n` +
-    `📞 ${details.phone}\n` +
-    `💬 "${details.preview.slice(0, 200)}"\n\n` +
-    `⏰ ${new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" })}\n` +
-    `🔗 ${BASE_URL}/crm/inbox`;
+  const time = new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" });
+  const mediaLabel = details.isMedia ? " [وسائط]" : "";
+  const preview = `${details.preview.slice(0, 200)}${mediaLabel}`;
 
-  await notifyAdmin(msg);
+  await sendTemplateToAdmin("clal_new_msg", [
+    `${details.name || "مجهول"} (${details.phone})`,
+    preview,
+    `${time}\n${BASE_URL}/crm/inbox`,
+  ]);
 }
 
-// ===== Daily Report Link =====
+// ===== Daily Report =====
+// Template: clal_daily_report  (2 params)
 export async function sendDailyReportLink(): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
-  const msg =
-    `📊 *التقرير اليومي — ${today}*\n\n` +
-    `اضغط على الرابط لعرض التقرير المفصل:\n\n` +
-    `🔗 ${BASE_URL}/api/reports/daily?date=${today}\n` +
-    `📄 PDF: ${BASE_URL}/api/reports/daily?date=${today}&format=pdf\n\n` +
-    `صباح الخير! ☀️`;
-
-  await notifyAdmin(msg);
-
-  try {
-    const email = await getProvider<EmailProvider>("email");
-    if (!email) return;
-    const waCfg = await getIntegrationConfig("whatsapp");
-    const to = waCfg.reports_email || waCfg.completed_orders_email || "bawaya@icloud.com";
-    const { getDailyReportData, buildDailyReportHtml, buildDailyReportPdf } = await import("@/lib/reports/service");
-    const data = await getDailyReportData(today);
-    const html = buildDailyReportHtml(data);
-    const pdf = await buildDailyReportPdf(data);
-    await email.send({
-      to,
-      subject: `📊 التقرير اليومي - ${today}`,
-      html,
-      attachments: [{
-        filename: `daily-report-${today}.pdf`,
-        content: Buffer.from(pdf).toString("base64"),
-        contentType: "application/pdf",
-      }],
-    });
-  } catch (err) {
-    console.error("Daily report email failed:", err);
-  }
+  await sendTemplateToAdmin("clal_daily_report", [
+    today,
+    `${BASE_URL}/api/reports/daily?date=${today}`,
+  ]);
 }
 
-// ===== Weekly Report Link =====
+// ===== Weekly Report =====
+// Template: clal_weekly_report  (2 params)
 export async function sendWeeklyReportLink(): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
-  const msg =
-    `📈 *التقرير الأسبوعي — ${today}*\n\n` +
-    `اضغط على الرابط لعرض التقرير المفصل:\n\n` +
-    `🔗 ${BASE_URL}/api/reports/weekly?date=${today}\n` +
-    `📄 PDF: ${BASE_URL}/api/reports/weekly?date=${today}&format=pdf\n\n` +
-    `أسبوع موفق! 🚀`;
-
-  await notifyAdmin(msg);
-
-  try {
-    const email = await getProvider<EmailProvider>("email");
-    if (!email) return;
-    const waCfg = await getIntegrationConfig("whatsapp");
-    const to = waCfg.reports_email || waCfg.completed_orders_email || "bawaya@icloud.com";
-    const { getWeeklyReportData, buildWeeklyReportHtml, buildWeeklyReportPdf } = await import("@/lib/reports/service");
-    const data = await getWeeklyReportData(today);
-    const html = buildWeeklyReportHtml(data);
-    const pdf = await buildWeeklyReportPdf(data);
-    await email.send({
-      to,
-      subject: `📈 التقرير الأسبوعي - ${data.startDate} إلى ${data.endDate}`,
-      html,
-      attachments: [{
-        filename: `weekly-report-${data.startDate}-to-${data.endDate}.pdf`,
-        content: Buffer.from(pdf).toString("base64"),
-        contentType: "application/pdf",
-      }],
-    });
-  } catch (err) {
-    console.error("Weekly report email failed:", err);
-  }
+  await sendTemplateToAdmin("clal_weekly_report", [
+    today,
+    `${BASE_URL}/api/reports/weekly?date=${today}`,
+  ]);
 }
+
+// =====================================================
+// WHATSAPP TEMPLATES — أنشئها في yCloud Dashboard
+// Template Language: Arabic (ar)
+// Category: UTILITY
+// =====================================================
+//
+// 1. clal_admin_alert  (generic — 1 param)
+//    Body:
+//    {{1}}
+//
+// 2. clal_new_order  (4 params)
+//    Body:
+//    طلب جديد 🆕
+//
+//    رقم الطلب: {{1}}
+//    {{2}}
+//
+//    المنتجات:
+//    {{3}}
+//
+//    {{4}}
+//
+// 3. clal_order_done  (3 params)
+//    Body:
+//    طلب مكتمل ✅
+//
+//    {{1}}
+//    {{2}}
+//
+//    {{3}}
+//
+// 4. clal_contact_form  (3 params)
+//    Body:
+//    رسالة تواصل جديدة 📩
+//
+//    {{1}}
+//
+//    {{2}}
+//
+//    {{3}}
+//
+// 5. clal_handoff  (3 params)
+//    Body:
+//    طلب تحدث مع محمد 👤
+//
+//    {{1}}
+//
+//    محتوى الطلب:
+//    {{2}}
+//
+//    الوقت: {{3}}
+//
+// 6. clal_angry_cust  (3 params)
+//    Body:
+//    تنبيه: زبون غاضب ⚠️
+//
+//    {{1}}
+//
+//    رسالة الزبون:
+//    "{{2}}"
+//
+//    الوقت: {{3}}
+//
+// 7. clal_new_msg  (3 params)
+//    Body:
+//    رسالة واتساب جديدة 💬
+//
+//    من: {{1}}
+//    "{{2}}"
+//
+//    {{3}}
+//
+// 8. clal_daily_report  (2 params)
+//    Body:
+//    التقرير اليومي 📊 — {{1}}
+//
+//    اضغط على الرابط لعرض التقرير المفصل:
+//    {{2}}
+//
+//    صباح الخير! ☀️
+//
+// 9. clal_weekly_report  (2 params)
+//    Body:
+//    التقرير الأسبوعي 📈 — {{1}}
+//
+//    اضغط على الرابط لعرض التقرير المفصل:
+//    {{2}}
+//
+//    أسبوع موفق! 🚀
+// =====================================================

@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     const supabase = createAdminSupabase();
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+      return apiError("DB error", 500);
     }
 
     const now = new Date();
@@ -63,8 +64,9 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: true }),
       supabase
         .from("order_items")
-        .select("product_name, quantity, order_id")
-        .limit(5000),
+        .select("product_name, quantity, order_id, created_at")
+        .gte("created_at", thirtyDaysAgo)
+        .limit(2000),
       supabase
         .from("customers")
         .select("id, created_at")
@@ -170,9 +172,7 @@ export async function GET(req: NextRequest) {
     const pctChange = (curr: number, prev: number) =>
       prev > 0 ? Math.round(((curr - prev) / prev) * 100) : curr > 0 ? 100 : 0;
 
-    return NextResponse.json({
-      success: true,
-      data: {
+    return apiSuccess({
         metrics: {
           totalRevenue: Math.round(thisRevenue),
           prevRevenue: Math.round(prevRevenue),
@@ -194,11 +194,10 @@ export async function GET(req: NextRequest) {
         statusDistribution: statusMap,
         sourceDistribution: sourceMap,
         customerGrowth,
-      },
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = errMsg(err, "Unknown error");
     console.error("Analytics dashboard API error:", message);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return apiError(message, 500);
   }
 }

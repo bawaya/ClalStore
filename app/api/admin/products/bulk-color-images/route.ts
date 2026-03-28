@@ -8,6 +8,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const PAYNGO_API = "https://www.payngo.co.il/rest/V1/products";
 const PAYNGO_MEDIA = "https://www.payngo.co.il/media/catalog/product";
@@ -135,14 +136,14 @@ export async function POST(req: NextRequest) {
     };
 
     if (!name || !brand || !colors?.length) {
-      return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
+      return apiError("بيانات ناقصة", 400);
     }
 
     const results: ColorResult[] = [];
     const needsFetch = colors.map((c, i) => ({ ...c, index: i })).filter(c => !c.has_image);
 
     if (needsFetch.length === 0) {
-      return NextResponse.json({ results: [], message: "جميع الألوان لديها صور" });
+      return apiSuccess({ results: [], message: "جميع الألوان لديها صور" });
     }
 
     // === Stage 1: Try PaynGo for each color (most reliable) ===
@@ -223,11 +224,11 @@ export async function POST(req: NextRequest) {
     const succeeded = results.filter(r => r.image_url).length;
     const failed = results.filter(r => !r.image_url).length;
 
-    return NextResponse.json({
+    return apiSuccess({
       results,
       summary: { total: results.length, succeeded, failed },
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "فشل في الجلب" }, { status: 500 });
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "فشل في الجلب"), 500);
   }
 }

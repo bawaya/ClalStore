@@ -1,24 +1,25 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 // POST — Save/update abandoned cart
 export async function POST(req: NextRequest) {
   try {
     const db = createServerSupabase();
-    if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
+    if (!db) return apiError("DB unavailable", 500);
 
     // Check if feature is enabled
     const { data: setting } = await db.from("settings").select("value").eq("key", "feature_abandoned_cart").single();
-    if (setting?.value !== "true") return NextResponse.json({ ok: true });
+    if (setting?.value !== "true") return apiSuccess(null);
 
     const body = await req.json();
     const { visitor_id, customer_phone, customer_name, items, total } = body;
 
     if (!visitor_id || !items || items.length === 0) {
-      return NextResponse.json({ ok: true });
+      return apiSuccess(null);
     }
 
     // Upsert: check existing cart for this visitor
@@ -52,11 +53,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ ok: true });
-  } catch (err: any) {
+    return apiSuccess(null);
+  } catch (err: unknown) {
     // Don't fail the user experience — fire and forget
-    console.error("Abandoned cart error:", err.message);
-    return NextResponse.json({ ok: true });
+    console.error("Abandoned cart error:", err instanceof Error ? err.message : err);
+    return apiSuccess(null);
   }
 }
 
@@ -64,19 +65,19 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const db = createServerSupabase();
-    if (!db) return NextResponse.json({ ok: true });
+    if (!db) return apiSuccess(null);
 
     const url = new URL(req.url);
     const visitorId = url.searchParams.get("visitor_id");
-    if (!visitorId) return NextResponse.json({ ok: true });
+    if (!visitorId) return apiSuccess(null);
 
     await db.from("abandoned_carts")
       .update({ recovered: true, updated_at: new Date().toISOString() })
       .eq("visitor_id", visitorId)
       .eq("recovered", false);
 
-    return NextResponse.json({ ok: true });
+    return apiSuccess(null);
   } catch {
-    return NextResponse.json({ ok: true });
+    return apiSuccess(null);
   }
 }

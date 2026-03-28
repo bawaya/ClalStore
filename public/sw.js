@@ -3,6 +3,39 @@
 // Cache-first for static assets, network-first for API
 // =====================================================
 
+// Push — show notification when received from server
+self.addEventListener("push", (event) => {
+  let data = { title: "ClalMobile", body: "إشعار جديد", url: "/", icon: "/icons/icon-192x192.png" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {}
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon || "/icons/icon-192x192.png",
+      badge: "/icons/icon-72x72.png",
+      data: { url: data.url || "/" },
+      dir: "rtl",
+      lang: "ar",
+    })
+  );
+});
+
+// Notification click — open or focus the target URL
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if (client.url === url && "focus" in client) return client.focus();
+      }
+      return clients.openWindow(url);
+    })
+  );
+});
+
 const CACHE_NAME = "clalmobile-v2";
 const STATIC_ASSETS = [
   "/",

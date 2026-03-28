@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const SETTINGS_KEY = "product_sort_rules";
 
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
+    if (!db) return apiError("DB unavailable", 500);
 
     const [settingsRes, brandsRes] = await Promise.all([
       db.from("settings").select("value").eq("key", SETTINGS_KEY).single(),
@@ -26,10 +27,9 @@ export async function GET(req: NextRequest) {
       if (settingsRes.data?.value) config = JSON.parse(settingsRes.data.value);
     } catch {}
 
-    return NextResponse.json({ config, allBrands });
+    return apiSuccess({ config, allBrands });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return apiError(errMsg(err, "Unknown error"));
   }
 }
 
@@ -41,19 +41,19 @@ export async function PUT(req: NextRequest) {
     const config = body.config;
 
     if (!config?.rules || !Array.isArray(config.rules) || config.rules.length !== 3) {
-      return NextResponse.json({ error: "يجب تحديد 3 معايير ترتيب" }, { status: 400 });
+      return apiError("يجب تحديد 3 معايير ترتيب", 400);
     }
 
     const validFields = new Set(["price", "brand", "has_image"]);
     const validDirs = new Set(["asc", "desc"]);
     for (const r of config.rules) {
       if (!validFields.has(r.field) || !validDirs.has(r.direction) || typeof r.enabled !== "boolean") {
-        return NextResponse.json({ error: "معايير غير صالحة" }, { status: 400 });
+        return apiError("معايير غير صالحة", 400);
       }
     }
 
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
+    if (!db) return apiError("DB unavailable", 500);
 
     const value = JSON.stringify({
       rules: config.rules,
@@ -68,9 +68,8 @@ export async function PUT(req: NextRequest) {
       await db.from("settings").insert({ key: SETTINGS_KEY, value, type: "json" });
     }
 
-    return NextResponse.json({ success: true });
+    return apiSuccess(null);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return apiError(errMsg(err, "Unknown error"));
   }
 }

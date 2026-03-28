@@ -107,12 +107,11 @@ export async function sendWhatsAppButtons(
 export async function sendWhatsAppTemplate(
   to: string,
   templateName: string,
-  params: string[],
-  fromOverride?: string
+  params: string[]
 ) {
   const phone = normalizePhone(to);
   const headers = await getHeaders();
-  const from = fromOverride || await getFromPhone();
+  const from = await getFromPhone();
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
     method: "POST",
     headers,

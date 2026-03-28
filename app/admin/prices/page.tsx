@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useRef, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PageHeader, ToastContainer } from "@/components/admin/shared";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -299,7 +300,7 @@ export default function PricesPage() {
           setMatching(true);
           const res = await fetch("/api/admin/prices/match-direct", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders(),
             body: JSON.stringify({ rows }),
           });
           json = await res.json();
@@ -314,7 +315,7 @@ export default function PricesPage() {
           setMatching(true);
           const res = await fetch("/api/admin/prices/match", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders(),
             body: JSON.stringify({ pdfText: extractedText }),
           });
           json = await res.json();
@@ -335,8 +336,8 @@ export default function PricesPage() {
         setSelected(matchedIdx);
 
         setStep("preview");
-      } catch (err: any) {
-        const msg = err.message || String(err);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         setErrorMsg(msg);
         show("حدث خطأ — راجع التفاصيل أدناه", "error");
         console.error("PRICE MATCH ERROR:", msg);
@@ -398,7 +399,7 @@ export default function PricesPage() {
     try {
       const res = await fetch("/api/admin/prices/apply", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ updates, creates }),
       });
       const json = await res.json();
@@ -414,8 +415,8 @@ export default function PricesPage() {
       if (json.updated > 0) parts.push(`تم تحديث ${json.updated} سعر`);
       if (json.created > 0) parts.push(`إنشاء ${json.created} منتج جديد`);
       show(parts.length ? parts.join(" — ") + " بنجاح" : "تم", "success");
-    } catch (err: any) {
-      show(`خطأ في التحديث: ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`خطأ في التحديث: ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     } finally {
       setApplying(false);
     }

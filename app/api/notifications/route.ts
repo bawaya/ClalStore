@@ -2,16 +2,16 @@ export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 503 }
-      );
-    }
+    if (!supabase) return apiError("Server configuration error", 503);
 
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("user_id");
@@ -27,39 +27,27 @@ export async function GET(req: NextRequest) {
     }
 
     const { data, error } = await query;
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    if (error) return apiError(error.message, 500);
 
     const unreadCount = (data ?? []).filter((n: { read: boolean }) => !n.read).length;
-
-    return NextResponse.json({ data: data ?? [], unreadCount });
+    return apiSuccess({ notifications: data ?? [], unreadCount });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(errMsg(err), 500);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 503 }
-      );
-    }
+    if (!supabase) return apiError("Server configuration error", 503);
 
     const body = await req.json();
     const { user_id, type, title, body: notifBody, link, icon } = body;
 
-    if (!title || !type) {
-      return NextResponse.json(
-        { error: "title and type are required" },
-        { status: 400 }
-      );
-    }
+    if (!title || !type) return apiError("title and type are required", 400);
 
     const { data, error } = await supabase
       .from("notifications")
@@ -75,26 +63,20 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ data });
+    if (error) return apiError(error.message, 500);
+    return apiSuccess(data);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(errMsg(err), 500);
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 503 }
-      );
-    }
+    if (!supabase) return apiError("Server configuration error", 503);
 
     const body = await req.json();
 
@@ -105,11 +87,8 @@ export async function PATCH(req: NextRequest) {
         .or(`user_id.eq.${body.user_id},user_id.is.null`)
         .eq("read", false);
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true });
+      if (error) return apiError(error.message, 500);
+      return apiSuccess(null);
     }
 
     if (body.id) {
@@ -118,19 +97,12 @@ export async function PATCH(req: NextRequest) {
         .update({ read: true })
         .eq("id", body.id);
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true });
+      if (error) return apiError(error.message, 500);
+      return apiSuccess(null);
     }
 
-    return NextResponse.json(
-      { error: "Provide id or { user_id, mark_all: true }" },
-      { status: 400 }
-    );
+    return apiError("Provide id or { user_id, mark_all: true }", 400);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(errMsg(err), 500);
   }
 }

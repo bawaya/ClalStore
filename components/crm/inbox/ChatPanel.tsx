@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type { InboxConversation, InboxMessage, InboxTemplate, InboxQuickReply } from "@/lib/crm/inbox-types";
 import { STATUS_CONFIG } from "@/lib/crm/inbox-types";
 import { sendMessage, fetchTemplates } from "@/lib/crm/inbox";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { analyzeSentimentFromMessages, SENTIMENT_CONFIG } from "@/lib/crm/sentiment";
 import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
@@ -131,7 +132,7 @@ export function ChatPanel({
     try {
       const res = await fetch(`/api/crm/inbox/${conversation.id}/summary`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ force }),
       });
       const data = await res.json();

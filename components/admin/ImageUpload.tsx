@@ -8,6 +8,7 @@
 
 import { useState, useRef } from "react";
 import { useScreen } from "@/lib/hooks";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface ImageUploadProps {
   value: string;
@@ -96,7 +97,7 @@ export function ImageUpload({
     try {
       const res = await fetch("/api/admin/image-enhance", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ image_url: value }),
       });
       const data = await res.json();

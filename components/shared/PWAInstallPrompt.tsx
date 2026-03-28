@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 // =====================================================
 // ClalMobile — PWA Install Prompt + SW Registration
@@ -13,6 +14,37 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+async function subscribeToPush(reg: ServiceWorkerRegistration) {
+  try {
+    const res = await fetch("/api/push/vapid");
+    if (!res.ok) return;
+    const { publicKey } = await res.json();
+    if (!publicKey) return;
+
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) return; // already subscribed
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: publicKey,
+    });
+
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: csrfHeaders(),
+      body: JSON.stringify({
+        endpoint: sub.endpoint,
+        keys: {
+          p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("p256dh")!))),
+          auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth")!))),
+        },
+      }),
+    });
+  } catch {
+    // Push subscription is optional — fail silently
+  }
+}
+
 export function PWAInstallPrompt() {
   const { t } = useLang();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -21,12 +53,16 @@ export function PWAInstallPrompt() {
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
   useEffect(() => {
-    // Register service worker
+    // Register service worker + subscribe to push notifications
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
-        .then((reg) => {
+        .then(async (reg) => {
           console.log("SW registered:", reg.scope);
+          // Auto-subscribe to push if permission already granted
+          if (Notification.permission === "granted") {
+            subscribeToPush(reg);
+          }
         })
         .catch((err) => {
           console.log("SW registration failed:", err);
@@ -78,6 +114,14 @@ export function PWAInstallPrompt() {
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === "accepted") {
         setShowBanner(false);
+        // Request push permission after install
+        if ("Notification" in window && Notification.permission === "default") {
+          const perm = await Notification.requestPermission();
+          if (perm === "granted" && "serviceWorker" in navigator) {
+            const reg = await navigator.serviceWorker.ready;
+            subscribeToPush(reg);
+          }
+        }
       }
       setDeferredPrompt(null);
     } else if (isIOS) {

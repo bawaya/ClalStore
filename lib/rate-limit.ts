@@ -1,5 +1,6 @@
-// In-memory rate limiter for Edge Runtime
+// In-memory rate limiter for Edge Runtime (middleware)
 // Uses a sliding window counter per IP/key
+// For persistent rate limiting across instances, use checkRateLimitDb from rate-limit-db.ts
 
 interface RateLimitEntry {
   count: number;

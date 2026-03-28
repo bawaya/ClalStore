@@ -16,11 +16,41 @@ export default function LoginPage() {
 
     try {
       const { signIn } = await import("@/lib/auth");
-      await signIn(email, password);
+      const data = await signIn(email, password);
+
+      // Check if user must change password
+      if (data?.user) {
+        const { getSupabase } = await import("@/lib/supabase");
+        const supabase = getSupabase();
+        const { data: profile } = await supabase
+          .from("users")
+          .select("must_change_password, temp_password_expires_at")
+          .eq("auth_id", data.user.id)
+          .single();
+
+        if (profile?.must_change_password) {
+          // Check if temp password has expired
+          if (profile.temp_password_expires_at) {
+            const expiresAt = new Date(profile.temp_password_expires_at);
+            if (expiresAt < new Date()) {
+              setError("كلمة المرور المؤقتة انتهت صلاحيتها. تواصل مع المدير لإعادة تعيينها.");
+              const { signOut } = await import("@/lib/auth");
+              await signOut();
+              setLoading(false);
+              return;
+            }
+          }
+          // Redirect to change password page
+          window.location.href = "/change-password";
+          return;
+        }
+      }
+
       const params = new URLSearchParams(window.location.search);
       window.location.href = params.get("redirect") || "/crm";
-    } catch (err: any) {
-      setError(err.message || "خطأ في تسجيل الدخول");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "خطأ في تسجيل الدخول";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -68,7 +98,7 @@ export default function LoginPage() {
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-red-400 text-xs text-center">
-              ⚠️ {error}
+              {error}
             </div>
           )}
 
@@ -77,7 +107,7 @@ export default function LoginPage() {
             disabled={loading}
             className="btn-primary w-full disabled:opacity-50"
           >
-            {loading ? "جاري الدخول..." : "🔐 تسجيل الدخول"}
+            {loading ? "جاري الدخول..." : "تسجيل الدخول"}
           </button>
         </form>
 

@@ -142,9 +142,9 @@ export async function createPaymentPage(params: {
       success: false,
       error: data.DebugMessage || `iCredit error (Status: ${data.Status})`,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("iCredit GetUrl error:", err);
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
 

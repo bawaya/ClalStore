@@ -34,18 +34,12 @@ export class SendGridProvider implements EmailProvider {
           content: [
             params.html ? { type: "text/html", value: params.html } : { type: "text/plain", value: params.text || "" },
           ],
-          attachments: params.attachments?.map((a) => ({
-            filename: a.filename,
-            type: a.contentType || "application/octet-stream",
-            content: a.content,
-            disposition: "attachment",
-          })),
         }),
       });
 
       return { success: res.ok, messageId: res.headers.get("x-message-id") || undefined };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
     }
   }
 
@@ -63,8 +57,8 @@ export class SendGridProvider implements EmailProvider {
       });
 
       return { success: res.ok, messageId: res.headers.get("x-message-id") || undefined };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
     }
   }
 }

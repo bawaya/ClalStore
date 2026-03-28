@@ -5,16 +5,18 @@ export const runtime = 'edge';
 // PUT /api/crm/inbox/[id]/assign
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { user_id } = await req.json();
-    const convId = params.id;
+    const convId = id;
 
     // Get agent name
     let agentName = "موظف";
@@ -50,9 +52,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       status: "sent",
     } as any);
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
+    return apiSuccess(null);
+  } catch (err: unknown) {
     console.error("Assign error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

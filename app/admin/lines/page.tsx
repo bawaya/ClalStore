@@ -38,7 +38,7 @@ export default function LinesPage() {
       if (editId) { await update(editId, form); show("✅ تم التعديل"); }
       else { await create(form); show("✅ تم الإضافة"); }
       setModal(false);
-    } catch (err: any) { show(`❌ ${err.message}`, "error"); }
+    } catch (err: unknown) { show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error"); }
   };
 
   const handleDelete = async () => { if (confirm) { await remove(confirm); show("🗑️ تم"); setConfirm(null); } };

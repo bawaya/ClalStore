@@ -5,18 +5,20 @@ export const runtime = 'edge';
 // POST /api/crm/inbox/[id]/suggest
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
 import { getProductByQuery } from "@/lib/ai/product-context";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
-    const convId = params.id;
+    const convId = id;
     const body = await req.json().catch(() => ({}));
     const agentContext = (body as { context?: string }).context || "";
 
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .single();
 
     if (convErr || !conversation) {
-      return NextResponse.json({ success: false, error: "المحادثة غير موجودة" }, { status: 404 });
+      return apiError("المحادثة غير موجودة", 404);
     }
 
     // 2. Fetch last 15 messages
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .limit(15);
 
     if (!messages || messages.length === 0) {
-      return NextResponse.json({ success: false, error: "لا توجد رسائل" }, { status: 400 });
+      return apiError("لا توجد رسائل", 400);
     }
 
     // 3. Fetch customer info
@@ -136,7 +138,7 @@ ${agentContext ? `ملاحظة من الموظف: ${agentContext}` : ""}
     });
 
     if (!result) {
-      return NextResponse.json({ success: false, error: "تعذر اقتراح رد — حاول مجدداً" }, { status: 500 });
+      return apiError("تعذر اقتراح رد — حاول مجدداً", 500);
     }
 
     // 9. Track usage
@@ -154,14 +156,9 @@ ${agentContext ? `ملاحظة من الموظف: ${agentContext}` : ""}
     if (/آسف|نعتذر|معذرة|عفوا|سليחה/i.test(text)) tone = "apologetic";
     else if (/سيدي|حضرتك|אדוני/i.test(text)) tone = "formal";
 
-    return NextResponse.json({
-      success: true,
-      suggestion: text,
-      tone,
-      confidence: 0.85,
-    });
-  } catch (err: any) {
+    return apiSuccess({ suggestion: text, tone, confidence: 0.85 });
+  } catch (err: unknown) {
     console.error("Smart reply error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

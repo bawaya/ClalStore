@@ -6,8 +6,9 @@ export const runtime = 'edge';
 // Validates credentials and optionally pings the provider
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getIntegrations } from "@/lib/admin/queries";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const MASK = "••••••••";
 
@@ -52,6 +53,7 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
           client_name: "Test",
           client_phone: "0500000000",
         }),
+        signal: AbortSignal.timeout(10000),
       });
       const data = await res.json();
       // Rivhit returns status=1 for success, any response without network error means credentials work
@@ -59,8 +61,8 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
         return { ok: true, message: "✅ Rivhit متصل بنجاح" };
       }
       return { ok: false, message: data.error_message || `Rivhit error: ${data.error_code || "unknown"}` };
-    } catch (err: any) {
-      return { ok: false, message: `خطأ في الاتصال: ${err.message}` };
+    } catch (err: unknown) {
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
     }
   },
 
@@ -73,12 +75,13 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       // Light validate: check API key by fetching user profile
       const res = await fetch("https://api.sendgrid.com/v3/user/profile", {
         headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(10000),
       });
       if (res.ok) return { ok: true, message: "✅ SendGrid متصل بنجاح" };
       if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
       return { ok: false, message: `SendGrid responded with ${res.status}` };
-    } catch (err: any) {
-      return { ok: false, message: `خطأ في الاتصال: ${err.message}` };
+    } catch (err: unknown) {
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
     }
   },
 
@@ -91,12 +94,13 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       // Light validate: list WhatsApp phone numbers
       const res = await fetch("https://api.ycloud.com/v2/whatsapp/phoneNumbers?limit=1", {
         headers: { "X-API-Key": apiKey },
+        signal: AbortSignal.timeout(10000),
       });
       if (res.ok) return { ok: true, message: "✅ yCloud WhatsApp متصل بنجاح" };
       if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
       return { ok: false, message: `yCloud responded with ${res.status}` };
-    } catch (err: any) {
-      return { ok: false, message: `خطأ في الاتصال: ${err.message}` };
+    } catch (err: unknown) {
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
     }
   },
 
@@ -121,6 +125,7 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
         headers: {
           Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
         },
+        signal: AbortSignal.timeout(10000),
       });
 
       if (res.ok) {
@@ -135,8 +140,8 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
         return { ok: false, message: "❌ Account SID أو Auth Token غير صحيح" };
       }
       return { ok: false, message: `Twilio responded with ${res.status}` };
-    } catch (err: any) {
-      return { ok: false, message: `خطأ في الاتصال: ${err.message}` };
+    } catch (err: unknown) {
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
     }
   },
 
@@ -158,19 +163,19 @@ export async function POST(req: NextRequest) {
     const { type, config } = await req.json();
 
     if (!type || !config) {
-      return NextResponse.json({ ok: false, message: "نوع التكامل أو الإعدادات مفقودة" }, { status: 400 });
+      return apiError("نوع التكامل أو الإعدادات مفقودة", 400);
     }
 
     const testFn = TESTS[type];
     if (!testFn) {
-      return NextResponse.json({ ok: false, message: `لا يوجد اختبار لنوع التكامل: ${type}` }, { status: 400 });
+      return apiError(`لا يوجد اختبار لنوع التكامل: ${type}`, 400);
     }
 
     // Resolve any masked values from DB before testing
     const resolvedConfig = await resolveConfig(type, config);
     const result = await testFn(resolvedConfig);
-    return NextResponse.json(result);
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, message: err.message }, { status: 500 });
+    return apiSuccess(result);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"), 500);
   }
 }

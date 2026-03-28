@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { uploadImage } from "@/lib/storage";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_IMAGES = ["image/jpeg", "image/png", "image/webp"];
@@ -22,21 +23,18 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ success: false, error: "لم يتم اختيار ملف" }, { status: 400 });
+      return apiError("لم يتم اختيار ملف", 400);
     }
 
     if (file.size > MAX_SIZE) {
-      return NextResponse.json({ success: false, error: "الملف أكبر من 10MB" }, { status: 400 });
+      return apiError("الملف أكبر من 10MB", 400);
     }
 
     const isImage = ALLOWED_IMAGES.includes(file.type);
     const isDoc = ALLOWED_DOCS.includes(file.type);
 
     if (!isImage && !isDoc) {
-      return NextResponse.json({
-        success: false,
-        error: "نوع غير مدعوم (صور: JPG, PNG, WebP | مستندات: PDF, Word, Excel)",
-      }, { status: 400 });
+      return apiError("نوع غير مدعوم (صور: JPG, PNG, WebP | مستندات: PDF, Word, Excel)", 400);
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -50,15 +48,14 @@ export async function POST(req: NextRequest) {
       url = `data:${file.type};base64,${base64}`;
     }
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       url,
       filename: file.name,
       mime_type: file.type,
       type: isImage ? "image" : "document",
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Inbox upload error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return apiError(errMsg(err, "Unknown error"), 500);
   }
 }

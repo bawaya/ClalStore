@@ -5,15 +5,15 @@ export const runtime = 'edge';
 // GET /api/store/smart-search?q=...
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
-// Simple in-memory rate limiter
-const rateLimit = new Map<string, number[]>();
-const RATE_LIMIT = 10; // per minute per IP
-const RATE_WINDOW = 60_000;
+// Route-level rate limiter (persistent via DB, in-memory fallback)
+import { checkRateLimitDb, getRateLimitKey } from "@/lib/rate-limit-db";
+const SEARCH_RATE_CONFIG = { maxRequests: 10, windowMs: 60_000 };
 
 // Result cache (60 seconds)
 const resultCache = new Map<string, { data: unknown; time: number }>();
@@ -48,14 +48,9 @@ function getClientIP(req: NextRequest): string {
     "unknown";
 }
 
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const timestamps = rateLimit.get(ip) || [];
-  const recent = timestamps.filter((t) => now - t < RATE_WINDOW);
-  rateLimit.set(ip, recent);
-  if (recent.length >= RATE_LIMIT) return false;
-  recent.push(now);
-  return true;
+async function checkSearchRateLimit(ip: string): Promise<boolean> {
+  const rl = await checkRateLimitDb(getRateLimitKey(ip, "search"), SEARCH_RATE_CONFIG);
+  return rl.allowed;
 }
 
 export async function GET(req: NextRequest) {
@@ -64,24 +59,24 @@ export async function GET(req: NextRequest) {
     const q = searchParams.get("q")?.trim();
 
     if (!q || q.length < 2) {
-      return NextResponse.json({ success: false, error: "استعلام قصير جداً" }, { status: 400 });
+      return apiError("استعلام قصير جداً", 400);
     }
 
-    // Rate limit
+    // Rate limit (persistent via DB)
     const ip = getClientIP(req);
-    if (!checkRateLimit(ip)) {
-      return NextResponse.json({ success: false, error: "كثرة طلبات — حاول بعد دقيقة" }, { status: 429 });
+    if (!(await checkSearchRateLimit(ip))) {
+      return apiError("كثرة طلبات — حاول بعد دقيقة", 429);
     }
 
     // Check cache
     const cacheKey = q.toLowerCase();
     const cached = resultCache.get(cacheKey);
     if (cached && Date.now() - cached.time < CACHE_TTL) {
-      return NextResponse.json(cached.data);
+      return apiSuccess(cached.data);
     }
 
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     let filters: SearchFilters = {};
     let aiUsed = false;
@@ -216,7 +211,7 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error("Smart search query error:", error);
-      return NextResponse.json({ success: false, error: "خطأ في البحث" }, { status: 500 });
+      return apiError("خطأ في البحث", 500);
     }
 
     const total = products?.length || 0;
@@ -231,7 +226,6 @@ export async function GET(req: NextRequest) {
     }
 
     const responseData = {
-      success: true,
       filters,
       products: products || [],
       total,
@@ -240,11 +234,12 @@ export async function GET(req: NextRequest) {
     };
 
     // Cache result
+    const response = apiSuccess(responseData);
     resultCache.set(cacheKey, { data: responseData, time: Date.now() });
 
-    return NextResponse.json(responseData);
-  } catch (err: any) {
+    return response;
+  } catch (err: unknown) {
     console.error("Smart search error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

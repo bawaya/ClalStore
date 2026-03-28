@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 // GET — all labels
 export async function GET(req: NextRequest) {
@@ -10,16 +11,16 @@ export async function GET(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { data: labels } = await supabase
       .from("inbox_labels")
       .select("*")
       .order("sort_order", { ascending: true });
 
-    return NextResponse.json({ success: true, labels: labels || [] });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return apiSuccess({ labels: labels || [] });
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -29,18 +30,18 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { conversation_id, label_id } = await req.json();
     if (!conversation_id || !label_id) {
-      return NextResponse.json({ success: false, error: "conversation_id and label_id required" }, { status: 400 });
+      return apiError("conversation_id and label_id required", 400);
     }
 
     const { error } = await supabase
       .from("inbox_conversation_labels")
       .upsert({ conversation_id, label_id } as any, { onConflict: "conversation_id,label_id" });
 
-    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    if (error) return apiError(error.message, 500);
 
     await supabase.from("inbox_events").insert({
       conversation_id,
@@ -48,9 +49,9 @@ export async function POST(req: NextRequest) {
       new_value: label_id,
     } as any);
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return apiSuccess(null);
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -60,10 +61,10 @@ export async function PUT(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { name, color } = await req.json();
-    if (!name) return NextResponse.json({ success: false, error: "name required" }, { status: 400 });
+    if (!name) return apiError("name required", 400);
 
     const { data, error } = await supabase
       .from("inbox_labels")
@@ -71,10 +72,10 @@ export async function PUT(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true, label: data });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    if (error) return apiError(error.message, 500);
+    return apiSuccess({ label: data });
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -84,14 +85,14 @@ export async function DELETE(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversation_id");
     const labelId = searchParams.get("label_id");
 
     if (!conversationId || !labelId) {
-      return NextResponse.json({ success: false, error: "conversation_id and label_id required" }, { status: 400 });
+      return apiError("conversation_id and label_id required", 400);
     }
 
     await supabase
@@ -106,8 +107,8 @@ export async function DELETE(req: NextRequest) {
       old_value: labelId,
     } as any);
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return apiSuccess(null);
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }

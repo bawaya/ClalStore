@@ -35,8 +35,8 @@ export default function WebsiteContentPage() {
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setSections(json.data || []);
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     } finally {
       setLoading(false);
     }
@@ -88,8 +88,8 @@ export default function WebsiteContentPage() {
       show("✅ تم الحفظ");
       setModal(false);
       await fetchSections();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     } finally {
       setSaving(false);
     }

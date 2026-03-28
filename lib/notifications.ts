@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 import type { Notification } from "@/types/database";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface NotificationStore {
   notifications: Notification[];
@@ -68,7 +69,7 @@ export const useNotifications = create<NotificationStore>((set, get) => ({
     try {
       await fetch("/api/notifications", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ id }),
       });
     } catch {}
@@ -83,7 +84,7 @@ export const useNotifications = create<NotificationStore>((set, get) => ({
     try {
       await fetch("/api/notifications", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ user_id: userId, mark_all: true }),
       });
     } catch {}
@@ -100,7 +101,7 @@ export const useNotifications = create<NotificationStore>((set, get) => ({
     try {
       const res = await fetch("/api/notifications", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify(payload),
       });
       if (!res.ok) return null;

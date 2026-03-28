@@ -1,7 +1,8 @@
 export const runtime = 'edge';
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getAdminSettings, updateSetting, getIntegrations, updateIntegration, logAction } from "@/lib/admin/queries";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 // Prevent Next.js from caching this route — settings must always be fresh
 export const dynamic = "force-dynamic";
@@ -41,9 +42,9 @@ export async function GET() {
       ...integ,
       config: maskConfig(integ.config),
     }));
-    return NextResponse.json({ settings, integrations: safeIntegrations });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess({ settings, integrations: safeIntegrations });
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }
 
@@ -89,8 +90,8 @@ export async function PUT(req: NextRequest) {
       await logAction("مدير", `تعديل تكامل: ${body.updates.provider || body.id}`, "integration", body.id);
     }
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(null);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }

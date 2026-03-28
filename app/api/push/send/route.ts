@@ -1,176 +1,238 @@
-export const runtime = "edge";
-export const dynamic = "force-dynamic";
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
-function base64UrlToUint8Array(b64url: string): Uint8Array {
-  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
-  const bin = atob(b64 + pad);
-  const arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-  return arr;
+// ── Web Push helpers (Edge-compatible, no web-push npm package) ──
+
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
-function toBuffer(arr: Uint8Array): ArrayBuffer {
-  return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength) as ArrayBuffer;
+function uint8ToUrlBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function uint8ToBase64Url(arr: Uint8Array): string {
-  let bin = "";
-  for (const b of arr) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
+async function importVapidKeys(publicKeyB64: string, privateKeyB64: string) {
+  const pubRaw = urlBase64ToUint8Array(publicKeyB64);
+  const privRaw = urlBase64ToUint8Array(privateKeyB64);
 
-function concat(...arrays: Uint8Array[]): Uint8Array {
-  const len = arrays.reduce((s, a) => s + a.length, 0);
-  const result = new Uint8Array(len);
-  let offset = 0;
-  for (const a of arrays) { result.set(a, offset); offset += a.length; }
-  return result;
-}
+  // Build uncompressed public key (65 bytes)
+  const pubUncompressed = pubRaw.length === 65 ? pubRaw : pubRaw;
 
-async function encryptPayload(
-  p256dhKey: string,
-  authSecret: string,
-  payload: string
-): Promise<{ ciphertext: Uint8Array; salt: Uint8Array; serverPublicKey: Uint8Array }> {
-  const clientPublicKey = base64UrlToUint8Array(p256dhKey);
-  const clientAuth = base64UrlToUint8Array(authSecret);
-  const payloadBytes = new TextEncoder().encode(payload);
+  // Build JWK for private key (ECDSA P-256)
+  const x = uint8ToUrlBase64(pubUncompressed.slice(1, 33));
+  const y = uint8ToUrlBase64(pubUncompressed.slice(33, 65));
+  const d = uint8ToUrlBase64(privRaw);
 
-  const serverKeys = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
-  const serverPubRaw = new Uint8Array(await crypto.subtle.exportKey("raw", serverKeys.publicKey));
-
-  const clientPubCryptoKey = await crypto.subtle.importKey(
-    "raw", toBuffer(clientPublicKey), { name: "ECDH", namedCurve: "P-256" }, false, []
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    { kty: "EC", crv: "P-256", x, y, d },
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
   );
-
-  const sharedSecret = new Uint8Array(
-    await crypto.subtle.deriveBits({ name: "ECDH", public: clientPubCryptoKey }, serverKeys.privateKey, 256)
-  );
-
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-
-  const authInfo = new TextEncoder().encode("Content-Encoding: auth\0");
-  const prkCombine = await crypto.subtle.importKey("raw", toBuffer(sharedSecret), { name: "HKDF" }, false, ["deriveBits"]);
-  const ikm = new Uint8Array(await crypto.subtle.deriveBits(
-    { name: "HKDF", hash: "SHA-256", salt: toBuffer(clientAuth), info: toBuffer(authInfo) }, prkCombine, 256
-  ));
-
-  const keyInfo = concat(
-    new TextEncoder().encode("Content-Encoding: aesgcm\0P-256\0"),
-    new Uint8Array([0, clientPublicKey.length >> 8, clientPublicKey.length & 0xff]),
-    clientPublicKey,
-    new Uint8Array([0, serverPubRaw.length >> 8, serverPubRaw.length & 0xff]),
-    serverPubRaw
-  );
-  const nonceInfo = concat(
-    new TextEncoder().encode("Content-Encoding: nonce\0P-256\0"),
-    new Uint8Array([0, clientPublicKey.length >> 8, clientPublicKey.length & 0xff]),
-    clientPublicKey,
-    new Uint8Array([0, serverPubRaw.length >> 8, serverPubRaw.length & 0xff]),
-    serverPubRaw
-  );
-
-  const prkKey = await crypto.subtle.importKey("raw", toBuffer(ikm), { name: "HKDF" }, false, ["deriveBits"]);
-  const contentKey = new Uint8Array(await crypto.subtle.deriveBits(
-    { name: "HKDF", hash: "SHA-256", salt: toBuffer(salt), info: toBuffer(keyInfo) }, prkKey, 128
-  ));
-  const nonce = new Uint8Array(await crypto.subtle.deriveBits(
-    { name: "HKDF", hash: "SHA-256", salt: toBuffer(salt), info: toBuffer(nonceInfo) }, prkKey, 96
-  ));
-
-  const paddingLength = 0;
-  const padded = concat(new Uint8Array([paddingLength >> 8, paddingLength & 0xff]), payloadBytes);
-
-  const aesKey = await crypto.subtle.importKey("raw", toBuffer(contentKey), { name: "AES-GCM" }, false, ["encrypt"]);
-  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: toBuffer(nonce) }, aesKey, toBuffer(padded)));
-
-  return { ciphertext: encrypted, salt, serverPublicKey: serverPubRaw };
+  return { privateKey, publicKeyRaw: pubUncompressed };
 }
 
-async function signJwt(audience: string, subject: string, vapidPrivateKey: string, vapidPublicKey: string): Promise<string> {
-  const header = uint8ToBase64Url(new TextEncoder().encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+async function createVapidAuthHeader(
+  audience: string,
+  subject: string,
+  publicKeyB64: string,
+  privateKeyB64: string
+) {
+  const { privateKey, publicKeyRaw } = await importVapidKeys(publicKeyB64, privateKeyB64);
+
+  const header = { typ: "JWT", alg: "ES256" };
   const now = Math.floor(Date.now() / 1000);
-  const claims = uint8ToBase64Url(new TextEncoder().encode(JSON.stringify({
-    aud: audience, exp: now + 43200, sub: subject,
-  })));
-  const unsigned = `${header}.${claims}`;
-  const unsignedBytes = new TextEncoder().encode(unsigned);
+  const payload = { aud: audience, exp: now + 12 * 3600, sub: subject };
 
-  const privKeyRaw = base64UrlToUint8Array(vapidPrivateKey);
-  const pubKeyRaw = base64UrlToUint8Array(vapidPublicKey);
+  const enc = new TextEncoder();
+  const jwtUnsigned =
+    uint8ToUrlBase64(enc.encode(JSON.stringify(header))) +
+    "." +
+    uint8ToUrlBase64(enc.encode(JSON.stringify(payload)));
 
-  const jwk = {
-    kty: "EC", crv: "P-256",
-    x: uint8ToBase64Url(pubKeyRaw.slice(1, 33)),
-    y: uint8ToBase64Url(pubKeyRaw.slice(33, 65)),
-    d: uint8ToBase64Url(privKeyRaw),
-  };
+  const sigBuf = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    privateKey,
+    enc.encode(jwtUnsigned)
+  );
 
-  const key = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
-  const sig = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, toBuffer(unsignedBytes)));
+  // Convert DER signature to raw r||s (64 bytes)
+  const sig = new Uint8Array(sigBuf);
+  let r: Uint8Array, s: Uint8Array;
+  if (sig.length === 64) {
+    r = sig.slice(0, 32);
+    s = sig.slice(32);
+  } else {
+    // DER encoding
+    const rLen = sig[3];
+    const rStart = 4 + (rLen - 32);
+    r = sig.slice(rStart, rStart + 32);
+    const sOffset = 4 + rLen;
+    const sLen = sig[sOffset + 1];
+    const sStart = sOffset + 2 + (sLen - 32);
+    s = sig.slice(sStart, sStart + 32);
+  }
+  const rawSig = new Uint8Array(64);
+  rawSig.set(r, 0);
+  rawSig.set(s, 32);
 
-  return `${unsigned}.${uint8ToBase64Url(sig)}`;
+  const jwt = jwtUnsigned + "." + uint8ToUrlBase64(rawSig);
+  const k = uint8ToUrlBase64(publicKeyRaw);
+
+  return `vapid t=${jwt}, k=${k}`;
 }
 
-async function sendWebPush(
-  endpoint: string,
-  p256dh: string,
-  auth: string,
-  payload: string,
+async function sendPushNotification(
+  subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+  payloadStr: string,
   vapidPublicKey: string,
-  vapidPrivateKey: string
+  vapidPrivateKey: string,
+  vapidSubject: string
 ): Promise<{ ok: boolean; status: number }> {
-  const { ciphertext, salt, serverPublicKey } = await encryptPayload(p256dh, auth, payload);
-  const url = new URL(endpoint);
+  const url = new URL(subscription.endpoint);
   const audience = `${url.protocol}//${url.host}`;
-  const jwt = await signJwt(audience, "mailto:support@clalmobile.com", vapidPrivateKey, vapidPublicKey);
-  const vapidPubB64 = vapidPublicKey;
 
-  const resp = await fetch(endpoint, {
+  const authorization = await createVapidAuthHeader(
+    audience,
+    vapidSubject,
+    vapidPublicKey,
+    vapidPrivateKey
+  );
+
+  // Encrypt payload using ECDH + HKDF (RFC 8291)
+  const clientPublicKey = urlBase64ToUint8Array(subscription.keys.p256dh);
+  const clientAuth = urlBase64ToUint8Array(subscription.keys.auth);
+
+  // Generate ephemeral ECDH key pair
+  const ephemeral = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveBits"]
+  );
+  const ephemeralPubRaw = new Uint8Array(
+    await crypto.subtle.exportKey("raw", ephemeral.publicKey)
+  );
+
+  // Import client public key
+  const clientKey = await crypto.subtle.importKey(
+    "raw",
+    clientPublicKey.buffer as ArrayBuffer,
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    []
+  );
+
+  // ECDH shared secret
+  const sharedBits = new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: "ECDH", public: clientKey },
+      ephemeral.privateKey,
+      256
+    )
+  );
+
+  const enc = new TextEncoder();
+
+  // HKDF helper
+  async function hkdfSha256(ikm: Uint8Array, salt: Uint8Array, info: Uint8Array, length: number) {
+    const key = await crypto.subtle.importKey("raw", ikm.buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const prk = new Uint8Array(await crypto.subtle.sign("HMAC", key, salt.length ? (salt.buffer as ArrayBuffer) : new Uint8Array(32)));
+    const prkKey = await crypto.subtle.importKey("raw", prk.buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const infoWithCounter = new Uint8Array(info.length + 1);
+    infoWithCounter.set(info);
+    infoWithCounter[info.length] = 1;
+    const okm = new Uint8Array(await crypto.subtle.sign("HMAC", prkKey, infoWithCounter));
+    return okm.slice(0, length);
+  }
+
+  // Build info strings per RFC 8291
+  function buildInfo(type: string, clientPub: Uint8Array, serverPub: Uint8Array) {
+    const prefix = enc.encode(`Content-Encoding: ${type}\0P-256\0`);
+    const result = new Uint8Array(prefix.length + 2 + clientPub.length + 2 + serverPub.length);
+    let offset = 0;
+    result.set(prefix, offset); offset += prefix.length;
+    result[offset++] = 0; result[offset++] = clientPub.length;
+    result.set(clientPub, offset); offset += clientPub.length;
+    result[offset++] = 0; result[offset++] = serverPub.length;
+    result.set(serverPub, offset);
+    return result;
+  }
+
+  // PRK for key and nonce derivation
+  const authInfo = enc.encode("Content-Encoding: auth\0");
+  const prk = await hkdfSha256(sharedBits, clientAuth, authInfo, 32);
+
+  const keyInfo = buildInfo("aesgcm", clientPublicKey, ephemeralPubRaw);
+  const nonceInfo = buildInfo("nonce", clientPublicKey, ephemeralPubRaw);
+
+  const contentKey = await hkdfSha256(prk, new Uint8Array(0), keyInfo, 16);
+  const nonce = await hkdfSha256(prk, new Uint8Array(0), nonceInfo, 12);
+
+  // Add padding (2 bytes of padding length = 0)
+  const payloadBytes = enc.encode(payloadStr);
+  const paddedPayload = new Uint8Array(2 + payloadBytes.length);
+  paddedPayload[0] = 0;
+  paddedPayload[1] = 0;
+  paddedPayload.set(payloadBytes, 2);
+
+  // AES-128-GCM encrypt
+  const aesKey = await crypto.subtle.importKey("raw", contentKey, { name: "AES-GCM" }, false, ["encrypt"]);
+  const encrypted = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, aesKey, paddedPayload)
+  );
+
+  const res = await fetch(subscription.endpoint, {
     method: "POST",
     headers: {
-      "Content-Type": "application/octet-stream",
+      Authorization: authorization,
       "Content-Encoding": "aesgcm",
-      "Crypto-Key": `dh=${uint8ToBase64Url(serverPublicKey)};p256ecdsa=${vapidPubB64}`,
-      Authorization: `WebPush ${jwt}`,
-      Encryption: `salt=${uint8ToBase64Url(salt)}`,
+      "Crypto-Key": `dh=${uint8ToUrlBase64(ephemeralPubRaw)}`,
+      Encryption: `salt=${uint8ToUrlBase64(crypto.getRandomValues(new Uint8Array(16)))}`,
+      "Content-Type": "application/octet-stream",
       TTL: "86400",
     },
-    body: toBuffer(ciphertext),
+    body: encrypted,
   });
 
-  return { ok: resp.ok, status: resp.status };
+  return { ok: res.ok, status: res.status };
 }
 
+// POST — Admin: Send push notification to all subscribers
 export async function POST(req: NextRequest) {
-  const auth = await requireAdmin(req);
-  if (auth instanceof NextResponse) return auth;
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "Server error" }, { status: 500 });
+    if (!db) return apiError("DB unavailable", 500);
 
     const body = await req.json();
     const { title, body: notifBody, url, icon } = body;
 
     if (!title || !notifBody) {
-      return NextResponse.json({ error: "Missing title or body" }, { status: 400 });
+      return apiError("Missing title or body", 400);
     }
 
-    const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
-
-    if (!vapidPublic || !vapidPrivate) {
-      return NextResponse.json(
-        { error: "VAPID keys غير مُعدّة. أضف NEXT_PUBLIC_VAPID_PUBLIC_KEY و VAPID_PRIVATE_KEY في .env.local" },
-        { status: 500 }
-      );
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      return apiError("VAPID keys not configured", 500);
     }
 
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+    const vapidSubject = process.env.VAPID_SUBJECT || "mailto:info@clalmobile.com";
+
+    // Get all active subscriptions
     const { data: subs } = await db.from("push_subscriptions")
       .select("*")
       .eq("active", true);
@@ -180,81 +242,82 @@ export async function POST(req: NextRequest) {
       title,
       body: notifBody,
       url: url || "https://clalmobile.com",
-      icon: icon || "/icons/icon-192x192.svg",
+      icon: icon || "/icons/icon-192x192.png",
     });
 
+    // Send to all subscribers, collect results
     let sent = 0;
-    const expiredEndpoints: string[] = [];
+    let failed = 0;
+    const staleIds: string[] = [];
 
-    for (const sub of subscribers) {
-      try {
-        const keys = sub.keys as { p256dh?: string; auth?: string } | null;
-        if (!keys?.p256dh || !keys?.auth) continue;
-
-        const result = await sendWebPush(
-          sub.endpoint,
-          keys.p256dh,
-          keys.auth,
-          payload,
-          vapidPublic,
-          vapidPrivate
-        );
-
-        if (result.ok) {
-          sent++;
-        } else if (result.status === 410 || result.status === 404) {
-          expiredEndpoints.push(sub.endpoint);
+    await Promise.allSettled(
+      subscribers.map(async (sub: any) => {
+        try {
+          const result = await sendPushNotification(
+            { endpoint: sub.endpoint, keys: sub.keys },
+            payload,
+            vapidPublicKey,
+            vapidPrivateKey,
+            vapidSubject
+          );
+          if (result.ok) {
+            sent++;
+          } else {
+            if (result.status === 410) staleIds.push(sub.id);
+            failed++;
+          }
+        } catch {
+          failed++;
         }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.warn("Push failed:", sub.endpoint?.slice(0, 50), msg);
-      }
-    }
+      })
+    );
 
-    if (expiredEndpoints.length > 0) {
+    // Deactivate stale subscriptions
+    if (staleIds.length > 0) {
       await db.from("push_subscriptions")
         .update({ active: false })
-        .in("endpoint", expiredEndpoints);
+        .in("id", staleIds);
     }
 
+    // Save notification record
     const { data: notif, error } = await db.from("push_notifications").insert({
       title,
       body: notifBody,
       url: url || "https://clalmobile.com",
-      icon: icon || "/icons/icon-192x192.svg",
+      icon: icon || "/icons/icon-192x192.png",
       sent_count: sent,
       target: "all",
     }).select().single();
 
     if (error) throw error;
 
-    return NextResponse.json({
+    return apiSuccess({
       notification: notif,
       sent_to: sent,
-      failed: subscribers.length - sent,
-      message: `تم إرسال الإشعار إلى ${sent} مشترك${expiredEndpoints.length ? ` (${expiredEndpoints.length} اشتراك منتهي)` : ""}`,
+      failed,
+      message: `تم إرسال الإشعار إلى ${sent} مشترك`,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("Push send error:", msg);
-    return NextResponse.json({ error: "فشل إرسال الإشعار" }, { status: 500 });
+    return apiError(errMsg(err), 500);
   }
 }
 
+// GET — Admin: Get notification history
 export async function GET(req: NextRequest) {
-  const auth = await requireAdmin(req);
-  if (auth instanceof NextResponse) return auth;
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ notifications: [] });
+    if (!db) return apiSuccess({ notifications: [] });
 
     const { data } = await db.from("push_notifications")
       .select("*")
       .order("sent_at", { ascending: false })
       .limit(50);
 
-    return NextResponse.json({ notifications: data || [] });
+    return apiSuccess({ notifications: data || [] });
   } catch {
-    return NextResponse.json({ notifications: [] });
+    return apiSuccess({ notifications: [] });
   }
 }

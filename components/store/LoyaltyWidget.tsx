@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLang } from "@/lib/i18n";
 import { LOYALTY_CONFIG, type TierKey } from "@/lib/loyalty";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface LoyaltyData {
   points: number;
@@ -116,10 +117,7 @@ export function LoyaltyWidget() {
     try {
       const res = await fetch("/api/customer/loyalty", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: csrfHeaders({ Authorization: `Bearer ${token}` }),
         body: JSON.stringify({ action: "redeem", points: pts }),
       });
       const data = await res.json();

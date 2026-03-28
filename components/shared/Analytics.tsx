@@ -17,11 +17,9 @@ export function Analytics() {
   useEffect(() => {
     async function loadSettings() {
       try {
-        const res = await fetch("/api/admin/settings");
+        const res = await fetch("/api/settings/public");
         const json = await res.json();
         const settings = json.settings || {};
-
-        if (settings.feature_analytics !== "true") return;
 
         setEnabled(true);
         if (settings.ga_measurement_id) setGaId(settings.ga_measurement_id);

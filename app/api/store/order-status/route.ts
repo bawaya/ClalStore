@@ -1,18 +1,19 @@
 export const runtime = 'edge';
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
     const orderId = req.nextUrl.searchParams.get("orderId")?.trim()?.toUpperCase();
     if (!orderId || !/^CLM-\d{5}$/.test(orderId)) {
-      return NextResponse.json({ success: false, error: "رقم طلب غير صالح" }, { status: 400 });
+      return apiError("رقم طلب غير صالح", 400);
     }
 
     const supabase = createAdminSupabase();
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "خطأ في الاتصال" }, { status: 500 });
+      return apiError("خطأ في الاتصال", 500);
     }
 
     const { data: order, error } = await supabase
@@ -22,11 +23,10 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (error || !order) {
-      return NextResponse.json({ success: false, error: "لم يتم العثور على الطلب" }, { status: 404 });
+      return apiError("لم يتم العثور على الطلب", 404);
     }
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       order: {
         id: order.id,
         status: order.status,
@@ -36,6 +36,6 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch {
-    return NextResponse.json({ success: false, error: "حدث خطأ" }, { status: 500 });
+    return apiError("حدث خطأ", 500);
   }
 }

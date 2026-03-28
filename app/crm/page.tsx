@@ -33,8 +33,8 @@ export default function CRMDashboard() {
           const inbox = await inboxRes.json();
           if (inbox?.success) setInboxStats(inbox.stats);
         } catch { /* inbox stats are optional */ }
-      } catch (err: any) {
-        setError(err.message || "خطأ في التحميل");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "خطأ في التحميل");
       } finally {
         setLoading(false);
       }

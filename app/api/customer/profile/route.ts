@@ -6,8 +6,9 @@ export const runtime = 'edge';
 // PUT  /api/customer/profile — update profile
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 async function authenticateCustomer(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -32,13 +33,13 @@ export async function GET(req: NextRequest) {
   try {
     const customer = await authenticateCustomer(req);
     if (!customer) {
-      return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
+      return apiError("غير مصرح", 401);
     }
 
-    return NextResponse.json({ success: true, customer });
-  } catch (err: any) {
+    return apiSuccess({ customer });
+  } catch (err: unknown) {
     console.error("Customer profile GET error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }
 
@@ -46,7 +47,7 @@ export async function PUT(req: NextRequest) {
   try {
     const customer = await authenticateCustomer(req);
     if (!customer) {
-      return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
+      return apiError("غير مصرح", 401);
     }
 
     const body = await req.json();
@@ -54,7 +55,7 @@ export async function PUT(req: NextRequest) {
 
     const supabase = createAdminSupabase();
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+      return apiError("خطأ في السيرفر", 500);
     }
 
     const updates: Record<string, any> = {};
@@ -64,7 +65,7 @@ export async function PUT(req: NextRequest) {
     if (typeof address === "string") updates.address = address.trim().slice(0, 500);
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ success: false, error: "لا توجد بيانات للتحديث" }, { status: 400 });
+      return apiError("لا توجد بيانات للتحديث", 400);
     }
 
     const { data: updated, error } = await supabase
@@ -76,12 +77,12 @@ export async function PUT(req: NextRequest) {
 
     if (error) {
       console.error("Customer profile update error:", error);
-      return NextResponse.json({ success: false, error: "فشل في تحديث البيانات" }, { status: 500 });
+      return apiError("فشل في تحديث البيانات", 500);
     }
 
-    return NextResponse.json({ success: true, customer: updated });
-  } catch (err: any) {
+    return apiSuccess({ customer: updated });
+  } catch (err: unknown) {
     console.error("Customer profile PUT error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

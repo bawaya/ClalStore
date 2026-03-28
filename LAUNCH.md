@@ -43,9 +43,9 @@ npm run dev
 
 ## الخطوة 4: إعداد Cloudflare Pages
 ```bash
-# 1. اربط الريبو بـ Cloudflare Pages
-# 2. Build command: npx @cloudflare/next-on-pages
-# 3. Output directory: .vercel/output/static
+# 1. اربط الريبو بـ Cloudflare Workers
+# 2. Build command: npx opennextjs-cloudflare build
+# 3. Output: .open-next/ (auto-detected by wrangler)
 # 4. أضف Environment Variables في Cloudflare Dashboard
 # 5. ربط الدومين: clalmobile.com
 ```

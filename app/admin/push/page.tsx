@@ -68,8 +68,8 @@ export default function AdminPushPage() {
       setBody("");
       setUrl("https://clalmobile.com");
       load();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setSending(false);
   };

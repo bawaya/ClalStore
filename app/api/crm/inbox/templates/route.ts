@@ -1,17 +1,18 @@
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Inbox Templates & Quick Replies
 // GET/POST/PUT/DELETE /api/crm/inbox/templates
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
@@ -35,26 +36,25 @@ export async function GET(req: NextRequest) {
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       templates: templates || [],
       quick_replies: quick_replies || [],
     });
   } catch {
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const body = await req.json();
     const { name, category, content, variables, type } = body;
 
     if (!name || !content) {
-      return NextResponse.json({ success: false, error: "الاسم والمحتوى مطلوبان" }, { status: 400 });
+      return apiError("الاسم والمحتوى مطلوبان", 400);
     }
 
     if (type === "quick_reply") {
@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
         } as any)
         .select("*")
         .single();
-      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-      return NextResponse.json({ success: true, quick_reply: data });
+      if (error) return apiError(error.message, 500);
+      return apiSuccess({ quick_reply: data });
     }
 
     const { data, error } = await supabase
@@ -83,21 +83,21 @@ export async function POST(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true, template: data });
+    if (error) return apiError(error.message, 500);
+    return apiSuccess({ template: data });
   } catch {
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }
 
 export async function PUT(req: NextRequest) {
   try {
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const body = await req.json();
     const { id, name, category, content, variables, is_active, type } = body;
-    if (!id) return NextResponse.json({ success: false, error: "ID مطلوب" }, { status: 400 });
+    if (!id) return apiError("ID مطلوب", 400);
 
     if (type === "quick_reply") {
       const updates: Record<string, any> = {};
@@ -106,7 +106,7 @@ export async function PUT(req: NextRequest) {
       if (category !== undefined) updates.category = category;
       if (is_active !== undefined) updates.is_active = is_active;
       await supabase.from("inbox_quick_replies").update(updates).eq("id", id);
-      return NextResponse.json({ success: true });
+      return apiSuccess({ ok: true });
     }
 
     const updates: Record<string, any> = {};
@@ -117,21 +117,21 @@ export async function PUT(req: NextRequest) {
     if (is_active !== undefined) updates.is_active = is_active;
 
     await supabase.from("inbox_templates").update(updates).eq("id", id);
-    return NextResponse.json({ success: true });
+    return apiSuccess({ ok: true });
   } catch {
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     const type = searchParams.get("type");
-    if (!id) return NextResponse.json({ success: false, error: "ID مطلوب" }, { status: 400 });
+    if (!id) return apiError("ID مطلوب", 400);
 
     if (type === "quick_reply") {
       await supabase.from("inbox_quick_replies").delete().eq("id", id);
@@ -139,8 +139,8 @@ export async function DELETE(req: NextRequest) {
       await supabase.from("inbox_templates").delete().eq("id", id);
     }
 
-    return NextResponse.json({ success: true });
+    return apiSuccess({ ok: true });
   } catch {
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }
