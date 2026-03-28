@@ -29,6 +29,7 @@ import {
   rmSync,
   readdirSync,
   statSync,
+  lstatSync,
   readFileSync,
 } from "node:fs";
 import { execSync } from "node:child_process";
@@ -115,8 +116,11 @@ function walkAndPrune(dir, relBase, prefix, neededFiles) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     const rel = relBase ? `${relBase}/${entry}` : entry;
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
+    const lst = lstatSync(full);
+    if (lst.isSymbolicLink()) {
+      // Remove all symlinks in pruned dirs — they aren't needed at runtime
+      saved += rm(full, `${prefix}/${rel}`);
+    } else if (lst.isDirectory()) {
       saved += walkAndPrune(full, rel, prefix, neededFiles);
       try {
         if (readdirSync(full).length === 0) rmSync(full, { recursive: true });
@@ -261,7 +265,43 @@ console.log(
   `\n  Total trimmed: ${(totalSaved / 1024 / 1024).toFixed(1)} MiB`,
 );
 
-// ── Step 4: _routes.json so static assets bypass the Worker ──────────────
+// ── Step 4: Remove broken symlinks left after pruning ────────────────────
+// cpSync preserves symlinks from node_modules; pruning may remove their
+// targets, leaving dangling links that Cloudflare Pages rejects.
+
+function removeBrokenSymlinks(dir) {
+  let removed = 0;
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    const lst = lstatSync(full);
+    if (lst.isSymbolicLink()) {
+      // Check if target exists (statSync follows the link and throws if broken)
+      try {
+        statSync(full);
+      } catch (err) {
+        if (err.code === "ENOENT" || err.code === "ELOOP") {
+          rmSync(full, { force: true });
+          console.log(`  🔗 Removed broken symlink: ${relative(".", full)}`);
+          removed++;
+        }
+      }
+    } else if (lst.isDirectory()) {
+      removed += removeBrokenSymlinks(full);
+      // Clean up empty dirs
+      try {
+        if (readdirSync(full).length === 0) rmSync(full, { recursive: true });
+      } catch {}
+    }
+  }
+  return removed;
+}
+
+const brokenCount = removeBrokenSymlinks(WORKER_DIR);
+if (brokenCount > 0) {
+  console.log(`  Removed ${brokenCount} broken symlink(s)`);
+}
+
+// ── Step 5: _routes.json so static assets bypass the Worker ──────────────
 
 const routesJson = {
   version: 1,
