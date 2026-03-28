@@ -4,7 +4,6 @@ import { CookieConsent } from "@/components/shared/CookieConsent";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
 import { Analytics } from "@/components/shared/Analytics";
 import { Providers } from "@/components/shared/Providers";
-import { createServerSupabase } from "@/lib/supabase";
 
 export const metadata: Metadata = {
   title: "ClalMobile — وكيل رسمي لـ HOT Mobile",
@@ -32,28 +31,11 @@ export const metadata: Metadata = {
   },
 };
 
-async function getGaId(): Promise<string | null> {
-  try {
-    const db = createServerSupabase();
-    if (!db) return null;
-    const { data } = await db
-      .from("settings")
-      .select("value")
-      .eq("key", "ga_measurement_id")
-      .single();
-    return data?.value || null;
-  } catch {
-    return null;
-  }
-}
-
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const gaId = await getGaId();
-
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning style={{ backgroundColor: '#09090b', colorScheme: 'dark' }}>
       <head>
@@ -61,16 +43,6 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ClalMobile" />
-        {gaId && (
-          <>
-            <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${gaId}');`,
-              }}
-            />
-          </>
-        )}
         <link
           href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap"
           rel="stylesheet"

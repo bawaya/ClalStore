@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseWebhook, handleWhatsAppMessage, sendBotResponse, normalizePhone } from "@/lib/bot/whatsapp";
 import { logBotInteraction } from "@/lib/bot/engine";
 import { createAdminSupabase } from "@/lib/supabase";
+import { verifyWebhookSignature } from "@/lib/webhook-verify";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 // Webhook verification (yCloud sends GET to verify)
 export async function GET(req: NextRequest) {
@@ -21,7 +23,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(challenge || "OK", { status: 200 });
   }
 
-  return NextResponse.json({ error: "Invalid token" }, { status: 403 });
+  return apiError("Invalid token", 403);
 }
 
 /* ── Save incoming + bot reply to inbox tables ── */
@@ -144,11 +146,32 @@ async function saveToInbox(
 // Receive messages
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+
+    // HMAC signature verification
+    const signature =
+      req.headers.get("x-ycloud-signature") ||
+      req.headers.get("x-hub-signature-256");
+    const webhookSecret =
+      process.env.WEBHOOK_SECRET || process.env.WEBHOOK_VERIFY_TOKEN;
+
+    if (webhookSecret) {
+      if (!signature) {
+        console.error("WhatsApp webhook: missing signature header — rejecting");
+        return apiError("Missing webhook signature", 401);
+      }
+      const valid = await verifyWebhookSignature(rawBody, signature, webhookSecret);
+      if (!valid) {
+        console.error("WhatsApp webhook: invalid HMAC signature");
+        return apiError("Invalid webhook signature", 401);
+      }
+    }
+
+    const body = JSON.parse(rawBody);
 
     const msg = parseWebhook(body);
     if (!msg) {
-      return NextResponse.json({ received: true });
+      return apiSuccess({ received: true });
     }
 
     const isMedia = ["image", "document", "audio", "video"].includes(msg.type);
@@ -156,7 +179,7 @@ export async function POST(req: NextRequest) {
 
     // Skip completely empty messages
     if (!hasText && !isMedia) {
-      return NextResponse.json({ received: true });
+      return apiSuccess({ received: true });
     }
 
     // For text/button messages or media with caption, process through bot
@@ -211,10 +234,10 @@ export async function POST(req: NextRequest) {
       await logBotInteraction("whatsapp", msg.from, msg.text || "", response.text, "processed");
     }
 
-    return NextResponse.json({ received: true });
+    return apiSuccess({ received: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Webhook error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(message, 500);
   }
 }

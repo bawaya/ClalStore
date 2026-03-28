@@ -1,7 +1,8 @@
 export const runtime = "edge";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,15 +11,12 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get("limit") || "5"), 10);
 
     if (!q || q.length < 1) {
-      return NextResponse.json({ products: [], brands: [], categories: [] });
+      return apiSuccess({ products: [], brands: [], categories: [] });
     }
 
     const supabase = createAdminSupabase();
     if (!supabase) {
-      return NextResponse.json(
-        { error: "DB unavailable" },
-        { status: 500 }
-      );
+      return apiError("DB unavailable", 500);
     }
 
     const sanitized = q.replace(/[%_\\'"]/g, "");
@@ -67,16 +65,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return apiSuccess({
       products,
       brands: [...brandSet],
       categories,
     });
   } catch (err) {
     console.error("Autocomplete error:", err);
-    return NextResponse.json(
-      { products: [], brands: [], categories: [] },
-      { status: 500 }
-    );
+    return apiSuccess({ products: [], brands: [], categories: [] });
   }
 }

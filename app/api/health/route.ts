@@ -5,8 +5,8 @@ export const runtime = 'edge';
 // GET: System status for monitoring
 // =====================================================
 
-import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess } from "@/lib/api-response";
 
 export async function GET() {
   const checks: Record<string, { ok: boolean; ms?: number; error?: string }> = {};
@@ -17,8 +17,8 @@ export async function GET() {
     const t0 = Date.now();
     const { error } = await createAdminSupabase().from("settings").select("key").limit(1);
     checks.database = { ok: !error, ms: Date.now() - t0, error: error?.message };
-  } catch (err: any) {
-    checks.database = { ok: false, error: err.message };
+  } catch (err: unknown) {
+    checks.database = { ok: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 
   // 2. Environment variables
@@ -71,8 +71,8 @@ export async function GET() {
       ok: !!(smsInteg?.status === "active" && cfg.account_sid && cfg.verify_service_sid),
       error: `status=${smsInteg?.status} provider=${smsInteg?.provider} keys=[${configKeys.join(",")}]`,
     };
-  } catch (err: any) {
-    checks.sms = { ok: false, error: err.message };
+  } catch (err: unknown) {
+    checks.sms = { ok: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 
   // 7. Image processing
@@ -89,12 +89,16 @@ export async function GET() {
   const allOk = Object.values(checks).every((c) => c.ok);
   const criticalOk = checks.database?.ok && checks.env?.ok;
 
-  return NextResponse.json({
-    status: criticalOk ? (allOk ? "healthy" : "degraded") : "unhealthy",
-    uptime: process.uptime?.() || 0,
-    totalMs: Date.now() - start,
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || "1.0.0",
-    checks,
-  }, { status: criticalOk ? 200 : 503 });
+  return apiSuccess(
+    {
+      status: criticalOk ? (allOk ? "healthy" : "degraded") : "unhealthy",
+      uptime: process.uptime?.() || 0,
+      totalMs: Date.now() - start,
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || "1.0.0",
+      checks,
+    },
+    undefined,
+    criticalOk ? 200 : 503,
+  );
 }

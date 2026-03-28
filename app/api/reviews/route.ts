@@ -1,8 +1,9 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase, createServerSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 // GET — Get reviews for a product (public) or all (admin)
 export async function GET(req: NextRequest) {
@@ -13,16 +14,16 @@ export async function GET(req: NextRequest) {
 
     if (admin) {
       const db = createAdminSupabase();
-      if (!db) return NextResponse.json({ reviews: [] });
+      if (!db) return apiSuccess({ reviews: [] });
       const { data } = await db.from("product_reviews")
         .select("*")
         .order("created_at", { ascending: false });
-      return NextResponse.json({ reviews: data || [] });
+      return apiSuccess({ reviews: data || [] });
     }
 
     // Public: only approved reviews for specific product
     const db = createServerSupabase();
-    if (!db || !productId) return NextResponse.json({ reviews: [], avg: 0, count: 0 });
+    if (!db || !productId) return apiSuccess({ reviews: [], avg: 0, count: 0 });
 
     const { data } = await db.from("product_reviews")
       .select("*")
@@ -35,9 +36,9 @@ export async function GET(req: NextRequest) {
       ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
       : 0;
 
-    return NextResponse.json({ reviews, avg: Math.round(avg * 10) / 10, count: reviews.length });
-  } catch (err: any) {
-    return NextResponse.json({ reviews: [], avg: 0, count: 0, error: err.message });
+    return apiSuccess({ reviews, avg: Math.round(avg * 10) / 10, count: reviews.length });
+  } catch (err: unknown) {
+    return apiSuccess({ reviews: [], avg: 0, count: 0, error: errMsg(err) });
   }
 }
 
@@ -45,19 +46,19 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const db = createServerSupabase();
-    if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
+    if (!db) return apiError("DB unavailable", 500);
 
     // Check if feature is enabled
     const { data: setting } = await db.from("settings").select("value").eq("key", "feature_reviews").single();
     if (setting?.value !== "true") {
-      return NextResponse.json({ error: "Reviews disabled" }, { status: 403 });
+      return apiError("Reviews disabled", 403);
     }
 
     const body = await req.json();
     const { product_id, customer_name, customer_phone, rating, title, body: reviewBody } = body;
 
     if (!product_id || !customer_name || !rating || rating < 1 || rating > 5) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return apiError("Missing required fields", 400);
     }
 
     // Check if customer already reviewed this product
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
         .eq("customer_phone", customer_phone)
         .single();
       if (existing) {
-        return NextResponse.json({ error: "Already reviewed" }, { status: 409 });
+        return apiError("Already reviewed", 409);
       }
     }
 
@@ -104,9 +105,9 @@ export async function POST(req: NextRequest) {
     }).select().single();
 
     if (error) throw error;
-    return NextResponse.json({ review: data, message: "سيتم نشر تقييمك بعد الموافقة" });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess({ review: data, message: "سيتم نشر تقييمك بعد الموافقة" });
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -114,12 +115,12 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!db) return apiError("Unauthorized", 401);
 
     const body = await req.json();
     const { id, status, admin_reply } = body;
 
-    if (!id) return NextResponse.json({ error: "Missing review ID" }, { status: 400 });
+    if (!id) return apiError("Missing review ID", 400);
 
     const updates: any = { updated_at: new Date().toISOString() };
     if (status) updates.status = status;
@@ -132,9 +133,9 @@ export async function PUT(req: NextRequest) {
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ review: data });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess({ review: data });
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -142,16 +143,16 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!db) return apiError("Unauthorized", 401);
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+    if (!id) return apiError("Missing ID", 400);
 
     const { error } = await db.from("product_reviews").delete().eq("id", id);
     if (error) throw error;
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(null);
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }

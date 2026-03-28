@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { logAction } from "@/lib/admin/queries";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 type Mode = "scarce" | "medium" | "available" | "abundant";
 
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
     const { mode } = await req.json() as { mode: Mode };
     if (!WEIGHTS[mode]) {
-      return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+      return apiError("Invalid mode", 400);
     }
 
     const s = createAdminSupabase();
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
     if (!products?.length) {
-      return NextResponse.json({ error: "لا يوجد منتجات نشطة" }, { status: 404 });
+      return apiError("لا يوجد منتجات نشطة", 404);
     }
 
     let updated = 0;
@@ -70,8 +71,8 @@ export async function POST(req: NextRequest) {
     };
     await logAction("مدير", `توزيع مخزون ${modeLabels[mode]} على ${updated} منتج`, "stock", "all");
 
-    return NextResponse.json({ success: true, updated, mode });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess({ updated, mode });
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }

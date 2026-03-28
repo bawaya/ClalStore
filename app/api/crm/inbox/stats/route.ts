@@ -5,13 +5,14 @@ export const runtime = 'edge';
 // GET /api/crm/inbox/stats
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function GET(_req: NextRequest) {
   try {
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     // Count by status
     const { data: allConvs } = await supabase
@@ -41,8 +42,8 @@ export async function GET(_req: NextRequest) {
       .gte("created_at", todayStart.toISOString());
     stats.messages_today = msgCount || 0;
 
-    return NextResponse.json({ success: true, stats });
+    return apiSuccess({ stats });
   } catch {
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

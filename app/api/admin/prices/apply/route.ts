@@ -5,6 +5,7 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { logAction } from "@/lib/admin/queries";
 import type { ProductVariant } from "@/types/database";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 type PriceUpdate = {
   productId: string;
@@ -38,10 +39,7 @@ export async function POST(req: NextRequest) {
     const creates = body.creates ?? [];
 
     if (!updates.length && !creates.length) {
-      return NextResponse.json(
-        { error: "No updates or creates provided" },
-        { status: 400 }
-      );
+      return apiError("No updates or creates provided", 400);
     }
 
     const db = createAdminSupabase();
@@ -183,9 +181,9 @@ export async function POST(req: NextRequest) {
           .from("products")
           .update(updatePayload)
           .eq("id", productId);
-      } catch (err: any) {
+      } catch (err: unknown) {
         failCount += productUpdates.length;
-        errors.push(`Error updating ${productId}: ${err.message}`);
+        errors.push(`Error updating ${productId}: ${errMsg(err, "Unknown error")}`);
       }
     }
 
@@ -198,14 +196,13 @@ export async function POST(req: NextRequest) {
       );
     } catch {}
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       updated: successCount,
       created: createdCount,
       failed: failCount,
       errors: errors.length > 0 ? errors : undefined,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }

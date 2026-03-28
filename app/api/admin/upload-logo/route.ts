@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { uploadLogo, deleteLogo } from "@/lib/storage";
 import { updateSetting } from "@/lib/admin/queries";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,14 +20,14 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "لم يتم إرسال ملف" }, { status: 400 });
+      return apiError("لم يتم إرسال ملف", 400);
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const url = await uploadLogo(buffer, file.name, file.type);
 
     if (!url) {
-      return NextResponse.json({ error: "فشل الحصول على رابط الشعار" }, { status: 500 });
+      return apiError("فشل الحصول على رابط الشعار", 500);
     }
 
     // Save logo_url in settings
@@ -39,10 +40,10 @@ export async function POST(req: NextRequest) {
       console.error("Logo URL mismatch after save:", { saved: settings.logo_url, expected: url });
     }
 
-    return NextResponse.json({ url });
-  } catch (err: any) {
+    return apiSuccess({ url });
+  } catch (err: unknown) {
     console.error("Upload logo error:", err);
-    return NextResponse.json({ error: err.message || "فشل رفع الشعار" }, { status: 500 });
+    return apiError(errMsg(err, "فشل رفع الشعار"));
   }
 }
 
@@ -56,8 +57,8 @@ export async function DELETE(req: NextRequest) {
     }
     await updateSetting("logo_url", "");
 
-    return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "فشل حذف الشعار" }, { status: 500 });
+    return apiSuccess(null);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "فشل حذف الشعار"));
   }
 }

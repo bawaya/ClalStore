@@ -9,6 +9,7 @@ import {
   provisionRequiredTemplates,
   REQUIRED_TEMPLATES,
 } from "@/lib/integrations/ycloud-templates";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
     const templates = await listTemplates();
     const requiredNames = new Set(REQUIRED_TEMPLATES.map((t) => t.name));
 
-    return NextResponse.json({
+    return apiSuccess({
       templates,
       required: REQUIRED_TEMPLATES.map((t) => t.name),
       missing: REQUIRED_TEMPLATES.filter((t) => !templates.some((e) => e.name === t.name)).map(
@@ -39,9 +40,9 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errMsg(err, String(err));
     console.error("[WhatsApp Templates GET]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(message);
   }
 }
 
@@ -55,19 +56,19 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "provision_all") {
       const result = await provisionRequiredTemplates();
-      return NextResponse.json(result);
+      return apiSuccess(result);
     }
 
     if (body.template) {
       const result = await createTemplate(body.template);
-      return NextResponse.json(result);
+      return apiSuccess(result);
     }
 
-    return NextResponse.json({ error: "Invalid request — send { action: 'provision_all' } or { template: {...} }" }, { status: 400 });
+    return apiError("Invalid request — send { action: 'provision_all' } or { template: {...} }", 400);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errMsg(err, String(err));
     console.error("[WhatsApp Templates POST]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(message);
   }
 }
 
@@ -79,14 +80,14 @@ export async function DELETE(req: NextRequest) {
 
     const name = req.nextUrl.searchParams.get("name");
     if (!name) {
-      return NextResponse.json({ error: "Missing ?name= parameter" }, { status: 400 });
+      return apiError("Missing ?name= parameter", 400);
     }
 
     const result = await deleteTemplate(name);
-    return NextResponse.json(result);
+    return apiSuccess(result);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errMsg(err, String(err));
     console.error("[WhatsApp Templates DELETE]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(message);
   }
 }

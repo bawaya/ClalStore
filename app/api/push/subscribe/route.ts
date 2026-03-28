@@ -1,24 +1,25 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 // POST — Subscribe to push notifications
 export async function POST(req: NextRequest) {
   try {
     const db = createServerSupabase();
-    if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
+    if (!db) return apiError("DB unavailable", 500);
 
     // Check if feature is enabled
     const { data: setting } = await db.from("settings").select("value").eq("key", "feature_push_notifications").single();
-    if (setting?.value !== "true") return NextResponse.json({ error: "Push disabled" }, { status: 403 });
+    if (setting?.value !== "true") return apiError("Push disabled", 403);
 
     const body = await req.json();
     const { endpoint, keys, visitor_id } = body;
 
     if (!endpoint || !keys) {
-      return NextResponse.json({ error: "Missing subscription data" }, { status: 400 });
+      return apiError("Missing subscription data", 400);
     }
 
     // Upsert by endpoint
@@ -41,9 +42,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess({ ok: true });
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -51,18 +52,18 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const db = createServerSupabase();
-    if (!db) return NextResponse.json({ ok: true });
+    if (!db) return apiSuccess({ ok: true });
 
     const url = new URL(req.url);
     const endpoint = url.searchParams.get("endpoint");
-    if (!endpoint) return NextResponse.json({ ok: true });
+    if (!endpoint) return apiSuccess({ ok: true });
 
     await db.from("push_subscriptions")
       .update({ active: false })
       .eq("endpoint", endpoint);
 
-    return NextResponse.json({ ok: true });
+    return apiSuccess({ ok: true });
   } catch {
-    return NextResponse.json({ ok: true });
+    return apiSuccess({ ok: true });
   }
 }

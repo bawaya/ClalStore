@@ -21,7 +21,7 @@ const EMPTY: Partial<Product> = {
 export default function ProductsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { data: products, loading, error, clearError, create, update, remove, bulkRemove } = useAdminApi<Product>({ endpoint: "/api/admin/products" });
+  const { data: products, loading, error, clearError, create, update, remove, bulkRemove, pagination, setPage } = useAdminApi<Product>({ endpoint: "/api/admin/products", paginate: { limit: 20 } });
 
   const [modal, setModal] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -167,9 +167,9 @@ export default function ProductsPage() {
           }
         }
         return currentUrl;
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`[Enhance] ${label} error:`, err);
-        show(`❌ ${label}: ${err.message || "خطأ غير متوقع"}`, "error");
+        show(`❌ ${label}: ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
         return null;
       }
     };
@@ -321,8 +321,8 @@ export default function ProductsPage() {
       }
       const colorImgCount = d.colors?.filter((c: any) => c.image).length || 0;
       show(`✅ تم جلب بيانات ${d.phone_name || form.name_ar} — ${d.colors?.length || 0} ألوان${colorImgCount ? ` (${colorImgCount} بصور)` : ""}، ${d.storage_options?.length || 0} سعات`);
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setAutoFilling(false);
   };
@@ -452,9 +452,9 @@ export default function ProductsPage() {
       }
       setAiProcessing(false);
       setModal(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setAiProcessing(false);
-      show(`❌ ${err.message}`, "error");
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
   };
 
@@ -463,8 +463,8 @@ export default function ProductsPage() {
     try {
       await remove(confirm);
       show("🗑️ تم الحذف");
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setConfirm(null);
   };
@@ -492,8 +492,8 @@ export default function ProductsPage() {
       const deleted = await bulkRemove(Array.from(selected));
       show(`🗑️ تم حذف ${deleted} منتج`);
       setSelected(new Set());
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setBulkDeleting(false);
     setBulkConfirm(false);
@@ -516,8 +516,8 @@ export default function ProductsPage() {
       } else {
         show(`❌ ${data.error}`, "error");
       }
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setPayngoLoading(false);
   };
@@ -567,8 +567,8 @@ export default function ProductsPage() {
       } else {
         show("لم يتم العثور على صورة لهذا اللون في PaynGo", "error");
       }
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setPayngoColorLoading(null);
   };
@@ -647,8 +647,8 @@ export default function ProductsPage() {
         });
         show(`✅ تم استيراد صورة (${allColors[0].name_en}) من GSMArena`);
       }
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setGsmaColorLoading(null);
   };
@@ -682,8 +682,8 @@ export default function ProductsPage() {
       const data = await res.json();
       setPexelsResults(data.photos || []);
       if (!data.photos?.length) show("لم يتم العثور على نتائج في Pexels", "error");
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setPexelsLoading(false);
   };
@@ -753,8 +753,8 @@ export default function ProductsPage() {
       if (failed.length > 0) msg += ` | ❌ ${failed.length} فشل: ${failed.map((r: any) => r.color_name).join("، ")}`;
 
       show(msg, failed.length > 0 && succeeded.length === 0 ? "error" : "success");
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setBulkColorLoading(false);
   };
@@ -775,8 +775,8 @@ export default function ProductsPage() {
       } else {
         show(`❌ ${data.error}`, "error");
       }
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setDistributing(false);
   };
@@ -953,6 +953,29 @@ export default function ProductsPage() {
               </div>
             </div>
           ))}
+
+          {/* Pagination Controls */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 py-4">
+              <button
+                disabled={pagination.page <= 1}
+                onClick={() => setPage(pagination.page - 1)}
+                className="px-3 py-1.5 rounded-lg border border-border text-sm disabled:opacity-30 cursor-pointer disabled:cursor-default hover:bg-surface-elevated"
+              >
+                ← السابق
+              </button>
+              <span className="text-sm text-muted">
+                صفحة {pagination.page} من {pagination.totalPages} ({pagination.total} منتج)
+              </span>
+              <button
+                disabled={pagination.page >= pagination.totalPages}
+                onClick={() => setPage(pagination.page + 1)}
+                className="px-3 py-1.5 rounded-lg border border-border text-sm disabled:opacity-30 cursor-pointer disabled:cursor-default hover:bg-surface-elevated"
+              >
+                التالي →
+              </button>
+            </div>
+          )}
         </div>
       )}
 

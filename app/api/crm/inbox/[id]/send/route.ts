@@ -1,38 +1,23 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Send Message via Inbox
 // POST /api/crm/inbox/[id]/send
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { sendWhatsAppText, sendWhatsAppImage, sendWhatsAppDocument } from "@/lib/bot/whatsapp";
-import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const convId = params.id;
     const body = await req.json();
     const { type = "text", content, template_name, template_params, media_url, reply_to } = body;
-
-    if (media_url) {
-      try {
-        const parsed = new URL(media_url);
-        const allowedHosts = [".supabase.co", ".cloudinary.com", ".r2.cloudflarestorage.com", "clalmobile.com"];
-        const isAllowed = allowedHosts.some((h) => parsed.hostname.endsWith(h));
-        if (!isAllowed || !["https:", "http:"].includes(parsed.protocol)) {
-          return NextResponse.json({ success: false, error: "عنوان الملف غير مسموح" }, { status: 400 });
-        }
-      } catch {
-        return NextResponse.json({ success: false, error: "رابط غير صالح" }, { status: 400 });
-      }
-    }
 
     // Get conversation
     const { data: conv } = await supabase
@@ -42,11 +27,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .single();
 
     if (!conv) {
-      return NextResponse.json({ success: false, error: "المحادثة غير موجودة" }, { status: 404 });
+      return apiError("المحادثة غير موجودة", 404);
     }
 
     if ((conv as any).is_blocked) {
-      return NextResponse.json({ success: false, error: "هذا العميل محظور" }, { status: 403 });
+      return apiError("هذا العميل محظور", 403);
     }
 
     // Check 24-hour window for non-template messages
@@ -55,11 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       if (lastInbound && (conv as any).last_message_direction === "inbound") {
         const hoursSince = (Date.now() - new Date(lastInbound).getTime()) / (1000 * 60 * 60);
         if (hoursSince > 24) {
-          return NextResponse.json({
-            success: false,
-            error: "مر 24 ساعة — يمكنك فقط إرسال قالب معتمد",
-            require_template: true,
-          }, { status: 400 });
+          return apiError("مر 24 ساعة — يمكنك فقط إرسال قالب معتمد", 400);
         }
       }
     }
@@ -92,10 +73,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         waMessageId = result?.id || null;
       }
       msgStatus = "sent";
-    } catch (sendErr: any) {
+    } catch (sendErr: unknown) {
       console.error("Send message error:", sendErr);
       msgStatus = "failed";
-      errorMessage = sendErr?.message || "فشل الإرسال";
+      errorMessage = errMsg(sendErr, "فشل الإرسال");
     }
 
     // Save message to DB
@@ -105,7 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         conversation_id: convId,
         direction: "outbound",
         sender_type: "agent",
-        sender_name: auth.email?.split("@")[0] || "موظف",
+        sender_name: "موظف",
         message_type: type,
         content: messageContent,
         media_url: media_url || null,
@@ -139,13 +120,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       await supabase.rpc("increment_template_usage", { tname: template_name }).catch(() => {});
     }
 
-    return NextResponse.json({
-      success: msgStatus === "sent",
-      message,
-      error: errorMessage,
-    });
-  } catch (err: any) {
+    if (msgStatus === "sent") {
+      return apiSuccess({ message });
+    }
+    return apiError(errorMessage || "فشل الإرسال", 500);
+  } catch (err: unknown) {
     console.error("Send error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

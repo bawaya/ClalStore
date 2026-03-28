@@ -1,7 +1,8 @@
 export const runtime = 'edge';
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 import {
   getCustomerLoyalty,
   getLoyaltyTransactions,
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
   try {
     const customer = await authenticateCustomer(req);
     if (!customer) {
-      return NextResponse.json({ success: false, error: "unauthorized" }, { status: 401 });
+      return apiError("unauthorized", 401);
     }
 
     const [loyalty, transactions] = await Promise.all([
@@ -50,8 +51,7 @@ export async function GET(req: NextRequest) {
     const tierConfig = LOYALTY_CONFIG.tiers[tier];
     const nextTierConfig = nextTier ? LOYALTY_CONFIG.tiers[nextTier] : null;
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       loyalty: {
         points: loyalty?.points || 0,
         lifetime_points: lifetimePoints,
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     console.error("Loyalty GET error:", err);
-    return NextResponse.json({ success: false, error: "server_error" }, { status: 500 });
+    return apiError("server_error", 500);
   }
 }
 
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
   try {
     const customer = await authenticateCustomer(req);
     if (!customer) {
-      return NextResponse.json({ success: false, error: "unauthorized" }, { status: 401 });
+      return apiError("unauthorized", 401);
     }
 
     const body = await req.json();
@@ -94,29 +94,28 @@ export async function POST(req: NextRequest) {
 
     if (action === "redeem") {
       if (!points || typeof points !== "number" || points <= 0) {
-        return NextResponse.json({ success: false, error: "invalid_points" }, { status: 400 });
+        return apiError("invalid_points", 400);
       }
 
       const result = await redeemPoints(customer.id, points, orderId);
 
       if (!result.success) {
-        return NextResponse.json({ success: false, error: result.error }, { status: 400 });
+        return apiError(result.error || "redeem_failed", 400);
       }
 
       const loyalty = await getCustomerLoyalty(customer.id);
       const tier = (loyalty?.tier || "bronze") as TierKey;
 
-      return NextResponse.json({
-        success: true,
+      return apiSuccess({
         value: result.value,
         remaining_points: loyalty?.points || 0,
         tier,
       });
     }
 
-    return NextResponse.json({ success: false, error: "invalid_action" }, { status: 400 });
+    return apiError("invalid_action", 400);
   } catch (err) {
     console.error("Loyalty POST error:", err);
-    return NextResponse.json({ success: false, error: "server_error" }, { status: 500 });
+    return apiError("server_error", 500);
   }
 }

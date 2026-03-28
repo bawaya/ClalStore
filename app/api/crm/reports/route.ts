@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       return await generateWeeklyReport(supabase, dateParam);
     }
     return await generateDailyReport(supabase, dateParam);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[CRM Reports]", err);
     return new NextResponse(errorHtml("فشل في تحميل التقرير"), {
       status: 500,

@@ -11,18 +11,37 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { verifyWebhookSignature } from "@/lib/webhook-verify";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
+    const rawBody = await req.text();
+
+    // HMAC signature verification (additional layer before IPN check)
+    const webhookSignature =
+      req.headers.get("x-signature") ||
+      req.headers.get("x-webhook-signature");
+    const paymentWebhookSecret = process.env.PAYMENT_WEBHOOK_SECRET;
+
+    if (webhookSignature && paymentWebhookSecret) {
+      const valid = await verifyWebhookSignature(rawBody, webhookSignature, paymentWebhookSecret);
+      if (!valid) {
+        console.error("Payment webhook: invalid HMAC signature");
+        return apiError("Invalid webhook signature", 401);
+      }
+    } else if (!webhookSignature) {
+      console.warn("Payment webhook: no signature header present — falling through to IPN verification");
+    }
+
     let body: Record<string, any>;
 
     const contentType = req.headers.get("content-type") || "";
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      const text = await req.text();
-      const params = new URLSearchParams(text);
+      const params = new URLSearchParams(rawBody);
       body = Object.fromEntries(params.entries());
     } else {
-      body = await req.json();
+      body = JSON.parse(rawBody);
     }
 
     // IPN received — only log order ID
@@ -38,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     if (!orderId) {
       console.error("iCredit IPN: missing orderId (Custom1)");
-      return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
+      return apiError("Missing order ID", 400);
     }
 
     const db = createAdminSupabase();
@@ -50,12 +69,12 @@ export async function POST(req: NextRequest) {
 
     if (!existingOrder) {
       console.error("iCredit IPN: order not found:", orderId);
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      return apiError("Order not found", 404);
     }
 
     if (existingOrder.payment_status === "paid") {
       console.warn("iCredit IPN: order already paid:", orderId);
-      return NextResponse.json({ received: true, note: "already_paid" });
+      return apiSuccess({ received: true, note: "already_paid" });
     }
 
     // Verify IPN with iCredit — mandatory
@@ -95,7 +114,7 @@ export async function POST(req: NextRequest) {
         details: { sale_id: saleId, amount, verified: false },
       });
 
-      return NextResponse.json({ received: true, verified: false });
+      return apiSuccess({ received: true, verified: false });
     }
 
     if (saleId && amount > 0 && !isJ5) {
@@ -199,13 +218,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ received: true });
+    return apiSuccess({ received: true });
   } catch {
     console.error("iCredit IPN processing error");
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return apiError("Internal error", 500);
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "ok" });
+  return apiSuccess({ status: "ok" });
 }

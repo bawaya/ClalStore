@@ -1,14 +1,14 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
+import { apiSuccess } from "@/lib/api-response";
 
 // GET /api/reviews/featured — up to 6 approved reviews with product name for homepage
 export async function GET() {
   try {
     const db = createServerSupabase();
-    if (!db) return NextResponse.json({ reviews: [] });
+    if (!db) return apiSuccess({ reviews: [] });
 
     const { data: reviews } = await db
       .from("product_reviews")
@@ -17,7 +17,7 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(6);
 
-    if (!reviews || reviews.length === 0) return NextResponse.json({ reviews: [] });
+    if (!reviews || reviews.length === 0) return apiSuccess({ reviews: [] });
 
     const productIds = [...new Set(reviews.map((r: any) => r.product_id))];
     const { data: products } = await db
@@ -35,8 +35,8 @@ export async function GET() {
       product_name: productMap[r.product_id]?.name_ar || productMap[r.product_id]?.name_he || "منتج",
     }));
 
-    return NextResponse.json({ reviews: enriched });
+    return apiSuccess({ reviews: enriched });
   } catch {
-    return NextResponse.json({ reviews: [] }, { status: 500 });
+    return apiSuccess({ reviews: [] });
   }
 }

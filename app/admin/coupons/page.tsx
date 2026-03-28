@@ -31,7 +31,7 @@ export default function CouponsPage() {
       if (editId) { await update(editId, data); show("✅ تم التعديل"); }
       else { await create(data); show("✅ تم الإضافة"); }
       setModal(false);
-    } catch (err: any) { show(`❌ ${err.message}`, "error"); }
+    } catch (err: unknown) { show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error"); }
   };
 
   const handleDelete = async () => { if (confirm) { await remove(confirm); show("🗑️ تم الحذف"); setConfirm(null); } };

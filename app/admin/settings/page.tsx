@@ -172,8 +172,8 @@ function IntegrationCard({
       });
       const data = await res.json();
       setTestResult({ ok: data.ok, message: data.message || data.error || "" });
-    } catch (err: any) {
-      setTestResult({ ok: false, message: err.message });
+    } catch (err: unknown) {
+      setTestResult({ ok: false, message: err instanceof Error ? err.message : "خطأ غير متوقع" });
     }
     setTesting(false);
   };

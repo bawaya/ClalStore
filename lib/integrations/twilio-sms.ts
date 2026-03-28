@@ -75,9 +75,9 @@ export async function startTwilioVerification(
     }
     console.error("Twilio Verify start error:", data.message || data);
     return { success: false, error: data.message || "Verification start failed" };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Twilio Verify start exception:", err);
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
 
@@ -114,9 +114,9 @@ export async function checkTwilioVerification(
       return { success: true };
     }
     return { success: false, error: "رمز التحقق خاطئ أو منتهي الصلاحية" };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Twilio Verify check exception:", err);
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
 
@@ -167,9 +167,9 @@ export class TwilioSMSProvider implements SMSProvider {
 
       console.error("Twilio SMS error:", data.message || data);
       return { success: false, error: data.message || "SMS send failed" };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Twilio SMS exception:", err);
-      return { success: false, error: err.message };
+      return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
     }
   }
 }

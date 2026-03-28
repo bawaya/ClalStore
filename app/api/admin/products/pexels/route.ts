@@ -7,6 +7,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const PEXELS_API = "https://api.pexels.com/v1/search";
 const PEXELS_KEY = process.env.PEXELS_API_KEY || "";
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!query || query.trim().length < 2) {
-      return NextResponse.json({ error: "أدخل كلمة البحث" }, { status: 400 });
+      return apiError("أدخل كلمة البحث", 400);
     }
 
     const params: Record<string, string> = {
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: `Pexels API error: ${res.status}` }, { status: 502 });
+      return apiError(`Pexels API error: ${res.status}`, 502);
     }
 
     const data = await res.json();
@@ -50,8 +51,8 @@ export async function POST(req: NextRequest) {
       thumb: p.src?.medium || p.src?.small,
     }));
 
-    return NextResponse.json({ photos, total: data.total_results || 0 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "فشل في البحث" }, { status: 500 });
+    return apiSuccess({ photos, total: data.total_results || 0 });
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "فشل في البحث"), 500);
   }
 }

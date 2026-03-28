@@ -1,12 +1,13 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Customer Orders API
 // GET /api/customer/orders — fetch orders for authenticated customer
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 async function authenticateCustomer(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -31,12 +32,12 @@ export async function GET(req: NextRequest) {
   try {
     const customer = await authenticateCustomer(req);
     if (!customer) {
-      return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
+      return apiError("غير مصرح", 401);
     }
 
     const supabase = createAdminSupabase();
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+      return apiError("خطأ في السيرفر", 500);
     }
 
     // Fetch orders by customer_id
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error("Fetch customer orders error:", error);
-      return NextResponse.json({ success: false, error: "خطأ في جلب الطلبات" }, { status: 500 });
+      return apiError("خطأ في جلب الطلبات", 500);
     }
 
     // Fetch order items for all orders
@@ -87,9 +88,9 @@ export async function GET(req: NextRequest) {
       items: itemsByOrder[order.id] || [],
     }));
 
-    return NextResponse.json({ success: true, orders: result });
-  } catch (err: any) {
+    return apiSuccess({ orders: result });
+  } catch (err: unknown) {
     console.error("Customer orders error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

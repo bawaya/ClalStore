@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Sub Pages CRUD API
@@ -6,8 +6,9 @@ export const runtime = 'edge';
 // Uses dedicated sub_pages table
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function GET() {
   try {
@@ -17,9 +18,9 @@ export async function GET() {
       .select("*")
       .order("sort_order", { ascending: true });
     if (error) throw error;
-    return NextResponse.json({ data: data || [] });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(data || []);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }
 
@@ -33,9 +34,9 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
     if (error) throw error;
-    return NextResponse.json({ data });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(data);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }
 
@@ -44,7 +45,7 @@ export async function PUT(req: NextRequest) {
     const db = createAdminSupabase();
     const body = await req.json();
     const { id, ...updates } = body;
-    if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+    if (!id) return apiError("id required", 400);
     updates.updated_at = new Date().toISOString();
     const { data, error } = await db
       .from("sub_pages")
@@ -53,9 +54,9 @@ export async function PUT(req: NextRequest) {
       .select()
       .single();
     if (error) throw error;
-    return NextResponse.json({ data });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(data);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }
 
@@ -64,14 +65,14 @@ export async function DELETE(req: NextRequest) {
     const db = createAdminSupabase();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+    if (!id) return apiError("id required", 400);
     const { error } = await db
       .from("sub_pages")
       .delete()
       .eq("id", id);
     if (error) throw error;
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(null);
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "Unknown error"));
   }
 }

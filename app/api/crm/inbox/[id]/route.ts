@@ -1,17 +1,18 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Single Conversation + Messages
 // GET /api/crm/inbox/[id] — conversation detail + messages
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const convId = params.id;
     const { searchParams } = new URL(req.url);
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .single();
 
     if (convErr || !conversation) {
-      return NextResponse.json({ success: false, error: "المحادثة غير موجودة" }, { status: 404 });
+      return apiError("المحادثة غير موجودة", 404);
     }
 
     // Fetch messages with cursor pagination
@@ -99,8 +100,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         .eq("id", convId);
     }
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       conversation,
       messages: messages || [],
       customer,
@@ -108,8 +108,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       notes: notes || [],
       has_more,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Inbox detail error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

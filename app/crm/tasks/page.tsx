@@ -56,7 +56,7 @@ export default function TasksPage() {
         show("✅ تم الإضافة");
       }
       setModal(false); fetchTasks();
-    } catch (err: any) { show(`❌ ${err.message}`, "error"); }
+    } catch (err: unknown) { show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error"); }
   };
 
   const toggleStatus = async (task: any) => {

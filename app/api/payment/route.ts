@@ -11,6 +11,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { getIntegrationConfig } from "@/lib/integrations/hub";
 import { detectPaymentGateway } from "@/lib/payment-gateway";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     if (!orderId || !amount || !customerName || !customerPhone) {
-      return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
+      return apiError("بيانات ناقصة", 400);
     }
 
     const gateway = forceGateway || detectPaymentGateway(customerCity || "");
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (gateway === "rivhit") {
       const rivhitCfg = await getIntegrationConfig("payment");
       if (!rivhitCfg.group_private_token && !process.env.ICREDIT_GROUP_PRIVATE_TOKEN) {
-        return NextResponse.json({ error: "بوابة iCredit غير مهيأة — أدخل GroupPrivateToken في الإعدادات" }, { status: 503 });
+        return apiError("بوابة iCredit غير مهيأة — أدخل GroupPrivateToken في الإعدادات", 503);
       }
       const { createPaymentPage } = await import("@/lib/integrations/rivhit");
       const result = await createPaymentPage({
@@ -43,18 +44,19 @@ export async function POST(req: NextRequest) {
       });
 
       if (result.success) {
-        return NextResponse.json({
-          success: true, paymentUrl: result.paymentUrl,
-          privateSaleToken: result.privateSaleToken, provider: "icredit",
+        return apiSuccess({
+          paymentUrl: result.paymentUrl,
+          privateSaleToken: result.privateSaleToken,
+          provider: "icredit",
         });
       }
-      return NextResponse.json({ success: false, error: result.error }, { status: 400 });
+      return apiError(result.error || "Payment failed", 400);
     }
 
     // UPay gateway
     const upayCfg = await getIntegrationConfig("payment_upay");
     if (!upayCfg.api_username && !process.env.UPAY_API_USERNAME) {
-      return NextResponse.json({ error: "بوابة UPay غير مهيأة" }, { status: 503 });
+      return apiError("بوابة UPay غير مهيأة", 503);
     }
     const { createUpayPaymentPage } = await import("@/lib/integrations/upay");
     const result = await createUpayPaymentPage({
@@ -62,11 +64,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.success) {
-      return NextResponse.json({ success: true, paymentUrl: result.paymentUrl, provider: "upay" });
+      return apiSuccess({ paymentUrl: result.paymentUrl, provider: "upay" });
     }
-    return NextResponse.json({ success: false, error: result.error }, { status: 400 });
-  } catch (err: any) {
+    return apiError(result.error || "Payment failed", 400);
+  } catch (err: unknown) {
     console.error("Payment API error:", err);
-    return NextResponse.json({ error: "حدث خطأ في معالجة الدفع" }, { status: 500 });
+    return apiError("حدث خطأ في معالجة الدفع", 500);
   }
 }

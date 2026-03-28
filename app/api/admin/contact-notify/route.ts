@@ -1,7 +1,8 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { notifyAdminContactForm } from "@/lib/bot/admin-notify";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,14 +10,14 @@ export async function POST(req: NextRequest) {
     const { name, phone, email, subject, message } = body;
 
     if (!name || !phone || !message) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+      return apiError("Missing fields", 400);
     }
 
     await notifyAdminContactForm({ name, phone, email, subject, message });
 
-    return NextResponse.json({ success: true });
+    return apiSuccess(null);
   } catch (err) {
     console.error("Contact notify error:", err);
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+    return apiError("Failed");
   }
 }

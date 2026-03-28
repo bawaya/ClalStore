@@ -7,6 +7,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const PAYNGO_API = "https://www.payngo.co.il/rest/V1/products";
 const PAYNGO_MEDIA = "https://www.payngo.co.il/media/catalog/product";
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
     const { query, color_he } = await req.json() as { query: string; color_he?: string };
     if (!query || query.trim().length < 2) {
-      return NextResponse.json({ error: "أدخل اسم المنتج للبحث" }, { status: 400 });
+      return apiError("أدخل اسم المنتج للبحث", 400);
     }
 
     // PaynGo names phones as: "סמארטפון Samsung Galaxy S26 Ultra ... צבע שחור"
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: `PaynGo API error: ${res.status}` }, { status: 502 });
+      return apiError(`PaynGo API error: ${res.status}`, 502);
     }
 
     const data = await res.json();
@@ -88,8 +89,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ results, total: results.length });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "فشل في البحث" }, { status: 500 });
+    return apiSuccess({ results, total: results.length });
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "فشل في البحث"), 500);
   }
 }

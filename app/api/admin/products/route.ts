@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminProducts, createProduct, updateProduct, deleteProduct, logAction } from "@/lib/admin/queries";
 import { requireAdmin } from "@/lib/admin/auth";
 import { productSchema, productUpdateSchema, validateBody } from "@/lib/admin/validators";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 function parseStorageRank(storage: string): number {
   const s = String(storage || "").toUpperCase().replace(/\s/g, "");
@@ -68,10 +69,18 @@ export async function GET(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-    const products = await getAdminProducts();
-    return NextResponse.json({ data: products });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+
+    const { searchParams } = new URL(req.url);
+    const limit = Math.min(Math.max(0, Number(searchParams.get("limit")) || 0), 200);
+    const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
+
+    const { data: products, total } = await getAdminProducts(limit > 0 ? { limit, offset } : undefined);
+    return apiSuccess(
+      products,
+      limit > 0 ? { limit, offset, total, totalPages: Math.ceil(total / limit) } : undefined,
+    );
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -81,13 +90,13 @@ export async function POST(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
     const body = await req.json();
     const v = validateBody(body, productSchema);
-    if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
+    if (v.error) return apiError(v.error, 400);
     const data = normalizePricingPayload(v.data!);
     const product = await createProduct(data);
     await logAction("مدير", `إضافة منتج: ${data.name_ar}`, "product", product.id);
-    return NextResponse.json({ data: product });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(product);
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -97,15 +106,15 @@ export async function PUT(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
     const body = await req.json();
     const { id, ...updates } = body;
-    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    if (!id) return apiError("Missing id", 400);
     const v = validateBody(updates, productUpdateSchema);
-    if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
+    if (v.error) return apiError(v.error, 400);
     const data = normalizePricingPayload(v.data!);
     const product = await updateProduct(id, data);
     await logAction("مدير", `تعديل منتج: ${data.name_ar || id}`, "product", id);
-    return NextResponse.json({ data: product });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(product);
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }
 
@@ -119,8 +128,8 @@ export async function DELETE(req: NextRequest) {
 
     if (ids) {
       const idList = ids.split(",").map((s) => s.trim()).filter(Boolean);
-      if (idList.length === 0) return NextResponse.json({ error: "No IDs provided" }, { status: 400 });
-      if (idList.length > 50) return NextResponse.json({ error: "Max 50 items per batch" }, { status: 400 });
+      if (idList.length === 0) return apiError("No IDs provided", 400);
+      if (idList.length > 50) return apiError("Max 50 items per batch", 400);
       let deleted = 0;
       for (const pid of idList) {
         try {
@@ -131,14 +140,14 @@ export async function DELETE(req: NextRequest) {
         }
       }
       await logAction("مدير", `حذف جماعي: ${deleted} منتج`, "product", idList[0]);
-      return NextResponse.json({ success: true, deleted });
+      return apiSuccess({ deleted });
     }
 
-    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    if (!id) return apiError("Missing id", 400);
     await deleteProduct(id);
     await logAction("مدير", `حذف منتج: ${id}`, "product", id);
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiSuccess(null);
+  } catch (err: unknown) {
+    return apiError(errMsg(err), 500);
   }
 }

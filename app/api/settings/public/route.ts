@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
-import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess } from "@/lib/api-response";
 
 // Public settings endpoint — no auth required
 // Only exposes safe, display-related settings (logo, store name, etc.)
@@ -15,13 +15,13 @@ export async function GET() {
   try {
     const s = createAdminSupabase();
     if (!s) {
-      return NextResponse.json({ settings: {} });
+      return apiSuccess({ settings: {} });
     }
     const { data } = await s.from("settings").select("key, value").in("key", PUBLIC_KEYS);
     const map: Record<string, string> = {};
     (data || []).forEach((s: any) => { map[s.key] = s.value; });
-    return NextResponse.json({ settings: map });
+    return apiSuccess({ settings: map });
   } catch {
-    return NextResponse.json({ settings: {} });
+    return apiSuccess({ settings: {} });
   }
 }

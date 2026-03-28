@@ -6,8 +6,9 @@ export const runtime = 'edge';
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { fetchProductData } from "@/lib/admin/gsmarena";
+import { fetchFromGSMArena } from "@/lib/admin/device-data";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,10 +21,10 @@ export async function POST(req: NextRequest) {
     };
 
     if (!name || !brand) {
-      return NextResponse.json({ error: "أدخل اسم المنتج والشركة" }, { status: 400 });
+      return apiError("أدخل اسم المنتج والشركة", 400);
     }
 
-    const data = await fetchProductData(name, brand);
+    const data = await fetchFromGSMArena(name, brand);
 
     // If color specified, find matching color image
     if (color_en && data.colors?.length) {
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (bestMatch) {
-        return NextResponse.json({ image_url: bestMatch.image });
+        return apiSuccess({ image_url: bestMatch.image });
       }
 
       // Return all available color images so frontend can show options
@@ -63,10 +64,7 @@ export async function POST(req: NextRequest) {
         .filter(c => c.image)
         .map(c => ({ name_en: c.name_en, image_url: c.image! }));
 
-      return NextResponse.json({
-        error: "لم يتم العثور على تطابق دقيق للون",
-        available,
-      });
+      return apiError("لم يتم العثور على تطابق دقيق للون", 404);
     }
 
     // No specific color — return all colors with images
@@ -74,8 +72,8 @@ export async function POST(req: NextRequest) {
       .filter(c => c.image)
       .map(c => ({ name_en: c.name_en, image_url: c.image! }));
 
-    return NextResponse.json({ colors, total: colors.length });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "فشل في البحث" }, { status: 500 });
+    return apiSuccess({ colors, total: colors.length });
+  } catch (err: unknown) {
+    return apiError(errMsg(err, "فشل في البحث"), 500);
   }
 }

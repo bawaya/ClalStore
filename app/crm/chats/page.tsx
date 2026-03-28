@@ -90,8 +90,8 @@ export default function ChatsPage() {
       const statsData = await statsRes.json();
       setConversations(convosData.conversations || []);
       setStats(statsData);
-    } catch (err: any) {
-      setError(err.message || "خطأ في التحميل");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطأ في التحميل");
     } finally {
       setLoading(false);
     }
@@ -110,9 +110,9 @@ export default function ChatsPage() {
       }
       const data = await res.json();
       setMessages(data.data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessages([]);
-      setError(err.message || "خطأ");
+      setError(err instanceof Error ? err.message : "خطأ");
     } finally { setLoadingMsgs(false); }
   };
 
@@ -129,7 +129,7 @@ export default function ChatsPage() {
       }
       setConversations((prev) => prev.map((c) => c.id === id ? { ...c, status: "closed" as const } : c));
       if (selectedId === id) setSelectedId(null);
-    } catch (err: any) { setError(err.message || "خطأ"); }
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : "خطأ"); }
   };
 
   const filtered = conversations;

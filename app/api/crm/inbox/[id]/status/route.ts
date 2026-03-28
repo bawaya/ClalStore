@@ -1,24 +1,25 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Change Conversation Status
 // PUT /api/crm/inbox/[id]/status
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { status } = await req.json();
     const convId = params.id;
 
     const validStatuses = ["active", "waiting", "bot", "resolved", "archived"];
     if (!validStatuses.includes(status)) {
-      return NextResponse.json({ success: false, error: "حالة غير صالحة" }, { status: 400 });
+      return apiError("حالة غير صالحة", 400);
     }
 
     // Get current status
@@ -48,9 +49,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       new_value: status,
     } as any);
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
+    return apiSuccess(null);
+  } catch (err: unknown) {
     console.error("Status error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

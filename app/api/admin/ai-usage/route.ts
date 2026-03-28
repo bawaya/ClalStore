@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+      return apiError("DB error", 500);
     }
 
     const now = new Date();
@@ -92,23 +93,20 @@ export async function GET(req: NextRequest) {
         cost: Math.round(d.cost * 100) / 100,
       }));
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        totalRequests: current.length,
-        totalInputTokens: totalInput,
-        totalOutputTokens: totalOutput,
-        totalTokens: totalInput + totalOutput,
-        estimatedCost: Math.round(currentCost * 100) / 100,
-        prevMonthCost: Math.round(prevCost * 100) / 100,
-        prevMonthRequests: prev.length,
-        avgDuration: current.length > 0 ? Math.round(totalDuration / current.length) : 0,
-        byFeature,
-        daily: dailyData,
-      },
+    return apiSuccess({
+      totalRequests: current.length,
+      totalInputTokens: totalInput,
+      totalOutputTokens: totalOutput,
+      totalTokens: totalInput + totalOutput,
+      estimatedCost: Math.round(currentCost * 100) / 100,
+      prevMonthCost: Math.round(prevCost * 100) / 100,
+      prevMonthRequests: prev.length,
+      avgDuration: current.length > 0 ? Math.round(totalDuration / current.length) : 0,
+      byFeature,
+      daily: dailyData,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("AI usage API error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return apiError(errMsg(err), 500);
   }
 }

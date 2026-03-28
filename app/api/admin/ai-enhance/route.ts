@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Admin AI Enhance API (OpenAI GPT-4o-mini)
@@ -6,6 +6,7 @@ export const runtime = 'edge';
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
 
@@ -25,6 +26,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
       temperature: 0.3,
       max_tokens: 1200,
     }),
+    signal: AbortSignal.timeout(30000),
   });
 
   if (!res.ok) {
@@ -39,14 +41,14 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
 export async function POST(req: NextRequest) {
   try {
     if (!OPENAI_API_KEY) {
-      return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 500 });
+      return apiError("OpenAI API key not configured", 500);
     }
 
     const body = await req.json();
     const { name_en, brand, specs, type } = body;
 
     if (!name_en?.trim()) {
-      return NextResponse.json({ error: "name_en is required" }, { status: 400 });
+      return apiError("name_en is required", 400);
     }
 
     // Build specs summary for description generation
@@ -96,19 +98,16 @@ ${specsText ? `المواصفات التفصيلية: ${specsText}` : "لا تو
 
     const result = JSON.parse(jsonStr);
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        name_ar: result.name_ar || "",
-        name_he: result.name_he || "",
-        description_ar: result.description_ar || "",
-        description_he: result.description_he || "",
-        type: result.type || type || "device",
-        slug: result.slug || "",
-      },
+    return apiSuccess({
+      name_ar: result.name_ar || "",
+      name_he: result.name_he || "",
+      description_ar: result.description_ar || "",
+      description_he: result.description_he || "",
+      type: result.type || type || "device",
+      slug: result.slug || "",
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[AI Enhance Error]", err);
-    return NextResponse.json({ error: err.message || "AI processing failed" }, { status: 500 });
+    return apiError(errMsg(err, "AI processing failed"), 500);
   }
 }

@@ -63,6 +63,6 @@
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "vitest": "^4.0.18",
-    "wrangler": "^4.71.0"
+    "wrangler": "^4.78.0"
   }
 }

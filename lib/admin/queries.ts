@@ -47,9 +47,22 @@ export async function getDashboardStats() {
 }
 
 // ===== Products CRUD =====
-export async function getAdminProducts() {
+export async function getAdminProducts(opts?: { limit?: number; offset?: number }) {
+  const limit = opts?.limit ?? 0;
+  const offset = opts?.offset ?? 0;
+
+  if (limit > 0) {
+    const [{ data, error }, { count }] = await Promise.all([
+      db().from("products").select("*").order("created_at", { ascending: false }).range(offset, offset + limit - 1),
+      db().from("products").select("id", { count: "exact", head: true }),
+    ]);
+    if (error) throw error;
+    return { data: (data || []) as Product[], total: count ?? 0 };
+  }
+
+  // No pagination — return all (backward compat)
   const { data } = await db().from("products").select("*").order("created_at", { ascending: false });
-  return (data || []) as Product[];
+  return { data: (data || []) as Product[], total: (data || []).length };
 }
 
 export async function createProduct(product: any) {

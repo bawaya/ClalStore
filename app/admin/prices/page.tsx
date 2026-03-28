@@ -335,8 +335,8 @@ export default function PricesPage() {
         setSelected(matchedIdx);
 
         setStep("preview");
-      } catch (err: any) {
-        const msg = err.message || String(err);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         setErrorMsg(msg);
         show("حدث خطأ — راجع التفاصيل أدناه", "error");
         console.error("PRICE MATCH ERROR:", msg);
@@ -414,8 +414,8 @@ export default function PricesPage() {
       if (json.updated > 0) parts.push(`تم تحديث ${json.updated} سعر`);
       if (json.created > 0) parts.push(`إنشاء ${json.created} منتج جديد`);
       show(parts.length ? parts.join(" — ") + " بنجاح" : "تم", "success");
-    } catch (err: any) {
-      show(`خطأ في التحديث: ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`خطأ في التحديث: ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     } finally {
       setApplying(false);
     }

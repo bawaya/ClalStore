@@ -46,7 +46,7 @@ export default function PipelinePage() {
         show("✅ تم الإضافة");
       }
       setModal(false); fetchDeals();
-    } catch (err: any) { show(`❌ ${err.message}`, "error"); }
+    } catch (err: unknown) { show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error"); }
   };
 
   const moveStage = async (dealId: string, stage: string) => {

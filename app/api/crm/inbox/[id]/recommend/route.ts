@@ -5,6 +5,7 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 export async function POST(
   req: NextRequest,
@@ -16,7 +17,7 @@ export async function POST(
     const { id: conversationId } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+      return apiError("DB error", 500);
     }
 
     const { data: messages } = await supabase
@@ -35,7 +36,7 @@ export async function POST(
       .limit(30);
 
     if (!messages || messages.length === 0 || !products || products.length === 0) {
-      return NextResponse.json({ success: true, recommendations: [] });
+      return apiSuccess({ recommendations: [] });
     }
 
     const transcript = messages
@@ -74,7 +75,7 @@ ${catalog}
     });
 
     if (!result?.json) {
-      return NextResponse.json({ success: true, recommendations: [] });
+      return apiSuccess({ recommendations: [] });
     }
 
     trackAIUsage({
@@ -105,12 +106,9 @@ ${catalog}
       })
       .filter(Boolean);
 
-    return NextResponse.json({ success: true, recommendations: enriched });
-  } catch (err: any) {
+    return apiSuccess({ recommendations: enriched });
+  } catch (err: unknown) {
     console.error("Recommend API error:", err);
-    return NextResponse.json(
-      { success: false, error: err.message },
-      { status: 500 }
-    );
+    return apiError(errMsg(err), 500);
   }
 }

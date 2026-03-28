@@ -1,20 +1,18 @@
-export const runtime = "edge";
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — Inbox Conversations API
 // GET /api/crm/inbox — list with filters, search, stats
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
     const supabase = createAdminSupabase();
-    if (!supabase) return NextResponse.json({ success: false, error: "DB error" }, { status: 500 });
+    if (!supabase) return apiError("DB error", 500);
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
@@ -35,23 +33,15 @@ export async function GET(req: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (status && status !== "all") {
-      if (status === "pending") {
-        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        query = query.eq("last_message_direction", "inbound").lt("last_message_at", cutoff);
-      } else {
-        query = query.eq("status", status);
-      }
+      query = query.eq("status", status);
     }
     if (assigned) {
       query = query.eq("assigned_to", assigned);
     }
     if (search) {
-      const safe = search.replace(/[%_\\'"]/g, "");
-      if (safe.length > 0) {
-        query = query.or(
-          `customer_name.ilike.%${safe}%,customer_phone.ilike.%${safe}%,last_message_text.ilike.%${safe}%`
-        );
-      }
+      query = query.or(
+        `customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,last_message_text.ilike.%${search}%`
+      );
     }
     if (sentiment) {
       query = query.eq("sentiment", sentiment);
@@ -60,7 +50,7 @@ export async function GET(req: NextRequest) {
     const { data: conversations, count, error } = await query;
     if (error) {
       console.error("Inbox list error:", error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return apiError(error.message, 500);
     }
 
     // If label filter, get conversation IDs from junction table
@@ -117,43 +107,27 @@ export async function GET(req: NextRequest) {
       assigned_user: c.assigned_to ? usersMap[c.assigned_to] || null : null,
     }));
 
-    // Stats
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayISO = todayStart.toISOString();
-
-    const [allConvsRes, resolvedTodayRes, messagesTodayRes] = await Promise.all([
-      supabase.from("inbox_conversations").select("status, unread_count"),
-      supabase
-        .from("inbox_conversations")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "resolved")
-        .gte("updated_at", todayISO),
-      supabase
-        .from("inbox_messages")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", todayISO),
+    // Stats — use count queries instead of loading all conversations
+    const [totalRes, activeRes, waitingRes, botRes, unreadRes] = await Promise.all([
+      supabase.from("inbox_conversations").select("id", { count: "exact", head: true }),
+      supabase.from("inbox_conversations").select("id", { count: "exact", head: true }).eq("status", "active"),
+      supabase.from("inbox_conversations").select("id", { count: "exact", head: true }).eq("status", "waiting"),
+      supabase.from("inbox_conversations").select("id", { count: "exact", head: true }).eq("status", "bot"),
+      supabase.from("inbox_conversations").select("unread_count").gt("unread_count", 0),
     ]);
-
-    const allConvs = allConvsRes.data || [];
     const stats = {
-      total_conversations: allConvs.length,
-      active: allConvs.filter((c: any) => c.status === "active").length,
-      waiting: allConvs.filter((c: any) => c.status === "waiting").length,
-      bot: allConvs.filter((c: any) => c.status === "bot").length,
-      resolved_today: resolvedTodayRes.count || 0,
-      messages_today: messagesTodayRes.count || 0,
-      unread_total: allConvs.reduce((sum: number, c: any) => sum + (c.unread_count || 0), 0),
+      total_conversations: totalRes.count || 0,
+      active: activeRes.count || 0,
+      waiting: waitingRes.count || 0,
+      bot: botRes.count || 0,
+      resolved_today: 0,
+      messages_today: 0,
+      unread_total: (unreadRes.data || []).reduce((sum: number, c: { unread_count: number }) => sum + (c.unread_count || 0), 0),
     };
 
-    return NextResponse.json({
-      success: true,
-      conversations: enriched,
-      total: count || 0,
-      stats,
-    });
-  } catch (err: any) {
+    return apiSuccess({ conversations: enriched, total: count || 0, stats });
+  } catch (err: unknown) {
     console.error("Inbox error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

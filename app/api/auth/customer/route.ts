@@ -7,9 +7,10 @@ export const runtime = 'edge';
 // Customer chooses: SMS (Twilio Verify) or WhatsApp
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { validatePhone } from "@/lib/validators";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 function generateOTP(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -135,14 +136,14 @@ export async function POST(req: NextRequest) {
     const { phone, action, otp, channel } = body;
 
     if (!phone || !validatePhone(phone)) {
-      return NextResponse.json({ success: false, error: "رقم هاتف غير صالح" }, { status: 400 });
+      return apiError("رقم هاتف غير صالح", 400);
     }
 
     const cleanPhone = phone.replace(/[-\s]/g, "");
     const supabase = createAdminSupabase();
 
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "خطأ في إعدادات السيرفر" }, { status: 500 });
+      return apiError("خطأ في إعدادات السيرفر", 500);
     }
 
     // ===== SEND OTP =====
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
         .limit(1);
 
       if (recent && recent.length > 0) {
-        return NextResponse.json({ success: false, error: "انتظر دقيقة قبل طلب رمز جديد" }, { status: 429 });
+        return apiError("انتظر دقيقة قبل طلب رمز جديد", 429);
       }
 
       let sentVia: "sms" | "whatsapp" | "none" = "none";
@@ -201,20 +202,20 @@ export async function POST(req: NextRequest) {
         } as any);
       }
 
-      return NextResponse.json({
-        success: sentVia !== "none",
+      if (sentVia === "none") {
+        return apiError("فشل إرسال رمز التحقق — تحقق من الإعدادات", 500);
+      }
+      return apiSuccess({
         channel: sentVia,
         message: sentVia === "sms" ? "تم إرسال رمز التحقق عبر SMS"
-          : sentVia === "whatsapp" ? "تم إرسال رمز التحقق عبر واتساب"
-          : "فشل إرسال رمز التحقق",
-        ...(sentVia === "none" ? { error: "فشل إرسال رمز التحقق — تحقق من الإعدادات" } : {}),
+          : "تم إرسال رمز التحقق عبر واتساب",
       });
     }
 
     // ===== VERIFY OTP =====
     if (action === "verify_otp") {
       if (!otp || otp.length !== 4) {
-        return NextResponse.json({ success: false, error: "رمز التحقق غير صالح" }, { status: 400 });
+        return apiError("رمز التحقق غير صالح", 400);
       }
 
       // Cleanup expired
@@ -246,7 +247,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (!otpValid) {
-        return NextResponse.json({ success: false, error: "رمز التحقق خاطئ أو منتهي الصلاحية" }, { status: 400 });
+        return apiError("رمز التحقق خاطئ أو منتهي الصلاحية", 400);
       }
 
       // Generate auth token
@@ -284,8 +285,7 @@ export async function POST(req: NextRequest) {
         customer = newCust;
       }
 
-      return NextResponse.json({
-        success: true,
+      return apiSuccess({
         token,
         customer: {
           id: customer?.id,
@@ -298,9 +298,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: false, error: "action غير معروف" }, { status: 400 });
-  } catch (err: any) {
+    return apiError("action غير معروف", 400);
+  } catch (err: unknown) {
     console.error("Customer auth error:", err);
-    return NextResponse.json({ success: false, error: "خطأ في السيرفر" }, { status: 500 });
+    return apiError("خطأ في السيرفر", 500);
   }
 }

@@ -52,8 +52,8 @@ export default function OrdersPage() {
       }
       const json = await res.json();
       setOrders(json.data || []);
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     } finally {
       setLoading(false);
     }
@@ -74,8 +74,8 @@ export default function OrdersPage() {
       show(`✅ ${orderId} → ${ORDER_STATUS[status as keyof typeof ORDER_STATUS]?.label || status}`);
       fetchOrders();
       if (selected?.id === orderId) setSelected({ ...selected, status });
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
   };
 
@@ -93,8 +93,8 @@ export default function OrdersPage() {
       show("📝 تمت إضافة الملاحظة");
       setNoteText("");
       fetchOrders();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
   };
 
@@ -114,8 +114,8 @@ export default function OrdersPage() {
       show(`🗑️ تم حذف الطلب ${orderId}`, "success");
       if (selected?.id === orderId) setSelected(null);
       fetchOrders();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
   };
 
@@ -159,8 +159,8 @@ export default function OrdersPage() {
       setSelectedIds(new Set());
       setBulkStatus("");
       fetchOrders();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
   };
   const exportCSV = () => {

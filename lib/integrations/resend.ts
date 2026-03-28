@@ -38,11 +38,6 @@ export class ResendProvider implements EmailProvider {
           html: params.html || undefined,
           text: params.text || undefined,
           reply_to: params.replyTo || undefined,
-          attachments: params.attachments?.map((a) => ({
-            filename: a.filename,
-            content: a.content,
-            content_type: a.contentType || "application/octet-stream",
-          })),
         }),
       });
 
@@ -56,8 +51,8 @@ export class ResendProvider implements EmailProvider {
 
       const data = await res.json();
       return { success: true, messageId: data.id };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
     }
   }
 

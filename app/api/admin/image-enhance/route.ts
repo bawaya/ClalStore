@@ -1,4 +1,4 @@
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // =====================================================
 // ClalMobile — AI Image Enhance API
@@ -6,9 +6,10 @@ export const runtime = 'edge';
 // Uses Remove.bg for background removal
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { removeBackgroundFromBuffer } from "@/lib/integrations/removebg";
 import { uploadToR2 } from "@/lib/storage-r2";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 /** Detect image MIME type from magic bytes in the buffer */
 function detectImageType(buffer: ArrayBuffer): string {
@@ -37,7 +38,7 @@ function detectImageType(buffer: ArrayBuffer): string {
 export async function POST(req: NextRequest) {
   try {
     if (!process.env.REMOVEBG_API_KEY) {
-      return NextResponse.json({ error: "REMOVEBG_API_KEY not configured" }, { status: 500 });
+      return apiError("REMOVEBG_API_KEY not configured", 500);
     }
 
     const contentType = req.headers.get("content-type") || "";
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
       const { image_url } = body;
 
       if (!image_url) {
-        return NextResponse.json({ error: "image_url is required" }, { status: 400 });
+        return apiError("image_url is required", 400);
       }
 
       // Download image first, then send as buffer to Remove.bg
@@ -62,10 +63,7 @@ export async function POST(req: NextRequest) {
         signal: AbortSignal.timeout(15000),
       });
       if (!imgRes.ok) {
-        return NextResponse.json(
-          { error: `فشل تحميل الصورة: ${imgRes.status}`, success: false },
-          { status: 400 }
-        );
+        return apiError(`فشل تحميل الصورة: ${imgRes.status}`, 400);
       }
       const imgBuffer = await imgRes.arrayBuffer();
       // Detect actual image type from magic bytes (R2 returns wrong content-type
@@ -82,11 +80,11 @@ export async function POST(req: NextRequest) {
       const file = formData.get("file") as File | null;
 
       if (!file) {
-        return NextResponse.json({ error: "file is required" }, { status: 400 });
+        return apiError("file is required", 400);
       }
 
       if (file.size > 10 * 1024 * 1024) {
-        return NextResponse.json({ error: "الملف أكبر من 10MB" }, { status: 400 });
+        return apiError("الملف أكبر من 10MB", 400);
       }
 
       const buffer = await file.arrayBuffer();
@@ -95,33 +93,29 @@ export async function POST(req: NextRequest) {
       width = result.width;
       height = result.height;
     } else {
-      return NextResponse.json({ error: "Unsupported content type" }, { status: 400 });
+      return apiError("Unsupported content type", 400);
     }
 
     // Upload processed image to R2 (fallback: Supabase Storage)
     const filename = `enhanced-${Date.now()}.png`;
     const url = await uploadToR2(resultBuffer, filename, "image/png");
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       url,
       width,
       height,
       size: resultBuffer.byteLength,
       message: "✅ تمت إزالة الخلفية وتحسين الصورة",
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[Image Enhance Error]", err);
     // Return detailed error for debugging
-    const detail = err.message || "Image enhancement failed";
+    const detail = err instanceof Error ? err.message : "Image enhancement failed";
     const step = detail.includes("Remove.bg")
       ? "removebg"
       : detail.includes("R2") || detail.includes("Upload")
         ? "upload"
         : "unknown";
-    return NextResponse.json(
-      { error: detail, step, success: false },
-      { status: 500 }
-    );
+    return apiError(`${detail} [${step}]`, 500);
   }
 }

@@ -9,12 +9,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getProvider } from "@/lib/integrations/hub";
 import type { EmailProvider } from "@/lib/integrations/hub";
 import { buildOrderConfirmEmail, buildStatusUpdateEmail } from "@/lib/integrations/resend";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
     const email = await getProvider<EmailProvider>("email");
     if (!email) {
-      return NextResponse.json({ error: "Email provider not configured", sent: false }, { status: 200 });
+      return apiSuccess({ sent: false, reason: "Email provider not configured" });
     }
 
     const body = await req.json();
@@ -31,12 +32,12 @@ export async function POST(req: NextRequest) {
 
     if (type === "order_confirm") {
       const { orderId, customerName, customerEmail, total, items } = body;
-      if (!customerEmail) return NextResponse.json({ sent: false, reason: "No email" });
+      if (!customerEmail) return apiSuccess({ sent: false, reason: "No email" });
       params = buildOrderConfirmEmail(orderId, customerName, total, items);
       params.to = customerEmail;
     } else if (type === "status_update") {
       const { orderId, customerName, customerEmail, status, statusLabel } = body;
-      if (!customerEmail) return NextResponse.json({ sent: false, reason: "No email" });
+      if (!customerEmail) return apiSuccess({ sent: false, reason: "No email" });
       params = buildStatusUpdateEmail(orderId, customerName, status, statusLabel);
       params.to = customerEmail;
     } else if (body.to && body.subject && body.html) {
@@ -48,17 +49,17 @@ export async function POST(req: NextRequest) {
       ].filter(Boolean).map(e => e!.toLowerCase());
       const targetEmail = String(body.to).toLowerCase();
       if (!allowedRecipients.includes(targetEmail)) {
-        return NextResponse.json({ error: "Unauthorized recipient", sent: false }, { status: 403 });
+        return apiError("Unauthorized recipient", 403);
       }
       const result = await email.send({ to: body.to, subject: body.subject, html: body.html });
-      return NextResponse.json({ sent: result.success, messageId: result.messageId });
+      return apiSuccess({ sent: result.success, messageId: result.messageId });
     } else {
-      return NextResponse.json({ error: "Unknown email type" }, { status: 400 });
+      return apiError("Unknown email type", 400);
     }
 
     const result = await email.send(params);
-    return NextResponse.json({ sent: result.success, messageId: result.messageId });
+    return apiSuccess({ sent: result.success, messageId: result.messageId });
   } catch {
-    return NextResponse.json({ error: "Email sending failed", sent: false }, { status: 200 });
+    return apiSuccess({ sent: false, reason: "Email sending failed" });
   }
 }

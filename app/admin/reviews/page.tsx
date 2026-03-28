@@ -134,8 +134,8 @@ export default function AdminReviewsPage() {
       show(`✅ تم توليد ${json.count} تقييم بنجاح!`);
       setShowGenerator(false);
       load();
-    } catch (err: any) {
-      show(`❌ ${err.message}`, "error");
+    } catch (err: unknown) {
+      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
     }
     setGenerating(false);
   };

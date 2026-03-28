@@ -33,8 +33,8 @@ export default function CustomersPage() {
       }
       const json = await res.json();
       setCustomers(json.data || []);
-    } catch (err: any) {
-      setError(err.message || "خطأ");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطأ");
     } finally {
       setLoading(false);
     }
@@ -52,8 +52,8 @@ export default function CustomersPage() {
       }
       const json = await res.json();
       setCustOrders(json.orders || []);
-    } catch (err: any) {
-      setError(err.message || "خطأ");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطأ");
     }
   };
 

@@ -1,13 +1,13 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiSuccess } from "@/lib/api-response";
 
 export async function GET() {
   try {
     const db = createAdminSupabase();
-    if (!db) return NextResponse.json({});
+    if (!db) return apiSuccess({});
 
     // Gather stats for each feature — use try/catch for each in case table doesn't exist
     const stats: Record<string, any> = {};
@@ -35,8 +35,8 @@ export async function GET() {
       stats.deals = { "عرض فعّال": dealsCount || 0 };
     } catch {}
 
-    return NextResponse.json(stats);
+    return apiSuccess(stats);
   } catch {
-    return NextResponse.json({});
+    return apiSuccess({});
   }
 }

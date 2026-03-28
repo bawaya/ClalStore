@@ -7,9 +7,10 @@ export const runtime = 'edge';
 // Future: email notification, WhatsApp alert
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { generateOrderId, validatePhone, validateIsraeliID } from "@/lib/validators";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,27 +19,27 @@ export async function POST(req: NextRequest) {
 
     // === Validation ===
     if (!customer?.name || !customer?.phone || !customer?.city || !customer?.address) {
-      return NextResponse.json({ success: false, error: "بيانات ناقصة" }, { status: 400 });
+      return apiError("بيانات ناقصة", 400);
     }
 
     if (!validatePhone(customer.phone)) {
-      return NextResponse.json({ success: false, error: "رقم هاتف غير صالح" }, { status: 400 });
+      return apiError("رقم هاتف غير صالح", 400);
     }
 
     if (!items || items.length === 0) {
-      return NextResponse.json({ success: false, error: "السلة فارغة" }, { status: 400 });
+      return apiError("السلة فارغة", 400);
     }
 
     const hasDevice = items.some((i: any) => i.type === "device");
     if (hasDevice && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
-      return NextResponse.json({ success: false, error: "رقم هوية غير صالح" }, { status: 400 });
+      return apiError("رقم هوية غير صالح", 400);
     }
 
     const supabase = createAdminSupabase();
 
     if (!supabase) {
       console.error("Order API: Supabase admin client is null — check SUPABASE_SERVICE_ROLE_KEY");
-      return NextResponse.json({ success: false, error: "خطأ في إعدادات السيرفر" }, { status: 500 });
+      return apiError("خطأ في إعدادات السيرفر", 500);
     }
 
     // === 1. Upsert Customer ===
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
 
       if (custErr || !newCustomer) {
         console.error("Customer creation error:", custErr);
-        return NextResponse.json({ success: false, error: "خطأ في تسجيل الزبون" }, { status: 500 });
+        return apiError("خطأ في تسجيل الزبون", 500);
       }
       customerId = newCustomer.id;
     }
@@ -126,10 +127,13 @@ export async function POST(req: NextRequest) {
               ? Math.round(itemsTotal * (coupon.value / 100))
               : Math.min(coupon.value, itemsTotal);
 
-          await supabase
-            .from("coupons")
-            .update({ used_count: (coupon.used_count || 0) + 1 })
-            .eq("id", coupon.id);
+          // Cap at max_discount if set (for percent-type coupons)
+          if (coupon.max_discount && discount > coupon.max_discount) {
+            discount = coupon.max_discount;
+          }
+
+          // Note: coupon usage is incremented via RPC below (step 4)
+          // Do NOT increment inline here to avoid double-counting
         }
       }
     }
@@ -157,7 +161,7 @@ export async function POST(req: NextRequest) {
 
     if (orderErr) {
       console.error("Order creation error:", orderErr);
-      return NextResponse.json({ success: false, error: "خطأ في إنشاء الطلب" }, { status: 500 });
+      return apiError("خطأ في إنشاء الطلب", 500);
     }
 
     // === 3. Create Order Items ===
@@ -179,7 +183,9 @@ export async function POST(req: NextRequest) {
 
     if (itemsErr) {
       console.error("Order items error:", itemsErr);
-      // Order exists, items failed — log but don't fail
+      // Cleanup: delete the order since items failed
+      await supabase.from("orders").delete().eq("id", orderId);
+      return apiError("خطأ في حفظ تفاصيل الطلب", 500);
     }
 
     // === 4. Update Coupon Usage ===
@@ -267,8 +273,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       orderId,
       total,
       status: hasDevice ? "new" : "pending_payment",
@@ -279,11 +284,8 @@ export async function POST(req: NextRequest) {
         : "جاري تحويلك لصفحة الدفع الآمنة...",
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Order API error:", err);
-    return NextResponse.json(
-      { success: false, error: "خطأ في السيرفر" },
-      { status: 500 }
-    );
+    return apiError("خطأ في السيرفر", 500);
   }
 }

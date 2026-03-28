@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import type { Product } from "@/types/database";
 import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 type StructuredRow = {
   brand: string;
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const rows = (body.rows as StructuredRow[]) || [];
     if (!rows.length) {
-      return NextResponse.json({ error: "No rows provided" }, { status: 400 });
+      return apiError("No rows provided", 400);
     }
 
     const db = createAdminSupabase();
@@ -59,10 +60,7 @@ export async function POST(req: NextRequest) {
       .select("*")
       .eq("type", "device");
     if (dbErr || !products?.length) {
-      return NextResponse.json(
-        { error: "No products in DB" },
-        { status: 500 }
-      );
+      return apiError("No products in DB", 500);
     }
 
     const productList = products as Product[];
@@ -155,15 +153,12 @@ export async function POST(req: NextRequest) {
       unmatched: results.filter((r) => !r.matched).length,
     };
 
-    return NextResponse.json({
-      data: results,
+    return apiSuccess({
+      rows: results,
       summary,
       provider: "direct",
     });
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || String(err) },
-      { status: 500 }
-    );
+  } catch (err: unknown) {
+    return apiError(errMsg(err, String(err)));
   }
 }
