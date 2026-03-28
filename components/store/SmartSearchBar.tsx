@@ -78,8 +78,9 @@ export function SmartSearchBar({ value, onChange, onBrandSelect, onSubmit }: Pro
 
     fetch(`/api/store/autocomplete?q=${encodeURIComponent(debouncedQuery)}&limit=5`)
       .then((r) => r.json())
-      .then((data: AutocompleteResult) => {
+      .then((json: any) => {
         if (!cancelled) {
+          const data: AutocompleteResult = json.data ?? json;
           setResults(data);
           setActiveIdx(-1);
         }

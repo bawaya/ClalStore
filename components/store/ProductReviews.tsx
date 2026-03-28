@@ -52,9 +52,10 @@ export function ProductReviews({ productId }: { productId: string }) {
 
         const res = await fetch(`/api/reviews?product_id=${productId}`);
         const json = await res.json();
-        setReviews(json.reviews || []);
-        setAvg(json.avg || 0);
-        setCount(json.count || 0);
+        const rd = json.data ?? json;
+        setReviews(rd.reviews || []);
+        setAvg(rd.avg || 0);
+        setCount(rd.count || 0);
       } catch {}
       setLoading(false);
     }

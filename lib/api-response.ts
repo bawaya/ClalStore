@@ -17,7 +17,12 @@ interface ApiMeta {
  * Standard success response: { success: true, data, meta? }
  */
 export function apiSuccess<T>(data: T, meta?: ApiMeta, status = 200) {
-  const body: { success: true; data: T; meta?: ApiMeta } = { success: true, data };
+  // Spread object properties at top level for backward compatibility
+  // e.g. apiSuccess({ orders: [] }) → { success: true, data: { orders: [] }, orders: [] }
+  const body: Record<string, unknown> = { success: true, data };
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    Object.assign(body, data);
+  }
   if (meta) body.meta = meta;
   return NextResponse.json(body, { status });
 }

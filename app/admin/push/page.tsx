@@ -41,7 +41,8 @@ export default function AdminPushPage() {
     try {
       const res = await fetch("/api/push/send");
       const json = await res.json();
-      setNotifications(json.notifications || []);
+      const d = json.data ?? json;
+      setNotifications(d.notifications || []);
     } catch {}
     setLoading(false);
   };

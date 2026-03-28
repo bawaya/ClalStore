@@ -58,7 +58,8 @@ export default function AdminReviewsPage() {
     try {
       const res = await fetch("/api/admin/products");
       const json = await res.json();
-      setProducts(json.products || json.data || []);
+      const pd = json.data ?? json;
+      setProducts(Array.isArray(pd) ? pd : pd.products || pd.data || []);
     } catch {}
   };
 
@@ -67,7 +68,8 @@ export default function AdminReviewsPage() {
     try {
       const res = await fetch("/api/reviews?admin=true");
       const json = await res.json();
-      setReviews(json.reviews || []);
+      const rd = json.data ?? json;
+      setReviews(rd.reviews || []);
     } catch {}
     setLoading(false);
   };

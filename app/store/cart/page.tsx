@@ -265,7 +265,8 @@ export default function CartPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: couponInput, total: subtotal }),
       });
-      const data = await res.json();
+      const cJson = await res.json();
+      const data = cJson.data ?? cJson;
       if (data.valid) {
         cart.applyCoupon(couponInput.toUpperCase(), data.discount);
         show(`🎉 ${data.message}`, "success");
@@ -337,10 +338,11 @@ export default function CartPage() {
         }),
       });
 
-      const data = await res.json();
+      const oJson = await res.json();
+      const data = oJson.data ?? oJson;
 
-      if (!data.success) {
-        show("❌ " + (data.error || "خطأ في إرسال الطلب"), "error");
+      if (!oJson.success) {
+        show("❌ " + (oJson.error || data.error || "خطأ في إرسال الطلب"), "error");
         return;
       }
 
@@ -369,16 +371,17 @@ export default function CartPage() {
           }),
         });
 
-        const payData = await payRes.json();
+        const payJson = await payRes.json();
+        const payData = payJson.data ?? payJson;
 
-        if (payData.success && payData.paymentUrl) {
+        if (payJson.success && payData.paymentUrl) {
           // Clear cart before redirect
           cart.clearCart();
           // Redirect to Rivhit's hosted payment page
           window.location.href = payData.paymentUrl;
           return;
         } else {
-          show("❌ " + (payData.error || "خطأ في بوابة الدفع — حاول مجدداً"), "error");
+          show("❌ " + (payJson.error || payData.error || "خطأ في بوابة الدفع — حاول مجدداً"), "error");
           return;
         }
       }

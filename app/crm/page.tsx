@@ -24,14 +24,15 @@ export default function CRMDashboard() {
           const err = await dashRes.json().catch(() => ({}));
           throw new Error(err.error || "خطأ في جلب البيانات");
         }
-        const dashboard = await dashRes.json();
-        setData(dashboard);
+        const dashJson = await dashRes.json();
+        setData(dashJson.data ?? dashJson);
 
         try {
           const inboxRes = await fetch("/api/crm/inbox/stats");
           if (!inboxRes.ok) throw new Error("inbox stats failed");
           const inbox = await inboxRes.json();
-          if (inbox?.success) setInboxStats(inbox.stats);
+          const inboxData = inbox.data ?? inbox;
+          if (inbox?.success) setInboxStats(inboxData.stats ?? inbox.stats);
         } catch { /* inbox stats are optional */ }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "خطأ في التحميل");

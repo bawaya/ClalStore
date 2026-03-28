@@ -87,10 +87,11 @@ export default function ChatsPage() {
         const err = await statsRes.json().catch(() => ({}));
         throw new Error(err.error || "خطأ في جلب الإحصائيات");
       }
-      const convosData = await convosRes.json();
-      const statsData = await statsRes.json();
-      setConversations(convosData.conversations || []);
-      setStats(statsData);
+      const convosJson = await convosRes.json();
+      const statsJson = await statsRes.json();
+      const cd = convosJson.data ?? convosJson;
+      setConversations(cd.conversations || []);
+      setStats(statsJson.data ?? statsJson);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطأ في التحميل");
     } finally {

@@ -68,14 +68,15 @@ export default function AuthPage() {
           channel: ch,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const json = await res.json();
+      const data = json.data ?? json;
+      if (json.success) {
         setSentChannel(data.channel || ch);
         setStep("otp");
         setCountdown(60);
         setTimeout(() => otpRefs[0]?.current?.focus(), 200);
       } else {
-        setError(data.error || t("auth.sendError"));
+        setError(json.error || data.error || t("auth.sendError"));
       }
     } catch {
       setError(t("auth.sendError"));
@@ -103,14 +104,15 @@ export default function AuthPage() {
           otp: code,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        localStorage.setItem("clal_customer_token", data.token);
-        localStorage.setItem("clal_customer", JSON.stringify(data.customer));
+      const vJson = await res.json();
+      const vData = vJson.data ?? vJson;
+      if (vJson.success) {
+        localStorage.setItem("clal_customer_token", vData.token);
+        localStorage.setItem("clal_customer", JSON.stringify(vData.customer));
         const returnUrl = new URLSearchParams(window.location.search).get("return") || "/store/account";
         router.push(returnUrl);
       } else {
-        setError(data.error || t("auth.verifyError"));
+        setError(vJson.error || vData.error || t("auth.verifyError"));
       }
     } catch {
       setError(t("auth.verifyError"));

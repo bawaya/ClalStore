@@ -120,7 +120,7 @@ export async function middleware(request: NextRequest) {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https: http:",
-      "connect-src 'self' https://*.supabase.co https://api.ycloud.com https://api.anthropic.com https://www.google-analytics.com https://connect.facebook.net https://*.mixpanel.com https://api-js.mixpanel.com https://static.cloudflareinsights.com https://cloudflareinsights.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.ycloud.com https://api.anthropic.com https://www.google-analytics.com https://connect.facebook.net https://*.mixpanel.com https://api-js.mixpanel.com https://static.cloudflareinsights.com https://cloudflareinsights.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

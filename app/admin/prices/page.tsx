@@ -321,16 +321,17 @@ export default function PricesPage() {
           json = await res.json();
         }
 
-        if (json.error) {
+        if ((json as any).error) {
           console.error("Match API error:", json);
-          throw new Error(json.error + (json.steps ? " [" + json.steps.join(" > ") + "]" : ""));
+          throw new Error((json as any).error + ((json as any).steps ? " [" + (json as any).steps.join(" > ") + "]" : ""));
         }
 
-        setResults(json.data);
-        setSummary(json.summary);
+        const rows = (json as any).rows ?? json.data ?? json;
+        setResults(rows);
+        setSummary((json as any).summary);
 
         const matchedIdx = new Set<number>();
-        (json.data as MatchResult[]).forEach((r, i) => {
+        (rows as MatchResult[]).forEach((r: any, i: number) => {
           if (r.matched) matchedIdx.add(i);
         });
         setSelected(matchedIdx);

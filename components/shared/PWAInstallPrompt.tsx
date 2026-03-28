@@ -18,7 +18,8 @@ async function subscribeToPush(reg: ServiceWorkerRegistration) {
   try {
     const res = await fetch("/api/push/vapid");
     if (!res.ok) return;
-    const { publicKey } = await res.json();
+    const vapidJson = await res.json();
+    const publicKey = vapidJson.data?.publicKey ?? vapidJson.publicKey;
     if (!publicKey) return;
 
     const existing = await reg.pushManager.getSubscription();

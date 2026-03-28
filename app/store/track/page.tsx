@@ -39,11 +39,12 @@ export default function TrackPage() {
     setLoading(true);
     try {
       const res = await fetch(`/api/store/order-status?orderId=${encodeURIComponent(id)}`);
-      const data = await res.json();
-      if (data.success && data.order) {
+      const json = await res.json();
+      const data = json.data ?? json;
+      if (json.success && data.order) {
         setOrder(data.order);
       } else {
-        setError(data.error || (lang === "he" ? "ההזמנה לא נמצאה" : "لم يتم العثور على الطلب"));
+        setError(json.error || data.error || (lang === "he" ? "ההזמנה לא נמצאה" : "لم يتم العثور على الطلب"));
       }
     } catch {
       setError(lang === "he" ? "שגיאה בחיבור" : "خطأ في الاتصال");

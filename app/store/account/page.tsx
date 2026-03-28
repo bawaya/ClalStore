@@ -118,8 +118,9 @@ export default function AccountPage() {
       const res = await fetch("/api/customer/orders", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (data.success) {
+      const json = await res.json();
+      const data = json.data ?? json;
+      if (json.success) {
         setOrders(data.orders || []);
       } else if (res.status === 401) {
         handleLogout();
@@ -136,14 +137,15 @@ export default function AccountPage() {
       const res = await fetch("/api/customer/profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (data.success && data.customer) {
-        setCustomer(data.customer);
-        setFormName(data.customer.name || "");
-        setFormEmail(data.customer.email || "");
-        setFormCity(data.customer.city || "");
-        setFormAddress(data.customer.address || "");
-        localStorage.setItem("clal_customer", JSON.stringify(data.customer));
+      const pJson = await res.json();
+      const pData = pJson.data ?? pJson;
+      if (pJson.success && pData.customer) {
+        setCustomer(pData.customer);
+        setFormName(pData.customer.name || "");
+        setFormEmail(pData.customer.email || "");
+        setFormCity(pData.customer.city || "");
+        setFormAddress(pData.customer.address || "");
+        localStorage.setItem("clal_customer", JSON.stringify(pData.customer));
       } else if (res.status === 401) {
         handleLogout();
       }
@@ -173,14 +175,15 @@ export default function AccountPage() {
           address: formAddress,
         }),
       });
-      const data = await res.json();
-      if (data.success && data.customer) {
-        setCustomer(data.customer);
-        localStorage.setItem("clal_customer", JSON.stringify(data.customer));
+      const uJson = await res.json();
+      const uData = uJson.data ?? uJson;
+      if (uJson.success && uData.customer) {
+        setCustomer(uData.customer);
+        localStorage.setItem("clal_customer", JSON.stringify(uData.customer));
         setProfileMsg(lang === "he" ? "נשמר בהצלחה!" : "تم الحفظ بنجاح!");
         setTimeout(() => setProfileMsg(""), 3000);
       } else {
-        setProfileMsg(data.error || (lang === "he" ? "שגיאה" : "خطأ"));
+        setProfileMsg(uJson.error || uData.error || (lang === "he" ? "שגיאה" : "خطأ"));
       }
     } catch {
       setProfileMsg(lang === "he" ? "שגיאה" : "خطأ في الاتصال");

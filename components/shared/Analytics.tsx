@@ -19,7 +19,8 @@ export function Analytics() {
       try {
         const res = await fetch("/api/settings/public");
         const json = await res.json();
-        const settings = json.settings || {};
+        const inner = json.data ?? json;
+        const settings = inner.settings || {};
 
         setEnabled(true);
         if (settings.ga_measurement_id) setGaId(settings.ga_measurement_id);

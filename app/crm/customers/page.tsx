@@ -32,7 +32,8 @@ export default function CustomersPage() {
         throw new Error(err.error || "خطأ في جلب الزبائن");
       }
       const json = await res.json();
-      setCustomers(json.data || []);
+      const cd = json.data ?? json;
+      setCustomers(cd.customers ?? (Array.isArray(cd) ? cd : []));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطأ");
     } finally {
@@ -51,7 +52,8 @@ export default function CustomersPage() {
         throw new Error(err.error || "خطأ في جلب طلبات الزبون");
       }
       const json = await res.json();
-      setCustOrders(json.orders || []);
+      const cd = json.data ?? json;
+      setCustOrders(cd.orders || []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطأ");
     }

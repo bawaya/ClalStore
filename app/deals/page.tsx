@@ -176,7 +176,8 @@ export default function DealsPage() {
       try {
         const res = await fetch("/api/admin/deals");
         const json = await res.json();
-        setDeals(json.deals || []);
+        const dd = json.data ?? json;
+        setDeals(dd.deals || []);
       } catch {}
       setLoading(false);
     }
