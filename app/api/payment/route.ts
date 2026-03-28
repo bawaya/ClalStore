@@ -8,7 +8,7 @@ export const runtime = 'edge';
 //   Palestinian / other → UPay
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getIntegrationConfig } from "@/lib/integrations/hub";
 import { detectPaymentGateway } from "@/lib/payment-gateway";
 import { apiSuccess, apiError } from "@/lib/api-response";

@@ -5,7 +5,7 @@ export const runtime = 'edge';
 // Validates a coupon code against the database
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
 

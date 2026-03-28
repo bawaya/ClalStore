@@ -5,7 +5,7 @@ export const runtime = 'edge';
 // POST: { name, brand, provider? } → specs, colors, images
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { fetchDeviceData } from "@/lib/admin/device-data";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 

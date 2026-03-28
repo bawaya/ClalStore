@@ -7,12 +7,21 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
-// Configure VAPID once at module level
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || "mailto:info@clalmobile.com",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
-  process.env.VAPID_PRIVATE_KEY || ""
-);
+// Lazy-init VAPID so build doesn't fail when env vars are missing
+let vapidConfigured = false;
+function ensureVapid() {
+  if (vapidConfigured) return;
+  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+  const priv = process.env.VAPID_PRIVATE_KEY || "";
+  if (pub && priv) {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:info@clalmobile.com",
+      pub,
+      priv
+    );
+    vapidConfigured = true;
+  }
+}
 
 // POST — Admin: Send push notification to all subscribers
 export async function POST(req: NextRequest) {
@@ -33,6 +42,8 @@ export async function POST(req: NextRequest) {
     if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
       return apiError("VAPID keys not configured", 500);
     }
+
+    ensureVapid();
 
     // Get all active subscriptions
     const { data: subs } = await db.from("push_subscriptions")

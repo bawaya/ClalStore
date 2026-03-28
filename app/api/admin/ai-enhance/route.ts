@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 // POST: translate name, generate descriptions, classify, SEO
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";

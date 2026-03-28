@@ -9,7 +9,7 @@ export const runtime = 'edge';
 // Docs: https://rivhit-api.readme.io/docs/ipn-by-sale-types
 // =====================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { verifyWebhookSignature } from "@/lib/webhook-verify";
 import { apiSuccess, apiError } from "@/lib/api-response";
