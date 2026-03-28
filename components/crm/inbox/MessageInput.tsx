@@ -8,6 +8,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type { InboxTemplate, InboxQuickReply } from "@/lib/crm/inbox-types";
 import { QuickReplies } from "./QuickReplies";
 import { TemplateSelector } from "./TemplateSelector";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface Props {
   conversationId: string;
@@ -120,7 +121,7 @@ export function MessageInput({
     try {
       const res = await fetch(`/api/crm/inbox/${conversationId}/suggest`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({}),
       });
       const data = await res.json();

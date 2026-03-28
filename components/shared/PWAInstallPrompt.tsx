@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 // =====================================================
 // ClalMobile — PWA Install Prompt + SW Registration
@@ -30,7 +31,7 @@ async function subscribeToPush(reg: ServiceWorkerRegistration) {
 
     await fetch("/api/push/subscribe", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: csrfHeaders(),
       body: JSON.stringify({
         endpoint: sub.endpoint,
         keys: {

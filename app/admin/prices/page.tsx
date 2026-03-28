@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useRef, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PageHeader, ToastContainer } from "@/components/admin/shared";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -299,7 +300,7 @@ export default function PricesPage() {
           setMatching(true);
           const res = await fetch("/api/admin/prices/match-direct", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders(),
             body: JSON.stringify({ rows }),
           });
           json = await res.json();
@@ -314,7 +315,7 @@ export default function PricesPage() {
           setMatching(true);
           const res = await fetch("/api/admin/prices/match", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders(),
             body: JSON.stringify({ pdfText: extractedText }),
           });
           json = await res.json();
@@ -398,7 +399,7 @@ export default function PricesPage() {
     try {
       const res = await fetch("/api/admin/prices/apply", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ updates, creates }),
       });
       const json = await res.json();

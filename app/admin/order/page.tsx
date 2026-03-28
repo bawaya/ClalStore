@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PageHeader } from "@/components/admin/shared";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 type SortConfig = {
   rules: { field: string; direction: "asc" | "desc"; enabled: boolean }[];
@@ -54,7 +55,7 @@ export default function OrderPage() {
     try {
       const res = await fetch("/api/admin/order", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ config }),
       });
       const json = await res.json();

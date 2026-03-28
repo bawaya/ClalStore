@@ -19,12 +19,13 @@ import type {
   ConversationStatus,
 } from "./inbox-types";
 import { useInboxRealtime, type RealtimeEvent } from "./realtime";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 // ===== API Helpers =====
 
 async function api<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...opts?.headers },
+    headers: { ...csrfHeaders(), ...opts?.headers },
     ...opts,
   });
   return res.json();

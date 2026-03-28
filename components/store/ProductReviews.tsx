@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface Review {
   id: string;
@@ -68,7 +69,7 @@ export function ProductReviews({ productId }: { productId: string }) {
     try {
       const res = await fetch("/api/reviews", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({
           product_id: productId,
           customer_name: name,

@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useScreen } from "@/lib/hooks";
 import { USER_ROLE } from "@/lib/constants";
 import { timeAgo } from "@/lib/utils";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface UserData {
   id: string;
@@ -102,7 +103,7 @@ export default function UsersPage() {
     try {
       const res = await fetch("/api/crm/users", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify(form),
       });
 
@@ -133,7 +134,7 @@ export default function UsersPage() {
     try {
       const res = await fetch("/api/crm/users", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ id: user.id }),
       });
       const data = await res.json();
@@ -150,7 +151,7 @@ export default function UsersPage() {
     try {
       const res = await fetch("/api/crm/users", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ id: user.id, status: newStatus }),
       });
       const data = await res.json();
@@ -166,7 +167,7 @@ export default function UsersPage() {
     try {
       const res = await fetch("/api/crm/users", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ id: userId, role: newRole }),
       });
       const data = await res.json();

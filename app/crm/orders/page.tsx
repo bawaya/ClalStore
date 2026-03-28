@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useScreen, useToast, useDebounce } from "@/lib/hooks";
 import { ORDER_STATUS, ORDER_SOURCE, BANKS } from "@/lib/constants";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { formatCurrency, formatDateTime, timeAgo } from "@/lib/utils";
 import { Modal, ToastContainer } from "@/components/admin/shared";
 
@@ -64,7 +65,7 @@ export default function OrdersPage() {
   const changeStatus = async (orderId: string, status: string) => {
     try {
       const res = await fetch("/api/crm/orders", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: csrfHeaders(),
         body: JSON.stringify({ action: "status", orderId, status }),
       });
       if (!res.ok) {
@@ -83,7 +84,7 @@ export default function OrdersPage() {
     if (!noteText.trim() || !selected) return;
     try {
       const res = await fetch("/api/crm/orders", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: csrfHeaders(),
         body: JSON.stringify({ action: "note", orderId: selected.id, text: noteText }),
       });
       if (!res.ok) {
@@ -104,7 +105,7 @@ export default function OrdersPage() {
     try {
       const res = await fetch("/api/crm/orders", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ action: "delete", orderId }),
       });
       if (!res.ok) {
@@ -148,7 +149,7 @@ export default function OrdersPage() {
     try {
       const res = await fetch("/api/crm/orders", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ action: "bulk_status", ids: [...selectedIds], status: bulkStatus }),
       });
       if (!res.ok) {

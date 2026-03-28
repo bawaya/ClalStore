@@ -15,6 +15,7 @@ import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
 import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import type { WebsiteContent, Hero, SubPage } from "@/types/database";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 // ===== Section Meta =====
 const SECTIONS: { key: string; icon: string; label: string; desc: string }[] = [
@@ -83,7 +84,7 @@ export default function HomepageAdminPage() {
         : { section: sectionKey, ...updates };
       const res = await fetch("/api/admin/website", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify(body),
       });
       const json = await res.json();

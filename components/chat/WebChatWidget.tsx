@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface Message {
   id: string;
@@ -91,7 +92,7 @@ export function WebChatWidget() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ message: text.trim(), sessionId }),
       });
       const data = await res.json();

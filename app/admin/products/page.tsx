@@ -11,6 +11,7 @@ import { PRODUCT_TYPES } from "@/lib/constants";
 import { calcMargin } from "@/lib/utils";
 import { aiEnhanceProduct, translateProductName, detectProductType, findDuplicates } from "@/lib/admin/ai-tools";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const EMPTY: Partial<Product> = {
   type: "device", brand: "", name_ar: "", name_en: "", name_he: "", price: 0, old_price: undefined,
@@ -144,7 +145,7 @@ export default function ProductsPage() {
         if (mode === "removebg" || mode === "both") {
           const res = await fetch("/api/admin/image-enhance", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders(),
             body: JSON.stringify({ image_url: currentUrl }),
           });
           const data = await res.json();
@@ -288,7 +289,7 @@ export default function ProductsPage() {
       const searchName = nameEn || form.name_ar;
       const res = await fetch("/api/admin/products/autofill", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ name: searchName, brand: form.brand, provider }),
       });
       const json = await res.json();
@@ -403,7 +404,7 @@ export default function ProductsPage() {
         try {
           const aiRes = await fetch("/api/admin/ai-enhance", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders(),
             body: JSON.stringify({ name_en: nameEn, brand: form.brand || "", specs: form.specs || {}, type: form.type || "device" }),
           });
           if (aiRes.ok) {
@@ -506,7 +507,7 @@ export default function ProductsPage() {
     try {
       const res = await fetch("/api/admin/products/import-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ query: payngoQuery.trim() }),
       });
       const data = await res.json();
@@ -552,7 +553,7 @@ export default function ProductsPage() {
     try {
       const res = await fetch("/api/admin/products/import-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ query: productName, color_he: colorHe }),
       });
       const data = await res.json();
@@ -584,7 +585,7 @@ export default function ProductsPage() {
       // First try: fetch all GSMArena color images for this product
       const res = await fetch("/api/admin/products/color-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ name: productName, brand: form.brand }),
       });
       const data = await res.json();
@@ -676,7 +677,7 @@ export default function ProductsPage() {
     try {
       const res = await fetch("/api/admin/products/pexels", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ query, per_page: 12 }),
       });
       const data = await res.json();
@@ -713,7 +714,7 @@ export default function ProductsPage() {
     try {
       const res = await fetch("/api/admin/products/bulk-color-images", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({
           name: productName,
           brand: form.brand,
@@ -764,7 +765,7 @@ export default function ProductsPage() {
     try {
       const res = await fetch("/api/admin/products/distribute-stock", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ mode }),
       });
       const data = await res.json();

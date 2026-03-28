@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
 import { StatCard } from "@/components/admin/shared";
 import { formatDateTime, timeAgo } from "@/lib/utils";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface Conversation {
   id: string;
@@ -120,7 +121,7 @@ export default function ChatsPage() {
     try {
       const res = await fetch(`/api/crm/chats/${id}/messages`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ action: "close" }),
       });
       if (!res.ok) {

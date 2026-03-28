@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Logo } from "@/components/shared/Logo";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 export default function ChangePasswordPage() {
   const [newPassword, setNewPassword] = useState("");
@@ -60,7 +61,7 @@ export default function ChangePasswordPage() {
     try {
       const res = await fetch("/api/auth/change-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ newPassword, confirmPassword }),
       });
 
