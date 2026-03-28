@@ -92,29 +92,44 @@ export async function POST(req: NextRequest) {
     // Temp password expires in 24 hours
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    // Insert into users table
+    // Find the current admin's users table ID for invited_by
+    let invitedById: string | null = null;
+    const { data: adminRow } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_id", auth.id)
+      .single();
+    if (adminRow) invitedById = adminRow.id;
+
+    // Insert into users table — only include columns that exist
+    const insertData: Record<string, unknown> = {
+      auth_id: authData.user.id,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone?.trim() || null,
+      role: role || "viewer",
+      status: "active",
+    };
+
+    // Add optional columns (may not exist if migration not run)
+    try {
+      insertData.must_change_password = true;
+      insertData.temp_password_expires_at = expiresAt;
+      if (invitedById) insertData.invited_by = invitedById;
+      insertData.invited_at = new Date().toISOString();
+    } catch {}
+
     const { data: newUser, error: dbError } = await supabase
       .from("users")
-      .insert({
-        auth_id: authData.user.id,
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone?.trim() || null,
-        role: role || "viewer",
-        status: "active",
-        must_change_password: true,
-        temp_password_expires_at: expiresAt,
-        invited_by: auth.id,
-        invited_at: new Date().toISOString(),
-      })
+      .insert(insertData)
       .select("id, name, email, phone, role, status, created_at")
       .single();
 
     if (dbError) {
       // Cleanup: delete the auth user if DB insert fails
       await supabase.auth.admin.deleteUser(authData.user.id);
-      console.error("[UserCreate] DB error:", dbError);
-      return apiError("فشل في حفظ بيانات المستخدم", 500);
+      console.error("[UserCreate] DB error:", JSON.stringify(dbError));
+      return apiError(`فشل في حفظ بيانات المستخدم: ${dbError.message || dbError.code || "unknown"}`, 500);
     }
 
     // Log the action
