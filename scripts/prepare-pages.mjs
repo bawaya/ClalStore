@@ -18,7 +18,7 @@
  * This script copies the worker + server dirs into assets/_worker.js/ so Pages can serve them.
  */
 
-import { cpSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
+import { cpSync, mkdirSync, copyFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const OPEN_NEXT = ".open-next";
@@ -50,5 +50,25 @@ for (const dir of serverDirs) {
     cpSync(src, join(WORKER_DIR, dir), { recursive: true });
   }
 }
+
+// Add _routes.json so static assets bypass the Worker
+const routesJson = {
+  version: 1,
+  include: ["/*"],
+  exclude: [
+    "/_next/static/*",
+    "/icons/*",
+    "/manifest.json",
+    "/sw.js",
+    "/pdf.worker.min.mjs", // pdfjs-dist worker — loaded client-side only
+    "/BUILD_ID",
+  ],
+};
+
+writeFileSync(
+  join(OPEN_NEXT, "assets", "_routes.json"),
+  JSON.stringify(routesJson, null, 2),
+  "utf-8"
+);
 
 console.log("✅ Prepared _worker.js directory for Cloudflare Pages");
