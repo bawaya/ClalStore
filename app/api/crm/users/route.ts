@@ -89,39 +89,17 @@ export async function POST(req: NextRequest) {
       return apiError(authError?.message || "فشل في إنشاء حساب المستخدم", 500);
     }
 
-    // Temp password expires in 24 hours
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-    // Find the current admin's users table ID for invited_by
-    let invitedById: string | null = null;
-    const { data: adminRow } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_id", auth.id)
-      .single();
-    if (adminRow) invitedById = adminRow.id;
-
-    // Insert into users table — only include columns that exist
-    const insertData: Record<string, unknown> = {
-      auth_id: authData.user.id,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone?.trim() || null,
-      role: role || "viewer",
-      status: "active",
-    };
-
-    // Add optional columns (may not exist if migration not run)
-    try {
-      insertData.must_change_password = true;
-      insertData.temp_password_expires_at = expiresAt;
-      if (invitedById) insertData.invited_by = invitedById;
-      insertData.invited_at = new Date().toISOString();
-    } catch {}
-
+    // Insert into users table
     const { data: newUser, error: dbError } = await supabase
       .from("users")
-      .insert(insertData)
+      .insert({
+        auth_id: authData.user.id,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone?.trim() || null,
+        role: role || "viewer",
+        status: "active",
+      })
       .select("id, name, email, phone, role, status, created_at")
       .single();
 
