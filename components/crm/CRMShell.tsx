@@ -76,6 +76,7 @@ export function CRMShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="p-3 border-t border-surface-border">
+          <Link href="/command-center" className="flex items-center gap-2 text-muted text-xs hover:text-white px-3 py-2">🚀 مركز القيادة</Link>
           <Link href="/store" className="flex items-center gap-2 text-muted text-xs hover:text-white px-3 py-2">🛒 المتجر</Link>
           <Link href="/admin" className="flex items-center gap-2 text-muted text-xs hover:text-white px-3 py-2">⚙️ الأدمن</Link>
         </div>
