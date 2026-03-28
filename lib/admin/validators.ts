@@ -28,10 +28,10 @@ export const couponSchema = z.object({
   code: z.string().min(1).max(50).transform((v) => v.toUpperCase()),
   type: z.enum(["fixed", "percentage"]),
   value: z.number().min(0),
-  min_order: z.number().min(0).default(0),
-  max_uses: z.number().int().min(0).default(0),
-  used: z.number().int().min(0).default(0),
-  active: z.boolean().default(true),
+  min_order: z.number().min(0).nullable().default(0),
+  max_uses: z.number().int().min(0).nullable().default(0),
+  used: z.number().int().min(0).nullable().default(0),
+  active: z.boolean().nullable().default(true),
   expires_at: z.string().optional().nullable(),
 });
 
@@ -39,42 +39,42 @@ export const couponUpdateSchema = couponSchema.partial();
 
 export const heroSchema = z.object({
   title_ar: z.string().min(1).max(200),
-  title_he: z.string().max(200).default(""),
-  subtitle_ar: z.string().max(500).default(""),
-  subtitle_he: z.string().max(500).default(""),
-  image_url: z.string().max(1000).default(""),
-  link_url: z.string().max(1000).default(""),
-  cta_text_ar: z.string().max(100).default(""),
-  cta_text_he: z.string().max(100).default(""),
-  sort_order: z.number().int().min(0).default(0),
-  active: z.boolean().default(true),
+  title_he: z.string().max(200).nullable().default(""),
+  subtitle_ar: z.string().max(500).nullable().default(""),
+  subtitle_he: z.string().max(500).nullable().default(""),
+  image_url: z.string().max(1000).nullable().default(""),
+  link_url: z.string().max(1000).nullable().default(""),
+  cta_text_ar: z.string().max(100).nullable().default(""),
+  cta_text_he: z.string().max(100).nullable().default(""),
+  sort_order: z.number().int().min(0).nullable().default(0),
+  active: z.boolean().nullable().default(true),
 });
 
 export const heroUpdateSchema = heroSchema.partial();
 
 export const lineSchema = z.object({
   name_ar: z.string().min(1).max(200),
-  name_he: z.string().max(200).default(""),
+  name_he: z.string().max(200).nullable().default(""),
   data_amount: z.string().min(1).max(50),
   price: z.number().min(0),
-  features_ar: z.array(z.string()).optional().default([]),
-  features_he: z.array(z.string()).optional().default([]),
-  popular: z.boolean().default(false),
-  sort_order: z.number().int().min(0).default(0),
-  active: z.boolean().default(true),
+  features_ar: z.array(z.string()).nullable().optional().default([]),
+  features_he: z.array(z.string()).nullable().optional().default([]),
+  popular: z.boolean().nullable().default(false),
+  sort_order: z.number().int().min(0).nullable().default(0),
+  active: z.boolean().nullable().default(true),
 });
 
 export const lineUpdateSchema = lineSchema.partial();
 
 export const dealSchema = z.object({
   title_ar: z.string().min(1).max(200),
-  title_he: z.string().max(200).default(""),
-  description_ar: z.string().max(1000).default(""),
-  description_he: z.string().max(1000).default(""),
+  title_he: z.string().max(200).nullable().default(""),
+  description_ar: z.string().max(1000).nullable().default(""),
+  description_he: z.string().max(1000).nullable().default(""),
   product_id: z.string().optional().nullable(),
-  discount_type: z.enum(["fixed", "percentage"]).optional(),
-  discount_value: z.number().min(0).optional(),
-  active: z.boolean().default(true),
+  discount_type: z.enum(["fixed", "percentage"]).optional().nullable(),
+  discount_value: z.number().min(0).optional().nullable(),
+  active: z.boolean().nullable().default(true),
   starts_at: z.string().optional().nullable(),
   ends_at: z.string().optional().nullable(),
 });
