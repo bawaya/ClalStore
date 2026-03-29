@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminSupabase } from "@/lib/supabase";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
@@ -81,8 +81,7 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ message: "تم تغيير كلمة المرور بنجاح" });
   } catch (err: unknown) {
-    const message = errMsg(err);
-    console.error("[ChangePassword] Error:", message);
-    return apiError(message, 500);
+    console.error("[ChangePassword] Error:", err);
+    return apiError("Internal server error", 500);
   }
 }

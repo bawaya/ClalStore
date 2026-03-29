@@ -1,7 +1,7 @@
 "use client";
 
 import { useScreen } from "@/lib/hooks";
-import type { Toast } from "@/lib/hooks";
+import type { Toast as ToastType } from "@/lib/hooks";
 
 // ===== Modal =====
 export function Modal({
@@ -153,59 +153,48 @@ export function ConfirmDialog({
   );
 }
 
-// ===== Error Banner =====
-export function ErrorBanner({
-  error,
-  onDismiss,
-}: {
-  error?: string | null;
-  onDismiss?: () => void;
-}) {
-  if (!error) return null;
+// ===== Toast Container =====
+const toastStyles: Record<ToastType["type"], string> = {
+  success: "border-state-success/40 text-state-success",
+  error: "border-state-error/40 text-state-error",
+  warning: "border-state-warning/40 text-state-warning",
+  info: "border-state-info/40 text-state-info",
+};
+
+export function ToastContainer({ toasts }: { toasts: ToastType[] }) {
+  if (toasts.length === 0) return null;
   return (
     <div
-      className="mb-3 rounded-xl border px-3 py-2 flex items-center justify-between gap-2"
-      style={{ background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.35)" }}
+      className="fixed bottom-5 z-[120] flex flex-col gap-2 items-center pointer-events-none"
+      style={{ left: "50%", transform: "translateX(-50%)" }}
+      role="status"
+      aria-live="polite"
     >
-      <button
-        onClick={onDismiss}
-        className="text-state-error text-xs bg-transparent border-0 cursor-pointer"
-        aria-label="Dismiss error"
-      >
-        ✕
-      </button>
-      <div className="text-state-error text-xs font-semibold text-right">
-        {error}
-      </div>
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`glass-card-static font-bold shadow-glass-lg pointer-events-auto animate-slide-up px-6 py-3 text-sm ${toastStyles[t.type]}`}
+        >
+          {t.message}
+        </div>
+      ))}
     </div>
   );
 }
 
-// ===== Toast Container =====
-export function ToastContainer({ toasts }: { toasts: Toast[] }) {
-  if (!toasts?.length) return null;
-
-  const styles: Record<Toast["type"], { bg: string; border: string; color: string }> = {
-    success: { bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.35)", color: "#4ade80" },
-    error: { bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.35)", color: "#f87171" },
-    warning: { bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.35)", color: "#fbbf24" },
-    info: { bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.35)", color: "#60a5fa" },
-  };
-
+// ===== Error Banner =====
+export function ErrorBanner({
+  error, onDismiss,
+}: {
+  error: string | null; onDismiss?: () => void;
+}) {
+  if (!error) return null;
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[999] flex flex-col gap-2 w-[min(92vw,420px)]">
-      {toasts.map((t) => {
-        const s = styles[t.type || "success"];
-        return (
-          <div
-            key={t.id}
-            className="rounded-xl border px-4 py-2 text-center shadow-2xl"
-            style={{ background: s.bg, borderColor: s.border, color: s.color }}
-          >
-            <span className="text-sm font-bold">{t.message}</span>
-          </div>
-        );
-      })}
+    <div className="mb-3 p-3 rounded-xl bg-state-error/10 border border-state-error/30 flex items-center justify-between gap-2">
+      <span className="text-state-error text-sm font-semibold">⚠️ {error}</span>
+      {onDismiss && (
+        <button onClick={onDismiss} className="text-state-error/60 hover:text-state-error cursor-pointer bg-transparent border-0 text-sm">✕</button>
+      )}
     </div>
   );
 }

@@ -38,8 +38,8 @@ export class SendGridProvider implements EmailProvider {
       });
 
       return { success: res.ok, messageId: res.headers.get("x-message-id") || undefined };
-    } catch (err: unknown) {
-      return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   }
 
@@ -57,8 +57,8 @@ export class SendGridProvider implements EmailProvider {
       });
 
       return { success: res.ok, messageId: res.headers.get("x-message-id") || undefined };
-    } catch (err: unknown) {
-      return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   }
 }

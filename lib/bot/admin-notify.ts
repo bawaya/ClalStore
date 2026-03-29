@@ -16,8 +16,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
 async function getNotifyTargets() {
   const waCfg = await getIntegrationConfig("whatsapp");
-  const reportFrom = waCfg.reports_phone || process.env.ADMIN_REPORT_PHONE || "";
-  const adminTo = waCfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "";
+  const reportFrom = waCfg.reports_phone || process.env.ADMIN_REPORT_PHONE || "+972537777963";
+  const adminTo = waCfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
   const teamRaw = waCfg.team_whatsapp_numbers || process.env.TEAM_WHATSAPP_NUMBERS || "";
   const teamNumbers = String(teamRaw).split(",").map((n) => n.trim()).filter(Boolean);
   return { reportFrom, adminTo, teamNumbers };
@@ -29,7 +29,6 @@ async function sendTemplateToAdmin(
   params: string[]
 ): Promise<void> {
   const { adminTo } = await getNotifyTargets();
-  if (!adminTo) return;
   try {
     await sendWhatsAppTemplate(adminTo, templateName, params);
   } catch (err) {
@@ -43,7 +42,6 @@ async function sendTemplateToTeam(
   params: string[]
 ): Promise<void> {
   const { teamNumbers } = await getNotifyTargets();
-  if (teamNumbers.length === 0) return;
   for (const num of teamNumbers) {
     try {
       await sendWhatsAppTemplate(num, templateName, params);
@@ -58,7 +56,9 @@ export async function notifyAdmin(message: string): Promise<void> {
   await sendTemplateToAdmin("clal_admin_alert", [message.slice(0, 1024)]);
 }
 
-export const notifyAdminPersonal = notifyAdmin;
+export async function notifyAdminPersonal(message: string): Promise<void> {
+  await sendTemplateToAdmin("clal_admin_alert", [message.slice(0, 1024)]);
+}
 
 export async function notifyTeam(message: string): Promise<void> {
   await sendTemplateToTeam("clal_admin_alert", [message.slice(0, 1024)]);
@@ -231,67 +231,80 @@ export async function sendWeeklyReportLink(): Promise<void> {
 //    Body:
 //    {{1}}
 //
-// 2. clal_new_order  (4 params)
+// 2. clal_new_order  (7 params)
 //    Body:
 //    طلب جديد 🆕
 //
 //    رقم الطلب: {{1}}
-//    {{2}}
+//    الزبون: {{2}} | {{3}}
+//    المبلغ: {{4}}
+//    المصدر: {{5}}
 //
 //    المنتجات:
-//    {{3}}
+//    {{6}}
 //
-//    {{4}}
+//    {{7}}
 //
-// 3. clal_order_done  (3 params)
+// 3. clal_order_done  (5 params)
 //    Body:
 //    طلب مكتمل ✅
 //
-//    {{1}}
-//    {{2}}
+//    رقم الطلب: {{1}}
+//    الزبون: {{2}}
+//    المبلغ: {{3}}
+//    الحالة: {{4}}
 //
-//    {{3}}
+//    {{5}}
 //
-// 4. clal_contact_form  (3 params)
+// 4. clal_contact_form  (6 params)
 //    Body:
 //    رسالة تواصل جديدة 📩
 //
-//    {{1}}
+//    الاسم: {{1}}
+//    الهاتف: {{2}}
+//    الإيميل: {{3}}
+//    الموضوع: {{4}}
 //
-//    {{2}}
+//    الرسالة:
+//    {{5}}
 //
-//    {{3}}
+//    {{6}}
 //
-// 5. clal_handoff  (3 params)
+// 5. clal_handoff  (5 params)
 //    Body:
 //    طلب تحدث مع محمد 👤
 //
-//    {{1}}
+//    الاسم: {{1}}
+//    الهاتف: {{2}}
+//    القناة: {{3}}
 //
 //    محتوى الطلب:
-//    {{2}}
+//    {{4}}
 //
-//    الوقت: {{3}}
+//    الوقت: {{5}}
 //
-// 6. clal_angry_cust  (3 params)
+// 6. clal_angry_cust  (5 params)
 //    Body:
 //    تنبيه: زبون غاضب ⚠️
 //
-//    {{1}}
+//    الاسم: {{1}}
+//    الهاتف: {{2}}
+//    القناة: {{3}}
 //
 //    رسالة الزبون:
-//    "{{2}}"
+//    "{{4}}"
 //
-//    الوقت: {{3}}
+//    الوقت: {{5}}
 //
-// 7. clal_new_msg  (3 params)
+// 7. clal_new_msg  (5 params)
 //    Body:
 //    رسالة واتساب جديدة 💬
 //
-//    من: {{1}}
-//    "{{2}}"
+//    من: {{1}} ({{2}})
+//    "{{3}}"
 //
-//    {{3}}
+//    الوقت: {{4}}
+//    {{5}}
 //
 // 8. clal_daily_report  (2 params)
 //    Body:

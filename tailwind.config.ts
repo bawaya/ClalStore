@@ -51,7 +51,6 @@ const config: Config = {
       },
     },
   },
-  blocklist: ["[-:T]"],
   plugins: [],
 };
 

@@ -44,7 +44,8 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ ok: true });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("[PushSubscribe]", err);
+    return apiError("Failed to subscribe", 500);
   }
 }
 

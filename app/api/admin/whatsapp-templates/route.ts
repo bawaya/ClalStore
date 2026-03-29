@@ -9,7 +9,7 @@ import {
   provisionRequiredTemplates,
   REQUIRED_TEMPLATES,
 } from "@/lib/integrations/ycloud-templates";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { apiSuccess, apiError, errDetail } from "@/lib/api-response";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +40,9 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err: unknown) {
-    const message = errMsg(err, String(err));
+    const message = errDetail(err, String(err));
     console.error("[WhatsApp Templates GET]", message);
-    return apiError(message);
+    return apiError("Failed to fetch templates");
   }
 }
 
@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
 
     return apiError("Invalid request — send { action: 'provision_all' } or { template: {...} }", 400);
   } catch (err: unknown) {
-    const message = errMsg(err, String(err));
+    const message = errDetail(err, String(err));
     console.error("[WhatsApp Templates POST]", message);
-    return apiError(message);
+    return apiError("Failed to create template");
   }
 }
 
@@ -86,8 +86,8 @@ export async function DELETE(req: NextRequest) {
     const result = await deleteTemplate(name);
     return apiSuccess(result);
   } catch (err: unknown) {
-    const message = errMsg(err, String(err));
+    const message = errDetail(err, String(err));
     console.error("[WhatsApp Templates DELETE]", message);
-    return apiError(message);
+    return apiError("Failed to delete template");
   }
 }

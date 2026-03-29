@@ -29,7 +29,7 @@ export default function HeroesPage() {
       if (editId) { await update(editId, form); show("✅ تم التعديل"); }
       else { await create(form); show("✅ تم الإضافة"); }
       setModal(false);
-    } catch (err: unknown) { show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error"); }
+    } catch (err: any) { show(`❌ ${err.message}`, "error"); }
   };
 
   const handleDelete = async () => { if (confirm) { await remove(confirm); show("🗑️ تم"); setConfirm(null); } };

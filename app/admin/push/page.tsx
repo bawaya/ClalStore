@@ -41,8 +41,7 @@ export default function AdminPushPage() {
     try {
       const res = await fetch("/api/push/send");
       const json = await res.json();
-      const d = json.data ?? json;
-      setNotifications(d.notifications || []);
+      setNotifications(json.notifications || []);
     } catch {}
     setLoading(false);
   };
@@ -69,8 +68,8 @@ export default function AdminPushPage() {
       setBody("");
       setUrl("https://clalmobile.com");
       load();
-    } catch (err: unknown) {
-      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
     }
     setSending(false);
   };

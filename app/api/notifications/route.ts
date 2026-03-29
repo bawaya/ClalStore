@@ -32,7 +32,8 @@ export async function GET(req: NextRequest) {
     const unreadCount = (data ?? []).filter((n: { read: boolean }) => !n.read).length;
     return apiSuccess({ notifications: data ?? [], unreadCount });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("[Notifications GET]", err);
+    return apiError("Failed to load notifications");
   }
 }
 
@@ -66,7 +67,8 @@ export async function POST(req: NextRequest) {
     if (error) return apiError(error.message, 500);
     return apiSuccess(data);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("[Notifications POST]", err);
+    return apiError("Failed to create notification");
   }
 }
 
@@ -103,6 +105,7 @@ export async function PATCH(req: NextRequest) {
 
     return apiError("Provide id or { user_id, mark_all: true }", 400);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("[Notifications PATCH]", err);
+    return apiError("Failed to update notifications");
   }
 }

@@ -35,8 +35,30 @@ export function apiError(error: string, status = 500) {
 }
 
 /**
- * Extract error message from unknown catch value
+ * Extract error message from unknown catch value.
+ * Logs the real error internally but returns only the generic fallback.
+ * Safe for API responses — never exposes internal error details to clients.
  */
-export function errMsg(err: unknown, fallback = "Unknown error"): string {
+export function errMsg(err: unknown, fallback = "Internal server error"): string {
+  if (err instanceof Error) {
+    console.error("[API Error]", err.message);
+  }
+  return fallback;
+}
+
+/**
+ * Extract the actual error message — for internal logging or admin-only debug responses.
+ * Do NOT use in public-facing API responses.
+ */
+export function errDetail(err: unknown, fallback = "Unknown error"): string {
   return err instanceof Error ? err.message : fallback;
+}
+
+/**
+ * Log error internally and return a safe generic message to the client.
+ * Use this instead of errMsg() in API catch blocks.
+ */
+export function safeError(err: unknown, context: string, fallback = "Internal server error", status = 500) {
+  console.error(`[${context}]`, err instanceof Error ? err.message : err);
+  return apiError(fallback, status);
 }

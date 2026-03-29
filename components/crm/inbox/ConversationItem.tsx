@@ -7,12 +7,24 @@
 import type { InboxConversation } from "@/lib/crm/inbox-types";
 import { STATUS_CONFIG } from "@/lib/crm/inbox-types";
 import { analyzeSentiment, SENTIMENT_CONFIG, type Sentiment } from "@/lib/crm/sentiment";
-import { timeAgo } from "@/lib/utils";
 
 interface Props {
   conversation: InboxConversation;
   isSelected: boolean;
   onClick: () => void;
+}
+
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "الآن";
+  if (mins < 60) return `${mins}د`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}س`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}ي`;
+  return new Date(dateStr).toLocaleDateString("ar-EG", { day: "numeric", month: "numeric" });
 }
 
 export function ConversationItem({ conversation, isSelected, onClick }: Props) {
@@ -64,7 +76,7 @@ export function ConversationItem({ conversation, isSelected, onClick }: Props) {
         </div>
 
         <div className="flex flex-col items-end gap-0.5 shrink-0">
-          <span className="text-[10px] text-muted">{c.last_message_at ? timeAgo(c.last_message_at) : ""}</span>
+          <span className="text-[10px] text-muted">{timeAgo(c.last_message_at)}</span>
           {hasUnread && (
             <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
               {c.unread_count}

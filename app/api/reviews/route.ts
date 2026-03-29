@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
 
     return apiSuccess({ reviews, avg: Math.round(avg * 10) / 10, count: reviews.length });
   } catch (err: unknown) {
-    return apiSuccess({ reviews: [], avg: 0, count: 0, error: errMsg(err) });
+    console.error("[Reviews GET]", err);
+    return apiSuccess({ reviews: [], avg: 0, count: 0 });
   }
 }
 
@@ -107,7 +108,8 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     return apiSuccess({ review: data, message: "سيتم نشر تقييمك بعد الموافقة" });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("[Reviews POST]", err);
+    return apiError("Failed to submit review", 500);
   }
 }
 
@@ -135,7 +137,8 @@ export async function PUT(req: NextRequest) {
     if (error) throw error;
     return apiSuccess({ review: data });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("[Reviews PUT]", err);
+    return apiError("Failed to update review", 500);
   }
 }
 
@@ -153,6 +156,7 @@ export async function DELETE(req: NextRequest) {
     if (error) throw error;
     return apiSuccess(null);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("[Reviews DELETE]", err);
+    return apiError("Failed to delete review", 500);
   }
 }

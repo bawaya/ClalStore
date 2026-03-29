@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
       message: `تم إنشاء المستخدم ${name} بنجاح`,
     });
   } catch (err: unknown) {
-    console.error("[UserCreate] Error:", errMsg(err));
+    console.error("[UserCreate] Error:", err);
     return apiError(errMsg(err), 500);
   }
 }

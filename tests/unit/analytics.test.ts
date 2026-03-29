@@ -25,9 +25,9 @@ describe("Analytics Helpers", () => {
       expect(gtagMock).toHaveBeenCalledWith("event", "test_event", { foo: "bar" });
     });
 
-    it("calls fbq with event name and params", () => {
+    it("calls fbq with trackCustom for non-standard events", () => {
       trackEvent("test_event", { foo: "bar" });
-      expect(fbqMock).toHaveBeenCalledWith("track", "test_event", { foo: "bar" });
+      expect(fbqMock).toHaveBeenCalledWith("trackCustom", "test_event", { foo: "bar" });
     });
 
     it("does not throw when gtag is missing", () => {

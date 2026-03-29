@@ -1,23 +1,91 @@
-# Agent Guide (clalmobile)
-- Stack: Next.js 14 App Router + TypeScript + Tailwind + Supabase (Postgres) + Cloudflare Pages.
-- Primary areas: `app/store` (public storefront), `app/admin` (admin panel), `app/crm` (CRM), `app/api/*` (route handlers).
-- Business logic lives in `lib/*` (`lib/store`, `lib/admin`, `lib/crm`, `lib/bot`, `lib/integrations`, `lib/ai`); DB types are in `types/database.ts`.
-- Database: Supabase migrations in `supabase/migrations`; seed data in `supabase/seed`; use `npm run db:migrate|db:seed|db:reset` for local DB workflows.
-- Internal APIs: protected endpoints under `/api/admin/*` and `/api/crm/*`; public/partner endpoints include `/api/store/*`, `/api/webhook/*`, `/api/payment/*`, `/api/orders`.
-- Middleware (`middleware.ts`) enforces auth/route protection, rate limiting, security headers, and CORS behavior.
+# Agent Guide — ClalMobile
 
-- Install deps: `npm install` (Node `>=18.17.0`).
-- Dev server: `npm run dev`; production build/start: `npm run build` then `npm run start`.
-- Lint: `npm run lint`; format check: `npm run format:check`; format write: `npm run format`.
-- Tests (watch): `npm run test`; CI-style run: `npm run test:run`; coverage: `npm run test:coverage`.
-- Run one test file: `npm run test:run -- tests/unit/auth.test.ts`.
-- Run one named test: `npm run test:run -- tests/unit/auth.test.ts -t "test name"`.
+## Stack
+Next.js 14 App Router · TypeScript (strict) · Tailwind CSS 3 · Supabase (Postgres + Auth + Storage) · Cloudflare Pages (edge) · Zod 4 validation · Zustand state · Vitest testing.
 
-- Use TS strict mode and keep types explicit at API boundaries; prefer `unknown` + narrowing over broad `any`.
-- Follow Prettier defaults here: 2 spaces, semicolons, double quotes, trailing commas, max width 100.
-- Import order: framework/external imports first, then `@/*` aliases, then relative imports; keep imports minimal and used.
-- Naming: `PascalCase` React components, `camelCase` vars/functions, `UPPER_SNAKE_CASE` constants; route files export HTTP handlers (`GET/POST/...`).
-- Error handling: validate input early, return structured `NextResponse.json(...)` with correct status codes, avoid leaking secrets/tokens in logs.
-- Security: do not hardcode credentials; rely on env vars and existing integration helpers under `lib/integrations/*`.
+## Architecture
 
-- Rule files check: no `.cursor/rules/`, `.cursorrules`, `CLAUDE.md`, `.windsurfrules`, `.clinerules`, `.goosehints`, or `.github/copilot-instructions.md` currently exist in this repo.
+| Area | Path | Purpose |
+|------|------|---------|
+| **Public Store** | `app/store/` | E-commerce storefront (products, cart, checkout, wishlist, compare, tracking) |
+| **Admin Panel** | `app/admin/` | Product/order/content management, analytics, bot config, push notifications |
+| **CRM** | `app/crm/` | Inbox, customers, chats, orders, tasks, pipeline, reports, team users |
+| **API Routes** | `app/api/` | 88 route handlers — REST endpoints for all features |
+| **Business Logic** | `lib/` | Domain logic: `lib/store/`, `lib/admin/`, `lib/crm/`, `lib/bot/`, `lib/ai/`, `lib/integrations/` |
+| **Components** | `components/` | UI by domain: `store/`, `admin/`, `crm/`, `chat/`, `website/`, `shared/`, `ui/` |
+| **DB Types** | `types/database.ts` | 35+ table types — single source of truth for the Supabase schema |
+| **Migrations** | `supabase/migrations/` | 22 SQL migrations defining the full schema |
+| **i18n** | `locales/` | Hebrew (`he.json`) + Arabic (`ar.json`) — RTL bilingual UI |
+
+## Build & Test
+```
+npm install              # Node >=18.17.0
+npm run dev              # Dev server
+npm run build            # Production build
+npm run build:cf         # Cloudflare Pages build
+npm run deploy:cf        # Build + deploy to CF Pages
+npm run lint             # ESLint
+npm run format           # Prettier write
+npm run format:check     # Prettier check
+npm run test             # Vitest watch
+npm run test:run         # Vitest single run
+npm run test:coverage    # Coverage report
+npm run test:run -- tests/unit/auth.test.ts           # One file
+npm run test:run -- tests/unit/auth.test.ts -t "name" # One test
+npm run db:migrate       # Push migrations to Supabase
+npm run db:seed          # Seed data
+npm run db:reset         # Reset DB
+```
+
+## Code Style
+- Prettier: 2 spaces, semicolons, double quotes, trailing commas, max width 100.
+- Import order: framework/external → `@/*` aliases → relative. Keep imports minimal.
+- Naming: `PascalCase` components, `camelCase` vars/functions, `UPPER_SNAKE_CASE` constants.
+- Route files export HTTP method handlers: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`.
+
+## Conventions
+
+### API Routes
+- Validate input with Zod schemas via `validateBody()` from `lib/admin/validators.ts`.
+- Return structured responses via `apiSuccess(data)` / `apiError(msg, status)` from `lib/api-response.ts`.
+- Admin routes: call `requireAdmin(request)` from `lib/admin/auth.ts` first.
+- CRM routes: check auth via middleware (auto 401 for `/api/crm/*`).
+- Never expose `err.message` in production responses — use generic errors.
+
+### Auth & Security
+- Supabase Auth for sessions; `users` table for roles/permissions.
+- 6 roles: `super_admin` > `admin` > `sales` > `support` > `content` > `viewer`.
+- Permission check: `hasPermission(user, 'orders')` / `canAccessPage(user, '/admin/products')`.
+- Middleware enforces: auth gating, CSRF (double-submit cookie), rate limiting, security headers, CORS.
+- CSRF exempt: `/api/webhook/*`, `/api/cron/*`, `/api/payment/callback`, `/api/csrf`, `/api/orders`.
+- Never hardcode secrets — use env vars. Integration configs stored in `integrations` table.
+
+### Database
+- All table types in `types/database.ts` — update this file when adding/modifying tables.
+- RLS policies enforced — service role for server operations, anon for public reads.
+- Migrations are sequential: `001_initial_schema.sql` through `020_rate_limits.sql` + date-prefixed.
+- Use `createServerSupabase()` for server components, `createBrowserSupabase()` for client, `createAdminSupabase()` for service-role ops.
+
+### Integrations (`lib/integrations/`)
+- Provider registry pattern: `hub.ts` manages providers by type (payment, email, sms, whatsapp).
+- Payment gateway auto-detected by city: Israeli cities → Rivhit (iCredit), else → UPay.
+- WhatsApp: YCloud API. SMS: Twilio. Email: SendGrid/Resend. AI: Anthropic Claude.
+- Webhook verification: HMAC SHA256 via `lib/webhook-verify.ts` (constant-time comparison).
+
+### i18n
+- Bilingual: Hebrew + Arabic (RTL). DB columns use `*_ar` / `*_he` suffixes.
+- UI translations in `locales/he.json` and `locales/ar.json`.
+- Always provide both language variants for user-facing content.
+
+### Components
+- Store components: `components/store/` — ProductCard, SearchFilters, HeroCarousel, etc.
+- Admin shell: `components/admin/AdminShell.tsx`. CRM shell: `components/crm/CRMShell.tsx`.
+- Shared: `components/shared/` — Analytics, CookieConsent, LangSwitcher, Logo, Providers.
+- Chat widget: `components/chat/WebChatWidget.tsx`.
+
+## Key Domain Knowledge
+- **Products**: type `device` or `accessory`; multi-storage variants with separate pricing; color system (hex + bilingual names); specs as JSONB.
+- **Orders**: ID format `CLM-XXXXX`; statuses: new → approved → processing → shipped → delivered (or cancelled/rejected); sources: store/facebook/external/whatsapp/webchat/manual.
+- **Customers**: segments: vip/loyal/active/new/cold/lost/inactive; loyalty program with points tiers (bronze/silver/gold/platinum).
+- **Bot**: Multi-channel (webchat, WhatsApp, SMS); intent detection; AI-powered responses via Claude; handoff to human agents; 14 modules in `lib/bot/`.
+- **Pipeline**: Sales stages: lead → negotiation → proposal → won/lost.

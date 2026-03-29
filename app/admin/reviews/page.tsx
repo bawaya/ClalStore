@@ -58,8 +58,7 @@ export default function AdminReviewsPage() {
     try {
       const res = await fetch("/api/admin/products");
       const json = await res.json();
-      const pd = json.data ?? json;
-      setProducts(Array.isArray(pd) ? pd : pd.products || pd.data || []);
+      setProducts(json.products || json.data || []);
     } catch {}
   };
 
@@ -68,8 +67,7 @@ export default function AdminReviewsPage() {
     try {
       const res = await fetch("/api/reviews?admin=true");
       const json = await res.json();
-      const rd = json.data ?? json;
-      setReviews(rd.reviews || []);
+      setReviews(json.reviews || []);
     } catch {}
     setLoading(false);
   };
@@ -136,8 +134,8 @@ export default function AdminReviewsPage() {
       show(`✅ تم توليد ${json.count} تقييم بنجاح!`);
       setShowGenerator(false);
       load();
-    } catch (err: unknown) {
-      show(`❌ ${err instanceof Error ? err.message : "خطأ غير متوقع"}`, "error");
+    } catch (err: any) {
+      show(`❌ ${err.message}`, "error");
     }
     setGenerating(false);
   };

@@ -1,11 +1,15 @@
 export const runtime = 'edge';
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin/auth";
 import { notifyAdminContactForm } from "@/lib/bot/admin-notify";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await req.json();
     const { name, phone, email, subject, message } = body;
 

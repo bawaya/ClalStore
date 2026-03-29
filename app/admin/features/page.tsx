@@ -74,14 +74,13 @@ export default function FeaturesPage() {
       try {
         const res = await fetch("/api/admin/settings");
         const json = await res.json();
-        const sd = json.data ?? json;
-        setSettings(sd.settings || sd || {});
+        setSettings(json.settings || {});
 
         // Load feature stats
         const statsRes = await fetch("/api/admin/features/stats");
         if (statsRes.ok) {
           const s = await statsRes.json();
-          setStats(s.data ?? s);
+          setStats(s);
         }
       } catch {}
       setLoading(false);

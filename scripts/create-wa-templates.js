@@ -3,7 +3,11 @@
 // Run once: node scripts/create-wa-templates.js
 // =====================================================
 
-const YCLOUD_API_KEY = process.env.YCLOUD_API_KEY || "870bd9e405b4344518f09b77552b4cd6";
+const YCLOUD_API_KEY = process.env.YCLOUD_API_KEY;
+if (!YCLOUD_API_KEY) {
+  console.error("Error: YCLOUD_API_KEY environment variable is required");
+  process.exit(1);
+}
 const WABA_ID = "806505221863803";
 const YCLOUD_API = "https://api.ycloud.com/v2";
 

@@ -70,8 +70,7 @@ export default function AdminDealsPage() {
     try {
       const res = await fetch("/api/admin/deals?admin=true");
       const json = await res.json();
-      const d = json.data ?? json;
-      setDeals(d.deals || d || []);
+      setDeals(json.deals || []);
     } catch {}
     setLoading(false);
   };
@@ -80,8 +79,7 @@ export default function AdminDealsPage() {
     try {
       const res = await fetch("/api/admin/products");
       const json = await res.json();
-      const p = json.data ?? json;
-      setProducts(Array.isArray(p) ? p : p.products || p.data || []);
+      setProducts(json.products || json || []);
     } catch {}
   };
 

@@ -8,7 +8,7 @@ export const runtime = 'edge';
 
 import { NextRequest } from "next/server";
 import { getIntegrations } from "@/lib/admin/queries";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { apiSuccess, apiError, errMsg, errDetail } from "@/lib/api-response";
 
 const MASK = "••••••••";
 
@@ -62,7 +62,7 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       }
       return { ok: false, message: data.error_message || `Rivhit error: ${data.error_code || "unknown"}` };
     } catch (err: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
+      return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
     }
   },
 
@@ -81,7 +81,7 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
       return { ok: false, message: `SendGrid responded with ${res.status}` };
     } catch (err: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
+      return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
     }
   },
 
@@ -100,7 +100,7 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
       return { ok: false, message: `yCloud responded with ${res.status}` };
     } catch (err: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
+      return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
     }
   },
 
@@ -141,7 +141,7 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       }
       return { ok: false, message: `Twilio responded with ${res.status}` };
     } catch (err: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
+      return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
     }
   },
 

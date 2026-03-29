@@ -12,31 +12,30 @@ const db = () => createAdminSupabase();
 // ===== Dashboard Stats =====
 export async function getDashboardStats() {
   const s = db();
-  const [orders, products, customers, revenue] = await Promise.all([
+  const [orders, products, customers] = await Promise.all([
     s.from("orders").select("id, status, source, total, created_at"),
     s.from("products").select("id, stock, sold, price, active"),
     s.from("customers").select("id, segment, total_spent"),
-    s.from("orders").select("total").not("status", "eq", "rejected"),
   ]);
 
-  const ordersData = orders.data || [];
-  const productsData = products.data || [];
-  const customersData = customers.data || [];
+  const ordersData = (orders.data || []) as Array<{ id: string; status: string; source: string; total: number; created_at: string }>;
+  const productsData = (products.data || []) as Array<{ id: string; stock: number; sold: number; price: number; active: boolean }>;
+  const customersData = (customers.data || []) as Array<{ id: string; segment: string; total_spent: number }>;
 
-  const totalRevenue = (revenue.data || []).reduce((s: number, o: any) => s + Number(o.total), 0);
-  const newOrders = ordersData.filter((o: any) => o.status === "new").length;
-  const noReply = ordersData.filter((o: any) => o.status?.startsWith("no_reply")).length;
-  const lowStock = productsData.filter((p: any) => p.stock > 0 && p.stock <= 5 && p.active).length;
-  const outOfStock = productsData.filter((p: any) => p.stock === 0 && p.active).length;
-  const vipCustomers = customersData.filter((c: any) => c.segment === "vip").length;
+  const totalRevenue = ordersData.filter((o) => o.status !== "rejected").reduce((s, o) => s + Number(o.total), 0);
+  const newOrders = ordersData.filter((o) => o.status === "new").length;
+  const noReply = ordersData.filter((o) => o.status?.startsWith("no_reply")).length;
+  const lowStock = productsData.filter((p) => p.stock > 0 && p.stock <= 5 && p.active).length;
+  const outOfStock = productsData.filter((p) => p.stock === 0 && p.active).length;
+  const vipCustomers = customersData.filter((c) => c.segment === "vip").length;
 
   // Source distribution
   const sources: Record<string, number> = {};
-  ordersData.forEach((o: any) => { sources[o.source] = (sources[o.source] || 0) + 1; });
+  ordersData.forEach((o) => { sources[o.source] = (sources[o.source] || 0) + 1; });
 
   // Status distribution
   const statuses: Record<string, number> = {};
-  ordersData.forEach((o: any) => { statuses[o.status] = (statuses[o.status] || 0) + 1; });
+  ordersData.forEach((o) => { statuses[o.status] = (statuses[o.status] || 0) + 1; });
 
   return {
     totalRevenue, totalOrders: ordersData.length, newOrders, noReply,
@@ -48,7 +47,7 @@ export async function getDashboardStats() {
 
 // ===== Products CRUD =====
 export async function getAdminProducts(opts?: { limit?: number; offset?: number }) {
-  const limit = opts?.limit ?? 0;
+  const limit = opts?.limit ?? 50;
   const offset = opts?.offset ?? 0;
 
   if (limit > 0) {
@@ -65,13 +64,13 @@ export async function getAdminProducts(opts?: { limit?: number; offset?: number 
   return { data: (data || []) as Product[], total: (data || []).length };
 }
 
-export async function createProduct(product: any) {
+export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
   const { data, error } = await db().from("products").insert(product).select().single();
   if (error) throw error;
   return data;
 }
 
-export async function updateProduct(id: string, updates: any) {
+export async function updateProduct(id: string, updates: Partial<Product>) {
   const { data, error } = await db().from("products").update(updates).eq("id", id).select().single();
   if (error) throw error;
   return data;
@@ -88,13 +87,13 @@ export async function getAdminCoupons() {
   return (data || []) as Coupon[];
 }
 
-export async function createCoupon(coupon: any) {
+export async function createCoupon(coupon: Omit<Coupon, "id" | "created_at">) {
   const { data, error } = await db().from("coupons").insert(coupon).select().single();
   if (error) throw error;
   return data;
 }
 
-export async function updateCoupon(id: string, updates: any) {
+export async function updateCoupon(id: string, updates: Partial<Coupon>) {
   const { data, error } = await db().from("coupons").update(updates).eq("id", id).select().single();
   if (error) throw error;
   return data;
@@ -111,13 +110,13 @@ export async function getAdminHeroes() {
   return (data || []) as Hero[];
 }
 
-export async function createHero(hero: any) {
+export async function createHero(hero: Omit<Hero, "id" | "created_at">) {
   const { data, error } = await db().from("heroes").insert(hero).select().single();
   if (error) throw error;
   return data;
 }
 
-export async function updateHero(id: string, updates: any) {
+export async function updateHero(id: string, updates: Partial<Hero>) {
   const { data, error } = await db().from("heroes").update(updates).eq("id", id).select().single();
   if (error) throw error;
   return data;
@@ -134,13 +133,13 @@ export async function getAdminLines() {
   return (data || []) as LinePlan[];
 }
 
-export async function createLine(line: any) {
+export async function createLine(line: Omit<LinePlan, "id" | "created_at">) {
   const { data, error } = await db().from("line_plans").insert(line).select().single();
   if (error) throw error;
   return data;
 }
 
-export async function updateLine(id: string, updates: any) {
+export async function updateLine(id: string, updates: Partial<LinePlan>) {
   const { data, error } = await db().from("line_plans").update(updates).eq("id", id).select().single();
   if (error) throw error;
   return data;
@@ -155,7 +154,7 @@ export async function deleteLine(id: string) {
 export async function getAdminSettings() {
   const { data } = await db().from("settings").select("*");
   const map: Record<string, string> = {};
-  (data || []).forEach((s: any) => { map[s.key] = s.value; });
+  (data || []).forEach((s: { key: string; value: string }) => { map[s.key] = s.value; });
   return map;
 }
 
@@ -218,8 +217,8 @@ export async function getIntegrations() {
   return existing;
 }
 
-export async function updateIntegration(id: string, updates: any) {
-  const payload: any = { ...updates };
+export async function updateIntegration(id: string, updates: Partial<Integration>) {
+  const payload: Record<string, unknown> = { ...updates };
   // Always update last_synced_at when modifying an integration
   if (!payload.last_synced_at) payload.last_synced_at = new Date().toISOString();
   const { data, error } = await db().from("integrations").update(payload).eq("id", id).select().single();

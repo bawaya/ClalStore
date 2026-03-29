@@ -13,7 +13,10 @@ import { validatePhone } from "@/lib/validators";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
 function generateOTP(): string {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+  const bytes = new Uint8Array(2);
+  crypto.getRandomValues(bytes);
+  const num = 1000 + ((bytes[0] << 8 | bytes[1]) % 9000);
+  return num.toString();
 }
 
 function generateToken(): string {

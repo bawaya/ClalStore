@@ -3,7 +3,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
@@ -196,8 +196,7 @@ export async function GET(req: NextRequest) {
         customerGrowth,
     });
   } catch (err: unknown) {
-    const message = errMsg(err, "Unknown error");
-    console.error("Analytics dashboard API error:", message);
-    return apiError(message, 500);
+    console.error("Analytics dashboard API error:", err);
+    return apiError("Internal server error", 500);
   }
 }
