@@ -48,4 +48,23 @@ supabase/.temp/
 # Scripts
 scripts/check-stock-fn.js
 scripts/update-fn.js
-node_modules
+
+# OCR trained data (should not be in repo)
+*.traineddata
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Wrangler
+.wrangler/
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+*.lcov
