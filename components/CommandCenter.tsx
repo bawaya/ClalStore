@@ -176,8 +176,8 @@ function CTooltip({ active, payload, label }: { active?: boolean; payload?: { co
   return (
     <div style={{ background: CARD2, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 14px", boxShadow: `0 8px 32px #00000060` }}>
       <p style={{ color: TEXT, margin: 0, fontSize: 12, fontWeight: 700 }}>{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color, margin: "4px 0 0", fontSize: 11, fontWeight: 600 }}>
+      {payload.map((p) => (
+        <p key={p.name} style={{ color: p.color, margin: "4px 0 0", fontSize: 11, fontWeight: 600 }}>
           {p.name}: {typeof p.value === "number" ? `₪${p.value.toLocaleString()}` : p.value}
         </p>
       ))}
@@ -190,8 +190,8 @@ function CTooltipPlain({ active, payload, label }: { active?: boolean; payload?:
   return (
     <div style={{ background: CARD2, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 14px", boxShadow: `0 8px 32px #00000060` }}>
       <p style={{ color: TEXT, margin: 0, fontSize: 12, fontWeight: 700 }}>{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color, margin: "4px 0 0", fontSize: 11, fontWeight: 600 }}>
+      {payload.map((p) => (
+        <p key={p.name} style={{ color: p.color, margin: "4px 0 0", fontSize: 11, fontWeight: 600 }}>
           {p.name}: {typeof p.value === "number" ? p.value.toLocaleString() : p.value}
         </p>
       ))}
@@ -500,8 +500,8 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                 showInbox ? { label: "محادثات نشطة", val: inbox.active || 0, color: GREEN, icon: "💬", sub: `${inbox.unread_total || 0} غير مقروءة` } : null,
                 { label: "Pipeline", val: crm.pipelineValue, prefix: "₪", color: GOLD, icon: "🎯", sub: `${crm.pipelineDeals} صفقة` },
                 { label: "صافي الربح", val: netProfit, prefix: "₪", color: netProfit >= 0 ? TEAL : RED, icon: "📊" },
-              ].filter(Boolean) as { label: string; val: number; prefix?: string; color: string; icon: string; sub?: string }[]).map((k, i) => (
-                <GlowCard key={i} glow={k.color} style={{ animation: `slideUp 0.4s ease ${i * 0.06}s both` }}>
+              ].filter(Boolean) as { label: string; val: number; prefix?: string; color: string; icon: string; sub?: string }[]).map((k) => (
+                <GlowCard key={k.label} glow={k.color}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div>
                       <p style={{ margin: "0 0 4px", fontSize: 11, color: MUTED, fontWeight: 600 }}>{k.label}</p>
@@ -522,12 +522,12 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                 <h3 style={{ margin: "0 0 10px", fontSize: 14, color: CYAN, fontWeight: 700 }}>📊 حالات الطلبات</h3>
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart><Pie data={pieData} cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3} dataKey="value" stroke="none">
-                    {pieData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    {pieData.map((d) => <Cell key={d.name} fill={d.color} />)}
                   </Pie><Tooltip content={<CTooltipPlain />} /></PieChart>
                 </ResponsiveContainer>
                 <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-                  {pieData.map((d, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+                  {pieData.map((d) => (
+                    <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
                       <Dot color={d.color} size={7} /><span style={{ color: MUTED }}>{d.name} ({d.value})</span>
                     </div>
                   ))}
@@ -537,12 +537,12 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                 <h3 style={{ margin: "0 0 10px", fontSize: 14, color: PURPLE, fontWeight: 700 }}>📡 مصادر الطلبات</h3>
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart><Pie data={sourceData} cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3} dataKey="value" stroke="none">
-                    {sourceData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    {sourceData.map((d) => <Cell key={d.name} fill={d.color} />)}
                   </Pie><Tooltip content={<CTooltipPlain />} /></PieChart>
                 </ResponsiveContainer>
                 <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-                  {sourceData.map((d, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+                  {sourceData.map((d) => (
+                    <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
                       <Dot color={d.color} size={7} /><span style={{ color: MUTED }}>{d.name} ({d.value})</span>
                     </div>
                   ))}
@@ -556,8 +556,8 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                 <h3 style={{ margin: "0 0 12px", fontSize: 14, color: RED, fontWeight: 700 }}>⚡ تنبيهات</h3>
                 {(crm.alerts || []).length === 0
                   ? <p style={{ color: MUTED, fontSize: 12, textAlign: "center", padding: 20 }}>لا توجد تنبيهات 👍</p>
-                  : (crm.alerts || []).map((a, i) => (
-                    <div key={i} style={{
+                  : (crm.alerts || []).map((a) => (
+                    <div key={`${a.color}-${a.msg}`} style={{
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                       background: `${a.color}10`, borderRadius: 10, padding: "10px 14px", marginBottom: 8, border: `1px solid ${a.color}15`,
                     }}>
@@ -568,10 +568,10 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
               </GlowCard>
               <GlowCard glow={GREEN}>
                 <h3 style={{ margin: "0 0 12px", fontSize: 14, color: GREEN, fontWeight: 700 }}>📦 آخر الطلبات</h3>
-                {(crm.recentOrders || []).slice(0, 4).map((o, i) => (
-                  <div key={i} style={{
+                {(crm.recentOrders || []).slice(0, 4).map((o, idx) => (
+                  <div key={o.id} style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "8px 0", borderBottom: i < 3 ? `1px solid ${BORDER}30` : "none",
+                    padding: "8px 0", borderBottom: idx < 3 ? `1px solid ${BORDER}30` : "none",
                   }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <Badge text={STATUS_LABELS[o.status] || o.status} color={STATUS_COLORS[o.status] || MUTED} />
@@ -734,8 +734,8 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                     { label: "هامش الربح", val: profitMargin, suffix: "%", color: profitMargin >= 20 ? TEAL : GOLD, icon: "🎯" },
                     { label: "الميزانية المستخدمة", val: budgetUsed, suffix: "%", color: budgetUsed <= 80 ? GREEN : GOLD, icon: "📋" },
                     { label: "متوسط الطلب", val: m.avgOrderValue || 1311, prefix: "₪", color: CYAN, icon: "📦" },
-                  ].map((k, i) => (
-                    <GlowCard key={i} glow={k.color} style={{ animation: `slideUp 0.3s ease ${i * 0.05}s both`, textAlign: "center" }}>
+                  ].map((k) => (
+                    <GlowCard key={k.label} glow={k.color} style={{ textAlign: "center" }}>
                       <span style={{ fontSize: 20 }}>{k.icon}</span>
                       <p style={{ margin: "4px 0 2px", fontSize: 10, color: MUTED, fontWeight: 600 }}>{k.label}</p>
                       <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: k.color }}><AnimNum value={k.val || 0} prefix={k.prefix} suffix={k.suffix} /></p>
@@ -762,12 +762,12 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                     <h3 style={{ margin: "0 0 12px", fontSize: 14, color: GOLD, fontWeight: 700 }}>💎 مصادر الإيرادات</h3>
                     <ResponsiveContainer width="100%" height={160}>
                       <PieChart><Pie data={REVENUE_STREAMS} cx="50%" cy="50%" outerRadius={60} innerRadius={30} paddingAngle={3} dataKey="value" stroke="none">
-                        {REVENUE_STREAMS.map((d, i) => <Cell key={i} fill={d.color} />)}
+                        {REVENUE_STREAMS.map((d) => <Cell key={d.name} fill={d.color} />)}
                       </Pie><Tooltip content={<CTooltip />} /></PieChart>
                     </ResponsiveContainer>
                     <div style={{ marginTop: 8 }}>
-                      {REVENUE_STREAMS.map((r, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                      {REVENUE_STREAMS.map((r) => (
+                        <div key={r.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: r.color }}>₪{r.value.toLocaleString()}</span>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}><Dot color={r.color} size={7} /><span style={{ fontSize: 11, color: MUTED }}>{r.name}</span></div>
                         </div>
@@ -798,8 +798,8 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                   <h3 style={{ margin: "0 0 16px", fontSize: 15, color: TEAL, textAlign: "center", fontWeight: 800 }}>📋 تقرير الأرباح والخسائر — مارس 2026</h3>
                   <div style={{ background: `${GREEN}08`, borderRadius: 12, padding: 16, marginBottom: 12, border: `1px solid ${GREEN}18` }}>
                     <h4 style={{ margin: "0 0 10px", fontSize: 14, color: GREEN, fontWeight: 700 }}>💰 الإيرادات</h4>
-                    {REVENUE_STREAMS.map((r, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < REVENUE_STREAMS.length - 1 ? `1px solid ${BORDER}18` : "none" }}>
+                    {REVENUE_STREAMS.map((r, idx) => (
+                      <div key={r.name} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: idx < REVENUE_STREAMS.length - 1 ? `1px solid ${BORDER}18` : "none" }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: GREEN }}>₪{r.value.toLocaleString()}</span>
                         <span style={{ fontSize: 12, color: TEXT }}>{r.name}</span>
                       </div>
@@ -811,8 +811,8 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                   </div>
                   <div style={{ background: `${RED}06`, borderRadius: 12, padding: 16, marginBottom: 12, border: `1px solid ${RED}15` }}>
                     <h4 style={{ margin: "0 0 10px", fontSize: 14, color: RED, fontWeight: 700 }}>💸 المصاريف</h4>
-                    {sortedExp.map((e, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < sortedExp.length - 1 ? `1px solid ${BORDER}12` : "none" }}>
+                    {sortedExp.map((e, idx) => (
+                      <div key={e.name} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: idx < sortedExp.length - 1 ? `1px solid ${BORDER}12` : "none" }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: RED }}>₪{e.actual.toLocaleString()}</span>
                         <span style={{ fontSize: 12, color: TEXT }}>{e.icon} {e.name}</span>
                       </div>
@@ -833,13 +833,13 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                       <thead><tr style={{ borderBottom: `2px solid ${BORDER}` }}>
-                        {["الشهر", "الإيرادات", "المصاريف", "صافي الربح", "الطلبات", "متوسط الطلب"].map((h, i) => (
-                          <th key={i} style={{ padding: "10px 8px", textAlign: i === 0 ? "right" : "center", color: MUTED, fontWeight: 700, fontSize: 11 }}>{h}</th>
+                        {["الشهر", "الإيرادات", "المصاريف", "صافي الربح", "الطلبات", "متوسط الطلب"].map((h) => (
+                          <th key={h} style={{ padding: "10px 8px", textAlign: "center", color: MUTED, fontWeight: 700, fontSize: 11 }}>{h}</th>
                         ))}
                       </tr></thead>
                       <tbody>
-                        {monthly.map((row, i) => (
-                          <tr key={i} style={{ borderBottom: `1px solid ${BORDER}25` }}>
+                        {monthly.map((row) => (
+                          <tr key={row.month} style={{ borderBottom: `1px solid ${BORDER}25` }}>
                             <td style={{ padding: "10px 8px", fontWeight: 700, fontSize: 12 }}>{row.month}</td>
                             <td style={{ padding: "10px 8px", textAlign: "center", color: GREEN, fontWeight: 700 }}>₪{row.revenue.toLocaleString()}</td>
                             <td style={{ padding: "10px 8px", textAlign: "center", color: RED, fontWeight: 700 }}>₪{row.expenses.toLocaleString()}</td>
@@ -859,11 +859,11 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
             {finTab === "expenses" && (
               <div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 18 }}>
-                  {sortedExp.map((e, i) => {
+                  {sortedExp.map((e) => {
                     const pct = e.budget > 0 ? Math.round((e.actual / e.budget) * 100) : 0;
                     const over = pct > 100;
                     return (
-                      <GlowCard key={i} glow={e.color} style={{ animation: `slideUp 0.3s ease ${i * 0.04}s both` }}>
+                      <GlowCard key={e.name} glow={e.color}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                           <Badge text={over ? "تجاوز ⚠️" : `${pct}%`} color={over ? RED : pct > 80 ? GOLD : GREEN} />
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -893,10 +893,10 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                       <YAxis dataKey="name" type="category" tick={{ fill: TEXT, fontSize: 11, fontWeight: 600 }} width={120} />
                       <Tooltip content={<CTooltip />} /><Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                       <Bar dataKey="actual" name="فعلي" barSize={16} radius={[0, 6, 6, 0]}>
-                        {sortedExp.map((e, i) => <Cell key={i} fill={e.color} />)}
+                        {sortedExp.map((e) => <Cell key={e.name} fill={e.color} />)}
                       </Bar>
                       <Bar dataKey="budget" name="ميزانية" barSize={16} radius={[0, 6, 6, 0]} opacity={0.2}>
-                        {sortedExp.map((e, i) => <Cell key={i} fill={e.color} />)}
+                        {sortedExp.map((e) => <Cell key={`${e.name}-budget`} fill={e.color} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -1014,8 +1014,8 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                 { label: "زبائن جدد", val: m.newCustomers, change: m.customersChange, color: PURPLE, icon: "👥" },
                 { label: "معدل التحويل", val: m.conversionRate, suffix: "%", color: BRAND_DEFAULT, icon: "🎯" },
                 { label: "سلال متروكة", val: m.abandonmentRate, suffix: "%", color: RED, icon: "🛒" },
-              ].map((k, i) => (
-                <GlowCard key={i} glow={k.color} style={{ textAlign: "center", animation: `slideUp 0.3s ease ${i * 0.05}s both` }}>
+              ].map((k) => (
+                <GlowCard key={k.label} glow={k.color} style={{ textAlign: "center" }}>
                   <span style={{ fontSize: 18 }}>{k.icon}</span>
                   <p style={{ margin: "4px 0 2px", fontSize: 10, color: MUTED, fontWeight: 600 }}>{k.label}</p>
                   <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: k.color }}><AnimNum value={k.val || 0} prefix={k.prefix} suffix={k.suffix} /></p>
@@ -1063,7 +1063,7 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                   const colors = [GOLD, CYAN, PURPLE, GREEN, BRAND];
                   const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
                   return (
-                    <div key={i} style={{ marginBottom: 10 }}>
+                    <div key={p.label} style={{ marginBottom: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                         <span style={{ fontSize: 12, fontWeight: 800, color: colors[i] }}>{p.value} مبيعات</span>
                         <span style={{ fontSize: 11, color: TEXT, fontWeight: 600 }}>{medals[i]} {p.label}</span>
@@ -1082,10 +1082,10 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
                     { label: "الإيرادات", curr: m.totalRevenue, prev: m.prevRevenue, prefix: "₪", icon: "📈" },
                     { label: "الطلبات", curr: m.totalOrders, prev: m.prevOrders, icon: "📦" },
                     { label: "الزبائن", curr: m.newCustomers, prev: m.prevCustomers, icon: "👥" },
-                  ].map((s, i) => {
+                  ].map((s) => {
                     const change = s.prev > 0 ? Math.round(((s.curr - s.prev) / s.prev) * 100) : 0;
                     return (
-                      <div key={i} style={{ background: CARD2, borderRadius: 12, padding: 14, textAlign: "center", border: `1px solid ${BORDER}` }}>
+                      <div key={s.label} style={{ background: CARD2, borderRadius: 12, padding: 14, textAlign: "center", border: `1px solid ${BORDER}` }}>
                         <span style={{ fontSize: 20 }}>{s.icon}</span>
                         <p style={{ margin: "6px 0 2px", fontSize: 10, color: MUTED, fontWeight: 600 }}>{s.label}</p>
                         <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: TEXT }}>{s.prefix || ""}{(s.curr || 0).toLocaleString()}</p>

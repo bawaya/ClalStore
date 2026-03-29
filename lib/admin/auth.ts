@@ -56,7 +56,14 @@ export async function requireAdmin(req: NextRequest) {
       return { ...user, role: dbUser.role };
     }
 
-    // User not in users table — allow if authenticated (first admin / bootstrap)
+    // Bootstrap: only allow first authenticated user as admin when users table is empty
+    const { count } = await adminDb
+      .from("users")
+      .select("id", { count: "exact", head: true });
+
+    if ((count ?? 0) > 0) {
+      return NextResponse.json({ error: "ليس لديك صلاحيات إدارية" }, { status: 403 });
+    }
   }
 
   return { ...user, role: "admin" };

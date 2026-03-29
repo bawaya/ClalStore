@@ -11,6 +11,7 @@ import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { generateOrderId, validatePhone, validateIsraeliID } from "@/lib/validators";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,6 +25,16 @@ export async function POST(req: NextRequest) {
 
     if (!validatePhone(customer.phone)) {
       return apiError("رقم هاتف غير صالح", 400);
+    }
+
+    // Per-phone rate limit: max 5 orders per hour
+    const cleanPhoneRL = customer.phone.replace(/[-\s]/g, "");
+    const rl = checkRateLimit(
+      getRateLimitKey(cleanPhoneRL, "order"),
+      { maxRequests: 5, windowMs: 3600_000 }
+    );
+    if (!rl.allowed) {
+      return apiError("طلبات كثيرة — حاول بعد قليل", 429);
     }
 
     if (!items || items.length === 0) {

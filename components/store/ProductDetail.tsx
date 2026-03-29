@@ -152,7 +152,7 @@ export function ProductDetailClient({
               <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "thin" }}>
                 {allImages.map((img, i) => (
                   <button
-                    key={i}
+                    key={img}
                     onClick={() => setSelImage(i)}
                     className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-all border-0 glass-elevated relative"
                     style={{
@@ -233,7 +233,7 @@ export function ProductDetailClient({
                 <div className="flex gap-1.5">
                   {colors.map((c, i) => (
                     <button
-                      key={i}
+                      key={c.hex}
                       onClick={() => handleColorSelect(i)}
                       className="rounded-full cursor-pointer transition-all"
                       style={{
@@ -255,7 +255,7 @@ export function ProductDetailClient({
                 <div className="flex gap-1">
                   {storage.map((s, i) => (
                     <button
-                      key={i}
+                      key={s}
                       onClick={() => setSelStorage(i)}
                       className={`chip ${selStorage === i ? "chip-active" : ""}`}
                     >

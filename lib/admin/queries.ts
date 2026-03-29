@@ -83,7 +83,8 @@ export async function deleteProduct(id: string) {
 
 // ===== Coupons CRUD =====
 export async function getAdminCoupons() {
-  const { data } = await db().from("coupons").select("*").order("created_at", { ascending: false });
+  const { data, error } = await db().from("coupons").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
   return (data || []) as Coupon[];
 }
 
@@ -106,7 +107,8 @@ export async function deleteCoupon(id: string) {
 
 // ===== Heroes CRUD =====
 export async function getAdminHeroes() {
-  const { data } = await db().from("heroes").select("*").order("sort_order");
+  const { data, error } = await db().from("heroes").select("*").order("sort_order");
+  if (error) throw error;
   return (data || []) as Hero[];
 }
 
@@ -129,7 +131,8 @@ export async function deleteHero(id: string) {
 
 // ===== Line Plans CRUD =====
 export async function getAdminLines() {
-  const { data } = await db().from("line_plans").select("*").order("sort_order");
+  const { data, error } = await db().from("line_plans").select("*").order("sort_order");
+  if (error) throw error;
   return (data || []) as LinePlan[];
 }
 
@@ -152,7 +155,8 @@ export async function deleteLine(id: string) {
 
 // ===== Settings =====
 export async function getAdminSettings() {
-  const { data } = await db().from("settings").select("*");
+  const { data, error } = await db().from("settings").select("*");
+  if (error) throw error;
   const map: Record<string, string> = {};
   (data || []).forEach((s: { key: string; value: string }) => { map[s.key] = s.value; });
   return map;
@@ -175,7 +179,8 @@ export async function updateSetting(key: string, value: string) {
 // ===== Integrations =====
 export async function getIntegrations() {
   const supabase = db();
-  const { data } = await supabase.from("integrations").select("*");
+  const { data, error } = await supabase.from("integrations").select("*");
+  if (error) throw error;
   let existing = (data || []) as Integration[];
 
   // Deduplicate: keep the row with the most config for each type
@@ -228,7 +233,8 @@ export async function updateIntegration(id: string, updates: Partial<Integration
 
 /** Get integration config by type (for server-side provider initialization) */
 export async function getIntegrationByType(type: string): Promise<Integration | null> {
-  const { data } = await db().from("integrations").select("*").eq("type", type).single();
+  const { data, error } = await db().from("integrations").select("*").eq("type", type).single();
+  if (error && error.code !== "PGRST116") throw error;
   return (data as Integration) || null;
 }
 

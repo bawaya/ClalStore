@@ -231,8 +231,8 @@ export default function ComparePage() {
                 {items.map((item) => (
                   <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 6 : 10 }}>
                     <div className="flex justify-center gap-1 flex-wrap">
-                      {(item.colors || []).slice(0, 5).map((c: any, i: number) => (
-                        <span key={i} className="inline-block rounded-full border border-surface-border" style={{ width: 16, height: 16, background: c?.hex || "#888" }} title={getColorName(c, lang)} />
+                      {(item.colors || []).slice(0, 5).map((c: any) => (
+                        <span key={c?.hex || Math.random()} className="inline-block rounded-full border border-surface-border" style={{ width: 16, height: 16, background: c?.hex || "#888" }} title={getColorName(c, lang)} />
                       ))}
                       {(!item.colors || item.colors.length === 0) && <span className="text-muted">—</span>}
                     </div>

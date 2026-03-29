@@ -416,7 +416,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
           <div className="flex gap-1.5 items-center mb-2">
             {colors.slice(0, 6).map((c, i) => (
               <button
-                key={i}
+                key={c.hex}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

@@ -53,12 +53,16 @@ export async function getProduct(id: string): Promise<Product | null> {
 export async function getHeroes(): Promise<Hero[]> {
   const supabase = createServerSupabase();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("heroes")
     .select("*")
     .eq("active", true)
     .order("sort_order");
 
+  if (error) {
+    console.error("Error fetching heroes:", error);
+    return [];
+  }
   return (data as Hero[]) || [];
 }
 
@@ -66,12 +70,16 @@ export async function getHeroes(): Promise<Hero[]> {
 export async function getLinePlans(): Promise<LinePlan[]> {
   const supabase = createServerSupabase();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("line_plans")
     .select("*")
     .eq("active", true)
     .order("sort_order");
 
+  if (error) {
+    console.error("Error fetching line plans:", error);
+    return [];
+  }
   return (data as LinePlan[]) || [];
 }
 
@@ -79,12 +87,16 @@ export async function getLinePlans(): Promise<LinePlan[]> {
 export async function getCategories(): Promise<Category[]> {
   const supabase = createServerSupabase();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("categories")
     .select("*")
     .eq("active", true)
     .order("sort_order");
 
+  if (error) {
+    console.error("Error fetching categories:", error);
+    return [];
+  }
   return (data as Category[]) || [];
 }
 
@@ -141,8 +153,12 @@ export async function validateCoupon(
 export async function getSettings(): Promise<Record<string, string>> {
   const supabase = createServerSupabase();
   if (!supabase) return {};
-  const { data } = await supabase.from("settings").select("*");
+  const { data, error } = await supabase.from("settings").select("*");
 
+  if (error) {
+    console.error("Error fetching settings:", error);
+    return {};
+  }
   const settings: Record<string, string> = {};
   (data || []).forEach((row: any) => {
     settings[row.key] = row.value;
@@ -154,12 +170,16 @@ export async function getSettings(): Promise<Record<string, string>> {
 export async function getWebsiteContent(): Promise<Record<string, WebsiteContent>> {
   const supabase = createServerSupabase();
   if (!supabase) return {};
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("website_content")
     .select("*")
     .eq("is_visible", true)
     .order("sort_order");
 
+  if (error) {
+    console.error("Error fetching website content:", error);
+    return {};
+  }
   const sections: Record<string, WebsiteContent> = {};
   (data || []).forEach((row: any) => {
     sections[row.section] = row;

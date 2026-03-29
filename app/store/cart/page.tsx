@@ -630,8 +630,8 @@ export default function CartPage() {
 
       <div className="card text-right mb-3" style={{ padding: scr.mobile ? 14 : 20 }}>
         <div className="font-bold mb-2" style={{ fontSize: scr.mobile ? 12 : 14 }}>📦 تفاصيل الطلب</div>
-        {order?.items.map((it, i) => (
-          <div key={i} className="flex justify-between py-1.5 border-b border-surface-border">
+        {order?.items.map((it, idx) => (
+          <div key={`item-${idx}`} className="flex justify-between py-1.5 border-b border-surface-border">
             <span className="text-brand" style={{ fontSize: scr.mobile ? 11 : 13 }}>₪{it.price}</span>
             <span style={{ fontSize: scr.mobile ? 11 : 13 }}>{lang === "he" ? (it.name_he || it.name) : it.name}</span>
           </div>

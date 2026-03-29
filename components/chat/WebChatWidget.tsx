@@ -248,9 +248,9 @@ export function WebChatWidget() {
             {/* Quick Replies */}
             {m.quickReplies && m.quickReplies.length > 0 && (
               <div className="flex gap-1 mt-1.5 flex-wrap justify-end">
-                {m.quickReplies.map((qr, i) => (
+                {m.quickReplies.map((qr) => (
                   <button
-                    key={i}
+                    key={qr}
                     onClick={() => send(qr)}
                     disabled={loading || escalated}
                     className="px-2.5 py-1.5 rounded-full border border-brand/40 text-brand text-[10px] font-bold cursor-pointer bg-brand/5 hover:bg-brand/15 transition-colors disabled:opacity-30"

@@ -221,6 +221,18 @@ export async function POST(req: NextRequest) {
         return apiError("رمز التحقق غير صالح", 400);
       }
 
+      // Brute-force protection: max 5 attempts per phone per 15 minutes
+      const { data: attempts } = await supabase
+        .from("customer_otps")
+        .select("id")
+        .eq("phone", cleanPhone)
+        .eq("verified", false)
+        .gte("created_at", new Date(Date.now() - 15 * 60_000).toISOString());
+
+      if (attempts && attempts.length >= 5) {
+        return apiError("محاولات كثيرة — حاول بعد 15 دقيقة", 429);
+      }
+
       // Cleanup expired
       await supabase.from("customer_otps").delete().lt("expires_at", new Date().toISOString());
 
@@ -253,8 +265,9 @@ export async function POST(req: NextRequest) {
         return apiError("رمز التحقق خاطئ أو منتهي الصلاحية", 400);
       }
 
-      // Generate auth token
+      // Generate auth token with expiration
       const token = generateToken();
+      const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60_000).toISOString();
 
       // Upsert customer
       const { data: existingCustomer } = await supabase
@@ -268,7 +281,11 @@ export async function POST(req: NextRequest) {
       if (existingCustomer) {
         const { data: updated } = await supabase
           .from("customers")
-          .update({ auth_token: token, last_login: new Date().toISOString() })
+          .update({
+            auth_token: token,
+            auth_token_expires_at: tokenExpiresAt,
+            last_login: new Date().toISOString(),
+          })
           .eq("id", existingCustomer.id)
           .select("id, name, phone, email, city, address")
           .single();
@@ -281,6 +298,7 @@ export async function POST(req: NextRequest) {
             name: "",
             segment: "new",
             auth_token: token,
+            auth_token_expires_at: tokenExpiresAt,
             last_login: new Date().toISOString(),
           } as any)
           .select("id, name, phone, email, city, address")

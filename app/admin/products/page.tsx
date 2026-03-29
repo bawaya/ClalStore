@@ -1230,7 +1230,7 @@ export default function ProductsPage() {
               <div className="font-bold text-right mt-3 mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>🖼️ معرض صور إضافية</div>
               <div className="flex gap-1.5 flex-wrap mb-1.5">
                 {(form.gallery || []).map((url, i) => (
-                  <div key={i} className="relative w-16 h-16 bg-surface-elevated rounded-lg overflow-hidden flex items-center justify-center cursor-pointer" onClick={() => setZoomImage(url)}>
+                  <div key={url} className="relative w-16 h-16 bg-surface-elevated rounded-lg overflow-hidden flex items-center justify-center cursor-pointer" onClick={() => setZoomImage(url)}>
                     <img src={url} alt="" className="max-h-full max-w-full object-contain" />
                     <button
                       onClick={() => removeGalleryImage(i)}
@@ -1291,7 +1291,7 @@ export default function ProductsPage() {
                 <div className="text-center text-dim text-[10px] py-2">لم تتم إضافة ألوان</div>
               )}
               {(form.colors || []).map((c, i) => (
-                <div key={i} className="bg-surface-elevated rounded-lg p-2 mb-2">
+                <div key={`${c.hex}-${c.name_ar}`} className="bg-surface-elevated rounded-lg p-2 mb-2">
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <button onClick={() => removeColor(i)} className="w-5 h-5 rounded-md border border-state-error/30 bg-transparent text-state-error text-[8px] cursor-pointer flex items-center justify-center flex-shrink-0">✕</button>
                     <input className="input text-xs flex-1" value={c.name_ar} onChange={(e) => updateColor(i, "name_ar", e.target.value)} placeholder="أسود" />
@@ -1449,7 +1449,7 @@ export default function ProductsPage() {
                 <>
                   <div className="text-muted text-[9px] text-right mb-2">كل سعة بسعر ومخزون مختلف. الخيارات ستظهر في كرت المنتج.</div>
                   {(form.variants || []).map((v, i) => (
-                    <div key={i} className="bg-surface-elevated rounded-lg p-2 mb-2">
+                    <div key={`variant-${v.storage}`} className="bg-surface-elevated rounded-lg p-2 mb-2">
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <button onClick={() => removeVariant(i)} className="w-5 h-5 rounded-md border border-state-error/30 bg-transparent text-state-error text-[8px] cursor-pointer flex items-center justify-center flex-shrink-0">✕</button>
                         <input className="input text-xs flex-1" value={v.storage} onChange={(e) => { updateVariant(i, "storage", e.target.value); }} placeholder="256GB" dir="ltr" />

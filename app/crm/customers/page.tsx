@@ -157,8 +157,8 @@ export default function CustomersPage() {
                 </div>
                 {selected.tags?.length > 0 && (
                   <div className="flex gap-1 mt-2 flex-wrap">
-                    {selected.tags.map((t: string, i: number) => (
-                      <span key={i} className="badge bg-brand/10 text-brand">{t}</span>
+                    {selected.tags.map((t: string) => (
+                      <span key={t} className="badge bg-brand/10 text-brand">{t}</span>
                     ))}
                   </div>
                 )}

@@ -46,8 +46,8 @@ export function ConfirmStep({ order }: { order: OrderResult | null }) {
         <div className="font-bold mb-2" style={{ fontSize: scr.mobile ? 12 : 14 }}>
           📦 تفاصيل الطلب
         </div>
-        {order?.items.map((it, i) => (
-          <div key={i} className="flex justify-between py-1.5 border-b border-glass-border">
+        {order?.items.map((it, idx) => (
+          <div key={`item-${idx}`} className="flex justify-between py-1.5 border-b border-glass-border">
             <span className="text-brand" style={{ fontSize: scr.mobile ? 11 : 13 }}>
               ₪{it.price}
             </span>
