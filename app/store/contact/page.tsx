@@ -103,6 +103,8 @@ export default function StoreContactPage() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder={t("storeContact.namePH")}
+                  required
+                  minLength={2}
                 />
               </div>
 
@@ -116,6 +118,8 @@ export default function StoreContactPage() {
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   placeholder="05X-XXXXXXX"
                   dir="ltr"
+                  required
+                  pattern="^0[0-9]{8,9}$"
                 />
               </div>
 

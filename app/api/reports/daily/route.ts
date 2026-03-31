@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Daily Report (Formatted HTML Page)
@@ -9,6 +8,9 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import type { Order, OrderItem, BotConversation, BotHandoff, Customer } from "@/types/database";
+
+type OrderWithItems = Order & { order_items?: OrderItem[] };
 
 export async function GET(req: NextRequest) {
   // Auth: allow CRON_SECRET or authenticated admin
@@ -43,18 +45,18 @@ export async function GET(req: NextRequest) {
   const handoffs = handoffsRes.data || [];
 
   // === Calculate Stats ===
-  const totalRevenue = orders.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+  const totalRevenue = orders.reduce((s: number, o: OrderWithItems) => s + Number(o.total || 0), 0);
   const avgOrderValue = orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
-  const deviceOrders = orders.filter((o: any) => (o.order_items || []).some((i: any) => i.product_type === "device"));
-  const accessoryOrders = orders.filter((o: any) => (o.order_items || []).every((i: any) => i.product_type !== "device"));
+  const deviceOrders = orders.filter((o: OrderWithItems) => (o.order_items || []).some((i: OrderItem) => i.product_type === "device"));
+  const accessoryOrders = orders.filter((o: OrderWithItems) => (o.order_items || []).every((i: OrderItem) => i.product_type !== "device"));
   const statusCounts: Record<string, number> = {};
-  orders.forEach((o: any) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
+  orders.forEach((o: OrderWithItems) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
   const sourceCounts: Record<string, number> = {};
-  orders.forEach((o: any) => { sourceCounts[o.source || "store"] = (sourceCounts[o.source || "store"] || 0) + 1; });
+  orders.forEach((o: OrderWithItems) => { sourceCounts[o.source || "store"] = (sourceCounts[o.source || "store"] || 0) + 1; });
 
-  const botMessages = conversations.reduce((s: number, c: any) => s + Number(c.message_count || 0), 0);
-  const whatsappConvos = conversations.filter((c: any) => c.channel === "whatsapp").length;
-  const webchatConvos = conversations.filter((c: any) => c.channel === "webchat").length;
+  const botMessages = conversations.reduce((s: number, c: BotConversation) => s + Number(c.message_count || 0), 0);
+  const whatsappConvos = conversations.filter((c: BotConversation) => c.channel === "whatsapp").length;
+  const webchatConvos = conversations.filter((c: BotConversation) => c.channel === "webchat").length;
 
   // === Build HTML ===
   const html = `<!DOCTYPE html>
@@ -142,13 +144,13 @@ export async function GET(req: NextRequest) {
       <table>
         <thead><tr><th>رقم الطلب</th><th>الزبون</th><th>المنتجات</th><th>المبلغ</th><th>الحالة</th><th>المصدر</th><th>الوقت</th></tr></thead>
         <tbody>
-          ${orders.map((o: any) => {
-            const items = (o.order_items || []).map((i: any) => i.product_name).join("، ");
+          ${orders.map((o: OrderWithItems) => {
+            const items = (o.order_items || []).map((i: OrderItem) => i.product_name).join("، ");
             const statusMap: Record<string, string> = { new: "جديد", approved: "موافق", processing: "تجهيز", shipped: "شحن", delivered: "تسليم", cancelled: "ملغي" };
             const badgeClass = `badge-${o.status}`;
             return `<tr>
               <td><strong>${o.id}</strong></td>
-              <td>${(o as any).customer_id?.slice(0, 8) || "—"}</td>
+              <td>${o.customer_id?.slice(0, 8) || "—"}</td>
               <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${items || "—"}</td>
               <td><strong>₪${Number(o.total).toLocaleString()}</strong></td>
               <td><span class="badge ${badgeClass}">${statusMap[o.status] || o.status}</span></td>

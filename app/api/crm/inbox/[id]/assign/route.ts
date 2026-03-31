@@ -1,16 +1,19 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Assign Agent to Conversation
 // PUT /api/crm/inbox/[id]/assign
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);

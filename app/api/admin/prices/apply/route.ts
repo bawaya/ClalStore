@@ -1,4 +1,3 @@
-export const runtime = "edge";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
@@ -42,7 +41,7 @@ export async function POST(req: NextRequest) {
       return apiError("No updates or creates provided", 400);
     }
 
-    const db = createAdminSupabase();
+    const supabase = createAdminSupabase();
     let successCount = 0;
     let failCount = 0;
     const errors: string[] = [];
@@ -72,7 +71,7 @@ export async function POST(req: NextRequest) {
         const prices = variants.map((v) => v.price).filter((p) => p > 0);
         const minPrice = prices.length ? Math.min(...prices) : 0;
 
-        const { error: insertErr } = await db.from("products").insert({
+        const { error: insertErr } = await supabase.from("products").insert({
           type: "device",
           brand,
           name_ar: modelName,
@@ -118,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     for (const [productId, productUpdates] of byProduct) {
       try {
-        const { data: product } = await db
+        const { data: product } = await supabase
           .from("products")
           .select("*")
           .eq("id", productId)
@@ -177,7 +176,7 @@ export async function POST(req: NextRequest) {
           updatePayload.storage_options = storageOptions;
         }
 
-        await db
+        await supabase
           .from("products")
           .update(updatePayload)
           .eq("id", productId);

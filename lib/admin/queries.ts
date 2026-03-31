@@ -47,7 +47,7 @@ export async function getDashboardStats() {
 
 // ===== Products CRUD =====
 export async function getAdminProducts(opts?: { limit?: number; offset?: number }) {
-  const limit = opts?.limit ?? 50;
+  const limit = opts?.limit ?? 0;
   const offset = opts?.offset ?? 0;
 
   if (limit > 0) {
@@ -59,8 +59,8 @@ export async function getAdminProducts(opts?: { limit?: number; offset?: number 
     return { data: (data || []) as Product[], total: count ?? 0 };
   }
 
-  // No pagination — return all (backward compat)
-  const { data } = await db().from("products").select("*").order("created_at", { ascending: false });
+  // No pagination — return all with safety limit (backward compat)
+  const { data } = await db().from("products").select("*").order("created_at", { ascending: false }).limit(500);
   return { data: (data || []) as Product[], total: (data || []).length };
 }
 
@@ -83,7 +83,7 @@ export async function deleteProduct(id: string) {
 
 // ===== Coupons CRUD =====
 export async function getAdminCoupons() {
-  const { data, error } = await db().from("coupons").select("*").order("created_at", { ascending: false });
+  const { data, error } = await db().from("coupons").select("*").order("created_at", { ascending: false }).limit(500);
   if (error) throw error;
   return (data || []) as Coupon[];
 }
@@ -163,17 +163,10 @@ export async function getAdminSettings() {
 }
 
 export async function updateSetting(key: string, value: string) {
-  // Try update first, then insert if not exists
-  const supabase = db();
-  const { data: existing } = await supabase.from("settings").select("key").eq("key", key).single();
-  
-  if (existing) {
-    const { error } = await supabase.from("settings").update({ value }).eq("key", key);
-    if (error) throw new Error(`updateSetting update error: ${error.message}`);
-  } else {
-    const { error } = await supabase.from("settings").insert({ key, value, type: "string" });
-    if (error) throw new Error(`updateSetting insert error: ${error.message}`);
-  }
+  const { error } = await db()
+    .from("settings")
+    .upsert({ key, value, type: "string" }, { onConflict: "key" });
+  if (error) throw new Error(`updateSetting error: ${error.message}`);
 }
 
 // ===== Integrations =====

@@ -1,11 +1,11 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Admin AI Enhance API (OpenAI GPT-4o-mini)
 // POST: translate name, generate descriptions, classify, SEO
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
@@ -40,6 +40,9 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     if (!OPENAI_API_KEY) {
       return apiError("OpenAI API key not configured", 500);
     }

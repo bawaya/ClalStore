@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — iCredit IPN Callback
@@ -60,9 +59,9 @@ export async function POST(req: NextRequest) {
       return apiError("Missing order ID", 400);
     }
 
-    const db = createAdminSupabase();
+    const supabase = createAdminSupabase();
 
-    const { data: existingOrder } = await db.from("orders")
+    const { data: existingOrder } = await supabase.from("orders")
       .select("id, status, payment_status")
       .eq("id", orderId)
       .single();
@@ -94,7 +93,7 @@ export async function POST(req: NextRequest) {
 
     // Block unverified payments (except J5 holds)
     if (!verified && !isJ5) {
-      await db.from("orders").update({
+      await supabase.from("orders").update({
         payment_status: "pending",
         payment_details: {
           type: "credit",
@@ -106,7 +105,7 @@ export async function POST(req: NextRequest) {
         },
       }).eq("id", orderId);
 
-      await db.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_name: "iCredit",
         action: `⚠️ دفع غير مُتحقق: ${orderId} — ₪${amount}`,
         entity_type: "payment",
@@ -118,7 +117,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (saleId && amount > 0 && !isJ5) {
-      await db.from("orders").update({
+      await supabase.from("orders").update({
         payment_status: "paid",
         payment_transaction_id: String(customerTransactionId || saleId),
         status: "approved",
@@ -135,7 +134,7 @@ export async function POST(req: NextRequest) {
         },
       }).eq("id", orderId);
 
-      await db.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_name: "iCredit",
         action: `💳 دفع ناجح: ${orderId} — ₪${amount} ${cardLast4 ? `(****${cardLast4})` : ""} ${numPayments > 1 ? `${numPayments} תשלומים` : ""}`,
         entity_type: "payment",
@@ -148,7 +147,7 @@ export async function POST(req: NextRequest) {
 
       try {
         const { notifyNewOrder } = await import("@/lib/bot/notifications");
-        const { data: order } = await db
+        const { data: order } = await supabase
           .from("orders")
           .select("*, customers(name, phone)")
           .eq("id", orderId)
@@ -177,7 +176,7 @@ export async function POST(req: NextRequest) {
         console.error("Payment notification failed for order:", orderId);
       }
     } else if (isJ5) {
-      await db.from("orders").update({
+      await supabase.from("orders").update({
         payment_status: "pending_capture",
         payment_details: {
           type: "credit",
@@ -190,7 +189,7 @@ export async function POST(req: NextRequest) {
         },
       }).eq("id", orderId);
 
-      await db.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_name: "iCredit",
         action: `⏳ دفع معلّق (J5): ${orderId} — ₪${amount}`,
         entity_type: "payment",
@@ -198,7 +197,7 @@ export async function POST(req: NextRequest) {
         details: { sale_id: saleId, amount, status: "j5_hold" },
       });
     } else {
-      await db.from("orders").update({
+      await supabase.from("orders").update({
         payment_status: "failed",
         payment_details: {
           type: "credit",
@@ -209,7 +208,7 @@ export async function POST(req: NextRequest) {
         },
       }).eq("id", orderId);
 
-      await db.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_name: "iCredit",
         action: `❌ فشل الدفع: ${orderId}`,
         entity_type: "payment",

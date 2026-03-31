@@ -1,4 +1,3 @@
-export const runtime = "edge";
 
 /**
  * مطابقة مباشرة بدون AI — لملفات Excel/CSV
@@ -54,8 +53,8 @@ export async function POST(req: NextRequest) {
       return apiError("No rows provided", 400);
     }
 
-    const db = createAdminSupabase();
-    const { data: products, error: dbErr } = await db
+    const supabase = createAdminSupabase();
+    const { data: products, error: dbErr } = await supabase
       .from("products")
       .select("*")
       .eq("type", "device");

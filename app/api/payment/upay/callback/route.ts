@@ -1,4 +1,3 @@
-export const runtime = "edge";
 
 // =====================================================
 // ClalMobile — UPay Payment Callback
@@ -25,10 +24,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${appUrl}/store/cart?error=missing_order`);
   }
 
-  const db = createAdminSupabase();
+  const supabase = createAdminSupabase();
 
   try {
-    const { data: existingOrder } = await db
+    const { data: existingOrder } = await supabase
       .from("orders")
       .select("id, status, payment_status, total")
       .eq("id", orderId)
@@ -49,7 +48,7 @@ export async function GET(req: NextRequest) {
 
     if (errorMessage) {
       console.error("[UPay Callback] Payment error for order:", orderId);
-      await db
+      await supabase
         .from("orders")
         .update({
           payment_status: "failed",
@@ -61,7 +60,7 @@ export async function GET(req: NextRequest) {
         })
         .eq("id", orderId);
 
-      await db.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_name: "UPay",
         action: `❌ فشل الدفع: ${orderId}`,
         entity_type: "payment",
@@ -79,7 +78,7 @@ export async function GET(req: NextRequest) {
       (status !== "SUCCESS" && status !== "APPROVED")
     ) {
       console.error("[UPay Callback] Invalid status for order:", orderId);
-      await db
+      await supabase
         .from("orders")
         .update({
           payment_status: "failed",
@@ -102,7 +101,7 @@ export async function GET(req: NextRequest) {
 
     if (!verification.valid) {
       console.error("[UPay Callback] Verification failed for order:", orderId, verification.error);
-      await db.from("orders").update({
+      await supabase.from("orders").update({
         payment_status: "failed",
         payment_details: {
           provider: "upay",
@@ -111,7 +110,7 @@ export async function GET(req: NextRequest) {
         },
       }).eq("id", orderId);
 
-      await db.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_name: "UPay",
         action: `❌ فشل التحقق من الدفع: ${orderId}`,
         entity_type: "payment",
@@ -131,7 +130,7 @@ export async function GET(req: NextRequest) {
     const orderTotal = Number(existingOrder.total || 0);
     if (orderTotal > 0 && Math.abs(parsedAmount - orderTotal) > 1) {
       console.error("[UPay Callback] Amount mismatch for order:", orderId);
-      await db.from("orders").update({
+      await supabase.from("orders").update({
         payment_status: "failed",
         payment_details: {
           provider: "upay",
@@ -142,7 +141,7 @@ export async function GET(req: NextRequest) {
         },
       }).eq("id", orderId);
 
-      await db.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_name: "UPay",
         action: `❌ مبلغ الدفع لا يطابق الطلب: ${orderId} — دفع ₪${parsedAmount} بدل ₪${orderTotal}`,
         entity_type: "payment",
@@ -155,7 +154,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    await db
+    await supabase
       .from("orders")
       .update({
         payment_status: "paid",
@@ -172,7 +171,7 @@ export async function GET(req: NextRequest) {
       })
       .eq("id", orderId);
 
-    await db.from("audit_log").insert({
+    await supabase.from("audit_log").insert({
       user_name: "UPay",
       action: `💳 دفع ناجح: ${orderId} — ₪${parsedAmount}`,
       entity_type: "payment",
@@ -182,7 +181,7 @@ export async function GET(req: NextRequest) {
 
     try {
       const { notifyNewOrder } = await import("@/lib/bot/notifications");
-      const { data: order } = await db
+      const { data: order } = await supabase
         .from("orders")
         .select("*, customers(name, phone)")
         .eq("id", orderId)

@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
@@ -214,8 +213,8 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    const db = createAdminSupabase();
-    if (!db) return apiError("DB unavailable", 500);
+    const supabase = createAdminSupabase();
+    if (!supabase) return apiError("DB unavailable", 500);
 
     const body = await req.json();
     const { title, body: notifBody, url, icon } = body;
@@ -233,7 +232,7 @@ export async function POST(req: NextRequest) {
     const vapidSubject = process.env.VAPID_SUBJECT || "mailto:info@clalmobile.com";
 
     // Get all active subscriptions
-    const { data: subs } = await db.from("push_subscriptions")
+    const { data: subs } = await supabase.from("push_subscriptions")
       .select("*")
       .eq("active", true);
 
@@ -274,13 +273,13 @@ export async function POST(req: NextRequest) {
 
     // Deactivate stale subscriptions
     if (staleIds.length > 0) {
-      await db.from("push_subscriptions")
+      await supabase.from("push_subscriptions")
         .update({ active: false })
         .in("id", staleIds);
     }
 
     // Save notification record
-    const { data: notif, error } = await db.from("push_notifications").insert({
+    const { data: notif, error } = await supabase.from("push_notifications").insert({
       title,
       body: notifBody,
       url: url || "https://clalmobile.com",
@@ -308,10 +307,10 @@ export async function GET(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    const db = createAdminSupabase();
-    if (!db) return apiSuccess({ notifications: [] });
+    const supabase = createAdminSupabase();
+    if (!supabase) return apiSuccess({ notifications: [] });
 
-    const { data } = await db.from("push_notifications")
+    const { data } = await supabase.from("push_notifications")
       .select("*")
       .order("sent_at", { ascending: false })
       .limit(50);

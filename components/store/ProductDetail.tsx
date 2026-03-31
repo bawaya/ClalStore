@@ -162,7 +162,7 @@ export function ProductDetailClient({
                       opacity: selImage === i ? 1 : 0.6,
                     }}
                   >
-                    <Image src={img} alt="" fill sizes="60px" className="object-contain" />
+                    <Image src={img} alt={`صورة المنتج ${i + 1}`} fill sizes="60px" className="object-contain" />
                   </button>
                 ))}
               </div>

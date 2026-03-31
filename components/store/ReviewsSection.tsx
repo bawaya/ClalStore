@@ -29,7 +29,7 @@ export function ReviewsSection() {
       .then((data) => {
         setReviews(data.reviews || []);
       })
-      .catch(() => setReviews([]))
+      .catch((err) => { console.error("Reviews fetch error:", err); setReviews([]); })
       .finally(() => setLoading(false));
   }, []);
 

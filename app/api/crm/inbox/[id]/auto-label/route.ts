@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
@@ -6,6 +5,16 @@ import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import type { InboxLabel, InboxMessage } from "@/types/database";
+
+interface SuggestedLabel {
+  name: string;
+  is_existing: boolean;
+}
+
+interface AutoLabelResult {
+  labels: SuggestedLabel[];
+}
 
 export async function POST(
   req: NextRequest,
@@ -35,10 +44,10 @@ export async function POST(
       .from("inbox_labels")
       .select("id, name, color");
 
-    const labelNames = (existingLabels || []).map((l: any) => l.name);
+    const labelNames = (existingLabels || []).map((l: InboxLabel) => l.name);
 
     const transcript = messages
-      .map((m: any) => `${m.direction === "inbound" ? "زبون" : "موظف"}: ${m.content || `[${m.message_type}]`}`)
+      .map((m: Pick<InboxMessage, "direction" | "content" | "message_type">) => `${m.direction === "inbound" ? "زبون" : "موظف"}: ${m.content || `[${m.message_type}]`}`)
       .join("\n");
 
     const systemPrompt = `أنت محلل محادثات CRM في متجر ClalMobile (أجهزة ذكية + باقات HOT Mobile).
@@ -78,11 +87,11 @@ export async function POST(
       conversationId,
     });
 
-    const suggested = (result.json as any).labels || [];
+    const suggested = ((result.json as unknown) as AutoLabelResult).labels || [];
 
-    const enriched = suggested.map((s: any) => {
+    const enriched = suggested.map((s: SuggestedLabel) => {
       const existing = (existingLabels || []).find(
-        (l: any) => l.name === s.name
+        (l: InboxLabel) => l.name === s.name
       );
       return {
         name: s.name,

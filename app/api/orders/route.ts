@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — POST /api/orders
@@ -12,10 +11,41 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { generateOrderId, validatePhone, validateIsraeliID } from "@/lib/validators";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import type { Product } from "@/types/database";
+import type { EmailProvider } from "@/lib/integrations/hub";
+
+interface CartItem {
+  productId?: string;
+  name: string;
+  brand: string;
+  type: string;
+  price: number;
+  quantity?: number;
+  color?: string;
+  storage?: string;
+  productName?: string;
+}
+
+interface OrderRequestBody {
+  customer: {
+    name: string;
+    phone: string;
+    city: string;
+    address: string;
+    email?: string;
+    idNumber?: string;
+    notes?: string;
+  };
+  items: CartItem[];
+  payment?: Record<string, unknown>;
+  couponCode?: string;
+  discountAmount?: number;
+  source?: string;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body: OrderRequestBody = await req.json();
     const { customer, items, payment, couponCode, discountAmount: _discountAmount, source } = body;
 
     // === Validation ===
@@ -41,7 +71,7 @@ export async function POST(req: NextRequest) {
       return apiError("السلة فارغة", 400);
     }
 
-    const hasDevice = items.some((i: any) => i.type === "device");
+    const hasDevice = items.some((i: CartItem) => i.type === "device");
     if (hasDevice && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
       return apiError("رقم هوية غير صالح", 400);
     }
@@ -88,7 +118,7 @@ export async function POST(req: NextRequest) {
           address: customer.address,
           id_number: customer.idNumber || undefined,
           segment: "new",
-        } as any)
+        } as Record<string, unknown>)
         .select("id")
         .single();
 
@@ -101,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     // === 2. Verify prices from DB ===
     const orderId = generateOrderId();
-    const productIds = items.map((i: any) => i.productId).filter(Boolean);
+    const productIds = items.map((i: CartItem) => i.productId).filter(Boolean);
     let priceMap: Record<string, number> = {};
     if (productIds.length > 0) {
       const { data: dbProducts } = await supabase
@@ -109,14 +139,14 @@ export async function POST(req: NextRequest) {
         .select("id, price")
         .in("id", productIds);
       if (dbProducts) {
-        priceMap = Object.fromEntries(dbProducts.map((p: any) => [p.id, Number(p.price)]));
+        priceMap = Object.fromEntries(dbProducts.map((p: Pick<Product, "id" | "price">) => [p.id, Number(p.price)]));
       }
     }
-    const verifiedItems = items.map((i: any) => {
-      const dbPrice = i.productId && priceMap[i.productId];
+    const verifiedItems: CartItem[] = items.map((i: CartItem) => {
+      const dbPrice = i.productId ? priceMap[i.productId] : undefined;
       return { ...i, price: dbPrice ?? i.price };
     });
-    const itemsTotal = verifiedItems.reduce((s: number, i: any) => s + i.price * (i.quantity || 1), 0);
+    const itemsTotal = verifiedItems.reduce((s: number, i: CartItem) => s + i.price * (i.quantity || 1), 0);
 
     let discount = 0;
     if (couponCode && typeof couponCode === "string") {
@@ -151,33 +181,8 @@ export async function POST(req: NextRequest) {
     const total = Math.max(0, itemsTotal - discount);
     const _onlyAccessories = !hasDevice && items.length > 0;
 
-    const { error: orderErr } = await supabase.from("orders").insert({
-      id: orderId,
-      customer_id: customerId,
-      status: "new",
-      source: source || "store",
-      items_total: itemsTotal,
-      discount_amount: discount,
-      total: total,
-      coupon_code: couponCode || undefined,
-      payment_method: hasDevice ? "bank" : "credit",
-      payment_details: {
-        ...(payment || {}),
-        payment_status: hasDevice ? "pending" : "awaiting_redirect",
-      },
-      shipping_city: customer.city,
-      shipping_address: customer.address,
-      customer_notes: customer.notes || undefined,
-    } as any);
-
-    if (orderErr) {
-      console.error("Order creation error:", orderErr);
-      return apiError("خطأ في إنشاء الطلب", 500);
-    }
-
-    // === 3. Create Order Items ===
-    const orderItems = verifiedItems.map((i: any) => ({
-      order_id: orderId,
+    // === 2b. Atomic order creation via RPC (single transaction) ===
+    const orderItems = verifiedItems.map((i: CartItem) => ({
       product_id: i.productId || null,
       product_name: i.name,
       product_brand: i.brand,
@@ -188,46 +193,28 @@ export async function POST(req: NextRequest) {
       storage: i.storage || null,
     }));
 
-    const { error: itemsErr } = await supabase
-      .from("order_items")
-      .insert(orderItems);
-
-    if (itemsErr) {
-      console.error("Order items error:", itemsErr);
-      // Cleanup: delete the order since items failed
-      await supabase.from("orders").delete().eq("id", orderId);
-      return apiError("خطأ في حفظ تفاصيل الطلب", 500);
-    }
-
-    // === 4. Update Coupon Usage ===
-    if (couponCode) {
-      const { error: couponErr } = await (supabase.rpc as any)("increment_coupon_usage", { coupon_code: couponCode.toUpperCase() });
-      if (couponErr) {
-        console.error("Coupon usage update failed:", couponErr);
-      }
-    }
-
-    // === 5. Audit Log ===
-    await supabase.from("audit_log").insert({
-      user_name: "النظام",
-      action: `طلب جديد ${orderId} — ₪${total} — ${customer.name}`,
-      entity_type: "order",
-      entity_id: orderId,
-      details: { source, total, items_count: verifiedItems.length, has_device: hasDevice },
+    const { data: rpcResult, error: rpcErr } = await (supabase.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>)("create_order_atomic", {
+      p_order_id: orderId,
+      p_customer_id: customerId,
+      p_source: source || "store",
+      p_items_total: itemsTotal,
+      p_discount_amount: discount,
+      p_total: total,
+      p_coupon_code: couponCode || "",
+      p_payment_method: hasDevice ? "bank" : "credit",
+      p_payment_details: {
+        ...(payment || {}),
+        payment_status: hasDevice ? "pending" : "awaiting_redirect",
+      },
+      p_shipping_city: customer.city,
+      p_shipping_address: customer.address,
+      p_customer_notes: customer.notes || "",
+      p_items: orderItems,
     });
 
-    // === 6. Update Product Stock ===
-    for (const item of verifiedItems) {
-      if (item.productId) {
-        const { error: stockErr } = await (supabase.rpc as any)("decrement_stock", {
-          product_id: item.productId,
-          qty: item.quantity || 1,
-          variant_storage: item.storage || null,
-        });
-        if (stockErr) {
-          console.error("Stock decrement failed:", stockErr);
-        }
-      }
+    if (rpcErr) {
+      console.error("Order atomic creation error:", rpcErr);
+      return apiError("خطأ في إنشاء الطلب", 500);
     }
 
     // === 7. WhatsApp Notifications (Season 4) ===
@@ -247,7 +234,7 @@ export async function POST(req: NextRequest) {
         customerPhone: customer.phone,
         total,
         source: source || "store",
-        items: verifiedItems.map((i: any) => ({
+        items: verifiedItems.map((i: CartItem) => ({
           name: i.name || i.productName || "منتج",
           qty: i.quantity || 1,
           price: Number(i.price || 0),
@@ -262,13 +249,13 @@ export async function POST(req: NextRequest) {
       try {
         const { orderConfirmationEmail } = await import("@/lib/email-templates");
         const { getProvider } = await import("@/lib/integrations/hub");
-        const emailProvider = await getProvider<any>("email");
+        const emailProvider = await getProvider<EmailProvider>("email");
         if (emailProvider) {
           const tmpl = orderConfirmationEmail(
             orderId,
             customer.name,
             total,
-            verifiedItems.map((i: any) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
+            verifiedItems.map((i: CartItem) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
             hasDevice ? "bank" : "credit",
             customer.city,
             customer.address,

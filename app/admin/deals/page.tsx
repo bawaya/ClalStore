@@ -71,7 +71,9 @@ export default function AdminDealsPage() {
       const res = await fetch("/api/admin/deals?admin=true");
       const json = await res.json();
       setDeals(json.deals || []);
-    } catch {}
+    } catch (err) {
+      console.error("Failed to load deals:", err);
+    }
     setLoading(false);
   };
 

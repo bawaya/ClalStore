@@ -1,12 +1,12 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — AI Smart Reply Suggestion
 // POST /api/crm/inbox/[id]/suggest
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
 import { getProductByQuery } from "@/lib/ai/product-context";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
@@ -14,6 +14,9 @@ import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);

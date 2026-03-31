@@ -47,7 +47,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
         {/* Right: Menu + Back + Logo Icon */}
         <div className="flex items-center gap-2">
           {scr.mobile && (
-            <button onClick={() => setMenuOpen(!menuOpen)} className="text-white bg-transparent border-0 cursor-pointer text-xl">☰</button>
+            <button onClick={() => setMenuOpen(!menuOpen)} className="text-white bg-transparent border-0 cursor-pointer text-xl" aria-label="فتح القائمة">☰</button>
           )}
           {showBack && (
             <Link
@@ -58,6 +58,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
                 height: scr.mobile ? 30 : 36,
                 fontSize: 14,
               }}
+              aria-label="العودة للمتجر"
             >
               →
             </Link>

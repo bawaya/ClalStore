@@ -1,11 +1,19 @@
-export const runtime = 'edge';
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getCRMOrders, updateOrderStatus, addOrderNote, assignOrder } from "@/lib/crm/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+
+const VALID_STATUSES = [
+  "pending", "confirmed", "processing", "shipped", "delivered",
+  "cancelled", "returned", "no_reply_1", "no_reply_2", "no_reply_3",
+];
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const { searchParams } = new URL(req.url);
     const filters = {
       status: searchParams.get("status") || undefined,
@@ -21,8 +29,14 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await req.json();
     if (body.action === "status") {
+      if (!body.orderId || !body.status || !VALID_STATUSES.includes(body.status)) {
+        return apiError("orderId and valid status required", 400);
+      }
       await updateOrderStatus(body.orderId, body.status, body.userName || "مدير");
       // WhatsApp notification for status change
       if (body.customerPhone) {

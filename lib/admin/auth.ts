@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminSupabase } from "@/lib/supabase";
+import { apiError, errMsg } from "@/lib/api-response";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Verify the request is from an authenticated admin user.
@@ -40,7 +42,7 @@ export async function requireAdmin(req: NextRequest) {
     const { data: dbUser, error: _dbError } = await adminDb
       .from("users")
       .select("role, status")
-      .eq("id", user.id)
+      .eq("auth_id", user.id)
       .single();
 
     if (dbUser) {
@@ -67,4 +69,32 @@ export async function requireAdmin(req: NextRequest) {
   }
 
   return { ...user, role: "admin" };
+}
+
+/**
+ * Higher-order wrapper for admin API routes.
+ * Handles auth check, DB init, try/catch, and error formatting.
+ *
+ * Usage:
+ *   export const GET = withAdminAuth(async (req, db, user) => {
+ *     const { data } = await db.from("table").select("*");
+ *     return apiSuccess(data);
+ *   });
+ */
+export function withAdminAuth(
+  handler: (req: NextRequest, db: SupabaseClient, user: { id: string; email?: string; role: string }) => Promise<NextResponse>
+) {
+  return async (req: NextRequest) => {
+    try {
+      const auth = await requireAdmin(req);
+      if (auth instanceof NextResponse) return auth;
+
+      const db = createAdminSupabase();
+      if (!db) return apiError("DB unavailable", 500);
+
+      return await handler(req, db, auth as { id: string; email?: string; role: string });
+    } catch (err: unknown) {
+      return apiError(errMsg(err), 500);
+    }
+  };
 }

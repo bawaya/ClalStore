@@ -1,6 +1,6 @@
 -- =====================================================
 -- ClalMobile — Sub Pages Table
--- Migration 011: Custom sub-pages managed from admin
+-- Migration 014: Custom sub-pages managed from admin
 -- Run in Supabase SQL Editor
 -- =====================================================
 

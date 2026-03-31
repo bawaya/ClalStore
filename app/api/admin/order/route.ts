@@ -1,4 +1,3 @@
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,12 +11,12 @@ export async function GET(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-    const db = createAdminSupabase();
-    if (!db) return apiError("DB unavailable", 500);
+    const supabase = createAdminSupabase();
+    if (!supabase) return apiError("DB unavailable", 500);
 
     const [settingsRes, brandsRes] = await Promise.all([
-      db.from("settings").select("value").eq("key", SETTINGS_KEY).single(),
-      db.from("products").select("brand").eq("active", true).eq("type", "device"),
+      supabase.from("settings").select("value").eq("key", SETTINGS_KEY).single(),
+      supabase.from("products").select("brand").eq("active", true).eq("type", "device"),
     ]);
 
     const allBrands = [...new Set((brandsRes.data || []).map((r: { brand: string }) => r.brand).filter(Boolean))].sort();
@@ -52,20 +51,20 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    const db = createAdminSupabase();
-    if (!db) return apiError("DB unavailable", 500);
+    const supabase = createAdminSupabase();
+    if (!supabase) return apiError("DB unavailable", 500);
 
     const value = JSON.stringify({
       rules: config.rules,
       brandOrder: Array.isArray(config.brandOrder) ? config.brandOrder : [],
     });
 
-    const { data: existing } = await db.from("settings").select("key").eq("key", SETTINGS_KEY).single();
+    const { data: existing } = await supabase.from("settings").select("key").eq("key", SETTINGS_KEY).single();
 
     if (existing) {
-      await db.from("settings").update({ value }).eq("key", SETTINGS_KEY);
+      await supabase.from("settings").update({ value }).eq("key", SETTINGS_KEY);
     } else {
-      await db.from("settings").insert({ key: SETTINGS_KEY, value, type: "json" });
+      await supabase.from("settings").insert({ key: SETTINGS_KEY, value, type: "json" });
     }
 
     return apiSuccess(null);

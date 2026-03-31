@@ -14,33 +14,25 @@ export default function CRMError({
   }, [error]);
 
   return (
-    <div
-      dir="rtl"
-      className="font-arabic bg-surface-bg text-white min-h-screen flex items-center justify-center"
-    >
-      <div className="text-center px-4 max-w-md">
-        <div className="text-6xl mb-4">⚠️</div>
-        <h1 className="text-2xl font-black mb-2">حصل خطأ في نظام CRM</h1>
-        <p className="text-muted mb-6">
-          حصل خطأ غير متوقع. حاول مرة ثانية أو ارجع للوحة التحكم.
-        </p>
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={reset}
-            className="px-6 py-3 rounded-button bg-brand font-bold text-white border-0 cursor-pointer hover:bg-brand-light transition-colors"
-          >
-            🔄 حاول مرة ثانية
-          </button>
-          <a
-            href="/crm"
-            className="px-6 py-3 rounded-button font-bold text-muted border border-surface-border hover:border-dim transition-colors"
-          >
-            🏠 لوحة CRM
-          </a>
-        </div>
-        {error.digest && (
-          <p className="text-dim text-[10px] mt-4">Error ID: {error.digest}</p>
-        )}
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-8">
+      <div className="text-4xl">⚠️</div>
+      <h2 className="text-xl font-bold text-white">حدث خطأ في نظام إدارة العملاء</h2>
+      <p className="text-muted text-sm max-w-md">
+        حدث خطأ غير متوقع. يمكنك المحاولة مجدداً أو العودة للوحة.
+      </p>
+      <div className="flex gap-3 mt-2">
+        <button
+          onClick={reset}
+          className="btn-primary px-6 py-2 rounded-xl font-bold text-sm"
+        >
+          حاول مجدداً
+        </button>
+        <a
+          href="/crm"
+          className="px-6 py-2 rounded-xl border border-surface-border text-muted text-sm hover:text-white transition"
+        >
+          الصفحة الرئيسية
+        </a>
       </div>
     </div>
   );

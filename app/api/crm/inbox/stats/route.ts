@@ -1,16 +1,25 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Inbox Stats
 // GET /api/crm/inbox/stats
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function GET(_req: NextRequest) {
+interface ConversationStats {
+  status: string;
+  unread_count: number;
+  resolved_at: string | null;
+}
+
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
@@ -25,14 +34,14 @@ export async function GET(_req: NextRequest) {
 
     const stats = {
       total_conversations: convs.length,
-      active: convs.filter((c: any) => c.status === "active").length,
-      waiting: convs.filter((c: any) => c.status === "waiting").length,
-      bot: convs.filter((c: any) => c.status === "bot").length,
+      active: convs.filter((c: ConversationStats) => c.status === "active").length,
+      waiting: convs.filter((c: ConversationStats) => c.status === "waiting").length,
+      bot: convs.filter((c: ConversationStats) => c.status === "bot").length,
       resolved_today: convs.filter(
-        (c: any) => c.status === "resolved" && c.resolved_at && new Date(c.resolved_at) >= todayStart
+        (c: ConversationStats) => c.status === "resolved" && c.resolved_at && new Date(c.resolved_at) >= todayStart
       ).length,
       messages_today: 0,
-      unread_total: convs.reduce((sum: number, c: any) => sum + (c.unread_count || 0), 0),
+      unread_total: convs.reduce((sum: number, c: ConversationStats) => sum + (c.unread_count || 0), 0),
     };
 
     // Messages today count

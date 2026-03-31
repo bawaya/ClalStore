@@ -263,7 +263,8 @@ export async function getLinePlans(): Promise<LinePlan[]> {
     .from("line_plans")
     .select("*")
     .eq("active", true)
-    .order("sort_order");
+    .order("sort_order")
+    .limit(50);
   return (data || []) as LinePlan[];
 }
 
@@ -297,13 +298,13 @@ export async function lookupOrder(orderId?: string, phone?: string) {
       .from("orders")
       .select("*, order_items(*)" as any)
       .eq("id", orderId)
-      .single();
+      .maybeSingle();
     return data as any;
   }
 
   if (phone) {
     // Find customer first, then last order
-    const { data: customer } = await s.from("customers").select("id").eq("phone", phone).single();
+    const { data: customer } = await s.from("customers").select("id").eq("phone", phone).maybeSingle();
     if (!customer) return null;
     const { data } = await s
       .from("orders")
@@ -311,7 +312,7 @@ export async function lookupOrder(orderId?: string, phone?: string) {
       .eq("customer_id", customer.id)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
     return data as any;
   }
 
@@ -324,7 +325,7 @@ export async function upsertCustomer(phone: string, name?: string, city?: string
   const normalized = phone.replace(/[-\s()]/g, "");
 
   // Check existing
-  const { data: existing } = await s.from("customers").select("*").eq("phone", normalized).single();
+  const { data: existing } = await s.from("customers").select("*").eq("phone", normalized).maybeSingle();
   if (existing) return existing;
 
   // Also check with +972 format
@@ -334,17 +335,18 @@ export async function upsertCustomer(phone: string, name?: string, city?: string
       ? "0" + normalized.slice(4)
       : normalized;
 
-  const { data: existing2 } = await s.from("customers").select("*").eq("phone", altPhone).single();
+  const { data: existing2 } = await s.from("customers").select("*").eq("phone", altPhone).maybeSingle();
   if (existing2) return existing2;
 
   // Create new customer
   if (name) {
-    const { data: newCust } = await s.from("customers").insert({
+    const { data: newCust, error: insertErr } = await s.from("customers").insert({
       name: name,
       phone: normalized,
       city: city || "",
       segment: "new",
     } as any).select().single();
+    if (insertErr) console.error("Customer insert error:", insertErr);
     return newCust;
   }
 

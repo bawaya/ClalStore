@@ -4,6 +4,34 @@
 // =====================================================
 
 import { createAdminSupabase } from "@/lib/supabase";
+import type { Order, Customer, Task, PipelineDeal, AppUser, AuditEntry, BotConversation, BotMessage } from "@/types/database";
+
+// ----- Row subsets returned by dashboard queries -----
+type DashboardOrder = Pick<Order, "id" | "status" | "source" | "total" | "created_at" | "customer_id" | "assigned_to">;
+type DashboardCustomer = Pick<Customer, "id" | "name" | "phone" | "segment" | "total_orders" | "total_spent" | "last_order_at">;
+type DashboardTask = Pick<Task, "id" | "status" | "priority" | "due_date" | "assigned_to">;
+type DashboardPipelineDeal = Pick<PipelineDeal, "id" | "stage" | "value">;
+
+// Row subset for order-deletion recalculation
+type OrderTotalRow = Pick<Order, "total" | "status" | "created_at">;
+
+// Supabase result for assigned_to counting
+type AssignedToRow = Pick<Order, "assigned_to">;
+
+// Audit entry subset
+type AuditActivityRow = Pick<AuditEntry, "user_name" | "action" | "created_at">;
+
+// Bot message subset used in chat enrichment
+type LastMessageRow = Pick<BotMessage, "conversation_id" | "content" | "role" | "created_at">;
+
+// Customer subset used in chat enrichment
+type ChatCustomerRow = Pick<Customer, "id" | "name" | "phone" | "email">;
+
+// Bot conversation subset for stats
+type ConvoStatsRow = Pick<BotConversation, "id" | "channel" | "status" | "intent" | "created_at">;
+
+// Allow null in addition to undefined for optional fields (Zod schemas produce `| null`)
+type Nullable<T> = { [K in keyof T]: T[K] | null };
 
 const db = () => createAdminSupabase();
 
@@ -11,10 +39,10 @@ const db = () => createAdminSupabase();
 export async function getCRMDashboard() {
   const s = db();
   const [orders, customers, tasks, pipeline] = await Promise.all([
-    s.from("orders").select("id, status, source, total, created_at, customer_id, assigned_to").order("created_at", { ascending: false }),
-    s.from("customers").select("id, name, phone, segment, total_orders, total_spent, last_order_at"),
-    s.from("tasks").select("id, status, priority, due_date, assigned_to"),
-    s.from("pipeline_deals").select("id, stage, value"),
+    s.from("orders").select("id, status, source, total, created_at, customer_id, assigned_to").order("created_at", { ascending: false }).limit(1000),
+    s.from("customers").select("id, name, phone, segment, total_orders, total_spent, last_order_at").limit(1000),
+    s.from("tasks").select("id, status, priority, due_date, assigned_to").limit(500),
+    s.from("pipeline_deals").select("id, stage, value").limit(500),
   ]);
 
   const o = orders.data || [];
@@ -22,17 +50,17 @@ export async function getCRMDashboard() {
   const t = tasks.data || [];
   const p = pipeline.data || [];
 
-  const revenue = o.filter((x: any) => !["rejected", "new"].includes(x.status)).reduce((s: number, x: any) => s + Number(x.total), 0);
+  const revenue = o.filter((x: DashboardOrder) => !["rejected", "new"].includes(x.status)).reduce((s: number, x: DashboardOrder) => s + Number(x.total), 0);
   const byStatus: Record<string, number> = {};
   const bySource: Record<string, number> = {};
-  o.forEach((x: any) => { byStatus[x.status] = (byStatus[x.status] || 0) + 1; bySource[x.source] = (bySource[x.source] || 0) + 1; });
+  o.forEach((x: DashboardOrder) => { byStatus[x.status] = (byStatus[x.status] || 0) + 1; bySource[x.source] = (bySource[x.source] || 0) + 1; });
 
   const alerts: { type: string; msg: string; count: number; color: string }[] = [];
-  const newCount = o.filter((x: any) => x.status === "new").length;
-  const noReply = o.filter((x: any) => x.status?.startsWith("no_reply")).length;
-  const noReply3 = o.filter((x: any) => x.status === "no_reply_3").length;
-  const openTasks = t.filter((x: any) => x.status !== "done").length;
-  const coldCustomers = c.filter((x: any) => x.segment === "cold" || x.segment === "lost").length;
+  const newCount = o.filter((x: DashboardOrder) => x.status === "new").length;
+  const noReply = o.filter((x: DashboardOrder) => x.status?.startsWith("no_reply")).length;
+  const noReply3 = o.filter((x: DashboardOrder) => x.status === "no_reply_3").length;
+  const openTasks = t.filter((x: DashboardTask) => x.status !== "done").length;
+  const coldCustomers = c.filter((x: DashboardCustomer) => x.segment === "cold" || x.segment === "lost").length;
 
   if (newCount > 0) alerts.push({ type: "new", msg: `${newCount} طلبات جديدة`, count: newCount, color: "#3b82f6" });
   if (noReply > 0) alerts.push({ type: "noReply", msg: `${noReply} بدون رد`, count: noReply, color: "#f97316" });
@@ -40,11 +68,11 @@ export async function getCRMDashboard() {
   if (openTasks > 0) alerts.push({ type: "tasks", msg: `${openTasks} مهام مفتوحة`, count: openTasks, color: "#a855f7" });
   if (coldCustomers > 0) alerts.push({ type: "cold", msg: `${coldCustomers} زبائن باردين`, count: coldCustomers, color: "#eab308" });
 
-  const pipelineValue = p.filter((x: any) => x.stage !== "lost").reduce((s: number, x: any) => s + Number(x.value), 0);
+  const pipelineValue = p.filter((x: DashboardPipelineDeal) => x.stage !== "lost").reduce((s: number, x: DashboardPipelineDeal) => s + Number(x.value), 0);
 
   const suggestedFollowupsList = c
-    .filter((x: any) => ["cold", "lost", "inactive"].includes(x.segment) || (!x.last_order_at && (x.total_orders || 0) === 0))
-    .sort((a: any, b: any) => {
+    .filter((x: DashboardCustomer) => ["cold", "lost", "inactive"].includes(x.segment) || (!x.last_order_at && (x.total_orders || 0) === 0))
+    .sort((a: DashboardCustomer, b: DashboardCustomer) => {
       const aDate = a.last_order_at ? new Date(a.last_order_at).getTime() : 0;
       const bDate = b.last_order_at ? new Date(b.last_order_at).getTime() : 0;
       return aDate - bDate;
@@ -53,11 +81,11 @@ export async function getCRMDashboard() {
 
   return {
     totalOrders: o.length, revenue, newCount, noReply, noReply3,
-    totalCustomers: c.length, vipCount: c.filter((x: any) => x.segment === "vip").length,
+    totalCustomers: c.length, vipCount: c.filter((x: DashboardCustomer) => x.segment === "vip").length,
     openTasks, pipelineValue, pipelineDeals: p.length,
     byStatus, bySource, alerts,
     recentOrders: o.slice(0, 5),
-    suggestedFollowups: suggestedFollowupsList.map((x: any) => ({ id: x.id, name: x.name, phone: x.phone, last_order_at: x.last_order_at, segment: x.segment })),
+    suggestedFollowups: suggestedFollowupsList.map((x: DashboardCustomer) => ({ id: x.id, name: x.name, phone: x.phone, last_order_at: x.last_order_at, segment: x.segment })),
   };
 }
 
@@ -128,6 +156,9 @@ export async function deleteOrderCompletely(orderId: string, userName: string) {
   // Keep audit history clean when removing an order entirely.
   await s.from("audit_log").delete().eq("entity_id", orderId);
 
+  // Delete order items first (foreign key dependency)
+  await s.from("order_items").delete().eq("order_id", orderId);
+
   // Loyalty transactions may reference order_id. Ignore missing-table setups.
   try {
     await s.from("loyalty_transactions").delete().eq("order_id", orderId);
@@ -143,13 +174,13 @@ export async function deleteOrderCompletely(orderId: string, userName: string) {
     .from("orders")
     .select("total, status, created_at")
     .eq("customer_id", order.customer_id);
-  const rows = remaining || [];
-  const nonRejected = rows.filter((r: any) => r.status !== "rejected");
-  const billable = rows.filter((r: any) => !["rejected", "new"].includes(r.status));
-  const totalSpent = billable.reduce((sum: number, r: any) => sum + Number(r.total || 0), 0);
+  const rows: OrderTotalRow[] = remaining || [];
+  const nonRejected = rows.filter((r) => r.status !== "rejected");
+  const billable = rows.filter((r) => !["rejected", "new"].includes(r.status));
+  const totalSpent = billable.reduce((sum: number, r) => sum + Number(r.total || 0), 0);
   const avg = billable.length > 0 ? totalSpent / billable.length : 0;
   const last = rows.length > 0
-    ? rows.map((r: any) => r.created_at).sort().at(-1) || null
+    ? rows.map((r) => r.created_at).sort().at(-1) || null
     : null;
   await s.from("customers").update({
     total_orders: nonRejected.length,
@@ -186,28 +217,28 @@ export async function getCRMCustomers(filters?: { segment?: string; search?: str
 
 export async function getCustomerOrders(customerId: string) {
   const s = db();
-  const { data } = await s.from("orders").select("*, order_items(*)" as any).eq("customer_id", customerId).order("created_at", { ascending: false });
-  return (data || []) as any[];
+  const { data } = await s.from("orders").select("*, order_items(*)").eq("customer_id", customerId).order("created_at", { ascending: false });
+  return data || [];
 }
 
 // ===== Tasks =====
 export async function getCRMTasks(filters?: { status?: string; assignedTo?: string }) {
   const s = db();
-  let query = s.from("tasks").select("*, customers(name), orders(id)" as any).order("created_at", { ascending: false });
-  if (filters?.status) query = query.eq("status", filters.status as any);
+  let query = s.from("tasks").select("*, customers(name), orders(id)").order("created_at", { ascending: false });
+  if (filters?.status) query = query.eq("status", filters.status);
   if (filters?.assignedTo) query = query.eq("assigned_to", filters.assignedTo);
   const { data } = await query;
   return data || [];
 }
 
-export async function createTask(task: any) {
+export async function createTask(task: Nullable<Omit<Task, "id" | "created_at" | "updated_at">>) {
   const s = db();
   const { data, error } = await s.from("tasks").insert(task).select().single();
   if (error) throw error;
   return data;
 }
 
-export async function updateTask(id: string, updates: any) {
+export async function updateTask(id: string, updates: Partial<Nullable<Omit<Task, "id">>>) {
   const s = db();
   const { error } = await s.from("tasks").update(updates).eq("id", id);
   if (error) throw error;
@@ -224,13 +255,13 @@ export async function getPipelineDeals() {
   return data || [];
 }
 
-export async function createDeal(deal: any) {
+export async function createDeal(deal: Omit<PipelineDeal, "id" | "created_at" | "updated_at">) {
   const { data, error } = await db().from("pipeline_deals").insert(deal).select().single();
   if (error) throw error;
   return data;
 }
 
-export async function updateDeal(id: string, updates: any) {
+export async function updateDeal(id: string, updates: Partial<Omit<PipelineDeal, "id">>) {
   const { error } = await db().from("pipeline_deals").update(updates).eq("id", id);
   if (error) throw error;
 }
@@ -243,13 +274,13 @@ export async function deleteDeal(id: string) {
 export async function getCRMUsers() {
   const s = db();
   const { data: users } = await s.from("users").select("*").order("created_at");
-  const list = (users || []) as any[];
+  const list: AppUser[] = users || [];
   if (list.length === 0) return [];
 
   // Enrich with orders count per user (assigned_to)
   const { data: orderCounts } = await s.from("orders").select("assigned_to");
   const countMap: Record<string, number> = {};
-  (orderCounts || []).forEach((o: any) => {
+  (orderCounts || []).forEach((o: AssignedToRow) => {
     if (o.assigned_to) countMap[o.assigned_to] = (countMap[o.assigned_to] || 0) + 1;
   });
 
@@ -259,11 +290,11 @@ export async function getCRMUsers() {
     .order("created_at", { ascending: false })
     .limit(200);
   const lastActivityMap: Record<string, { action: string; created_at: string }> = {};
-  (auditEntries || []).forEach((a: any) => {
+  (auditEntries || []).forEach((a: AuditActivityRow) => {
     if (!lastActivityMap[a.user_name]) lastActivityMap[a.user_name] = { action: a.action, created_at: a.created_at };
   });
 
-  return list.map((u: any) => ({
+  return list.map((u) => ({
     ...u,
     orders_count: countMap[u.id] || 0,
     last_activity: lastActivityMap[u.name] || null,
@@ -272,7 +303,7 @@ export async function getCRMUsers() {
 
 export async function updateUser(id: string, updates: { role?: string; status?: string }, userName = "النظام") {
   const s = db();
-  const { error } = await s.from("users").update(updates as any).eq("id", id);
+  const { error } = await s.from("users").update(updates).eq("id", id);
   if (error) throw error;
   // Record in audit_log
   const changes = Object.entries(updates).map(([k, v]) => `${k}=${v}`).join(", ");
@@ -281,8 +312,8 @@ export async function updateUser(id: string, updates: { role?: string; status?: 
     action: `تحديث مستخدم: ${changes}`,
     entity_type: "user",
     entity_id: id,
-    details: updates,
-  } as any);
+    details: updates as Record<string, unknown>,
+  });
 }
 
 // ===== Audit Log =====
@@ -297,23 +328,27 @@ export async function getCRMChats(filters?: { channel?: string; status?: string;
 
   // Count total (before filters for pagination context)
   let countQuery = s.from("bot_conversations").select("id", { count: "exact", head: true });
-  if (filters?.channel) countQuery = countQuery.eq("channel", filters.channel as any);
-  if (filters?.status) countQuery = countQuery.eq("status", filters.status as any);
+  if (filters?.channel) countQuery = countQuery.eq("channel", filters.channel);
+  if (filters?.status) countQuery = countQuery.eq("status", filters.status);
   const { count: totalCount } = await countQuery;
 
   // Main query
   let query = s.from("bot_conversations").select("*").order("updated_at", { ascending: false });
-  if (filters?.channel) query = query.eq("channel", filters.channel as any);
-  if (filters?.status) query = query.eq("status", filters.status as any);
+  if (filters?.channel) query = query.eq("channel", filters.channel);
+  if (filters?.status) query = query.eq("status", filters.status);
   if (filters?.limit) query = query.limit(filters.limit);
   if (filters?.offset) query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
   const { data } = await query;
-  let results = (data || []) as any[];
+  type ConvoResult = BotConversation & {
+    last_message?: { content: string | null; role: string; created_at: string } | null;
+    customer?: ChatCustomerRow | null;
+  };
+  let results: ConvoResult[] = (data || []) as ConvoResult[];
 
   // Client-side search filter (visitor_id, customer_name, customer_phone)
   if (filters?.search) {
     const q = filters.search.toLowerCase();
-    results = results.filter((c: any) =>
+    results = results.filter((c) =>
       c.visitor_id?.toLowerCase().includes(q) ||
       c.customer_name?.toLowerCase().includes(q) ||
       c.customer_phone?.includes(q)
@@ -322,17 +357,17 @@ export async function getCRMChats(filters?: { channel?: string; status?: string;
 
   // Fetch last_message for each conversation
   if (results.length > 0) {
-    const ids = results.map((c: any) => c.id);
+    const ids = results.map((c) => c.id);
     const { data: lastMsgs } = await s.from("bot_messages")
       .select("conversation_id, content, role, created_at")
       .in("conversation_id", ids)
       .order("created_at", { ascending: false });
     // Group by conversation_id — first per group is the latest
-    const lastByConvo: Record<string, any> = {};
-    (lastMsgs || []).forEach((m: any) => {
+    const lastByConvo: Record<string, LastMessageRow> = {};
+    (lastMsgs || []).forEach((m: LastMessageRow) => {
       if (!lastByConvo[m.conversation_id]) lastByConvo[m.conversation_id] = m;
     });
-    results = results.map((c: any) => ({
+    results = results.map((c) => ({
       ...c,
       last_message: lastByConvo[c.id]
         ? { content: lastByConvo[c.id].content, role: lastByConvo[c.id].role, created_at: lastByConvo[c.id].created_at }
@@ -341,12 +376,12 @@ export async function getCRMChats(filters?: { channel?: string; status?: string;
   }
 
   // Join customer info if customer_id exists
-  const customerIds = results.map((c: any) => c.customer_id).filter(Boolean);
+  const customerIds = results.map((c) => c.customer_id).filter(Boolean);
   if (customerIds.length > 0) {
-    const { data: customers } = await s.from("customers").select("id, name, phone, email").in("id", customerIds);
-    const custMap: Record<string, any> = {};
-    (customers || []).forEach((cu: any) => { custMap[cu.id] = cu; });
-    results = results.map((c: any) => {
+    const { data: customers } = await s.from("customers").select("id, name, phone, email").in("id", customerIds as string[]);
+    const custMap: Record<string, ChatCustomerRow> = {};
+    (customers || []).forEach((cu: ChatCustomerRow) => { custMap[cu.id] = cu; });
+    results = results.map((c) => {
       if (c.customer_id && custMap[c.customer_id]) {
         return { ...c, customer: custMap[c.customer_id] };
       }
@@ -369,39 +404,39 @@ export async function getChatMessages(conversationId: string) {
 export async function closeConversation(conversationId: string) {
   const s = db();
   const { error } = await s.from("bot_conversations")
-    .update({ status: "closed" } as any)
+    .update({ status: "closed" })
     .eq("id", conversationId);
   if (error) throw error;
   await s.from("audit_log").insert({
     user_name: "النظام", action: `إغلاق محادثة ${conversationId}`,
     entity_type: "bot_conversation", entity_id: conversationId,
-  } as any);
+  });
 }
 
 export async function escalateConversation(conversationId: string) {
   const s = db();
   const { error } = await s.from("bot_conversations")
-    .update({ status: "escalated" } as any)
+    .update({ status: "escalated" })
     .eq("id", conversationId);
   if (error) throw error;
   await s.from("audit_log").insert({
     user_name: "النظام", action: `تصعيد محادثة ${conversationId}`,
     entity_type: "bot_conversation", entity_id: conversationId,
-  } as any);
+  });
 }
 
 export async function getChatStats() {
   const s = db();
   const { data: convos } = await s.from("bot_conversations").select("id, channel, status, intent, created_at");
-  const all = (convos || []) as any[];
+  const all: ConvoStatsRow[] = convos || [];
   const total = all.length;
-  const whatsapp = all.filter((c: any) => c.channel === "whatsapp").length;
-  const webchat = all.filter((c: any) => c.channel === "webchat").length;
-  const sms = all.filter((c: any) => c.channel === "sms").length;
-  const active = all.filter((c: any) => c.status === "active").length;
-  const escalated = all.filter((c: any) => c.status === "escalated").length;
+  const whatsapp = all.filter((c) => c.channel === "whatsapp").length;
+  const webchat = all.filter((c) => c.channel === "webchat").length;
+  const sms = all.filter((c) => c.channel === "sms").length;
+  const active = all.filter((c) => c.status === "active").length;
+  const escalated = all.filter((c) => c.status === "escalated").length;
   const intentCounts: Record<string, number> = {};
-  all.forEach((c: any) => {
+  all.forEach((c) => {
     const intent = c.intent || "unknown";
     intentCounts[intent] = (intentCounts[intent] || 0) + 1;
   });

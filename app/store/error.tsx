@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { useLang } from "@/lib/i18n";
-import Link from "next/link";
 
 export default function StoreError({
   error,
@@ -11,38 +9,30 @@ export default function StoreError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const { t } = useLang();
-
   useEffect(() => {
     console.error("[Store Error]", error);
   }, [error]);
 
   return (
-    <div
-      dir="rtl"
-      className="font-arabic bg-surface-bg text-white min-h-screen flex items-center justify-center"
-    >
-      <div className="text-center px-4 max-w-md">
-        <div className="text-6xl mb-4">⚠️</div>
-        <h1 className="text-2xl font-black mb-2">{t("errors.somethingWrong")}</h1>
-        <p className="text-muted mb-6">{t("errors.unexpectedError")}</p>
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={reset}
-            className="px-6 py-3 rounded-button bg-brand font-bold text-white border-0 cursor-pointer hover:bg-brand-light transition-colors"
-          >
-            {t("errors.tryAgain")}
-          </button>
-          <Link
-            href="/store"
-            className="px-6 py-3 rounded-button font-bold text-muted border border-surface-border hover:border-dim transition-colors"
-          >
-            {t("errors.goStore")}
-          </Link>
-        </div>
-        {error.digest && (
-          <p className="text-dim text-[10px] mt-4">Error ID: {error.digest}</p>
-        )}
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-8">
+      <div className="text-4xl">😔</div>
+      <h2 className="text-xl font-bold text-white">حدث خطأ</h2>
+      <p className="text-muted text-sm max-w-md">
+        عذراً، حدث خطأ غير متوقع. يمكنك المحاولة مجدداً أو تصفح المتجر.
+      </p>
+      <div className="flex gap-3 mt-2">
+        <button
+          onClick={reset}
+          className="btn-primary px-6 py-2 rounded-xl font-bold text-sm"
+        >
+          حاول مجدداً
+        </button>
+        <a
+          href="/store"
+          className="px-6 py-2 rounded-xl border border-surface-border text-muted text-sm hover:text-white transition"
+        >
+          العودة للمتجر
+        </a>
       </div>
     </div>
   );

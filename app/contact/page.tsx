@@ -137,11 +137,11 @@ export default function ContactPage() {
             <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
               <div>
                 <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.name")} <span className="text-brand">*</span></label>
-                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required minLength={2} />
               </div>
               <div>
                 <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.phone")} <span className="text-brand">*</span></label>
-                <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05X-XXXXXXX" dir="ltr" />
+                <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05X-XXXXXXX" dir="ltr" required pattern="^0[0-9]{8,9}$" />
               </div>
             </div>
             <div className="mt-2">

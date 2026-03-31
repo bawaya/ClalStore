@@ -47,7 +47,7 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
       {h.image_url && (
         <img
           src={h.image_url}
-          alt=""
+          alt={h.title_ar || h.title_he || "عرض ترويجي"}
           className="absolute inset-0 w-full h-full object-cover opacity-20 rounded-[inherit]"
         />
       )}

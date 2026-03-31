@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Sub Pages CRUD API
@@ -25,10 +24,13 @@ const subPageSchema = z.object({
 
 const subPageUpdateSchema = subPageSchema.partial();
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const db = createAdminSupabase();
-    const { data, error } = await db
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
+    const supabase = createAdminSupabase();
+    const { data, error } = await supabase
       .from("sub_pages")
       .select("*")
       .order("sort_order", { ascending: true });
@@ -44,12 +46,12 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    const db = createAdminSupabase();
+    const supabase = createAdminSupabase();
     const body = await req.json();
     const parsed = subPageSchema.safeParse(body);
     if (!parsed.success) return apiError(parsed.error.issues[0]?.message || "Invalid data", 400);
 
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from("sub_pages")
       .insert(parsed.data)
       .select()
@@ -66,7 +68,7 @@ export async function PUT(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    const db = createAdminSupabase();
+    const supabase = createAdminSupabase();
     const body = await req.json();
     const { id, ...updates } = body;
     if (!id) return apiError("id required", 400);
@@ -75,7 +77,7 @@ export async function PUT(req: NextRequest) {
     if (!parsed.success) return apiError(parsed.error.issues[0]?.message || "Invalid data", 400);
 
     const payload = { ...parsed.data, updated_at: new Date().toISOString() };
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from("sub_pages")
       .update(payload)
       .eq("id", id)
@@ -93,11 +95,11 @@ export async function DELETE(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    const db = createAdminSupabase();
+    const supabase = createAdminSupabase();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return apiError("id required", 400);
-    const { error } = await db
+    const { error } = await supabase
       .from("sub_pages")
       .delete()
       .eq("id", id);

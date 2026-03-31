@@ -1,16 +1,20 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Inbox Conversations API
 // GET /api/crm/inbox — list with filters, search, stats
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import type { InboxConversation, InboxLabel } from "@/types/database";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
@@ -60,27 +64,27 @@ export async function GET(req: NextRequest) {
         .from("inbox_conversation_labels")
         .select("conversation_id")
         .eq("label_id", label);
-      const labelConvIds = new Set((labelConvs || []).map((l: any) => l.conversation_id));
-      filteredConvs = filteredConvs.filter((c: any) => labelConvIds.has(c.id));
+      const labelConvIds = new Set((labelConvs || []).map((l: { conversation_id: string }) => l.conversation_id));
+      filteredConvs = filteredConvs.filter((c: InboxConversation) => labelConvIds.has(c.id));
     }
 
     // Get labels for all conversations
-    const convIds = filteredConvs.map((c: any) => c.id);
-    let labelsMap: Record<string, any[]> = {};
+    const convIds = filteredConvs.map((c: InboxConversation) => c.id);
+    let labelsMap: Record<string, InboxLabel[]> = {};
     if (convIds.length > 0) {
       const { data: convLabels } = await supabase
         .from("inbox_conversation_labels")
         .select("conversation_id, label_id")
         .in("conversation_id", convIds);
-      const labelIds = [...new Set((convLabels || []).map((cl: any) => cl.label_id))];
+      const labelIds = [...new Set((convLabels || []).map((cl: { conversation_id: string; label_id: string }) => cl.label_id))];
       if (labelIds.length > 0) {
         const { data: labels } = await supabase
           .from("inbox_labels")
           .select("*")
           .in("id", labelIds);
-        const labelMap: Record<string, any> = {};
-        (labels || []).forEach((l: any) => { labelMap[l.id] = l; });
-        (convLabels || []).forEach((cl: any) => {
+        const labelMap: Record<string, InboxLabel> = {};
+        (labels || []).forEach((l: InboxLabel) => { labelMap[l.id] = l; });
+        (convLabels || []).forEach((cl: { conversation_id: string; label_id: string }) => {
           if (!labelsMap[cl.conversation_id]) labelsMap[cl.conversation_id] = [];
           if (labelMap[cl.label_id]) labelsMap[cl.conversation_id].push(labelMap[cl.label_id]);
         });
@@ -88,20 +92,20 @@ export async function GET(req: NextRequest) {
     }
 
     // Get assigned user names
-    const assignedIds = [...new Set(filteredConvs.map((c: any) => c.assigned_to).filter(Boolean))];
+    const assignedIds = [...new Set(filteredConvs.map((c: InboxConversation) => c.assigned_to).filter(Boolean))];
     let usersMap: Record<string, { id: string; name: string }> = {};
     if (assignedIds.length > 0) {
       const { data: users } = await supabase
         .from("users")
         .select("id, full_name, email")
         .in("id", assignedIds);
-      (users || []).forEach((u: any) => {
+      (users || []).forEach((u: { id: string; full_name?: string; email?: string }) => {
         usersMap[u.id] = { id: u.id, name: u.full_name || u.email || "موظف" };
       });
     }
 
     // Enrich with labels + assigned_user
-    const enriched = filteredConvs.map((c: any) => ({
+    const enriched = filteredConvs.map((c: InboxConversation) => ({
       ...c,
       labels: labelsMap[c.id] || [],
       assigned_user: c.assigned_to ? usersMap[c.assigned_to] || null : null,

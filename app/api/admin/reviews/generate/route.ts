@@ -1,12 +1,12 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — AI Review Generator
 // Generates realistic product reviews with Arab + Jewish Israeli names
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin/auth";
 import { callClaude } from "@/lib/ai/claude";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
@@ -97,13 +97,16 @@ function randomDate(): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     if (!process.env.ANTHROPIC_API_KEY_ADMIN && !process.env.ANTHROPIC_API_KEY) {
       return apiError("Anthropic Admin API key not configured", 500);
     }
     const aiKey = process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || "";
 
-    const db = createAdminSupabase();
-    if (!db) return apiError("DB unavailable", 500);
+    const supabase = createAdminSupabase();
+    if (!supabase) return apiError("DB unavailable", 500);
 
     const body = await req.json();
     const { product_id, count, distribution } = body as {
@@ -117,7 +120,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch product details
-    const { data: product } = await db.from("products")
+    const { data: product } = await supabase.from("products")
       .select("id, name_ar, name_he, brand, type, specs")
       .eq("id", product_id)
       .single();
@@ -127,7 +130,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch existing reviews to avoid duplication
-    const { data: existingReviews } = await db.from("product_reviews")
+    const { data: existingReviews } = await supabase.from("product_reviews")
       .select("body")
       .eq("product_id", product_id);
 
@@ -277,7 +280,7 @@ ${reviewRequests}`;
     }
 
     // Insert all reviews
-    const { data: inserted, error } = await db.from("product_reviews")
+    const { data: inserted, error } = await supabase.from("product_reviews")
       .insert(allReviews)
       .select("id");
 

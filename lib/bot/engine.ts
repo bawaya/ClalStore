@@ -33,6 +33,19 @@ export { logBotInteraction } from "./analytics";
 
 const BASE_URL = "https://clalmobile.com";
 
+// ===== Qualification JSONB shape (stored in bot_conversations.qualification) =====
+interface QualificationJsonb extends Record<string, unknown> {
+  step: number;
+  answers?: Record<string, string>;
+  budget?: string;
+  priority?: string;
+  brand?: string;
+  payment?: string;
+  _muhammadStep?: number;
+  _muhammadData?: { name?: string; phone?: string; message?: string } | null;
+  _greetingCount?: number;
+}
+
 // ===== Bot Response =====
 export interface BotResponse {
   text: string;
@@ -85,7 +98,7 @@ async function getSession(visitorId: string, channel: "webchat" | "whatsapp"): P
       .single();
 
     if (data) {
-      const qual = (data.qualification as any) || {};
+      const qual = (data.qualification as QualificationJsonb) || {} as QualificationJsonb;
       const session: SessionState = {
         conversationId: data.id,
         visitorId,
@@ -117,7 +130,7 @@ async function setSession(state: SessionState): Promise<void> {
   // Persist session state to DB — include Muhammad handoff + greeting count in qualification JSONB
   try {
     const s = createAdminSupabase();
-    const qualData = {
+    const qualData: QualificationJsonb = {
       ...state.qualification,
       _muhammadStep: state.muhammadStep || 0,
       _muhammadData: state.muhammadData || null,
@@ -127,13 +140,13 @@ async function setSession(state: SessionState): Promise<void> {
       .from("bot_conversations")
       .update({
         language: state.language,
-        qualification: qualData as any,
+        qualification: qualData satisfies Record<string, unknown>,
         message_count: state.messageCount,
         products_discussed: state.lastProductIds,
         customer_phone: state.customerPhone || null,
         customer_name: state.customerName || null,
         customer_id: state.customerId || null,
-      } as any)
+      })
       .eq("id", state.conversationId);
   } catch (err) {
     console.error("Session persist error:", err);
@@ -244,7 +257,7 @@ export async function processMessage(
       if (normalizedPhone) {
         await sb
           .from("inbox_conversations")
-          .update({ sentiment: "angry" } as any)
+          .update({ sentiment: "angry" } as Record<string, unknown>)
           .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.+${normalizedPhone}`)
           .neq("status", "archived");
       }
@@ -822,7 +835,7 @@ async function handleEscalation(session: SessionState, reason: string, lang: "ar
       if (normalizedPhone) {
         await sb
           .from("inbox_conversations")
-          .update({ status: "waiting", priority: "high" } as any)
+          .update({ status: "waiting", priority: "high" } as Record<string, unknown>)
           .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.+${normalizedPhone}`)
           .neq("status", "archived");
       }

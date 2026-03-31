@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase';
@@ -51,8 +50,8 @@ export async function POST(req: NextRequest) {
     steps.push('pdfText=' + pdfText.length);
 
     steps.push('fetching products');
-    const db = createAdminSupabase();
-    const { data: products, error: dbErr } = await db.from('products').select('*').eq('type', 'device');
+    const supabase = createAdminSupabase();
+    const { data: products, error: dbErr } = await supabase.from('products').select('*').eq('type', 'device');
     if (dbErr) {
       return apiError('DB: ' + dbErr.message, 500);
     }

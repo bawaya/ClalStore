@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest } from "next/server";
@@ -13,11 +12,12 @@ export async function GET(req: NextRequest) {
     const admin = url.searchParams.get("admin") === "true";
 
     if (admin) {
-      const db = createAdminSupabase();
-      if (!db) return apiSuccess({ reviews: [] });
-      const { data } = await db.from("product_reviews")
+      const supabase = createAdminSupabase();
+      if (!supabase) return apiSuccess({ reviews: [] });
+      const { data } = await supabase.from("product_reviews")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(500);
       return apiSuccess({ reviews: data || [] });
     }
 
@@ -36,7 +36,9 @@ export async function GET(req: NextRequest) {
       ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
       : 0;
 
-    return apiSuccess({ reviews, avg: Math.round(avg * 10) / 10, count: reviews.length });
+    const res = apiSuccess({ reviews, avg: Math.round(avg * 10) / 10, count: reviews.length });
+    res.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    return res;
   } catch (err: unknown) {
     console.error("[Reviews GET]", err);
     return apiSuccess({ reviews: [], avg: 0, count: 0 });
@@ -50,7 +52,7 @@ export async function POST(req: NextRequest) {
     if (!db) return apiError("DB unavailable", 500);
 
     // Check if feature is enabled
-    const { data: setting } = await db.from("settings").select("value").eq("key", "feature_reviews").single();
+    const { data: setting } = await db.from("settings").select("value").eq("key", "feature_reviews").maybeSingle();
     if (setting?.value !== "true") {
       return apiError("Reviews disabled", 403);
     }
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
         .select("id")
         .eq("product_id", product_id)
         .eq("customer_phone", customer_phone)
-        .single();
+        .maybeSingle();
       if (existing) {
         return apiError("Already reviewed", 409);
       }
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
         const { data: customer } = await adminDb.from("customers")
           .select("id")
           .eq("phone", customer_phone)
-          .single();
+          .maybeSingle();
         if (customer) {
           const { data: orderItems } = await adminDb.from("order_items")
             .select("id, order_id")
@@ -116,8 +118,8 @@ export async function POST(req: NextRequest) {
 // PUT — Admin: approve/reject/reply to review
 export async function PUT(req: NextRequest) {
   try {
-    const db = createAdminSupabase();
-    if (!db) return apiError("Unauthorized", 401);
+    const supabase = createAdminSupabase();
+    if (!supabase) return apiError("Unauthorized", 401);
 
     const body = await req.json();
     const { id, status, admin_reply } = body;
@@ -128,7 +130,7 @@ export async function PUT(req: NextRequest) {
     if (status) updates.status = status;
     if (admin_reply !== undefined) updates.admin_reply = admin_reply;
 
-    const { data, error } = await db.from("product_reviews")
+    const { data, error } = await supabase.from("product_reviews")
       .update(updates)
       .eq("id", id)
       .select()
@@ -145,14 +147,14 @@ export async function PUT(req: NextRequest) {
 // DELETE — Admin: delete review
 export async function DELETE(req: NextRequest) {
   try {
-    const db = createAdminSupabase();
-    if (!db) return apiError("Unauthorized", 401);
+    const supabase = createAdminSupabase();
+    if (!supabase) return apiError("Unauthorized", 401);
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     if (!id) return apiError("Missing ID", 400);
 
-    const { error } = await db.from("product_reviews").delete().eq("id", id);
+    const { error } = await supabase.from("product_reviews").delete().eq("id", id);
     if (error) throw error;
     return apiSuccess(null);
   } catch (err: unknown) {

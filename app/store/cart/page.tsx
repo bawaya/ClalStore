@@ -176,6 +176,7 @@ function CityCombobox({ value, onChange, error }: { value: string; onChange: (v:
             type="button"
             onClick={() => { setQuery(""); onChange(""); setOpen(false); }}
             className="absolute left-2 top-1/2 -translate-y-1/2 text-muted text-xs cursor-pointer bg-transparent border-0 p-0.5"
+            aria-label="مسح البحث"
           >✕</button>
         )}
         {trimmedQuery.length > 0 && trimmedQuery.length < CITY_SEARCH_MIN_LENGTH && (

@@ -86,7 +86,7 @@ export async function earnPoints(
   const newLifetime = loyalty.lifetime_points + earned;
   const newTier = calculateTier(newLifetime);
 
-  await supabase
+  const { error: updateErr } = await supabase
     .from("loyalty_points")
     .update({
       points: newPoints,
@@ -95,8 +95,9 @@ export async function earnPoints(
       updated_at: new Date().toISOString(),
     })
     .eq("id", loyalty.id);
+  if (updateErr) console.error("Loyalty points update error:", updateErr);
 
-  await supabase
+  const { error: insertErr } = await supabase
     .from("loyalty_transactions")
     .insert({
       customer_id: customerId,
@@ -106,6 +107,7 @@ export async function earnPoints(
       description: `Order ${orderId}`,
       order_id: orderId,
     });
+  if (insertErr) console.error("Loyalty transaction insert error:", insertErr);
 }
 
 export async function redeemPoints(
@@ -122,15 +124,16 @@ export async function redeemPoints(
   const newBalance = loyalty.points - points;
   const value = calculatePointsValue(points);
 
-  await supabase
+  const { error: updateErr } = await supabase
     .from("loyalty_points")
     .update({
       points: newBalance,
       updated_at: new Date().toISOString(),
     })
     .eq("id", loyalty.id);
+  if (updateErr) throw new Error(`Loyalty update failed: ${updateErr.message}`);
 
-  await supabase
+  const { error: insertErr } = await supabase
     .from("loyalty_transactions")
     .insert({
       customer_id: customerId,
@@ -140,6 +143,7 @@ export async function redeemPoints(
       description: orderId ? `Redeemed for order ${orderId}` : "Points redeemed",
       order_id: orderId || null,
     });
+  if (insertErr) console.error("Loyalty redeem transaction error:", insertErr);
 
   return { success: true, value };
 }

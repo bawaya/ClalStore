@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — AI Image Enhance API
@@ -6,7 +5,8 @@ export const runtime = 'edge';
 // Uses Remove.bg for background removal
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin/auth";
 import { removeBackgroundFromBuffer } from "@/lib/integrations/removebg";
 import { uploadToR2 } from "@/lib/storage-r2";
 import { apiSuccess, apiError } from "@/lib/api-response";
@@ -37,6 +37,9 @@ function detectImageType(buffer: ArrayBuffer): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     if (!process.env.REMOVEBG_API_KEY) {
       return apiError("REMOVEBG_API_KEY not configured", 500);
     }

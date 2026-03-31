@@ -1,8 +1,12 @@
-export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database, Order, OrderItem, BotConversation, BotHandoff, Customer } from "@/types/database";
+
+type OrderWithItems = Order & { order_items?: OrderItem[] };
+type AdminClient = SupabaseClient<Database>;
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
@@ -37,7 +41,7 @@ function errorHtml(msg: string) {
   return `<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><style>body{font-family:sans-serif;background:#0a0a0f;color:#f87171;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}</style></head><body><div style="text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-size:18px">${msg}</p></div></body></html>`;
 }
 
-async function generateDailyReport(supabase: any, dateParam: string) {
+async function generateDailyReport(supabase: AdminClient, dateParam: string) {
   const startOfDay = `${dateParam}T00:00:00.000Z`;
   const endOfDay = `${dateParam}T23:59:59.999Z`;
 
@@ -48,22 +52,22 @@ async function generateDailyReport(supabase: any, dateParam: string) {
     supabase.from("bot_handoffs").select("id").gte("created_at", startOfDay).lte("created_at", endOfDay),
   ]);
 
-  const orders = ordersRes.data || [];
+  const orders = (ordersRes.data || []) as unknown as OrderWithItems[];
   const newCustomers = customersRes.data || [];
-  const conversations = conversationsRes.data || [];
+  const conversations = (conversationsRes.data || []) as { id: string; channel: string; message_count: number }[];
   const handoffs = handoffsRes.data || [];
 
-  const totalRevenue = orders.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+  const totalRevenue = orders.reduce((s, o) => s + Number(o.total || 0), 0);
   const avgOrderValue = orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
-  const deviceOrders = orders.filter((o: any) => (o.order_items || []).some((i: any) => i.product_type === "device"));
-  const accessoryOrders = orders.filter((o: any) => (o.order_items || []).every((i: any) => i.product_type !== "device"));
+  const deviceOrders = orders.filter((o) => (o.order_items || []).some((i) => i.product_type === "device"));
+  const accessoryOrders = orders.filter((o) => (o.order_items || []).every((i) => i.product_type !== "device"));
   const statusCounts: Record<string, number> = {};
-  orders.forEach((o: any) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
+  orders.forEach((o) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
   const sourceCounts: Record<string, number> = {};
-  orders.forEach((o: any) => { sourceCounts[o.source || "store"] = (sourceCounts[o.source || "store"] || 0) + 1; });
-  const botMessages = conversations.reduce((s: number, c: any) => s + Number(c.message_count || 0), 0);
-  const whatsappConvos = conversations.filter((c: any) => c.channel === "whatsapp").length;
-  const webchatConvos = conversations.filter((c: any) => c.channel === "webchat").length;
+  orders.forEach((o) => { sourceCounts[o.source || "store"] = (sourceCounts[o.source || "store"] || 0) + 1; });
+  const botMessages = conversations.reduce((s, c) => s + Number(c.message_count || 0), 0);
+  const whatsappConvos = conversations.filter((c) => c.channel === "whatsapp").length;
+  const webchatConvos = conversations.filter((c) => c.channel === "webchat").length;
 
   const statusLabels: Record<string, string> = { new: "جديد", approved: "موافق", processing: "تجهيز", shipped: "شحن", delivered: "تسليم", cancelled: "ملغي", rejected: "مرفوض" };
 
@@ -119,8 +123,8 @@ async function generateDailyReport(supabase: any, dateParam: string) {
       ${orders.length === 0 ? '<div class="empty">لا توجد طلبات في هذا اليوم</div>' : `
       <div style="overflow-x:auto"><table>
         <thead><tr><th>الرقم</th><th>المنتجات</th><th>المبلغ</th><th>الحالة</th><th>المصدر</th><th>الوقت</th></tr></thead>
-        <tbody>${orders.map((o: any) => {
-          const items = (o.order_items || []).map((i: any) => i.product_name).join("، ");
+        <tbody>${orders.map((o: OrderWithItems) => {
+          const items = (o.order_items || []).map((i: OrderItem) => i.product_name).join("، ");
           return `<tr>
             <td><strong>${o.id}</strong></td>
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${items || "—"}</td>
@@ -161,7 +165,7 @@ async function generateDailyReport(supabase: any, dateParam: string) {
   return new NextResponse(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 
-async function generateWeeklyReport(supabase: any, dateParam: string) {
+async function generateWeeklyReport(supabase: AdminClient, dateParam: string) {
   const endDate = new Date(dateParam);
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 6);
@@ -177,7 +181,7 @@ async function generateWeeklyReport(supabase: any, dateParam: string) {
   const orders = ordersRes.data || [];
   const newCustomers = customersRes.data || [];
   const conversations = conversationsRes.data || [];
-  const totalRevenue = orders.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+  const totalRevenue = orders.reduce((s: number, o: Pick<Order, "id" | "total" | "status" | "source" | "created_at">) => s + Number(o.total || 0), 0);
   const avgOrder = orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
 
   const dailyBreakdown: Record<string, { count: number; revenue: number }> = {};
@@ -185,7 +189,7 @@ async function generateWeeklyReport(supabase: any, dateParam: string) {
     const key = d.toISOString().split("T")[0];
     dailyBreakdown[key] = { count: 0, revenue: 0 };
   }
-  orders.forEach((o: any) => {
+  orders.forEach((o: Pick<Order, "id" | "total" | "status" | "source" | "created_at">) => {
     const day = o.created_at?.split("T")[0];
     if (day && dailyBreakdown[day]) {
       dailyBreakdown[day].count++;

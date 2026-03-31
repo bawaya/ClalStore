@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Health Check API
@@ -51,9 +50,9 @@ export async function GET() {
   checks.ai = {
     ok: !!(aiKeys.bot && aiKeys.admin),
     error: [
-      aiKeys.bot   ? `BOT ✓ (${aiKeys.bot.substring(0, 8)}...)`     : "BOT ✗",
-      aiKeys.admin ? `ADMIN ✓ (${aiKeys.admin.substring(0, 8)}...)` : "ADMIN ✗",
-      aiKeys.store ? `STORE ✓ (${aiKeys.store.substring(0, 8)}...)` : "STORE ✗",
+      aiKeys.bot   ? "BOT ✓"   : "BOT ✗",
+      aiKeys.admin ? "ADMIN ✓" : "ADMIN ✗",
+      aiKeys.store ? "STORE ✓" : "STORE ✗",
       aiKeys.openai ? "OPENAI ✓" : "OPENAI ✗",
     ].join(" | "),
   };

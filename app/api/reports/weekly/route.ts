@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Weekly Report (Formatted HTML Page)
@@ -9,6 +8,12 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
+import type { Order, OrderItem, BotConversation } from "@/types/database";
+
+// Row type for the main orders query (with joined order_items)
+type OrderWithItems = Order & { order_items: OrderItem[] };
+// Subset for previous-week comparison
+type PrevOrderRow = Pick<Order, "id" | "total" | "status">;
 
 export async function GET(req: NextRequest) {
   // Auth: allow CRON_SECRET or authenticated admin
@@ -53,16 +58,16 @@ export async function GET(req: NextRequest) {
   const handoffs = handoffsRes.data || [];
 
   // === Stats ===
-  const totalRevenue = orders.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
-  const prevRevenue = prevOrders.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+  const totalRevenue = orders.reduce((s: number, o: OrderWithItems) => s + Number(o.total || 0), 0);
+  const prevRevenue = prevOrders.reduce((s: number, o: PrevOrderRow) => s + Number(o.total || 0), 0);
   const revenueChange = prevRevenue > 0 ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100) : 0;
   const ordersChange = prevOrders.length > 0 ? Math.round(((orders.length - prevOrders.length) / prevOrders.length) * 100) : 0;
   const avgOrder = orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
 
   // Top products
   const productCounts: Record<string, { name: string; count: number; revenue: number }> = {};
-  orders.forEach((o: any) => {
-    (o.order_items || []).forEach((i: any) => {
+  orders.forEach((o: OrderWithItems) => {
+    (o.order_items || []).forEach((i: OrderItem) => {
       const key = i.product_name || "Unknown";
       if (!productCounts[key]) productCounts[key] = { name: key, count: 0, revenue: 0 };
       productCounts[key].count += i.quantity || 1;
@@ -80,7 +85,7 @@ export async function GET(req: NextRequest) {
     const dayKey = day.toISOString().split("T")[0];
     dailyStats[dayKey] = { orders: 0, revenue: 0 };
   }
-  orders.forEach((o: any) => {
+  orders.forEach((o: OrderWithItems) => {
     const dayKey = new Date(o.created_at).toISOString().split("T")[0];
     if (dailyStats[dayKey]) {
       dailyStats[dayKey].orders++;
@@ -90,14 +95,14 @@ export async function GET(req: NextRequest) {
 
   // Status breakdown
   const statusCounts: Record<string, number> = {};
-  orders.forEach((o: any) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
+  orders.forEach((o: OrderWithItems) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
 
   const sourceCounts: Record<string, number> = {};
-  orders.forEach((o: any) => { sourceCounts[o.source || "store"] = (sourceCounts[o.source || "store"] || 0) + 1; });
+  orders.forEach((o: OrderWithItems) => { sourceCounts[o.source || "store"] = (sourceCounts[o.source || "store"] || 0) + 1; });
 
-  const botMessages = conversations.reduce((s: number, c: any) => s + Number(c.message_count || 0), 0);
-  const whatsappConvos = conversations.filter((c: any) => c.channel === "whatsapp").length;
-  const webchatConvos = conversations.filter((c: any) => c.channel === "webchat").length;
+  const botMessages = conversations.reduce((s: number, c: BotConversation) => s + Number(c.message_count || 0), 0);
+  const whatsappConvos = conversations.filter((c: BotConversation) => c.channel === "whatsapp").length;
+  const webchatConvos = conversations.filter((c: BotConversation) => c.channel === "webchat").length;
 
   const startLabel = startDate.toISOString().split("T")[0];
   const endLabel = dateParam;
@@ -285,8 +290,8 @@ export async function GET(req: NextRequest) {
       <table>
         <thead><tr><th>رقم الطلب</th><th>المنتجات</th><th>المبلغ</th><th>الحالة</th><th>المصدر</th><th>التاريخ</th></tr></thead>
         <tbody>
-          ${orders.map((o: any) => {
-            const items = (o.order_items || []).map((i: any) => i.product_name).join("، ");
+          ${orders.map((o: OrderWithItems) => {
+            const items = (o.order_items || []).map((i: OrderItem) => i.product_name).join("، ");
             const labels: Record<string, string> = { new: "جديد", approved: "موافق", processing: "تجهيز", shipped: "شحن", delivered: "تسليم", cancelled: "ملغي" };
             const badgeClass = "badge-" + o.status;
             return `<tr>

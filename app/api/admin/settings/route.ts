@@ -1,7 +1,7 @@
-export const runtime = 'edge';
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getAdminSettings, updateSetting, getIntegrations, updateIntegration, logAction } from "@/lib/admin/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 // Prevent Next.js from caching this route — settings must always be fresh
@@ -31,8 +31,11 @@ function maskConfig(config: Record<string, any> | null): Record<string, any> {
   return masked;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const [settings, integrations] = await Promise.all([
       getAdminSettings(),
       getIntegrations(),
@@ -50,6 +53,9 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const body = await req.json();
 
     if (body.type === "setting") {
