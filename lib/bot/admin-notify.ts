@@ -16,23 +16,24 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
 async function getNotifyTargets() {
   const waCfg = await getIntegrationConfig("whatsapp");
-  const reportFrom = waCfg.reports_phone || process.env.ADMIN_REPORT_PHONE || "+972537777963";
   const adminTo = waCfg.admin_phone || process.env.ADMIN_PERSONAL_PHONE || "+972502404412";
   const teamRaw = waCfg.team_whatsapp_numbers || process.env.TEAM_WHATSAPP_NUMBERS || "";
   const teamNumbers = String(teamRaw).split(",").map((n) => n.trim()).filter(Boolean);
-  return { reportFrom, adminTo, teamNumbers };
+  return { adminTo, teamNumbers };
 }
 
 /** Send a template to admin — always uses template (no 24h window issue) */
 async function sendTemplateToAdmin(
   templateName: string,
   params: string[]
-): Promise<void> {
+): Promise<{ sent: boolean }> {
   const { adminTo } = await getNotifyTargets();
   try {
     await sendWhatsAppTemplate(adminTo, templateName, params);
+    return { sent: true };
   } catch (err) {
     console.error(`[AdminNotify] Template "${templateName}" failed:`, err);
+    return { sent: false };
   }
 }
 
@@ -40,28 +41,27 @@ async function sendTemplateToAdmin(
 async function sendTemplateToTeam(
   templateName: string,
   params: string[]
-): Promise<void> {
+): Promise<{ sent: boolean }> {
   const { teamNumbers } = await getNotifyTargets();
+  let anySent = false;
   for (const num of teamNumbers) {
     try {
       await sendWhatsAppTemplate(num, templateName, params);
+      anySent = true;
     } catch (err) {
       console.error(`[AdminNotify] Team template "${templateName}" failed for ${num}:`, err);
     }
   }
+  return { sent: anySent || teamNumbers.length === 0 };
 }
 
 // ===== Generic admin alert (for backward compat) =====
-export async function notifyAdmin(message: string): Promise<void> {
-  await sendTemplateToAdmin("clal_admin_alert", [message.slice(0, 1024)]);
+export async function notifyAdmin(message: string): Promise<{ sent: boolean }> {
+  return sendTemplateToAdmin("clal_admin_alert", [message.slice(0, 1024)]);
 }
 
-export async function notifyAdminPersonal(message: string): Promise<void> {
-  await sendTemplateToAdmin("clal_admin_alert", [message.slice(0, 1024)]);
-}
-
-export async function notifyTeam(message: string): Promise<void> {
-  await sendTemplateToTeam("clal_admin_alert", [message.slice(0, 1024)]);
+export async function notifyTeam(message: string): Promise<{ sent: boolean }> {
+  return sendTemplateToTeam("clal_admin_alert", [message.slice(0, 1024)]);
 }
 
 // ===== New Order Alert =====
@@ -73,36 +73,16 @@ export async function notifyAdminNewOrder(order: {
   total: number;
   source: string;
   items: { name: string; qty: number; price: number }[];
-}): Promise<void> {
+}): Promise<{ sent: boolean }> {
   const itemsList = order.items
     .map((i) => `• ${i.name} × ${i.qty} — ₪${i.price.toLocaleString()}`)
     .join("\n")
     .slice(0, 500);
 
-  await sendTemplateToAdmin("clal_new_order", [
+  return sendTemplateToAdmin("clal_new_order", [
     order.orderId,
     `${order.customerName} | ${order.customerPhone}\nالمبلغ: ₪${order.total.toLocaleString()} | المصدر: ${order.source}`,
     itemsList,
-    `${BASE_URL}/crm/orders?search=${order.orderId}`,
-  ]);
-}
-
-// ===== Order Completed Alert =====
-// Template: clal_order_done  (3 params)
-export async function notifyAdminOrderCompleted(order: {
-  orderId: string;
-  customerName: string;
-  customerPhone?: string;
-  total: number;
-  status: string;
-}): Promise<void> {
-  const customerLine = order.customerPhone
-    ? `${order.customerName} | ${order.customerPhone}`
-    : order.customerName;
-
-  await sendTemplateToAdmin("clal_order_done", [
-    `رقم الطلب: ${order.orderId}\nالزبون: ${customerLine}`,
-    `₪${order.total.toLocaleString()} | ${order.status}`,
     `${BASE_URL}/crm/orders?search=${order.orderId}`,
   ]);
 }
@@ -115,13 +95,13 @@ export async function notifyAdminContactForm(contact: {
   email?: string;
   subject?: string;
   message: string;
-}): Promise<void> {
+}): Promise<{ sent: boolean }> {
   const senderInfo = [contact.name, contact.phone, contact.email].filter(Boolean).join(" | ");
   const msgContent = contact.subject
     ? `الموضوع: ${contact.subject}\n${contact.message.slice(0, 400)}`
     : contact.message.slice(0, 450);
 
-  await sendTemplateToAdmin("clal_contact_form", [
+  return sendTemplateToAdmin("clal_contact_form", [
     senderInfo,
     msgContent,
     `${BASE_URL}/crm/customers`,
@@ -135,11 +115,11 @@ export async function notifyAdminMuhammadHandoff(details: {
   phone: string;
   message: string;
   channel: "webchat" | "whatsapp";
-}): Promise<void> {
+}): Promise<{ sent: boolean }> {
   const time = new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" });
   const channel = details.channel === "whatsapp" ? "واتساب" : "شات الموقع";
 
-  await sendTemplateToAdmin("clal_handoff", [
+  return sendTemplateToAdmin("clal_handoff", [
     `${details.name} | ${details.phone} | ${channel}`,
     details.message.slice(0, 500),
     time,
@@ -154,11 +134,11 @@ export async function notifyAdminAngryCustomer(details: {
   message: string;
   sentiment: string;
   channel: "webchat" | "whatsapp";
-}): Promise<void> {
+}): Promise<{ sent: boolean }> {
   const time = new Date().toLocaleString("ar-EG", { timeZone: "Asia/Jerusalem" });
   const channel = details.channel === "whatsapp" ? "واتساب" : "شات الموقع";
 
-  await sendTemplateToAdmin("clal_angry_cust", [
+  return sendTemplateToAdmin("clal_angry_cust", [
     `${details.name} | ${details.phone} | ${channel}`,
     details.message.slice(0, 500),
     time,
@@ -176,11 +156,11 @@ export async function notifyAdminNewMessage(details: {
   name: string;
   preview: string;
   isMedia?: boolean;
-}): Promise<void> {
+}): Promise<{ sent: boolean }> {
   const cacheKey = details.phone.replace(/[^0-9]/g, "");
   const lastNotified = _msgNotifyCache.get(cacheKey) || 0;
 
-  if (Date.now() - lastNotified < MSG_NOTIFY_COOLDOWN) return;
+  if (Date.now() - lastNotified < MSG_NOTIFY_COOLDOWN) return { sent: false };
   _msgNotifyCache.set(cacheKey, Date.now());
 
   if (_msgNotifyCache.size > 200) {
@@ -194,7 +174,7 @@ export async function notifyAdminNewMessage(details: {
   const mediaLabel = details.isMedia ? " [وسائط]" : "";
   const preview = `${details.preview.slice(0, 200)}${mediaLabel}`;
 
-  await sendTemplateToAdmin("clal_new_msg", [
+  return sendTemplateToAdmin("clal_new_msg", [
     `${details.name || "مجهول"} (${details.phone})`,
     preview,
     `${time}\n${BASE_URL}/crm/inbox`,
@@ -203,9 +183,9 @@ export async function notifyAdminNewMessage(details: {
 
 // ===== Daily Report =====
 // Template: clal_daily_report  (2 params)
-export async function sendDailyReportLink(): Promise<void> {
+export async function sendDailyReportLink(): Promise<{ sent: boolean }> {
   const today = new Date().toISOString().split("T")[0];
-  await sendTemplateToAdmin("clal_daily_report", [
+  return sendTemplateToAdmin("clal_daily_report", [
     today,
     `${BASE_URL}/api/reports/daily?date=${today}`,
   ]);
@@ -213,9 +193,9 @@ export async function sendDailyReportLink(): Promise<void> {
 
 // ===== Weekly Report =====
 // Template: clal_weekly_report  (2 params)
-export async function sendWeeklyReportLink(): Promise<void> {
+export async function sendWeeklyReportLink(): Promise<{ sent: boolean }> {
   const today = new Date().toISOString().split("T")[0];
-  await sendTemplateToAdmin("clal_weekly_report", [
+  return sendTemplateToAdmin("clal_weekly_report", [
     today,
     `${BASE_URL}/api/reports/weekly?date=${today}`,
   ]);

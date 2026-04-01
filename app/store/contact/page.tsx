@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { StoreHeader } from "@/components/store/StoreHeader";
 
 export default function StoreContactPage() {
@@ -21,9 +22,9 @@ export default function StoreContactPage() {
     }
     setSending(true);
     try {
-      const res = await fetch("/api/admin/contact-notify", {
+      const res = await fetch("/api/contact", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({
           name: form.name,
           phone: form.phone,

@@ -13,7 +13,17 @@
       "Bash(curl -s \"https://api.ycloud.com/v2/whatsapp/phoneNumbers\" -H \"X-API-Key: 870bd9e405b4344518f09b77552b4cd6\")",
       "Bash(node -e \"const d=require\\(''''fs''''\\).readFileSync\\(''''/dev/stdin'''',''''utf8''''\\); const j=JSON.parse\\(d\\); console.log\\(JSON.stringify\\(j,null,2\\)\\);\")",
       "Bash(curl -s https://api.ycloud.com/v2/whatsapp/phoneNumbers -H 'X-API-Key: 870bd9e405b4344518f09b77552b4cd6')",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(find \"C:\\\\CLALSTORE\\\\clalmobile\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" -o -name \"*.jsx\" -o -name \"*.js\" \\\\\\) -exec wc -l {} +)",
+      "Bash(done)",
+      "Bash(sed 's/export //')",
+      "Bash(npm run:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep:*)",
+      "Bash(wc -l \"C:\\\\CLALSTORE\\\\clalmobile/components/store\"/*)",
+      "Bash(xargs wc:*)",
+      "WebFetch(domain:clalstore.bawaya-2019.workers.dev)",
+      "Bash(find /c/CLALSTORE/clalmobile/app/api -path *webhook* -o -path *cron*)"
     ]
   }
 }

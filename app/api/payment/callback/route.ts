@@ -160,36 +160,8 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      try {
-        const { notifyNewOrder } = await import("@/lib/bot/notifications");
-        const { data: order } = await supabase
-          .from("orders")
-          .select("*, customers(name, phone)")
-          .eq("id", orderId)
-          .single();
-
-        if (order?.customers) {
-          await notifyNewOrder(
-            orderId,
-            (order.customers as any).name,
-            (order.customers as any).phone,
-            amount,
-            "icredit_payment"
-          );
-
-          const { notifyAdminNewOrder } = await import("@/lib/bot/admin-notify");
-          await notifyAdminNewOrder({
-            orderId,
-            customerName: (order.customers as any).name || "زبون",
-            customerPhone: (order.customers as any).phone || "",
-            total: Number(amount || 0),
-            source: "icredit_payment",
-            items: [{ name: "Payment callback", qty: 1, price: Number(amount || 0) }],
-          });
-        }
-      } catch {
-        console.error("Payment notification failed for order:", orderId);
-      }
+      // Note: Customer + admin WhatsApp notifications were already sent at order creation
+      // (POST /api/orders). No need to re-send here to avoid duplicate notifications.
     } else if (isJ5) {
       await supabase.from("orders").update({
         payment_status: "pending_capture",

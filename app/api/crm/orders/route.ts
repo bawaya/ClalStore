@@ -47,7 +47,7 @@ export async function PUT(req: NextRequest) {
         } catch { /* silent */ }
       }
       // Email notification for status change
-      if (body.customerEmail && ["confirmed", "processing", "shipped", "delivered", "cancelled"].includes(body.status)) {
+      if (body.customerEmail && ["approved", "processing", "shipped", "delivered", "cancelled"].includes(body.status)) {
         try {
           const { orderStatusEmail } = await import("@/lib/email-templates");
           const { getProvider } = await import("@/lib/integrations/hub");

@@ -146,7 +146,7 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
-    name: "clal_admin_new_order",
+    name: "clal_new_order",
     category: "UTILITY",
     language: "ar",
     components: [
@@ -158,7 +158,7 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
-    name: "clal_admin_order_completed",
+    name: "clal_order_done",
     category: "UTILITY",
     language: "ar",
     components: [
@@ -170,7 +170,7 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
-    name: "clal_admin_contact",
+    name: "clal_contact_form",
     category: "UTILITY",
     language: "ar",
     components: [
@@ -182,7 +182,7 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
-    name: "clal_admin_handoff",
+    name: "clal_handoff",
     category: "UTILITY",
     language: "ar",
     components: [
@@ -194,7 +194,7 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
-    name: "clal_admin_angry_customer",
+    name: "clal_angry_cust",
     category: "UTILITY",
     language: "ar",
     components: [
@@ -206,7 +206,7 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
-    name: "clal_admin_new_message",
+    name: "clal_new_msg",
     category: "UTILITY",
     language: "ar",
     components: [
@@ -218,7 +218,7 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
-    name: "clal_admin_daily_report",
+    name: "clal_daily_report",
     category: "UTILITY",
     language: "ar",
     components: [
@@ -230,7 +230,7 @@ export const REQUIRED_TEMPLATES = [
     ],
   },
   {
-    name: "clal_admin_weekly_report",
+    name: "clal_weekly_report",
     category: "UTILITY",
     language: "ar",
     components: [

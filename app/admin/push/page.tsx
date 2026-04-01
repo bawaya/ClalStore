@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { PageHeader, FormField, EmptyState } from "@/components/admin/shared";
 
 interface PushNotification {
@@ -56,7 +57,7 @@ export default function AdminPushPage() {
     try {
       const res = await fetch("/api/push/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ title, body, url }),
       });
 

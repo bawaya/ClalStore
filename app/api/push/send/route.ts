@@ -143,10 +143,12 @@ async function sendPushNotification(
 
   const enc = new TextEncoder();
 
-  // HKDF helper
+  // HKDF helper (RFC 5869: extract = HMAC-SHA256(salt, ikm), expand = HMAC-SHA256(prk, info||0x01))
   async function hkdfSha256(ikm: Uint8Array, salt: Uint8Array, info: Uint8Array, length: number) {
-    const key = await crypto.subtle.importKey("raw", ikm.buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const prk = new Uint8Array(await crypto.subtle.sign("HMAC", key, salt.length ? (salt.buffer as ArrayBuffer) : new Uint8Array(32)));
+    const saltKey = salt.length
+      ? await crypto.subtle.importKey("raw", salt.buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+      : await crypto.subtle.importKey("raw", new Uint8Array(32), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const prk = new Uint8Array(await crypto.subtle.sign("HMAC", saltKey, ikm.buffer as ArrayBuffer));
     const prkKey = await crypto.subtle.importKey("raw", prk.buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     const infoWithCounter = new Uint8Array(info.length + 1);
     infoWithCounter.set(info);
@@ -172,11 +174,14 @@ async function sendPushNotification(
   const authInfo = enc.encode("Content-Encoding: auth\0");
   const prk = await hkdfSha256(sharedBits, clientAuth, authInfo, 32);
 
+  // Generate salt once — used in both HKDF derivation and Encryption header
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+
   const keyInfo = buildInfo("aesgcm", clientPublicKey, ephemeralPubRaw);
   const nonceInfo = buildInfo("nonce", clientPublicKey, ephemeralPubRaw);
 
-  const contentKey = await hkdfSha256(prk, new Uint8Array(0), keyInfo, 16);
-  const nonce = await hkdfSha256(prk, new Uint8Array(0), nonceInfo, 12);
+  const contentKey = await hkdfSha256(prk, salt, keyInfo, 16);
+  const nonce = await hkdfSha256(prk, salt, nonceInfo, 12);
 
   // Add padding (2 bytes of padding length = 0)
   const payloadBytes = enc.encode(payloadStr);
@@ -197,7 +202,7 @@ async function sendPushNotification(
       Authorization: authorization,
       "Content-Encoding": "aesgcm",
       "Crypto-Key": `dh=${uint8ToUrlBase64(ephemeralPubRaw)}`,
-      Encryption: `salt=${uint8ToUrlBase64(crypto.getRandomValues(new Uint8Array(16)))}`,
+      Encryption: `salt=${uint8ToUrlBase64(salt)}`,
       "Content-Type": "application/octet-stream",
       TTL: "86400",
     },

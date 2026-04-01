@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { Navbar, Footer } from "@/components/website/sections";
 
 export default function ContactPage() {
@@ -21,9 +22,9 @@ export default function ContactPage() {
     setSending(true);
     try {
       // Send WhatsApp notification to admin (primary notification)
-      const notifyRes = await fetch('/api/admin/contact-notify', {
+      const notifyRes = await fetch('/api/contact', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: csrfHeaders(),
         body: JSON.stringify({
           name: form.name,
           phone: form.phone,
@@ -37,7 +38,7 @@ export default function ContactPage() {
       // Send email (non-blocking, best-effort)
       fetch('/api/email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: csrfHeaders(),
         body: JSON.stringify({
           to: 'info@clalmobile.com',
           subject: `Contact from ${form.name}`,

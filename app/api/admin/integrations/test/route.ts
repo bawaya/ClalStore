@@ -66,20 +66,35 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
     }
   },
 
-  // ===== Email — SendGrid =====
+  // ===== Email — Resend (primary) or SendGrid (fallback) =====
   email: async (cfg) => {
     const apiKey = cfg.api_key;
-    if (!apiKey) return { ok: false, message: "مفتاح SendGrid API مفقود" };
+    if (!apiKey) return { ok: false, message: "مفتاح API مفقود" };
+
+    // Detect provider: Resend keys start with "re_", SendGrid keys start with "SG."
+    const isResend = apiKey.startsWith("re_");
+    const isSendGrid = apiKey.startsWith("SG.");
 
     try {
-      // Light validate: check API key by fetching user profile
-      const res = await fetch("https://api.sendgrid.com/v3/user/profile", {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        signal: AbortSignal.timeout(10000),
-      });
-      if (res.ok) return { ok: true, message: "✅ SendGrid متصل بنجاح" };
-      if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
-      return { ok: false, message: `SendGrid responded with ${res.status}` };
+      if (isResend) {
+        const res = await fetch("https://api.resend.com/domains", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (res.ok) return { ok: true, message: "✅ Resend متصل بنجاح" };
+        if (res.status === 401) return { ok: false, message: "مفتاح Resend API غير صالح" };
+        return { ok: false, message: `Resend responded with ${res.status}` };
+      } else if (isSendGrid) {
+        const res = await fetch("https://api.sendgrid.com/v3/user/profile", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (res.ok) return { ok: true, message: "✅ SendGrid متصل بنجاح" };
+        if (res.status === 401) return { ok: false, message: "مفتاح SendGrid API غير صالح" };
+        return { ok: false, message: `SendGrid responded with ${res.status}` };
+      } else {
+        return { ok: false, message: "مفتاح API غير معروف — يجب أن يبدأ بـ re_ (Resend) أو SG. (SendGrid)" };
+      }
     } catch (err: unknown) {
       return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
     }
