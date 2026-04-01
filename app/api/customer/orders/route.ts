@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Customer Orders API
@@ -8,25 +7,7 @@ export const runtime = 'edge';
 import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
-
-async function authenticateCustomer(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-
-  const token = authHeader.slice(7);
-  if (!token || token.length < 32) return null;
-
-  const supabase = createAdminSupabase();
-  if (!supabase) return null;
-
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("id, name, phone, email, city, address")
-    .eq("auth_token", token)
-    .single();
-
-  return customer;
-}
+import { authenticateCustomer } from "@/lib/customer-auth";
 
 export async function GET(req: NextRequest) {
   try {

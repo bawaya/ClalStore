@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Search Pexels for phone color images
@@ -10,7 +9,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const PEXELS_API = "https://api.pexels.com/v1/search";
-const PEXELS_KEY = process.env.PEXELS_API_KEY || "";
+function getPexelsKey() { return process.env.PEXELS_API_KEY || ""; }
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const url = `${PEXELS_API}?${new URLSearchParams(params)}`;
     const res = await fetch(url, {
-      headers: { Authorization: PEXELS_KEY },
+      headers: { Authorization: getPexelsKey() },
     });
 
     if (!res.ok) {

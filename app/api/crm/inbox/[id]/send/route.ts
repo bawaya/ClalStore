@@ -9,6 +9,7 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
 import { sendWhatsAppText, sendWhatsAppImage, sendWhatsAppDocument } from "@/lib/bot/whatsapp";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { inboxSendSchema, validateBody } from "@/lib/admin/validators";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,8 +21,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!supabase) return apiError("DB error", 500);
 
     const convId = id;
-    const body = await req.json();
-    const { type = "text", content, template_name, template_params, media_url, reply_to } = body;
+    const v = validateBody(await req.json(), inboxSendSchema);
+    if (!v.success) return apiError(v.error, 400);
+    const { type = "text", content, template_name, template_params, media_url, media_filename, reply_to } = v.data;
 
     // Get conversation
     const { data: conv } = await supabase
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         waMessageId = result?.id || null;
         messageContent = messageContent || "[صورة]";
       } else if (type === "document" && media_url) {
-        const filename = body.media_filename || "document";
+        const filename = media_filename || "document";
         const result = await sendWhatsAppDocument(phone, media_url, filename, messageContent || undefined);
         waMessageId = result?.id || null;
         messageContent = messageContent || `[مستند: ${filename}]`;

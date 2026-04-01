@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiSuccess } from "@/lib/api-response";

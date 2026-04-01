@@ -76,6 +76,22 @@ export async function POST(req: NextRequest) {
       return apiSuccess({ received: true, note: "already_paid" });
     }
 
+    // Idempotency: reject duplicate IPN by sale_id
+    if (saleId) {
+      const { data: existingIpn } = await supabase.from("audit_log")
+        .select("id")
+        .eq("entity_type", "payment")
+        .eq("entity_id", orderId)
+        .ilike("action", `%${saleId}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingIpn) {
+        console.warn("iCredit IPN: duplicate sale_id:", saleId, "for order:", orderId);
+        return apiSuccess({ received: true, note: "duplicate_ipn" });
+      }
+    }
+
     // Verify IPN with iCredit — mandatory
     let verified = false;
     try {
@@ -124,11 +140,10 @@ export async function POST(req: NextRequest) {
         payment_details: {
           type: "credit",
           provider: "icredit",
-          card: cardLast4,
+          card: cardLast4 ? `****${cardLast4}` : undefined,
           installments: numPayments,
           sale_id: saleId,
           customer_transaction_id: customerTransactionId,
-          token: token,
           amount: amount,
           verified: verified,
         },

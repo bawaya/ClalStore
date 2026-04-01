@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { NextRequest } from "next/server";
 import { notifyAdminContactForm } from "@/lib/bot/admin-notify";

@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Twilio Webhook (SMS/Verify Status Callbacks)

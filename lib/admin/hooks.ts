@@ -27,8 +27,10 @@ export function useAdminApi<T>({ endpoint, autoFetch = true, paginate }: UseAdmi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const initialLoadDone = useRef(false);
+  const paginateLimit = paginate?.limit ?? 0;
+  const offsetRef = useRef(0);
   const [pagination, setPagination] = useState<PaginationState | null>(
-    paginate ? { limit: paginate.limit, offset: 0, total: 0, totalPages: 0, page: 1 } : null
+    paginate ? { limit: paginateLimit, offset: 0, total: 0, totalPages: 0, page: 1 } : null
   );
 
   const fetchData = useCallback(async (silent = false, overrideOffset?: number) => {
@@ -36,16 +38,17 @@ export function useAdminApi<T>({ endpoint, autoFetch = true, paginate }: UseAdmi
     setError("");
     try {
       let url = endpoint;
-      if (paginate) {
-        const offset = overrideOffset ?? pagination?.offset ?? 0;
+      if (paginateLimit > 0) {
+        const offset = overrideOffset ?? offsetRef.current;
         const sep = endpoint.includes("?") ? "&" : "?";
-        url = `${endpoint}${sep}limit=${paginate.limit}&offset=${offset}`;
+        url = `${endpoint}${sep}limit=${paginateLimit}&offset=${offset}`;
       }
       const res = await fetch(url);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setData(json.data || []);
       if (json.pagination) {
+        offsetRef.current = json.pagination.offset;
         setPagination({
           limit: json.pagination.limit,
           offset: json.pagination.offset,
@@ -60,11 +63,12 @@ export function useAdminApi<T>({ endpoint, autoFetch = true, paginate }: UseAdmi
       setLoading(false);
       initialLoadDone.current = true;
     }
-  }, [endpoint, paginate, pagination?.offset]);
+  }, [endpoint, paginateLimit]);
 
   useEffect(() => {
     if (autoFetch) fetchData();
-  }, [autoFetch, fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFetch, endpoint, paginateLimit]);
 
   const silentRefresh = useCallback(() => fetchData(true), [fetchData]);
 
@@ -138,11 +142,12 @@ export function useAdminApi<T>({ endpoint, autoFetch = true, paginate }: UseAdmi
   const clearError = useCallback(() => setError(""), []);
 
   const setPage = useCallback((page: number) => {
-    if (!paginate) return;
-    const newOffset = (page - 1) * paginate.limit;
+    if (!paginateLimit) return;
+    const newOffset = (page - 1) * paginateLimit;
+    offsetRef.current = newOffset;
     setPagination((prev) => prev ? { ...prev, offset: newOffset, page } : prev);
     fetchData(false, newOffset);
-  }, [paginate, fetchData]);
+  }, [paginateLimit, fetchData]);
 
   return { data, loading, error, clearError, fetchData, create, update, remove, bulkRemove, pagination, setPage };
 }

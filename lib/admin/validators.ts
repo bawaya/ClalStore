@@ -83,16 +83,65 @@ export const dealUpdateSchema = dealSchema.partial();
 
 export const idParam = z.string().uuid().or(z.string().min(1).max(100));
 
+export const autofillSchema = z.object({
+  name: z.string().min(1).max(200),
+  brand: z.string().min(1).max(100),
+  provider: z.enum(["mobileapi", "gsmarena", "combined"]).optional(),
+});
+
+export const inboxSendSchema = z.object({
+  type: z.enum(["text", "template", "image", "document"]).default("text"),
+  content: z.string().max(4096).optional(),
+  template_name: z.string().max(200).optional(),
+  template_params: z.record(z.string(), z.string()).optional(),
+  media_url: z.string().url().max(2000).optional(),
+  media_filename: z.string().max(200).optional(),
+  reply_to: z.string().uuid().optional(),
+});
+
+export const reviewSubmitSchema = z.object({
+  product_id: z.string().min(1).max(100),
+  customer_name: z.string().min(1).max(100),
+  customer_phone: z.string().max(20).optional(),
+  rating: z.number().int().min(1).max(5),
+  title: z.string().max(200).optional(),
+  body: z.string().max(2000).optional(),
+});
+
+export const reviewUpdateSchema = z.object({
+  id: z.string().min(1).max(100),
+  status: z.enum(["pending", "approved", "rejected"]).optional(),
+  admin_reply: z.string().max(1000).optional(),
+});
+
+export const paymentSchema = z.object({
+  orderId: z.string().min(1).max(100),
+  amount: z.number().positive(),
+  customerName: z.string().min(1).max(200),
+  customerPhone: z.string().min(1).max(20),
+  customerEmail: z.string().email().max(200).optional(),
+  customerCity: z.string().max(100).optional(),
+  customerAddress: z.string().max(500).optional(),
+  idNumber: z.string().max(20).optional(),
+  items: z.array(z.object({
+    name: z.string(),
+    price: z.number(),
+    quantity: z.number().int().positive(),
+  })).optional(),
+  maxInstallments: z.number().int().min(1).max(36).optional(),
+  forceGateway: z.enum(["rivhit", "upay"]).optional(),
+});
+
 /**
  * Validate request body against a Zod schema.
- * Returns { data, error: null } on success, { data: null, error } on failure.
+ * Returns { success: true, data } on success, { success: false, error } on failure.
  */
-export function validateBody<T>(body: unknown, schema: z.ZodSchema<T>): 
-  { data: T; error: null } | { data: null; error: string } {
+export function validateBody<T>(body: unknown, schema: z.ZodSchema<T>):
+  { success: true; data: T; error?: undefined } | { success: false; data?: undefined; error: string } {
   const result = schema.safeParse(body);
   if (!result.success) {
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-    return { data: null, error: issues };
+    return { success: false, error: issues };
   }
-  return { data: result.data, error: null };
+  return { success: true, data: result.data };
 }

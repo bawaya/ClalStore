@@ -214,6 +214,10 @@ export async function POST(req: NextRequest) {
 
     if (rpcErr) {
       console.error("Order atomic creation error:", rpcErr);
+      const msg = rpcErr.message || "";
+      // Surface stock/coupon errors clearly to the user
+      if (msg.includes("المخزون غير كافٍ")) return apiError(msg, 409);
+      if (msg.includes("الكوبون غير صالح")) return apiError(msg, 409);
       return apiError("خطأ في إنشاء الطلب", 500);
     }
 

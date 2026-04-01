@@ -1,8 +1,7 @@
-export const runtime = 'edge';
 
 import { NextRequest } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { authenticateCustomer } from "@/lib/customer-auth";
 import {
   getCustomerLoyalty,
   getLoyaltyTransactions,
@@ -13,25 +12,6 @@ import {
   pointsToNextTier,
   type TierKey,
 } from "@/lib/loyalty";
-
-async function authenticateCustomer(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const token = authHeader.slice(7);
-  if (!token || token.length < 32) return null;
-
-  const supabase = createAdminSupabase();
-  if (!supabase) return null;
-
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("id, name, phone")
-    .eq("auth_token", token)
-    .single();
-
-  return customer;
-}
 
 export async function GET(req: NextRequest) {
   try {

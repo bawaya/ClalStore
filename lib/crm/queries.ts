@@ -39,8 +39,8 @@ const db = () => createAdminSupabase();
 export async function getCRMDashboard() {
   const s = db();
   const [orders, customers, tasks, pipeline] = await Promise.all([
-    s.from("orders").select("id, status, source, total, created_at, customer_id, assigned_to").order("created_at", { ascending: false }).limit(1000),
-    s.from("customers").select("id, name, phone, segment, total_orders, total_spent, last_order_at").limit(1000),
+    s.from("orders").select("id, status, source, total, created_at, customer_id, assigned_to").order("created_at", { ascending: false }).limit(200),
+    s.from("customers").select("id, name, phone, segment, total_orders, total_spent, last_order_at").limit(200),
     s.from("tasks").select("id, status, priority, due_date, assigned_to").limit(500),
     s.from("pipeline_deals").select("id, stage, value").limit(500),
   ]);

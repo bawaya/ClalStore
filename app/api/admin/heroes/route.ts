@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminHeroes, createHero, updateHero, deleteHero, logAction } from "@/lib/admin/queries";

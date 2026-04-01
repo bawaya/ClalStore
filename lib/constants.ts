@@ -28,6 +28,7 @@ export const ORDER_STATUS = {
   delivered: { label: "تم التسليم", labelHe: "נמסר", color: "#06b6d4", icon: "📦" },
   cancelled: { label: "ملغي", labelHe: "בוטל", color: "#71717a", icon: "🚫" },
   rejected: { label: "مرفوض", labelHe: "נדחה", color: "#ef4444", icon: "❌" },
+  returned: { label: "مرتجع", labelHe: "הוחזר", color: "#78716c", icon: "↩️" },
   no_reply_1: { label: "لا يوجد رد 1", labelHe: "אין מענה 1", color: "#f97316", icon: "📞" },
   no_reply_2: { label: "لا يوجد رد 2", labelHe: "אין מענה 2", color: "#f97316", icon: "📞📞" },
   no_reply_3: { label: "لا يوجد رد 3", labelHe: "אין מענה 3", color: "#ef4444", icon: "📞📞📞" },

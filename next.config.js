@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Image optimization (unoptimized for Cloudflare Pages)
+  // Image optimization (unoptimized for Cloudflare Workers)
   images: {
     unoptimized: true,
     remotePatterns: [

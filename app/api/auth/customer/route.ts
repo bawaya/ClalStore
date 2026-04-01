@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Customer Auth API (OTP via SMS or WhatsApp)
@@ -11,6 +10,7 @@ import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { validatePhone } from "@/lib/validators";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { hashSHA256 } from "@/lib/crypto";
 
 function generateOTP(): string {
   const bytes = new Uint8Array(2);
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
           // SMS failed → fallback to WhatsApp
           const otpCode = generateOTP();
           await supabase.from("customer_otps").insert({
-            phone: cleanPhone, otp: otpCode,
+            phone: cleanPhone, otp: await hashSHA256(otpCode),
             expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
           } as any);
           if (await sendViaWhatsApp(cleanPhone, otpCode)) sentVia = "whatsapp";
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
           // Fallback: direct WhatsApp text message with generated OTP
           const otpCode = generateOTP();
           await supabase.from("customer_otps").insert({
-            phone: cleanPhone, otp: otpCode,
+            phone: cleanPhone, otp: await hashSHA256(otpCode),
             expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
           } as any);
           if (await sendViaWhatsApp(cleanPhone, otpCode)) sentVia = "whatsapp";
@@ -255,7 +255,7 @@ export async function POST(req: NextRequest) {
         if (otpValid) {
           await supabase.from("customer_otps").update({ verified: true }).eq("id", latestOtp.id);
         }
-      } else if (latestOtp && (latestOtp as any).otp === otp) {
+      } else if (latestOtp && (latestOtp as any).otp === await hashSHA256(otp)) {
         // Sent via direct WhatsApp → check DB match
         otpValid = true;
         await supabase.from("customer_otps").update({ verified: true }).eq("id", latestOtp.id);
@@ -267,6 +267,7 @@ export async function POST(req: NextRequest) {
 
       // Generate auth token with expiration
       const token = generateToken();
+      const hashedToken = await hashSHA256(token);
       const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60_000).toISOString();
 
       // Upsert customer
@@ -282,7 +283,7 @@ export async function POST(req: NextRequest) {
         const { data: updated } = await supabase
           .from("customers")
           .update({
-            auth_token: token,
+            auth_token: hashedToken,
             auth_token_expires_at: tokenExpiresAt,
             last_login: new Date().toISOString(),
           })
@@ -297,7 +298,7 @@ export async function POST(req: NextRequest) {
             phone: cleanPhone,
             name: "",
             segment: "new",
-            auth_token: token,
+            auth_token: hashedToken,
             auth_token_expires_at: tokenExpiresAt,
             last_login: new Date().toISOString(),
           } as any)

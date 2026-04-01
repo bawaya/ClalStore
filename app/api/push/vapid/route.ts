@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { apiSuccess, apiError } from "@/lib/api-response";
 

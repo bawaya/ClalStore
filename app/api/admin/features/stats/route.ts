@@ -1,12 +1,17 @@
 export const dynamic = 'force-dynamic';
 
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { apiSuccess } from "@/lib/api-response";
+import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
-    if (!supabase) return apiSuccess({});
+    if (!supabase) return apiError("DB unavailable", 500);
 
     // Gather stats for each feature — use try/catch for each in case table doesn't exist
     const stats: Record<string, any> = {};

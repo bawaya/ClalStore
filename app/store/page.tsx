@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import type { Metadata } from "next";
 import { getProducts, getHeroes, getLinePlans } from "@/lib/store/queries";

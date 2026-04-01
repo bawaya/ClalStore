@@ -31,16 +31,12 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Vercel
-.vercel
-
 # Supabase
 supabase/.temp/
 
 # Build output
 .open-next/
-.vercel/output/
-.pages-deploy/
+.wrangler/
 
 # Backup files
 *.bak

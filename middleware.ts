@@ -61,6 +61,21 @@ export async function middleware(request: NextRequest) {
   } else if (pathname.startsWith("/api/customer")) {
     rlConfig = { maxRequests: 20, windowMs: 60_000 };
     rlPrefix = "customer";
+  } else if (pathname.startsWith("/api/payment")) {
+    rlConfig = { maxRequests: 10, windowMs: 60_000 };
+    rlPrefix = "payment";
+  } else if (pathname.startsWith("/api/reviews")) {
+    rlConfig = { maxRequests: 5, windowMs: 3_600_000 };
+    rlPrefix = "reviews";
+  } else if (pathname.startsWith("/api/push")) {
+    rlConfig = { maxRequests: 50, windowMs: 60_000 };
+    rlPrefix = "push";
+  } else if (pathname.startsWith("/api/notifications")) {
+    rlConfig = { maxRequests: 20, windowMs: 60_000 };
+    rlPrefix = "notif";
+  } else if (pathname.startsWith("/api/admin") || pathname.startsWith("/api/crm")) {
+    rlConfig = { maxRequests: 200, windowMs: 60_000 };
+    rlPrefix = "admin";
   } else if (pathname.startsWith("/api/")) {
     rlConfig = RATE_LIMITS.api;
     rlPrefix = "api";
@@ -83,7 +98,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // === CSRF Protection (double-submit cookie) ===
-  const CSRF_EXEMPT = ["/api/webhook", "/api/cron", "/api/payment/callback", "/api/csrf", "/api/orders"];
+  const CSRF_EXEMPT = ["/api/webhook", "/api/cron", "/api/payment/callback", "/api/csrf"];
   const stateChanging = ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
   const csrfExempt = CSRF_EXEMPT.some((p) => pathname.startsWith(p));
 
@@ -226,6 +241,6 @@ export const config = {
     "/api/push/:path*", "/api/orders", "/api/payment",
     "/api/coupons/:path*", "/api/customer/:path*",
     "/api/reviews/:path*", "/api/cart/:path*", "/api/notifications/:path*",
-    "/api/csrf",
+    "/api/settings/:path*", "/api/csrf",
   ],
 };

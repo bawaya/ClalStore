@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 // =====================================================
 // ClalMobile — Integration Test API
@@ -6,8 +5,9 @@ export const runtime = 'edge';
 // Validates credentials and optionally pings the provider
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getIntegrations } from "@/lib/admin/queries";
+import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg, errDetail } from "@/lib/api-response";
 
 const MASK = "••••••••";
@@ -160,6 +160,9 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const { type, config } = await req.json();
 
     if (!type || !config) {

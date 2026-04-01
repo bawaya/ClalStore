@@ -5,8 +5,9 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const VALID_STATUSES = [
-  "pending", "confirmed", "processing", "shipped", "delivered",
-  "cancelled", "returned", "no_reply_1", "no_reply_2", "no_reply_3",
+  "new", "approved", "processing", "shipped", "delivered",
+  "cancelled", "rejected", "returned",
+  "no_reply_1", "no_reply_2", "no_reply_3",
 ];
 
 export async function GET(req: NextRequest) {

@@ -8,14 +8,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
+function getOpenAIKey() {
+  return process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
+}
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${getOpenAIKey()}`,
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    if (!OPENAI_API_KEY) {
+    if (!getOpenAIKey()) {
       return apiError("OpenAI API key not configured", 500);
     }
 

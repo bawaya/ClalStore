@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { notFound } from "next/navigation";
 import { getProduct, getProducts } from "@/lib/store/queries";
@@ -6,17 +5,19 @@ import { ProductDetailClient } from "@/components/store/ProductDetail";
 import { getProductMetadata } from "@/lib/seo";
 
 interface Props {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
-  const product = await getProduct(params.id);
+  const { id } = await params;
+  const product = await getProduct(id);
   if (!product) return { title: "منتج غير موجود" };
   return getProductMetadata(product);
 }
 
 export default async function ProductPage({ params }: Props) {
-  const product = await getProduct(params.id);
+  const { id } = await params;
+  const product = await getProduct(id);
   if (!product) notFound();
 
   // Related products (same brand or type)

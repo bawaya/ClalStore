@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from "next/server";
 import { createAdminSupabase, createServerSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { reviewSubmitSchema, reviewUpdateSchema, validateBody } from "@/lib/admin/validators";
 
 // GET — Get reviews for a product (public) or all (admin)
 export async function GET(req: NextRequest) {
@@ -57,12 +58,9 @@ export async function POST(req: NextRequest) {
       return apiError("Reviews disabled", 403);
     }
 
-    const body = await req.json();
-    const { product_id, customer_name, customer_phone, rating, title, body: reviewBody } = body;
-
-    if (!product_id || !customer_name || !rating || rating < 1 || rating > 5) {
-      return apiError("Missing required fields", 400);
-    }
+    const v = validateBody(await req.json(), reviewSubmitSchema);
+    if (!v.success) return apiError(v.error, 400);
+    const { product_id, customer_name, customer_phone, rating, title, body: reviewBody } = v.data;
 
     // Check if customer already reviewed this product
     if (customer_phone) {
@@ -121,10 +119,9 @@ export async function PUT(req: NextRequest) {
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("Unauthorized", 401);
 
-    const body = await req.json();
-    const { id, status, admin_reply } = body;
-
-    if (!id) return apiError("Missing review ID", 400);
+    const v = validateBody(await req.json(), reviewUpdateSchema);
+    if (!v.success) return apiError(v.error, 400);
+    const { id, status, admin_reply } = v.data;
 
     const updates: any = { updated_at: new Date().toISOString() };
     if (status) updates.status = status;
