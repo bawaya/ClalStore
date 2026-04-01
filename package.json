@@ -7,10 +7,9 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "build:cf": "npx opennextjs-cloudflare build",
-    "preview:cf": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare preview",
-    "deploy:cf": "npx opennextjs-cloudflare build && npx wrangler deploy",
+    "build": "npx opennextjs-cloudflare build",
+    "preview:cf": "npm run build && npx opennextjs-cloudflare preview",
+    "deploy:cf": "npm run build && npx wrangler deploy",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
