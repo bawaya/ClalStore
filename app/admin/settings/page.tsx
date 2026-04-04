@@ -57,6 +57,12 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
     { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },
     { key: "completed_orders_email", label: "📧 إيميل الطلبات الجاهزة", type: "email", placeholder: "bawaya@icloud.com" },
   ],
+  "Google Gemini": [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "AIzaSy..." },
+  ],
+  "Anthropic Claude": [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "sk-ant-..." },
+  ],
   "Meta API": [
     { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
     { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "" },

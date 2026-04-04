@@ -115,7 +115,7 @@ export const INTEGRATION_TYPES = {
   payment: { label: "الدفع — إسرائيل", icon: "💳", providers: ["רווחית (Rivhit)", "Tranzila", "PayPlus", "Stripe"] as readonly string[] },
   payment_upay: { label: "الدفع — فلسطين والعالم", icon: "💳", providers: ["UPay"] as readonly string[] },
   email: { label: "Email", icon: "📧", providers: ["Resend", "SendGrid"] as readonly string[] },
-  ai_chat: { label: "ذكاء اصطناعي (بوت + بحث)", icon: "🤖", providers: ["Anthropic Claude"] as readonly string[] },
+  ai_chat: { label: "ذكاء اصطناعي (بوت + بحث)", icon: "🤖", providers: ["Anthropic Claude", "Google Gemini"] as readonly string[] },
   ai_admin: { label: "ذكاء اصطناعي (أدمن)", icon: "🧠", providers: ["OpenAI"] as readonly string[] },
   storage: { label: "تخزين الصور", icon: "☁️", providers: ["Cloudflare R2"] as readonly string[] },
   image_processing: { label: "معالجة الصور", icon: "🖼️", providers: ["RemoveBG"] as readonly string[] },

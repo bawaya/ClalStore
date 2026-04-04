@@ -6,6 +6,7 @@
 
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
+import { callGemini } from "@/lib/ai/gemini";
 import { getProductByQuery } from "@/lib/ai/product-context";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 
@@ -128,9 +129,25 @@ export async function getAIResponse(
   currentMessage: string,
   context: AIContext
 ): Promise<{ text: string; quickReplies?: string[] } | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY;
+  const sb = createAdminSupabase();
+  const { data: dbIntegration } = await sb
+    .from("integrations")
+    .select("provider, config")
+    .eq("type", "ai_chat")
+    .single();
+
+  const provider = dbIntegration?.provider || "Anthropic Claude";
+  const integrationConfig = dbIntegration?.config || {};
+
+  let apiKey = "";
+  if (provider === "Google Gemini") {
+    apiKey = integrationConfig.api_key || process.env.GEMINI_API_KEY || "AIzaSyCnQjDfKoCdcmjdxcgFpwC2-REXXsS0zpQ";
+  } else {
+    apiKey = integrationConfig.api_key || process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY || "";
+  }
+
   if (!apiKey) {
-    console.warn("ANTHROPIC_API_KEY_BOT not set — AI responses disabled");
+    console.warn(`[AI] ${provider} API key not set — AI responses disabled`);
     return null;
   }
 
@@ -166,17 +183,28 @@ export async function getAIResponse(
     // Add current message
     claudeMessages.push({ role: "user", content: currentMessage });
 
-    // Ensure messages alternate correctly (Claude requirement)
+    // Ensure messages alternate correctly (Claude requirement, works for Gemini too)
     const cleaned = cleanAlternatingMessages(claudeMessages);
 
-    // 5. Call Claude via shared client
-    const result = await callClaude({
-      systemPrompt,
-      messages: cleaned,
-      maxTokens: 400,
-      temperature: 0.7,
-      apiKey,
-    });
+    // 5. Call AI via selected client
+    let result;
+    if (provider === "Google Gemini") {
+      result = await callGemini({
+        systemPrompt,
+        messages: cleaned,
+        maxTokens: 400,
+        temperature: 0.7,
+        apiKey,
+      });
+    } else {
+      result = await callClaude({
+        systemPrompt,
+        messages: cleaned,
+        maxTokens: 400,
+        temperature: 0.7,
+        apiKey,
+      });
+    }
 
     if (!result) return null;
 
