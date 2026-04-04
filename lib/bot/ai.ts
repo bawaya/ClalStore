@@ -141,7 +141,7 @@ export async function getAIResponse(
 
   let apiKey = "";
   if (provider === "Google Gemini") {
-    apiKey = integrationConfig.api_key || process.env.GEMINI_API_KEY || "AIzaSyCnQjDfKoCdcmjdxcgFpwC2-REXXsS0zpQ";
+    apiKey = integrationConfig.api_key || process.env.GEMINI_API_KEY || "AIzaSyDQYgEfgo2itJfVWkdKNIryq6qw8JIxUI0";
   } else {
     apiKey = integrationConfig.api_key || process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY || "";
   }
