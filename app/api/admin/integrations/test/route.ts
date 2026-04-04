@@ -171,6 +171,17 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
     if (!cfg.tracking_id && !cfg.api_key) return { ok: false, message: "معرف التتبع مفقود" };
     return { ok: true, message: "✅ بيانات التحليلات محفوظة" };
   },
+
+  // ===== AI =====
+  ai_chat: async (cfg) => {
+    if (!cfg.api_key) return { ok: false, message: "مفتاح API مفقود" };
+    return { ok: true, message: "✅ تم حفظ مفتاح الذكاء الاصطناعي (يتم فحص أدائه حياً من الشات)" };
+  },
+
+  ai_admin: async (cfg) => {
+    if (!cfg.api_key) return { ok: false, message: "مفتاح API مفقود" };
+    return { ok: true, message: "✅ تم التفعيل (ذكاء الآدمن)" };
+  },
 };
 
 export async function POST(req: NextRequest) {
