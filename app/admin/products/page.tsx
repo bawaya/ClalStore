@@ -23,7 +23,7 @@ const EMPTY: Partial<Product> = {
 export default function ProductsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { data: products, loading, error, clearError, create, update, remove, bulkRemove, pagination, setPage } = useAdminApi<Product>({ endpoint: "/api/admin/products", paginate: { limit: 20 } });
+  const { data: products, loading, error, clearError, create, update, remove, bulkRemove, pagination, setPage } = useAdminApi<Product>({ endpoint: "/api/admin/products" });
 
   const [modal, setModal] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
