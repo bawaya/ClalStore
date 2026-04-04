@@ -6,7 +6,7 @@
 import type { ClaudeRequest, ClaudeResponse } from "./claude";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const MODEL = "gemini-1.5-flash"; 
+const MODEL = "gemini-1.5-flash-latest"; 
 
 export async function callGemini(req: ClaudeRequest): Promise<ClaudeResponse | null> {
   const apiKey = req.apiKey || process.env.GEMINI_API_KEY;

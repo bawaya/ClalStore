@@ -8,6 +8,7 @@ import { useAdminSettings } from "@/lib/admin/hooks";
 import { FormField, Toggle } from "@/components/admin/shared";
 import { INTEGRATION_TYPES } from "@/lib/constants";
 import { invalidateLogoCache } from "@/components/shared/Logo";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 // ===== Provider Config Fields =====
 const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string; placeholder: string }[]> = {
@@ -167,7 +168,7 @@ function IntegrationCard({
       }
       const res = await fetch("/api/admin/integrations/test", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ type, config: configToTest }),
       });
       const data = await res.json();
