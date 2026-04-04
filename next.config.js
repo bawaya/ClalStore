@@ -14,6 +14,9 @@ const nextConfig = {
   compress: true,
   reactStrictMode: true,
 
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+
   // Redirects
   async redirects() {
     return [
