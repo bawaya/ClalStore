@@ -95,8 +95,8 @@ function LinesCalculator() {
           <FormField label="מספר קווים">
             <input type="number" className="input" min={1} value={count} onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))} />
           </FormField>
-          <FormField label="מחיר חבילה (₪)">
-            <input type="number" className="input" step="0.1" value={price} onChange={(e) => setPrice(parseFloat(e.target.value) || 0)} />
+          <FormField label="מחיר חבילה (₪) — טווח: ₪20–₪120">
+            <input type="number" className="input" step="0.1" min={0} max={500} value={price} onChange={(e) => setPrice(Math.min(500, parseFloat(e.target.value) || 0))} />
           </FormField>
           <div className="flex items-center gap-2 mb-3">
             <label className="text-muted text-xs">הו״ק תקינה</label>
@@ -553,14 +553,25 @@ function SimulationCalculator() {
                 placeholder="0"
               />
             </FormField>
-            <FormField label="מחיר חבילה לקו (₪)">
+            <FormField label="מחיר חבילה לקו (₪) — טווח: ₪20–₪120">
               <input
                 type="number"
                 className="input"
                 step="0.1"
+                min={0}
+                max={500}
                 value={linePackagePrice}
-                onChange={(e) => setLinePackagePrice(parseFloat(e.target.value) || 25)}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value) || 0;
+                  setLinePackagePrice(Math.min(500, v));
+                }}
+                placeholder="25"
               />
+              {linePackagePrice > 200 && (
+                <div className="text-[10px] mt-1 font-bold" style={{ color: "#ef4444" }}>
+                  ⚠ מחיר חבילה גבוה מדי — חבילות HOT בטווח ₪20–₪120
+                </div>
+              )}
             </FormField>
             <FormField label="מכירות מכשירים נוספות (₪)">
               <input
@@ -569,7 +580,7 @@ function SimulationCalculator() {
                 min={0}
                 value={additionalDeviceSales || ""}
                 onChange={(e) => setAdditionalDeviceSales(Math.max(0, parseFloat(e.target.value) || 0))}
-                placeholder="0"
+                placeholder="250000"
               />
             </FormField>
           </div>
@@ -594,7 +605,7 @@ function SimulationCalculator() {
               {additionalLines > 0 && (
                 <div className="flex justify-between">
                   <span className="font-bold" style={{ color: "#3b82f6" }}>+{formatCurrency(simLinesCommission)}</span>
-                  <span className="text-muted text-xs">{additionalLines} קווים x ₪{linePackagePrice} x {COMMISSION.LINE_MULTIPLIER}</span>
+                  <span className="text-muted text-xs" dir="ltr">{additionalLines} x ₪{linePackagePrice} x {COMMISSION.LINE_MULTIPLIER} = ₪{simLinesCommission.toLocaleString()}</span>
                 </div>
               )}
 
