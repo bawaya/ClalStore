@@ -1,17 +1,18 @@
-# 🔴 ClalMobile — E-Commerce Ecosystem
+# ClalMobile — E-Commerce Ecosystem
 
-> وكيل رسمي معتمد لـ HOT Mobile — نظام تجارة إلكتروني متكامل
+> HOT Mobile authorized dealer — full-stack e-commerce, CRM, and commission management platform
 
-## 🏗️ Tech Stack
+## Tech Stack
 
 - **Frontend:** Next.js 14 + TypeScript + Tailwind CSS
 - **Database:** Supabase (PostgreSQL)
 - **Auth:** Supabase Auth
-- **Storage:** Supabase Storage
-- **Hosting:** Cloudflare Pages
+- **Storage:** Supabase Storage + Cloudflare R2
+- **Hosting:** Cloudflare Pages (edge runtime)
+- **AI:** Anthropic Claude + Google Gemini (dynamic switching)
 - **Domain:** clalmobile.com
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Install dependencies
 ```bash
@@ -20,7 +21,7 @@ npm install
 
 ### 2. Set up Supabase
 1. Create a project at [supabase.com](https://supabase.com)
-2. Go to SQL Editor → run `supabase/migrations/001_initial_schema.sql`
+2. Go to SQL Editor and run all migrations in `supabase/migrations/` (001 through 026)
 3. Copy your project URL and keys
 
 ### 3. Environment variables
@@ -36,63 +37,125 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 clalmobile/
 ├── app/
-│   ├── store/        → المتجر (public)
-│   ├── admin/        → لوحة الإدارة (protected)
-│   ├── crm/          → CRM (protected)
-│   ├── (auth)/login/ → تسجيل الدخول
-│   └── api/          → API Routes
+│   ├── store/              → Public e-commerce storefront
+│   ├── admin/              → Admin dashboard (protected)
+│   │   ├── products/       → Product CRUD
+│   │   ├── categories/     → Category management
+│   │   ├── commissions/    → Commission Calculator module
+│   │   │   ├── page.tsx        → Dashboard (overview + pace tracking)
+│   │   │   ├── calculator/     → Calculator (5 tabs)
+│   │   │   ├── sanctions/      → Sanctions management
+│   │   │   ├── history/        → Sales history
+│   │   │   ├── import/         → Order sync / CSV import
+│   │   │   └── analytics/      → Multi-month analytics
+│   │   └── ...             → Other admin pages (14 total)
+│   ├── crm/                → CRM system (protected)
+│   ├── (auth)/login/       → Team login
+│   └── api/                → 99 API routes
+│       ├── admin/commissions/  → 8 commission endpoints
+│       └── ...
 ├── components/
-│   ├── ui/           → مكونات مشتركة (Button, Card, Badge...)
-│   ├── layouts/      → Sidebar, Header, TabNav
-│   └── shared/       → مكونات متكررة
+│   ├── ui/                 → Shared UI (Button, Card, Badge...)
+│   ├── admin/              → Admin components
+│   ├── store/              → Store components
+│   └── crm/                → CRM components
 ├── lib/
-│   ├── supabase.ts   → Supabase clients
-│   ├── auth.ts       → Authentication
-│   ├── hooks.ts      → useScreen, useToast, useDebounce
-│   ├── constants.ts  → Statuses, roles, banks, cities
-│   ├── validators.ts → Israeli ID, Luhn, phone validation
-│   └── utils.ts      → Formatters, helpers
+│   ├── commissions/        → Commission calculation engine
+│   │   ├── calculator.ts   → Formulas (line, device, loyalty, target)
+│   │   └── sync-orders.ts  → Auto-sync orders to commission_sales
+│   ├── admin/              → Admin logic
+│   ├── crm/                → CRM logic
+│   ├── bot/                → WhatsApp bot engine
+│   ├── ai/                 → AI utilities (Claude / Gemini)
+│   ├── integrations/       → External services (payment, email, SMS)
+│   └── ...                 → Supabase, auth, hooks, validators
 ├── types/
-│   └── database.ts   → TypeScript types for all entities
-├── styles/
-│   └── globals.css   → Tailwind + Design System
-└── supabase/
-    └── migrations/   → SQL schema
+│   └── database.ts         → TypeScript types (35+ tables)
+├── supabase/
+│   └── migrations/         → 26 SQL migrations (001-026)
+└── middleware.ts            → Auth, CSRF, rate limiting, CORS
 ```
 
-## 🔐 Roles & Permissions
+## Core Modules
+
+| Module | Path | Description |
+|--------|------|-------------|
+| **Store** | `app/store/` | Product catalog, cart, checkout, wishlist, compare, tracking |
+| **Admin** | `app/admin/` | 14 admin pages: products, categories, commissions, analytics, etc. |
+| **CRM** | `app/crm/` | Inbox, customers, pipeline, tasks, reports, team |
+| **Bot** | `lib/bot/` | WhatsApp + WebChat bot with AI fallback |
+| **Commissions** | `lib/commissions/` + `app/admin/commissions/` | HOT Mobile commission calculator with 6 sub-pages |
+
+## Commission Calculator Module
+
+Contract-based commission tracking for HOT Mobile dealer:
+
+- **Line commissions:** Package price x4 multiplier (min 19.90 ILS)
+- **Device commissions:** 5% of net device sales + milestone bonuses (2,500 ILS per 50,000 ILS)
+- **Loyalty bonuses:** Earned at 5, 9, 12, and 15 months (80+30+20+50 = 180 ILS total per line)
+- **Sanctions:** 9 predefined penalty types (1,000-2,500 ILS)
+- **Auto-sync:** Syncs completed orders from the store to commission tracking
+- **External API:** Bearer token authenticated endpoint for local HTML app sync
+
+Admin pages: Dashboard, Calculator (5 tabs), Sanctions, History, Import/Sync, Analytics
+
+## Roles & Permissions
 
 | Role | Access |
 |------|--------|
 | super_admin | Everything |
-| admin | Products, Orders, Customers, Settings |
+| admin | Products, Orders, Customers, Settings, Commissions |
 | sales | Orders, Customers, Pipeline, Tasks |
 | support | Orders, Customers, Tasks |
 | content | Products, Heroes, Emails |
 | viewer | Read-only Orders & Customers |
 
-## 📋 Order Statuses
+## Order Statuses
 
 ```
-جديد → موافق → قيد الشحن → تم التسليم
-         ↘ مرفوض
-         ↘ لا يوجد رد 1 → لا يوجد رد 2 → لا يوجد رد 3
+new → approved → shipping → delivered
+        ↘ rejected
+        ↘ no_answer_1 → no_answer_2 → no_answer_3
 ```
 
-## 📡 Order Sources
-🛒 المتجر | 📘 فيسبوك | 🏪 متجر خارجي | 💬 واتساب | 🌐 شات الموقع | ✍️ يدوي
+## Order Sources
+Store | Facebook | External | WhatsApp | WebChat | Manual
 
-## 🗺️ Roadmap
+## API Highlights
 
-- [x] Season 0: Infrastructure ← **أنت هنا**
-- [ ] Season 1: Store (real backend)
-- [ ] Season 2: Admin Panel (real CRUD)
-- [ ] Season 3: CRM (real-time)
-- [ ] Season 4: Bots (WhatsApp + WebChat)
-- [ ] Season 5: Website
-- [ ] Season 6: Launch
+| Category | Count | Auth |
+|----------|-------|------|
+| Admin APIs | ~40 | Session (role-based) |
+| CRM APIs | ~25 | Session |
+| Commission APIs | 8 | Session or Bearer token |
+| Store/Public APIs | ~26 | Public or customer token |
+| Total | 99 | Mixed |
+
+### Commission API Endpoints
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/admin/commissions/dashboard` | Session or Bearer | Full dashboard with pace tracking |
+| GET | `/api/admin/commissions/summary` | Bearer only | Lightweight summary for local app |
+| GET/POST | `/api/admin/commissions/sales` | Session | CRUD sales records |
+| POST | `/api/admin/commissions/calculate` | Session | Calculate line/device/loyalty/target |
+| GET/POST | `/api/admin/commissions/sanctions` | Session | CRUD sanctions |
+| GET/POST | `/api/admin/commissions/sync` | Session | Auto-sync orders |
+| GET/POST | `/api/admin/commissions/targets` | Session | Monthly targets |
+| GET | `/api/admin/commissions/analytics` | Session | Multi-month analytics |
+| GET | `/api/admin/commissions/export` | Session | CSV export |
+
+## Deployment
+
+```bash
+npm run build:cf        # Build for Cloudflare Pages
+npm run deploy:cf       # Deploy
+```
+
+See [LAUNCH.md](./LAUNCH.md) for full deployment guide.
+See [DOCS.md](./DOCS.md) for comprehensive technical documentation.

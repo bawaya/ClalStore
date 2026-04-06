@@ -14,13 +14,14 @@
 5. [API Reference](#api-reference)
 6. [Authentication & Authorization](#authentication--authorization)
 7. [Core Modules](#core-modules)
-8. [Integrations](#integrations)
-9. [Environment Variables](#environment-variables)
-10. [Deployment](#deployment)
-11. [Scripts & Commands](#scripts--commands)
-12. [Design System](#design-system)
-13. [Testing](#testing)
-14. [Security Audit](#security-audit)
+8. [Commission Calculator Module](#commission-calculator-module)
+9. [Integrations](#integrations)
+10. [Environment Variables](#environment-variables)
+11. [Deployment](#deployment)
+12. [Scripts & Commands](#scripts--commands)
+13. [Design System](#design-system)
+14. [Testing](#testing)
+15. [Security Audit](#security-audit)
 
 ---
 
@@ -41,12 +42,12 @@ ClalMobile is a monolithic Next.js 14 application using the App Router pattern, 
 │                      │                               │
 │              ┌───────┴────────┐                      │
 │              │  API Routes    │                      │
-│              │  (84 endpoints)│                      │
+│              │  (99 endpoints)│                      │
 │              └───────┬────────┘                      │
 │                      │                               │
 │  ┌───────────────────┼───────────────────────────┐  │
-│  │           lib/ (Business Logic)                │  │
-│  │  bot/ │ admin/ │ crm/ │ store/ │ integrations/ │  │
+│  │           lib/ (Business Logic)                     │  │
+│  │  bot/ │ admin/ │ crm/ │ store/ │ commissions/ │ ... │  │
 │  └───────────────────┬───────────────────────────┘  │
 │                      │                               │
 │  ┌───────────────────┼───────────────────────────┐  │
@@ -121,6 +122,7 @@ clalmobile/
 │   │   ├── page.tsx                # Dashboard overview
 │   │   ├── layout.tsx              # Admin layout (sidebar)
 │   │   ├── products/               # Product CRUD
+│   │   ├── categories/             # Category management
 │   │   ├── order/                  # Order management
 │   │   ├── analytics/              # Sales analytics
 │   │   ├── prices/                 # Pricing management
@@ -131,6 +133,13 @@ clalmobile/
 │   │   ├── reviews/                # Review management
 │   │   ├── push/                   # Push notifications
 │   │   ├── bot/                    # Bot management
+│   │   ├── commissions/            # Commission Calculator module
+│   │   │   ├── page.tsx            # Commission dashboard (overview + pace)
+│   │   │   ├── calculator/         # Calculator (5 tabs: line, device, loyalty, target, summary)
+│   │   │   ├── sanctions/          # Sanctions management
+│   │   │   ├── history/            # Sales history with filters
+│   │   │   ├── import/             # Order sync + CSV import
+│   │   │   └── analytics/          # Multi-month analytics charts
 │   │   ├── settings/               # Store settings
 │   │   ├── features/               # Feature flags
 │   │   ├── homepage/               # Homepage CMS
@@ -147,8 +156,11 @@ clalmobile/
 │   │   ├── reports/                # CRM reports
 │   │   └── users/                  # Team management
 │   │
-│   └── api/                        # 84 API routes
+│   └── api/                        # 99 API routes
 │       ├── admin/                  # Admin endpoints (protected)
+│       │   ├── commissions/        # 8 commission endpoints
+│       │   ├── categories/         # Category management
+│       │   ├── products/export/    # Product CSV export
 │       ├── crm/                    # CRM endpoints (protected)
 │       ├── store/                  # Public store APIs
 │       ├── orders/                 # Order creation
@@ -244,6 +256,10 @@ clalmobile/
 │   │   ├── twilio-sms.ts           # SMS/OTP
 │   │   └── removebg.ts             # Image background removal
 │   │
+│   ├── commissions/                # Commission Calculator engine
+│   │   ├── calculator.ts           # Formulas (line, device, loyalty, target, monthly)
+│   │   └── sync-orders.ts          # Auto-sync completed orders to commission_sales
+│   │
 │   ├── ai/                         # AI utilities
 │   │   ├── claude.ts               # Anthropic Claude client
 │   │   ├── product-context.ts      # Product AI context
@@ -264,7 +280,7 @@ clalmobile/
 │   └── manifest.json               # PWA manifest
 │
 ├── supabase/
-│   ├── migrations/                 # 20 SQL migration files
+│   ├── migrations/                 # 26 SQL migration files
 │   └── seed/                       # Seed data scripts
 │
 ├── tests/
@@ -352,6 +368,14 @@ clalmobile/
 | `abandoned_carts` | Recovery | id, customer_id, items, recovered |
 | `audit_log` | Compliance | id, user_id, action, entity, entity_id, details |
 
+#### Commission Module (migrations 025-026)
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `commission_sales` | Sales records (manual + auto-synced) | id, sale_date, sale_type (line/device), source (manual/auto_sync/csv_import), order_id, customer_name, package_price, multiplier, has_valid_hk, loyalty_status, loyalty_start_date, device_name, device_sale_amount, commission_amount |
+| `commission_targets` | Monthly targets | id, month, target_lines_amount, target_devices_amount, target_total, target_lines_count, target_devices_count, is_locked, locked_at |
+| `commission_sanctions` | Penalties/sanctions | id, sanction_date, sanction_type, amount, has_sale_offset, description |
+| `commission_sync_log` | Order sync audit trail | id, sync_date, orders_synced, orders_skipped, total_amount, status, error_message |
+
 ### Order Status Flow
 
 ```
@@ -401,6 +425,35 @@ clalmobile/
 | POST | `/api/admin/ai-enhance` | AI product enhancement |
 | POST | `/api/admin/ai-usage` | Track AI token usage |
 | POST | `/api/admin/features/stats` | Feature analytics |
+
+#### Categories
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/categories` | List categories |
+| POST | `/api/admin/categories` | Create/update category |
+| DELETE | `/api/admin/categories` | Delete category |
+
+#### Products Export
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/products/export` | Export products as CSV |
+
+#### Commission Calculator
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/commissions/dashboard` | Full dashboard with pace tracking (dual auth: session or bearer) |
+| GET | `/api/admin/commissions/summary` | Lightweight summary for local HTML app (bearer token only, CORS-enabled) |
+| GET | `/api/admin/commissions/sales` | List sales with filters (type, source, date range, pagination) |
+| POST | `/api/admin/commissions/sales` | Create/update a sale record |
+| POST | `/api/admin/commissions/calculate` | Calculate commission (line, device, loyalty, or target scenario) |
+| GET | `/api/admin/commissions/sanctions` | List sanctions with date filters |
+| POST | `/api/admin/commissions/sanctions` | Create a sanction record |
+| GET | `/api/admin/commissions/sync` | Get last sync info |
+| POST | `/api/admin/commissions/sync` | Sync completed orders to commission_sales |
+| GET | `/api/admin/commissions/targets` | Get monthly target |
+| POST | `/api/admin/commissions/targets` | Create/update monthly target (lock-aware) |
+| GET | `/api/admin/commissions/analytics` | Multi-month analytics (configurable range) |
+| GET | `/api/admin/commissions/export` | Export monthly data as CSV (sales + sanctions) |
 
 #### Files & Settings
 | Method | Endpoint | Description |
@@ -606,6 +659,289 @@ Features:
 
 ---
 
+## Commission Calculator Module
+
+The Commission Calculator is a complete commission tracking and calculation system for the HOT Mobile dealer contract. It lives in `lib/commissions/`, `app/admin/commissions/`, and `app/api/admin/commissions/`.
+
+### Overview
+
+The module tracks three revenue streams for the dealer:
+
+1. **Line commissions** -- new mobile line activations
+2. **Device commissions** -- device/accessory sales
+3. **Loyalty bonuses** -- retention bonuses for lines that remain active
+
+Sanctions (penalties) are subtracted from the total. Monthly targets allow goal tracking with pace analysis.
+
+### Admin Pages (6 sub-pages)
+
+| Page | Path | Description |
+|------|------|-------------|
+| **Dashboard** | `/admin/commissions` | Monthly overview with KPI cards, pace tracking, daily chart, smart alerts, target progress |
+| **Calculator** | `/admin/commissions/calculator` | 5-tab calculator: Line, Device, Loyalty, Target Planner, Monthly Summary |
+| **Sanctions** | `/admin/commissions/sanctions` | Add/view sanctions with predefined types from the HOT contract |
+| **History** | `/admin/commissions/history` | Filterable sales history (by type, source, date range) with pagination |
+| **Import** | `/admin/commissions/import` | Auto-sync completed store orders + manual CSV import capability |
+| **Analytics** | `/admin/commissions/analytics` | Multi-month trend charts (up to 12 months) comparing lines, devices, sanctions, net |
+
+### Calculation Formulas
+
+All formulas are defined in `lib/commissions/calculator.ts` and match the HOT Mobile dealer contract.
+
+#### Line Commission
+
+```
+commission = package_price * 4 (multiplier)
+```
+
+- Minimum package price: 19.90 ILS (below this, commission = 0)
+- Requires valid HK (horadat kav / line transfer) document
+- Example: Package 29.90 ILS => commission = 29.90 * 4 = 119.60 ILS
+
+#### Device Commission
+
+```
+base = total_net_device_sales * 5%
+milestones = floor(total_net_device_sales / 50,000) * 2,500
+total = base + milestones
+```
+
+- 5% of net device sales amount
+- Milestone bonus: 2,500 ILS for every 50,000 ILS in cumulative sales
+- Example: 120,000 ILS in sales => 6,000 (5%) + 5,000 (2 milestones) = 11,000 ILS
+
+#### Loyalty Bonuses (per line)
+
+Bonuses are earned when a line remains active past certain month milestones within the 150-day loyalty period:
+
+| Months Active | Bonus Amount |
+|---------------|-------------|
+| 5 months | 80 ILS |
+| 9 months | 30 ILS |
+| 12 months | 20 ILS |
+| 15 months | 50 ILS |
+| **Total** | **180 ILS** |
+
+Loyalty period: 150 days from activation. After 150 days, no further bonuses accrue.
+
+#### Monthly Summary
+
+```
+gross_commission = lines_commission + devices_commission + loyalty_bonuses
+net_commission = gross_commission - total_sanctions
+target_progress = min(100, round(net_commission / target_total * 100))
+```
+
+#### Target / Reverse Calculator
+
+Given a target amount, calculates what is needed to reach it:
+
+- **Lines-only scenario:** How many lines per working day (avg package 25 ILS => 100 ILS commission/line)
+- **Devices-only scenario:** How much in device sales per working day
+- **Mixed scenario (60/40):** 60% from lines, 40% from devices
+
+Working days exclude Saturdays (Shabbat).
+
+### Sanctions (Penalties)
+
+9 predefined sanction types from the HOT Mobile contract:
+
+| Key | Description (Hebrew) | Amount | Has Offset |
+|-----|----------------------|--------|-----------|
+| `FAKE_PAYMENT` | אמצעי תשלום פיקטיבי / לא תקין | 2,500 ILS | Yes |
+| `FALSE_PROMISE` | הבטחת מוכר בניגוד לתנאי התוכניות | 2,500 ILS | Yes |
+| `NO_PROOF` | הכנסת מכירה ללא אסמכתא | 2,500 ILS | Yes |
+| `ILLEGAL_DIALER` | שימוש בחיוגי אשראי בניגוד לחוק | 2,500 ILS | Yes |
+| `DOUBLE_CONNECTION` | חיבור כפול | 2,500 ILS | Yes |
+| `UNAUTHORIZED_AD` | פרסום מטעם המשווק ללא אישור החברה | 2,500 ILS | No |
+| `HARASSMENT` | הטרדות – פניות חוזרות ונשנות | 1,000 ILS | No |
+| `NO_DNC_REMOVAL` | אי הסרת מספר מרשימות ההתקשרות | 1,000 ILS | No |
+| `UNAUTHORIZED_VISOR` | שימוש בויזר ללא הרשאה | 2,500 ILS | Yes |
+
+"Has Offset" means the sanction amount can be offset against future sales commissions.
+
+### Database Schema (4 tables)
+
+Created by migrations `025_commissions.sql` and `026_commissions_lock_and_analytics.sql`.
+
+**`commission_sales`** -- Individual sale records
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | BIGSERIAL | Primary key |
+| `sale_date` | TEXT | Date (YYYY-MM-DD) |
+| `sale_type` | TEXT | `line` or `device` |
+| `source` | TEXT | `manual`, `auto_sync`, or `csv_import` |
+| `order_id` | TEXT | Link to orders table (unique, for dedup) |
+| `customer_name` | TEXT | Customer name (lines) |
+| `customer_phone` | TEXT | Customer phone (lines) |
+| `package_price` | REAL | Monthly package price (lines) |
+| `multiplier` | INTEGER | Commission multiplier (default 4) |
+| `has_valid_hk` | BOOLEAN | Valid HK document (lines) |
+| `loyalty_status` | TEXT | `pending`, `active`, `churned`, `cancelled` |
+| `loyalty_start_date` | TEXT | Loyalty tracking start date |
+| `device_name` | TEXT | Device description (devices) |
+| `device_sale_amount` | REAL | Net sale amount (devices) |
+| `commission_amount` | REAL | Calculated commission |
+
+**`commission_targets`** -- Monthly targets
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | BIGSERIAL | Primary key |
+| `month` | TEXT | Month (YYYY-MM), unique per user |
+| `target_lines_amount` | REAL | Target commission from lines |
+| `target_devices_amount` | REAL | Target commission from devices |
+| `target_total` | REAL | Overall target amount |
+| `target_lines_count` | INTEGER | Target number of lines |
+| `target_devices_count` | INTEGER | Target number of devices |
+| `is_locked` | BOOLEAN | Lock flag (prevents edits) |
+| `locked_at` | TIMESTAMPTZ | When the target was locked |
+
+**`commission_sanctions`** -- Penalties
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | BIGSERIAL | Primary key |
+| `sanction_date` | TEXT | Date of sanction |
+| `sanction_type` | TEXT | One of 9 predefined types |
+| `amount` | REAL | Penalty amount (default 2,500) |
+| `has_sale_offset` | BOOLEAN | Can offset against commissions |
+| `description` | TEXT | Free-text details |
+
+**`commission_sync_log`** -- Order sync audit
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | BIGSERIAL | Primary key |
+| `sync_date` | TIMESTAMPTZ | When sync ran |
+| `orders_synced` | INTEGER | Orders successfully synced |
+| `orders_skipped` | INTEGER | Orders already in system |
+| `total_amount` | REAL | Total sales amount synced |
+| `status` | TEXT | `success` or `partial` |
+| `error_message` | TEXT | Error details if any |
+
+### API Endpoints (8 route files)
+
+All commission endpoints are under `/api/admin/commissions/`.
+
+#### Dashboard (dual auth)
+
+```
+GET /api/admin/commissions/dashboard?month=2026-04
+Authorization: Bearer <COMMISSION_API_TOKEN>  (or admin session cookie)
+```
+
+Returns: monthly summary, device milestone calc, daily breakdown chart data, pace tracking (lines/devices/overall with ahead/on_track/behind status), smart alerts, recent sales, target details, sync info.
+
+#### Summary (bearer token only, CORS-enabled)
+
+```
+GET /api/admin/commissions/summary?month=2026-04
+Authorization: Bearer <COMMISSION_API_TOKEN>
+```
+
+Designed for the local HTML app. Returns a lightweight JSON payload with: lines count/commission, device sales/commission/milestones, sanctions total, loyalty bonus, net commission, target progress, daily breakdown by day number, lock status.
+
+Rate limit: 60 requests/hour per token.
+
+CORS: `Access-Control-Allow-Origin: *` -- allows calls from `file://` and any origin.
+
+#### Sales CRUD
+
+```
+GET  /api/admin/commissions/sales?type=line&source=manual&from=2026-04-01&to=2026-04-30&page=1&limit=50
+POST /api/admin/commissions/sales
+```
+
+GET returns paginated sales with total count. POST creates a new sale record.
+
+#### Calculate
+
+```
+POST /api/admin/commissions/calculate
+Content-Type: application/json
+
+// Line calculation
+{ "type": "line", "packagePrice": 29.90, "hasValidHK": true, "count": 5 }
+
+// Device calculation
+{ "type": "device", "totalNetSales": 120000 }
+
+// Loyalty calculation
+{ "type": "loyalty", "loyaltyStartDate": "2025-10-01" }
+
+// Target/reverse calculation
+{ "type": "target", "targetAmount": 15000, "periodStart": "2026-04-01", "periodEnd": "2026-04-30" }
+```
+
+#### Sanctions
+
+```
+GET  /api/admin/commissions/sanctions?from=2026-04-01&to=2026-04-30
+POST /api/admin/commissions/sanctions
+     { "sanction_type": "FAKE_PAYMENT", "sanction_date": "2026-04-05", "amount": 2500, "has_sale_offset": true, "description": "..." }
+```
+
+#### Sync (order auto-import)
+
+```
+GET  /api/admin/commissions/sync          # Last sync info
+POST /api/admin/commissions/sync
+     { "startDate": "2026-04-01", "endDate": "2026-04-30" }
+```
+
+Syncs completed orders (status: delivered, shipped, approved) from the `orders` table into `commission_sales` as device-type entries with 5% commission. Deduplicates by `order_id`. Logs the sync in `commission_sync_log`.
+
+#### Targets
+
+```
+GET  /api/admin/commissions/targets?month=2026-04
+POST /api/admin/commissions/targets
+     { "month": "2026-04", "target_total": 15000, "target_lines_amount": 8000, "target_devices_amount": 7000, "target_lines_count": 80, "target_devices_count": 40 }
+```
+
+Targets can be locked (`is_locked: true`) to prevent modifications after the month ends.
+
+#### Analytics
+
+```
+GET /api/admin/commissions/analytics?months=12
+```
+
+Returns an array of monthly analytics objects with: target, lines/devices commission, loyalty bonus, gross/net commission, target progress, sales counts.
+
+#### Export
+
+```
+GET /api/admin/commissions/export?month=2026-04
+```
+
+Returns a CSV file with sales and sanctions for the given month (Hebrew column headers).
+
+### Local HTML App Integration
+
+The commission module supports a standalone local HTML application that can sync data via the bearer-token-authenticated endpoints:
+
+1. Set `COMMISSION_API_TOKEN` in environment variables
+2. The local app calls `GET /api/admin/commissions/summary` or `GET /api/admin/commissions/dashboard` with `Authorization: Bearer <token>`
+3. Both endpoints have CORS enabled (`Access-Control-Allow-Origin: *`) so they work from `file://` URLs
+4. The summary endpoint is also listed in `PUBLIC_API` in middleware.ts, so it bypasses session auth
+5. The dashboard endpoint uses dual auth -- accepts either bearer token or admin session
+
+### Pace Tracking
+
+The dashboard endpoint calculates real-time pace tracking:
+
+- **Working days:** Excludes Saturdays (Shabbat) from the count
+- **Lines pace:** Current lines/day vs. expected lines/day vs. required lines/day to hit target
+- **Devices pace:** Current devices/day vs. expected vs. required
+- **Overall pace:** Commission earned per working day vs. expected and required
+- **Status:** `ahead` (>110% of expected), `on_track`, or `behind`
+- **Smart alerts:** Auto-generated Hebrew alerts for target gaps, pace warnings, milestone proximity, loyalty expirations
+
+---
+
 ## Integrations
 
 | Service | Purpose | Config File | Key Env Vars |
@@ -691,6 +1027,11 @@ R2_PUBLIC_URL=                    # R2 public URL
 ```env
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=     # VAPID public key
 VAPID_PRIVATE_KEY=                # VAPID private key
+```
+
+### Commission Module
+```env
+COMMISSION_API_TOKEN=             # Bearer token for external commission API access (summary + dashboard)
 ```
 
 ### Other
@@ -863,5 +1204,5 @@ npm run test:coverage  # With coverage
 
 ---
 
-*Last updated: 2026-03-20*
+*Last updated: 2026-04-05*
 *Generated from comprehensive codebase analysis*

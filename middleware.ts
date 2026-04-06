@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit";
 import { generateCsrfToken, setCsrfCookie, validateCsrf } from "@/lib/csrf";
 
-const PUBLIC_API = ["/api/webhook", "/api/health", "/api/payment/callback", "/api/contact", "/api/auth", "/api/email", "/api/store", "/api/chat", "/api/reports"];
+const PUBLIC_API = ["/api/webhook", "/api/health", "/api/payment/callback", "/api/contact", "/api/auth", "/api/email", "/api/store", "/api/chat", "/api/reports", "/api/admin/commissions/summary"];
 const WEBHOOK_PATHS = ["/api/webhook", "/api/payment/callback"];
+const OPEN_CORS_PATHS = ["/api/admin/commissions/summary", "/api/admin/commissions/dashboard"];
 const WEBHOOK_ORIGINS = [
   "https://api.ycloud.com",
   "https://api.twilio.com",
@@ -12,6 +13,25 @@ const WEBHOOK_ORIGINS = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // === Open CORS for token-authed API endpoints (local app sync) ===
+  const isOpenCors = OPEN_CORS_PATHS.some((p) => pathname.startsWith(p));
+  if (isOpenCors) {
+    if (request.method === "OPTIONS") {
+      return new NextResponse(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        },
+      });
+    }
+    // For GET — let the route handler run and add CORS headers
+    const response = NextResponse.next();
+    response.headers.set("Access-Control-Allow-Origin", "*");
+    return response;
+  }
 
   // === CORS for webhooks (restricted origins) ===
   if (PUBLIC_API.some((p) => pathname.startsWith(p))) {
@@ -61,21 +81,6 @@ export async function middleware(request: NextRequest) {
   } else if (pathname.startsWith("/api/customer")) {
     rlConfig = { maxRequests: 20, windowMs: 60_000 };
     rlPrefix = "customer";
-  } else if (pathname.startsWith("/api/payment")) {
-    rlConfig = { maxRequests: 10, windowMs: 60_000 };
-    rlPrefix = "payment";
-  } else if (pathname.startsWith("/api/reviews")) {
-    rlConfig = { maxRequests: 5, windowMs: 3_600_000 };
-    rlPrefix = "reviews";
-  } else if (pathname.startsWith("/api/push")) {
-    rlConfig = { maxRequests: 50, windowMs: 60_000 };
-    rlPrefix = "push";
-  } else if (pathname.startsWith("/api/notifications")) {
-    rlConfig = { maxRequests: 20, windowMs: 60_000 };
-    rlPrefix = "notif";
-  } else if (pathname.startsWith("/api/admin") || pathname.startsWith("/api/crm")) {
-    rlConfig = { maxRequests: 200, windowMs: 60_000 };
-    rlPrefix = "admin";
   } else if (pathname.startsWith("/api/")) {
     rlConfig = RATE_LIMITS.api;
     rlPrefix = "api";
@@ -98,7 +103,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // === CSRF Protection (double-submit cookie) ===
-  const CSRF_EXEMPT = ["/api/webhook", "/api/cron", "/api/payment/callback", "/api/csrf"];
+  const CSRF_EXEMPT = ["/api/webhook", "/api/cron", "/api/payment/callback", "/api/csrf", "/api/orders"];
   const stateChanging = ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
   const csrfExempt = CSRF_EXEMPT.some((p) => pathname.startsWith(p));
 
@@ -131,7 +136,7 @@ export async function middleware(request: NextRequest) {
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net https://www.google-analytics.com https://cdn.mxpnl.com https://*.mixpanel.com https://static.cloudflareinsights.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://connect.facebook.net https://www.google-analytics.com https://cdn.mxpnl.com https://*.mixpanel.com https://static.cloudflareinsights.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https: http:",
@@ -241,6 +246,6 @@ export const config = {
     "/api/push/:path*", "/api/orders", "/api/payment",
     "/api/coupons/:path*", "/api/customer/:path*",
     "/api/reviews/:path*", "/api/cart/:path*", "/api/notifications/:path*",
-    "/api/settings/:path*", "/api/csrf",
+    "/api/csrf",
   ],
 };

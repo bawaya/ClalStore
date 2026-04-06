@@ -1,7 +1,6 @@
 "use client";
 
 import { useScreen } from "@/lib/hooks";
-import type { Toast as ToastType } from "@/lib/hooks";
 
 // ===== Modal =====
 export function Modal({
@@ -40,13 +39,14 @@ export function Modal({
 
 // ===== Stat Card =====
 export function StatCard({
-  icon, label, value, sub, color,
+  icon, label, value, sub, color, change, href,
 }: {
   icon: string; label: string; value: string | number; sub?: string; color?: string;
+  change?: number | null; href?: string;
 }) {
   const scr = useScreen();
-  return (
-    <div className="card" style={{ padding: scr.mobile ? 12 : 18 }}>
+  const content = (
+    <div className={`card${href ? " cursor-pointer hover:ring-1 hover:ring-brand/40 transition-shadow" : ""}`} style={{ padding: scr.mobile ? 12 : 18 }}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>{label}</span>
         <span>{icon}</span>
@@ -54,9 +54,19 @@ export function StatCard({
       <div className="font-black" style={{ fontSize: scr.mobile ? 20 : 28, color: color || "#fafafa" }}>
         {value}
       </div>
+      {change != null && change !== 0 && (
+        <div style={{ fontSize: scr.mobile ? 9 : 11, color: change > 0 ? "#22c55e" : "#ef4444", marginTop: 2 }}>
+          {change > 0 ? "↑" : "↓"} {Math.abs(change)}% عن الفترة السابقة
+        </div>
+      )}
       {sub && <div className="text-muted mt-0.5" style={{ fontSize: scr.mobile ? 8 : 10 }}>{sub}</div>}
+      {href && <div className="text-brand mt-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>عرض التفاصيل ←</div>}
     </div>
   );
+  if (href) {
+    return <a href={href} style={{ textDecoration: "none", color: "inherit" }}>{content}</a>;
+  }
+  return content;
 }
 
 // ===== Empty State =====
@@ -154,26 +164,16 @@ export function ConfirmDialog({
 }
 
 // ===== Toast Container =====
-const toastStyles: Record<ToastType["type"], string> = {
-  success: "border-state-success/40 text-state-success",
-  error: "border-state-error/40 text-state-error",
-  warning: "border-state-warning/40 text-state-warning",
-  info: "border-state-info/40 text-state-info",
-};
-
-export function ToastContainer({ toasts }: { toasts: ToastType[] }) {
-  if (toasts.length === 0) return null;
+export function ToastContainer({ toasts, onDismiss }: { toasts: { id: string; message: string; type: string }[]; onDismiss?: (id: string) => void }) {
+  if (!toasts.length) return null;
   return (
-    <div
-      className="fixed bottom-5 z-[120] flex flex-col gap-2 items-center pointer-events-none"
-      style={{ left: "50%", transform: "translateX(-50%)" }}
-      role="status"
-      aria-live="polite"
-    >
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2">
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`glass-card-static font-bold shadow-glass-lg pointer-events-auto animate-slide-up px-6 py-3 text-sm ${toastStyles[t.type]}`}
+          className="px-4 py-2 rounded-xl text-white text-xs font-bold shadow-lg cursor-pointer"
+          style={{ background: t.type === "error" ? "#ef4444" : t.type === "warning" ? "#f59e0b" : "#22c55e" }}
+          onClick={() => onDismiss?.(t.id)}
         >
           {t.message}
         </div>
@@ -183,18 +183,12 @@ export function ToastContainer({ toasts }: { toasts: ToastType[] }) {
 }
 
 // ===== Error Banner =====
-export function ErrorBanner({
-  error, onDismiss,
-}: {
-  error: string | null; onDismiss?: () => void;
-}) {
-  if (!error) return null;
+export function ErrorBanner({ message, onDismiss }: { message: string; onDismiss?: () => void }) {
+  if (!message) return null;
   return (
-    <div className="mb-3 p-3 rounded-xl bg-state-error/10 border border-state-error/30 flex items-center justify-between gap-2">
-      <span className="text-state-error text-sm font-semibold">⚠️ {error}</span>
-      {onDismiss && (
-        <button onClick={onDismiss} className="text-state-error/60 hover:text-state-error cursor-pointer bg-transparent border-0 text-sm">✕</button>
-      )}
+    <div className="bg-state-error/10 border border-state-error/30 rounded-xl px-4 py-2 mb-3 flex items-center justify-between">
+      <span className="text-state-error text-xs font-bold">⚠️ {message}</span>
+      {onDismiss && <button onClick={onDismiss} className="text-state-error text-sm cursor-pointer bg-transparent border-0">✕</button>}
     </div>
   );
 }

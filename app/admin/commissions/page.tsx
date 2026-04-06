@@ -1,0 +1,768 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useScreen, useToast } from "@/lib/hooks";
+import { StatCard, Modal, FormField, ToastContainer, ConfirmDialog } from "@/components/admin/shared";
+import { formatCurrency } from "@/lib/utils";
+import { getCsrfToken } from "@/lib/csrf-client";
+
+interface PaceLines {
+  target: number;
+  achieved: number;
+  remaining: number;
+  perDayPace: number;
+  requiredPerDay: number;
+  expectedPace: number;
+  paceStatus: "ahead" | "on_track" | "behind";
+}
+
+interface PaceDevices {
+  target: number;
+  achieved: number;
+  remaining: number;
+  perDayPace: number;
+  requiredPerDay: number;
+  expectedPace: number;
+  paceStatus: "ahead" | "on_track" | "behind";
+  totalSalesAmount: number;
+  amountPerDayPace: number;
+}
+
+interface PaceTracking {
+  daysInMonth: number;
+  daysElapsed: number;
+  daysLeft: number;
+  totalWorkingDays: number;
+  workingDaysElapsed: number;
+  workingDaysLeft: number;
+  isCurrentMonth: boolean;
+  overallPaceStatus: "ahead" | "on_track" | "behind";
+  commissionPerDayPace: number;
+  commissionRequiredPerDay: number;
+  commissionExpectedPace: number;
+  lines: PaceLines;
+  devices: PaceDevices;
+}
+
+interface TargetDetails {
+  target_total: number;
+  target_lines_count: number;
+  target_devices_count: number;
+  target_lines_amount: number;
+  target_devices_amount: number;
+  is_locked: boolean;
+  locked_at: string | null;
+}
+
+interface DashboardData {
+  summary: {
+    linesCommission: number;
+    devicesCommission: number;
+    loyaltyBonus: number;
+    grossCommission: number;
+    totalSanctions: number;
+    netCommission: number;
+    targetAmount: number;
+    targetProgress: number;
+    autoSyncedCount: number;
+    manualEntryCount: number;
+  };
+  deviceCalc: {
+    basePct: number;
+    milestoneCount: number;
+    milestoneBonus: number;
+    total: number;
+    nextMilestoneAt: number;
+    nextMilestoneProgress: number;
+  };
+  dailyBreakdown: Array<{ date: string; lines: number; devices: number }>;
+  alerts: Array<{ text: string; color: string }>;
+  syncInfo: { lastSync: string; ordersSynced: number; status: string } | null;
+  recentSales: Array<{
+    id: number;
+    sale_date: string;
+    sale_type: string;
+    customer_name?: string;
+    device_name?: string;
+    commission_amount: number;
+    source: string;
+    package_price?: number;
+    device_sale_amount?: number;
+  }>;
+  month: string;
+  paceTracking: PaceTracking;
+  targetDetails: TargetDetails | null;
+}
+
+const paceStatusColor = (status: string) =>
+  status === "ahead" ? "#3b82f6" : status === "on_track" ? "#22c55e" : "#ef4444";
+const paceStatusLabel = (status: string) =>
+  status === "ahead" ? "מקדים" : status === "on_track" ? "בזמן" : "בפיגור";
+const paceStatusIcon = (status: string) =>
+  status === "ahead" ? "🚀" : status === "on_track" ? "✅" : "⚠️";
+
+interface Employee { id: string; name: string; role: string; }
+
+export default function CommissionsDashboard() {
+  const scr = useScreen();
+  const { toasts, show, dismiss } = useToast();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [targetAmount, setTargetAmount] = useState("");
+  const [targetLinesCount, setTargetLinesCount] = useState("");
+  const [targetDevicesCount, setTargetDevicesCount] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [showLockConfirm, setShowLockConfirm] = useState(false);
+  const [locking, setLocking] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
+
+  // Load employees list once
+  useEffect(() => {
+    fetch("/api/admin/commissions/profiles")
+      .then(r => r.json())
+      .then(json => {
+        const list = (json.data?.employees || []).map((e: any) => ({
+          id: e.id, name: e.name, role: e.role,
+        }));
+        setEmployees(list);
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchDashboard = useCallback(async (m: string, empId?: string) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ month: m });
+      if (empId) params.set("employee_id", empId);
+      const res = await fetch(`/api/admin/commissions/dashboard?${params}`);
+      if (!res.ok) throw new Error("Failed to load");
+      const json = await res.json();
+      setData(json.data || json);
+    } catch {
+      show("שגיאה בטעינת הנתונים", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [show]);
+
+  useEffect(() => { fetchDashboard(month, selectedEmployee); }, [month, selectedEmployee, fetchDashboard]);
+
+  const handleSetTarget = async () => {
+    const amt = parseFloat(targetAmount);
+    if (!amt || amt <= 0) { show("הזן סכום יעד תקין", "warning"); return; }
+    try {
+      const res = await fetch("/api/admin/commissions/targets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
+        body: JSON.stringify({
+          month,
+          target_total: amt,
+          target_lines_count: parseInt(targetLinesCount) || 0,
+          target_devices_count: parseInt(targetDevicesCount) || 0,
+        }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || "save failed");
+      }
+      show("היעד נשמר בהצלחה", "success");
+      setShowTargetModal(false);
+      setTargetAmount("");
+      setTargetLinesCount("");
+      setTargetDevicesCount("");
+      fetchDashboard(month);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "שגיאה בשמירת היעד";
+      show(msg, "error");
+    }
+  };
+
+  const handleLockToggle = async () => {
+    if (!data?.targetDetails) return;
+    const isLocked = data.targetDetails.is_locked;
+    setLocking(true);
+    try {
+      const res = await fetch("/api/admin/commissions/targets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
+        body: JSON.stringify({ month, action: isLocked ? "unlock" : "lock" }),
+      });
+      if (!res.ok) throw new Error();
+      show(isLocked ? "היעד שוחרר לעריכה" : "היעד ננעל בהצלחה", "success");
+      setShowLockConfirm(false);
+      fetchDashboard(month);
+    } catch {
+      show("שגיאה בעדכון נעילה", "error");
+    } finally {
+      setLocking(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const startDate = `${month}-01`;
+      const endDate = `${month}-31`;
+      const res = await fetch("/api/admin/commissions/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
+        body: JSON.stringify({ startDate, endDate }),
+      });
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      const d = json.data || json;
+      show(`סונכרנו ${d.synced} הזמנות (${d.skipped} דולגו)`, "success");
+      fetchDashboard(month);
+    } catch { show("שגיאה בסנכרון", "error"); }
+    finally { setSyncing(false); }
+  };
+
+  if (loading) return <div className="text-center py-20 text-muted" dir="rtl">טוען נתונים...</div>;
+  if (!data) return null;
+
+  const s = data.summary;
+  const pace = data.paceTracking;
+  const td = data.targetDetails;
+  const isLocked = td?.is_locked || false;
+  const maxDaily = Math.max(...data.dailyBreakdown.map((d) => d.lines + d.devices), 1);
+
+  return (
+    <div dir="rtl" className="font-hebrew">
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="font-black" style={{ fontSize: scr.mobile ? 16 : 22 }}>
+          💰 לוח בקרה — עמלות
+          {selectedEmployee && <span className="text-muted text-sm font-normal mr-2">({employees.find(e => e.id === selectedEmployee)?.name})</span>}
+        </h1>
+        <div className="flex items-center gap-2">
+          {employees.length > 0 && (
+            <select
+              value={selectedEmployee}
+              onChange={(e) => setSelectedEmployee(e.target.value)}
+              className="input"
+              style={{ width: scr.mobile ? 100 : 150, fontSize: 11, padding: "6px 8px" }}
+            >
+              <option value="">חוזה HOT (הכל)</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.name}</option>
+              ))}
+            </select>
+          )}
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="input"
+            style={{ width: scr.mobile ? 130 : 160, fontSize: 12, padding: "6px 10px" }}
+          />
+          <Link href="/admin/commissions/calculator" className="chip chip-active text-[10px]">🧮 מחשבון</Link>
+        </div>
+      </div>
+
+      {/* Sub-navigation */}
+      <div className="flex gap-2 mb-4 overflow-x-auto">
+        <Link href="/admin/commissions" className="chip chip-active">לוח בקרה</Link>
+        <Link href="/admin/commissions/calculator" className="chip">מחשבון</Link>
+        <Link href="/admin/commissions/sanctions" className="chip">סנקציות</Link>
+        <Link href="/admin/commissions/history" className="chip">היסטוריה</Link>
+        <Link href="/admin/commissions/import" className="chip">ייבוא</Link>
+        <Link href="/admin/commissions/analytics" className="chip">ניתוח</Link>
+        <Link href="/admin/commissions/team" className="chip">צוות</Link>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid gap-2 mb-4" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
+        <StatCard icon="📡" label="עמלות קווים" value={formatCurrency(s.linesCommission)} color="#3b82f6" />
+        <StatCard icon="📱" label="עמלות מכשירים" value={formatCurrency(s.devicesCommission)} color="#ef4444" />
+        <StatCard icon="⚠️" label="סנקציות" value={formatCurrency(s.totalSanctions)} color="#f97316" />
+        <StatCard icon="💰" label="נטו" value={formatCurrency(s.netCommission)} color="#22c55e" />
+      </div>
+
+      {/* Owner Profit Card — only in aggregate view */}
+      {!selectedEmployee && (data as any).ownerProfit && (data as any).ownerProfit.employeeCosts > 0 && (
+        <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 16, borderRight: "4px solid #8b5cf6" }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-muted text-[10px]">רווח בעל הנקודה</div>
+              <div className="font-black text-lg" style={{ color: "#8b5cf6" }}>
+                {formatCurrency((data as any).ownerProfit.netProfit)}
+              </div>
+            </div>
+            <div className="text-left text-[10px] text-muted">
+              <div>עמלות חוזה: {formatCurrency((data as any).ownerProfit.contractTotal)}</div>
+              <div>עלות עובדים: {formatCurrency((data as any).ownerProfit.employeeCosts)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Target Progress + Lock */}
+      <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18 }}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            {!isLocked && (
+              <button onClick={() => setShowTargetModal(true)} className="btn-outline" style={{ fontSize: 11, padding: "6px 14px" }}>
+                {s.targetAmount > 0 ? "עדכן יעד" : "הגדר יעד"}
+              </button>
+            )}
+            {s.targetAmount > 0 && (
+              <button
+                onClick={() => setShowLockConfirm(true)}
+                className="btn-outline"
+                style={{
+                  fontSize: 11,
+                  padding: "6px 14px",
+                  borderColor: isLocked ? "#22c55e" : "#f97316",
+                  color: isLocked ? "#22c55e" : "#f97316",
+                }}
+              >
+                {isLocked ? "🔒 נעול" : "🔓 נעל יעד"}
+              </button>
+            )}
+          </div>
+          <h3 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>🎯 התקדמות ליעד</h3>
+        </div>
+        {s.targetAmount > 0 ? (
+          <>
+            <div className="w-full h-4 bg-surface-elevated rounded-full overflow-hidden mb-2">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(100, s.targetProgress)}%`,
+                  background: s.targetProgress >= 80 ? "#22c55e" : s.targetProgress >= 50 ? "#eab308" : "#ef4444",
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+              <div className="text-muted">
+                {formatCurrency(s.netCommission)} מתוך {formatCurrency(s.targetAmount)} — {s.targetProgress}%
+              </div>
+              {isLocked && td?.locked_at && (
+                <div className="text-dim text-[9px]">
+                  ננעל ב-{new Date(td.locked_at).toLocaleDateString("he-IL")}
+                </div>
+              )}
+            </div>
+            {td && (td.target_lines_count > 0 || td.target_devices_count > 0) && (
+              <div className="flex gap-4 mt-2 text-[10px] text-muted">
+                {td.target_lines_count > 0 && <span>יעד קווים: {td.target_lines_count}</span>}
+                {td.target_devices_count > 0 && <span>יעד מכשירים: {td.target_devices_count}</span>}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center text-dim text-xs py-2">לא הוגדר יעד לחודש זה</div>
+        )}
+      </div>
+
+      {/* Pace Tracking Bar */}
+      {pace.isCurrentMonth && s.targetAmount > 0 && (
+        <div
+          className="card mb-4"
+          style={{
+            padding: scr.mobile ? 12 : 18,
+            borderRight: `3px solid ${paceStatusColor(pace.overallPaceStatus)}`,
+          }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span
+              className="font-bold text-[11px] px-2 py-1 rounded"
+              style={{
+                color: paceStatusColor(pace.overallPaceStatus),
+                background: `${paceStatusColor(pace.overallPaceStatus)}15`,
+              }}
+            >
+              {paceStatusIcon(pace.overallPaceStatus)} {paceStatusLabel(pace.overallPaceStatus)}
+            </span>
+            <h3 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>⏱️ מעקב קצב</h3>
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
+            <div className="text-center">
+              <div className="text-muted text-[9px]">ימי עבודה שעברו</div>
+              <div className="font-bold text-sm">{pace.workingDaysElapsed} / {pace.totalWorkingDays}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-muted text-[9px]">ימי עבודה שנותרו</div>
+              <div className="font-bold text-sm">{pace.workingDaysLeft}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-muted text-[9px]">קצב נוכחי (₪/יום)</div>
+              <div className="font-bold text-sm" style={{ color: paceStatusColor(pace.overallPaceStatus) }}>
+                {formatCurrency(pace.commissionPerDayPace)}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-muted text-[9px]">נדרש (₪/יום)</div>
+              <div className="font-bold text-sm">{formatCurrency(pace.commissionRequiredPerDay)}</div>
+            </div>
+          </div>
+          {/* Time progress bar */}
+          <div className="mt-2">
+            <div className="w-full h-2 bg-surface-elevated rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${pace.totalWorkingDays > 0 ? Math.min(100, (pace.workingDaysElapsed / pace.totalWorkingDays) * 100) : 0}%`,
+                  background: paceStatusColor(pace.overallPaceStatus),
+                }}
+              />
+            </div>
+            <div className="text-[9px] text-dim text-center mt-1">
+              {pace.totalWorkingDays > 0 ? Math.round((pace.workingDaysElapsed / pace.totalWorkingDays) * 100) : 0}% מהחודש חלף
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* "What You Need" Boxes — Lines + Devices */}
+      {pace.isCurrentMonth && (pace.lines.target > 0 || pace.devices.target > 0) && (
+        <div style={{ display: scr.mobile ? "block" : "flex", gap: 12 }} className="mb-4">
+          {/* Lines Need Box */}
+          {pace.lines.target > 0 && (
+            <div
+              className="card flex-1 mb-3"
+              style={{
+                padding: scr.mobile ? 12 : 18,
+                borderRight: `3px solid #3b82f6`,
+              }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span
+                  className="font-bold text-[10px] px-2 py-0.5 rounded"
+                  style={{
+                    color: paceStatusColor(pace.lines.paceStatus),
+                    background: `${paceStatusColor(pace.lines.paceStatus)}15`,
+                  }}
+                >
+                  {paceStatusIcon(pace.lines.paceStatus)} {paceStatusLabel(pace.lines.paceStatus)}
+                </span>
+                <h4 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>📡 מה צריך — קווים</h4>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full h-3 bg-surface-elevated rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${pace.lines.target > 0 ? Math.min(100, (pace.lines.achieved / pace.lines.target) * 100) : 0}%`,
+                    background: "#3b82f6",
+                  }}
+                />
+              </div>
+
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="font-bold">{pace.lines.target}</span>
+                  <span className="text-muted">יעד קווים</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold" style={{ color: "#3b82f6" }}>{pace.lines.achieved}</span>
+                  <span className="text-muted">הושגו</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold" style={{ color: pace.lines.remaining > 0 ? "#f97316" : "#22c55e" }}>{pace.lines.remaining}</span>
+                  <span className="text-muted">נותרו</span>
+                </div>
+                <div className="border-t border-surface-border pt-1.5 flex justify-between">
+                  <span className="font-bold">{pace.lines.requiredPerDay}</span>
+                  <span className="text-muted">קווים נדרשים ליום</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold" style={{ color: paceStatusColor(pace.lines.paceStatus) }}>
+                    {pace.lines.perDayPace}
+                  </span>
+                  <span className="text-muted">קצב נוכחי (ליום)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold">{pace.lines.expectedPace}</span>
+                  <span className="text-muted">קצב נדרש (ליום)</span>
+                </div>
+              </div>
+
+              {pace.lines.paceStatus === "behind" && (
+                <div className="mt-2 bg-state-error/10 border border-state-error/30 rounded-lg px-3 py-1.5 text-[10px] text-state-error font-bold text-right">
+                  הקצב הנוכחי ({pace.lines.perDayPace}/יום) נמוך מהנדרש ({pace.lines.expectedPace}/יום)
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Devices Need Box */}
+          {pace.devices.target > 0 && (
+            <div
+              className="card flex-1 mb-3"
+              style={{
+                padding: scr.mobile ? 12 : 18,
+                borderRight: `3px solid #ef4444`,
+              }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span
+                  className="font-bold text-[10px] px-2 py-0.5 rounded"
+                  style={{
+                    color: paceStatusColor(pace.devices.paceStatus),
+                    background: `${paceStatusColor(pace.devices.paceStatus)}15`,
+                  }}
+                >
+                  {paceStatusIcon(pace.devices.paceStatus)} {paceStatusLabel(pace.devices.paceStatus)}
+                </span>
+                <h4 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>📱 מה צריך — מכשירים</h4>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full h-3 bg-surface-elevated rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${pace.devices.target > 0 ? Math.min(100, (pace.devices.achieved / pace.devices.target) * 100) : 0}%`,
+                    background: "#ef4444",
+                  }}
+                />
+              </div>
+
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="font-bold">{pace.devices.target}</span>
+                  <span className="text-muted">יעד מכירות מכשירים</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold" style={{ color: "#ef4444" }}>{pace.devices.achieved}</span>
+                  <span className="text-muted">הושגו</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold" style={{ color: pace.devices.remaining > 0 ? "#f97316" : "#22c55e" }}>{pace.devices.remaining}</span>
+                  <span className="text-muted">נותרו</span>
+                </div>
+                <div className="border-t border-surface-border pt-1.5 flex justify-between">
+                  <span className="font-bold">{pace.devices.requiredPerDay}</span>
+                  <span className="text-muted">מכירות נדרשות ליום</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold" style={{ color: paceStatusColor(pace.devices.paceStatus) }}>
+                    {pace.devices.perDayPace}
+                  </span>
+                  <span className="text-muted">קצב נוכחי (ליום)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold">{pace.devices.expectedPace}</span>
+                  <span className="text-muted">קצב נדרש (ליום)</span>
+                </div>
+              </div>
+
+              {pace.devices.paceStatus === "behind" && (
+                <div className="mt-2 bg-state-error/10 border border-state-error/30 rounded-lg px-3 py-1.5 text-[10px] text-state-error font-bold text-right">
+                  הקצב הנוכחי ({pace.devices.perDayPace}/יום) נמוך מהנדרש ({pace.devices.expectedPace}/יום)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Smart Alerts */}
+      {data.alerts.length > 0 && (
+        <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18 }}>
+          <h3 className="font-bold mb-2 text-right" style={{ fontSize: scr.mobile ? 12 : 14 }}>💡 התראות חכמות</h3>
+          <div className="space-y-1.5">
+            {data.alerts.map((alert, i) => (
+              <div key={i} className="rounded-xl px-3 py-2 text-right" style={{ background: `${alert.color}15`, fontSize: scr.mobile ? 10 : 12 }}>
+                <span style={{ color: alert.color }} className="font-bold">{alert.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Daily Chart + Device Milestone */}
+      <div style={{ display: scr.mobile ? "block" : "flex", gap: 12 }}>
+        {/* Daily Performance */}
+        <div className="card flex-1 mb-3" style={{ padding: scr.mobile ? 12 : 18 }}>
+          <h3 className="font-bold mb-3 text-right" style={{ fontSize: scr.mobile ? 12 : 14 }}>📊 ביצועים יומיים</h3>
+          {data.dailyBreakdown.length === 0 ? (
+            <div className="text-center text-dim text-xs py-4">אין נתונים לחודש זה</div>
+          ) : (
+            <div className="flex items-end gap-1" style={{ height: 100 }}>
+              {data.dailyBreakdown.map((d) => {
+                const total = d.lines + d.devices;
+                const h = Math.max(4, (total / maxDaily) * 100);
+                const linesH = total > 0 ? (d.lines / total) * h : 0;
+                const devicesH = h - linesH;
+                return (
+                  <div key={d.date} className="flex-1 flex flex-col justify-end" title={`${d.date}: ₪${total.toFixed(0)}`}>
+                    <div className="rounded-t" style={{ height: devicesH, background: "#ef4444", minWidth: 4 }} />
+                    <div className="rounded-b" style={{ height: linesH, background: "#3b82f6", minWidth: 4 }} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex justify-center gap-4 mt-2">
+            <span className="text-[9px] text-muted flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm" style={{ background: "#3b82f6" }} /> קווים</span>
+            <span className="text-[9px] text-muted flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm" style={{ background: "#ef4444" }} /> מכשירים</span>
+          </div>
+        </div>
+
+        {/* Device Milestone Progress */}
+        <div className="card mb-3" style={{ padding: scr.mobile ? 12 : 18, width: scr.mobile ? "100%" : 280 }}>
+          <h3 className="font-bold mb-2 text-right" style={{ fontSize: scr.mobile ? 12 : 14 }}>🏆 מדרגות מכשירים</h3>
+          <div className="text-center mb-2">
+            <div className="font-black text-2xl" style={{ color: "#ef4444" }}>{data.deviceCalc.milestoneCount}</div>
+            <div className="text-muted text-[10px]">מדרגות הושגו (x₪2,500)</div>
+          </div>
+          <div className="w-full h-3 bg-surface-elevated rounded-full overflow-hidden mb-1">
+            <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${data.deviceCalc.nextMilestoneProgress}%` }} />
+          </div>
+          <div className="text-muted text-[10px] text-right">
+            {formatCurrency(data.deviceCalc.nextMilestoneAt)} למדרגה הבאה
+          </div>
+          <div className="text-muted text-[10px] text-right mt-1">
+            בונוס מדרגות: {formatCurrency(data.deviceCalc.milestoneBonus)}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Sales */}
+      <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18 }}>
+        <div className="flex items-center justify-between mb-2">
+          <Link href="/admin/commissions/history" className="text-brand text-[10px] font-bold">הצג הכל ←</Link>
+          <h3 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>📋 מכירות אחרונות</h3>
+        </div>
+        {data.recentSales.length === 0 ? (
+          <div className="text-center text-dim text-xs py-4">אין מכירות החודש</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+              <thead>
+                <tr className="text-muted border-b border-surface-border">
+                  <th className="py-1.5 font-semibold">מקור</th>
+                  <th className="py-1.5 font-semibold">עמלה</th>
+                  <th className="py-1.5 font-semibold">סכום</th>
+                  <th className="py-1.5 font-semibold">פרטים</th>
+                  <th className="py-1.5 font-semibold">סוג</th>
+                  <th className="py-1.5 font-semibold">תאריך</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentSales.map((sale) => (
+                  <tr key={sale.id} className="border-b border-surface-border/50">
+                    <td className="py-1.5">
+                      <span className="text-[9px]">{sale.source === "auto_sync" ? "🔄" : "✏️"}</span>
+                    </td>
+                    <td className="py-1.5 font-bold" style={{ color: "#22c55e" }}>{formatCurrency(sale.commission_amount)}</td>
+                    <td className="py-1.5">{formatCurrency(sale.sale_type === "line" ? (sale.package_price || 0) : (sale.device_sale_amount || 0))}</td>
+                    <td className="py-1.5">{sale.sale_type === "line" ? (sale.customer_name || "—") : (sale.device_name || "—")}</td>
+                    <td className="py-1.5">
+                      <span className="badge text-[9px]" style={{ background: sale.sale_type === "line" ? "#3b82f620" : "#ef444420", color: sale.sale_type === "line" ? "#3b82f6" : "#ef4444" }}>
+                        {sale.sale_type === "line" ? "קו" : "מכשיר"}
+                      </span>
+                    </td>
+                    <td className="py-1.5">{sale.sale_date}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Sync Status + Contract Info */}
+      <div style={{ display: scr.mobile ? "block" : "flex", gap: 12 }}>
+        <div className="card flex-1 mb-3" style={{ padding: scr.mobile ? 12 : 18 }}>
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={handleSync} disabled={syncing} className="btn-primary" style={{ fontSize: 10, padding: "6px 14px", opacity: syncing ? 0.5 : 1 }}>
+              {syncing ? "מסנכרן..." : "🔄 סנכרן עכשיו"}
+            </button>
+            <h3 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>🔄 סנכרון</h3>
+          </div>
+          {data.syncInfo ? (
+            <div className="text-muted text-[10px] text-right">
+              סנכרון אחרון: {new Date(data.syncInfo.lastSync).toLocaleString("he-IL")} | {data.syncInfo.ordersSynced} הזמנות סונכרנו
+            </div>
+          ) : (
+            <div className="text-dim text-[10px] text-right">לא בוצע סנכרון עדיין</div>
+          )}
+          <div className="flex gap-3 mt-2 text-[10px] text-muted">
+            <span>🔄 סנכרון: {s.autoSyncedCount}</span>
+            <span>✏️ ידני: {s.manualEntryCount}</span>
+          </div>
+        </div>
+
+        {/* Contract Info Widget */}
+        <div className="card mb-3" style={{ padding: scr.mobile ? 12 : 18, width: scr.mobile ? "100%" : 280 }}>
+          <h3 className="font-bold mb-2 text-right" style={{ fontSize: scr.mobile ? 12 : 14 }}>📄 פרטי הסכם</h3>
+          <div className="space-y-1 text-[10px] text-muted text-right">
+            <div>תקופת הסכם: מ-01/04/2021</div>
+            <div>מתחדש כל 12 חודשים (מקסימום 3 שנים)</div>
+            <div>הודעת ביטול: 45 יום מראש</div>
+            <div className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-full bg-state-success" />
+              <span>הסכם פעיל</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Target Modal */}
+      <Modal open={showTargetModal} onClose={() => setShowTargetModal(false)} title="🎯 הגדרת יעד חודשי">
+        <div dir="rtl">
+          {isLocked ? (
+            <div className="bg-state-warning/10 border border-state-warning/30 rounded-xl px-4 py-3 mb-3 text-[12px] text-state-warning font-bold text-right">
+              🔒 היעד לחודש זה ננעל ולא ניתן לעריכה. שחרר את הנעילה כדי לערוך.
+            </div>
+          ) : (
+            <>
+              <FormField label="סכום יעד כולל (₪)" required>
+                <input
+                  type="number"
+                  className="input"
+                  value={targetAmount}
+                  onChange={(e) => setTargetAmount(e.target.value)}
+                  placeholder="לדוגמה: 15000"
+                />
+              </FormField>
+              <FormField label="יעד קווים (מספר קווים)">
+                <input
+                  type="number"
+                  className="input"
+                  value={targetLinesCount}
+                  onChange={(e) => setTargetLinesCount(e.target.value)}
+                  placeholder="לדוגמה: 50"
+                />
+              </FormField>
+              <FormField label="יעד מכירות מכשירים (מספר מכשירים)">
+                <input
+                  type="number"
+                  className="input"
+                  value={targetDevicesCount}
+                  onChange={(e) => setTargetDevicesCount(e.target.value)}
+                  placeholder="לדוגמה: 20"
+                />
+              </FormField>
+              <div className="text-muted text-[10px] mb-3">חודש: {month}</div>
+              <button onClick={handleSetTarget} className="btn-primary w-full">שמור יעד</button>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* Lock Confirm Dialog */}
+      <ConfirmDialog
+        open={showLockConfirm}
+        onClose={() => setShowLockConfirm(false)}
+        onConfirm={handleLockToggle}
+        title={isLocked ? "🔓 שחרור נעילת יעד" : "🔒 נעילת יעד"}
+        message={
+          isLocked
+            ? "האם לשחרר את נעילת היעד? זה יאפשר עריכה חופשית."
+            : "לאחר נעילה לא ניתן יהיה לערוך את היעד. פעולה זו חשובה להשוואה חודשית אמינה. להמשיך?"
+        }
+      />
+    </div>
+  );
+}

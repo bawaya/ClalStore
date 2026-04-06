@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { key: "bot", href: "/admin/bot", icon: "🤖", label: "البوت" },
   { key: "homepage", href: "/admin/homepage", icon: "🏠", label: "الصفحة الرئيسية" },
   { key: "website", href: "/admin/website", icon: "🌐", label: "محتوى الموقع" },
+  { key: "commissions", href: "/admin/commissions", icon: "💰", label: "עמלות" },
   { key: "features", href: "/admin/features", icon: "🎛️", label: "الميزات" },
   { key: "settings", href: "/admin/settings", icon: "⚙️", label: "إعدادات" },
 ];

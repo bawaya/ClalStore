@@ -2,78 +2,181 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
 import { StatCard } from "@/components/admin/shared";
 import { ORDER_STATUS, ORDER_SOURCE } from "@/lib/constants";
 import { formatCurrency, timeAgo } from "@/lib/utils";
 import { exportStatsPDF } from "@/lib/pdf-export";
 
+// ===== G3 fix: explicit typed interfaces =====
+
+interface DashboardOrder {
+  id: string;
+  status: string;
+  source: string;
+  total: number;
+  created_at: string;
+  customer_id: string;
+  assigned_to?: string;
+}
+
+interface DashboardProduct {
+  id: string;
+  name_ar: string;
+  price: number;
+  stock: number;
+  sold?: number;
+}
+
+interface DashboardResponse {
+  totalOrders: number;
+  revenue: number;
+  prevRevenue: number | null;
+  newCount: number;
+  noReply: number;
+  totalCustomers: number;
+  vipCount: number;
+  byStatus: Record<string, number>;
+  bySource: Record<string, number>;
+  recentOrders: DashboardOrder[];
+}
+
+interface BotStatsResponse {
+  total?: number;
+  escalated?: number;
+}
+
 interface Stats {
-  totalRevenue: number; totalOrders: number; newOrders: number; noReply: number;
-  totalProducts: number; lowStock: number; outOfStock: number;
-  totalCustomers: number; vipCustomers: number;
-  sources: Record<string, number>; statuses: Record<string, number>;
-  recentOrders: any[]; topProducts: any[];
-  botTotal: number; botEscalated: number;
+  totalRevenue: number;
+  prevRevenue: number | null;
+  revenueChange: number | null;
+  totalOrders: number;
+  newOrders: number;
+  noReply: number;
+  totalProducts: number;
+  lowStock: number;
+  outOfStock: number;
+  totalCustomers: number;
+  vipCustomers: number;
+  sources: Record<string, number>;
+  statuses: Record<string, number>;
+  recentOrders: DashboardOrder[];
+  topProducts: DashboardProduct[];
+  botTotal: number;
+  botEscalated: number;
+}
+
+// ===== G5 fix: date range options =====
+type RangeKey = "7d" | "30d" | "90d" | "all";
+const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
+  { key: "7d", label: "7 أيام" },
+  { key: "30d", label: "30 يوم" },
+  { key: "90d", label: "90 يوم" },
+  { key: "all", label: "الكل" },
+];
+
+function getDateRange(key: RangeKey): { dateFrom?: string; dateTo?: string } {
+  if (key === "all") return {};
+  const now = new Date();
+  const to = now.toISOString().slice(0, 10);
+  const days = key === "7d" ? 7 : key === "30d" ? 30 : 90;
+  const from = new Date(now.getTime() - days * 86400000).toISOString().slice(0, 10);
+  return { dateFrom: from, dateTo: to };
 }
 
 export default function AdminDashboard() {
   const scr = useScreen();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<RangeKey>("30d");
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const [dashRes, prodRes, botRes] = await Promise.all([
-          fetch("/api/crm/dashboard"),
-          fetch("/api/admin/products"),
-          fetch("/api/crm/chats?stats=true").catch(() => null),
-        ]);
-        const dash = await dashRes.json();
-        const products = await prodRes.json();
-        const botStats = botRes ? await botRes.json().catch(() => ({})) : {};
+  const fetchDashboard = useCallback(async (rangeKey: RangeKey) => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const { dateFrom, dateTo } = getDateRange(rangeKey);
+      const params = new URLSearchParams();
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      const qs = params.toString();
 
-        const productList = Array.isArray(products) ? products : (products.data || []);
-        const totalProducts = productList.length;
-        const lowStock = productList.filter((p: any) => p.stock > 0 && p.stock <= 5).length;
-        const outOfStock = productList.filter((p: any) => p.stock === 0).length;
+      // G4 fix: no silent empty catches — handle each fetch explicitly
+      const [dashRes, prodRes, botRes] = await Promise.all([
+        fetch(`/api/crm/dashboard${qs ? `?${qs}` : ""}`),
+        fetch("/api/admin/products"),
+        fetch("/api/crm/chats?stats=true"),
+      ]);
 
-        // Top 5 best-selling products
-        const topProducts = [...productList]
-          .sort((a: any, b: any) => (b.sold || 0) - (a.sold || 0))
-          .slice(0, 5);
+      if (!dashRes.ok) throw new Error(`Dashboard API error: ${dashRes.status}`);
+      if (!prodRes.ok) throw new Error(`Products API error: ${prodRes.status}`);
 
-        const noReply = (dash.byStatus?.no_reply_1 || 0) + (dash.byStatus?.no_reply_2 || 0) + (dash.byStatus?.no_reply_3 || 0);
+      const dash: DashboardResponse = await dashRes.json();
+      const products = await prodRes.json();
 
-        setStats({
-          totalRevenue: dash.revenue || 0,
-          totalOrders: dash.totalOrders || 0,
-          newOrders: dash.newCount || 0,
-          noReply,
-          totalProducts,
-          lowStock,
-          outOfStock,
-          totalCustomers: dash.totalCustomers || 0,
-          vipCustomers: dash.vipCount || 0,
-          sources: dash.bySource || {},
-          statuses: dash.byStatus || {},
-          recentOrders: (dash.recentOrders || []).slice(0, 5),
-          topProducts,
-          botTotal: botStats.total || 0,
-          botEscalated: botStats.escalated || 0,
-        });
-      } catch (err) {
-        console.error("Dashboard fetch error:", err);
-      } finally {
-        setLoading(false);
+      // Bot stats are non-critical — handle gracefully but log
+      let botStats: BotStatsResponse = {};
+      if (botRes.ok) {
+        try {
+          botStats = await botRes.json();
+        } catch (parseErr) {
+          console.warn("Bot stats parse error:", parseErr);
+        }
+      } else {
+        console.warn("Bot stats unavailable:", botRes.status);
       }
-    };
-    fetchDashboard();
+
+      const productList: DashboardProduct[] = Array.isArray(products) ? products : (products.data || []);
+      const totalProducts = productList.length;
+      const lowStock = productList.filter((p) => p.stock > 0 && p.stock <= 5).length;
+      const outOfStock = productList.filter((p) => p.stock === 0).length;
+
+      const topProducts = [...productList]
+        .sort((a, b) => (b.sold || 0) - (a.sold || 0))
+        .slice(0, 5);
+
+      const noReply = (dash.byStatus?.no_reply_1 || 0) + (dash.byStatus?.no_reply_2 || 0) + (dash.byStatus?.no_reply_3 || 0);
+
+      // G1 fix: compute truthful change from real data only
+      let revenueChange: number | null = null;
+      if (dash.prevRevenue != null && dash.prevRevenue > 0) {
+        revenueChange = Math.round(((dash.revenue - dash.prevRevenue) / dash.prevRevenue) * 100);
+      }
+
+      setStats({
+        totalRevenue: dash.revenue || 0,
+        prevRevenue: dash.prevRevenue,
+        revenueChange,
+        totalOrders: dash.totalOrders || 0,
+        newOrders: dash.newCount || 0,
+        noReply,
+        totalProducts,
+        lowStock,
+        outOfStock,
+        totalCustomers: dash.totalCustomers || 0,
+        vipCustomers: dash.vipCount || 0,
+        sources: dash.bySource || {},
+        statuses: dash.byStatus || {},
+        recentOrders: (dash.recentOrders || []).slice(0, 5),
+        topProducts,
+        botTotal: botStats.total || 0,
+        botEscalated: botStats.escalated || 0,
+      });
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+      setFetchError(err instanceof Error ? err.message : "خطأ في تحميل البيانات");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchDashboard(range);
+  }, [range, fetchDashboard]);
+
   if (loading) return <div className="text-center py-20 text-muted">⏳ جاري التحميل...</div>;
+  if (fetchError) return <div className="text-center py-20 text-state-error">{fetchError}</div>;
   if (!stats) return null;
 
   const gridCols = scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr";
@@ -82,36 +185,59 @@ export default function AdminDashboard() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="font-black" style={{ fontSize: scr.mobile ? 16 : 22 }}>📊 داشبورد</h1>
-        <button
-          onClick={() => exportStatsPDF(
-            [
-              { label: "الإيرادات", value: formatCurrency(stats.totalRevenue) },
-              { label: "الطلبات", value: stats.totalOrders },
-              { label: "الزبائن", value: stats.totalCustomers },
-              { label: "VIP", value: stats.vipCustomers },
-              { label: "المنتجات", value: stats.totalProducts },
-              { label: "مخزون منخفض", value: stats.lowStock },
-              { label: "طلبات جديدة", value: stats.newOrders },
-              { label: "بدون رد", value: stats.noReply },
-            ],
-            "تقرير الداشبورد",
-            `<h3 style="margin-top:20px;font-weight:700">🏆 أكثر المنتجات مبيعاً</h3>
-            <table><thead><tr><th>المنتج</th><th>المبيعات</th><th>السعر</th></tr></thead><tbody>
-            ${stats.topProducts.map((p: any) => `<tr><td>${p.name_ar}</td><td>${p.sold || 0}</td><td>₪${p.price}</td></tr>`).join("")}
-            </tbody></table>`
-          )}
-          className="text-xs font-bold text-brand bg-surface-elevated px-3 py-1.5 rounded-lg hover:bg-brand/10 transition-colors"
-        >
-          📄 تصدير PDF
-        </button>
+        <div className="flex items-center gap-2">
+          {/* G5 fix: truthful date range selector */}
+          <div className="flex rounded-lg overflow-hidden border border-surface-border">
+            {RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setRange(opt.key)}
+                className="transition-colors"
+                style={{
+                  padding: scr.mobile ? "4px 8px" : "6px 12px",
+                  fontSize: scr.mobile ? 9 : 11,
+                  fontWeight: range === opt.key ? 700 : 400,
+                  background: range === opt.key ? "#c41040" : "transparent",
+                  color: range === opt.key ? "#fff" : "#a1a1aa",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => exportStatsPDF(
+              [
+                { label: "الإيرادات", value: formatCurrency(stats.totalRevenue) },
+                { label: "الطلبات", value: stats.totalOrders },
+                { label: "الزبائن", value: stats.totalCustomers },
+                { label: "VIP", value: stats.vipCustomers },
+                { label: "المنتجات", value: stats.totalProducts },
+                { label: "مخزون منخفض", value: stats.lowStock },
+                { label: "طلبات جديدة", value: stats.newOrders },
+                { label: "بدون رد", value: stats.noReply },
+              ],
+              "تقرير الداشبورد",
+              `<h3 style="margin-top:20px;font-weight:700">🏆 أكثر المنتجات مبيعاً</h3>
+              <table><thead><tr><th>المنتج</th><th>المبيعات</th><th>السعر</th></tr></thead><tbody>
+              ${stats.topProducts.map((p) => `<tr><td>${p.name_ar}</td><td>${p.sold || 0}</td><td>₪${p.price}</td></tr>`).join("")}
+              </tbody></table>`
+            )}
+            className="text-xs font-bold text-brand bg-surface-elevated px-3 py-1.5 rounded-lg hover:bg-brand/10 transition-colors"
+          >
+            📄 PDF
+          </button>
+        </div>
       </div>
 
-      {/* Stats grid */}
+      {/* G6 fix: KPI cards with deep links + G1 fix: truthful change */}
       <div className="grid gap-2 mb-4" style={{ gridTemplateColumns: gridCols }}>
-        <StatCard icon="💰" label="الإيرادات" value={formatCurrency(stats.totalRevenue)} color="#22c55e" />
-        <StatCard icon="📦" label="الطلبات" value={stats.totalOrders} sub={`${stats.newOrders} جديد`} />
-        <StatCard icon="👥" label="الزبائن" value={stats.totalCustomers} sub={`${stats.vipCustomers} VIP`} />
-        <StatCard icon="📱" label="المنتجات" value={stats.totalProducts} sub={`${stats.lowStock} مخزون منخفض`} />
+        <StatCard icon="💰" label="الإيرادات" value={formatCurrency(stats.totalRevenue)} color="#22c55e" change={stats.revenueChange} href="/admin/analytics" />
+        <StatCard icon="📦" label="الطلبات" value={stats.totalOrders} sub={`${stats.newOrders} جديد`} href="/admin/order" />
+        <StatCard icon="👥" label="الزبائن" value={stats.totalCustomers} sub={`${stats.vipCustomers} VIP`} href="/crm" />
+        <StatCard icon="📱" label="المنتجات" value={stats.totalProducts} sub={`${stats.lowStock} مخزون منخفض`} href="/admin/products" />
       </div>
 
       {/* Bot stats row */}
@@ -157,7 +283,7 @@ export default function AdminDashboard() {
           {stats.recentOrders.length === 0 ? (
             <div className="text-center py-4 text-dim text-xs">لا يوجد طلبات بعد</div>
           ) : (
-            stats.recentOrders.map((o: any) => {
+            stats.recentOrders.map((o) => {
               const st = ORDER_STATUS[o.status as keyof typeof ORDER_STATUS];
               return (
                 <div key={o.id} className="flex items-center justify-between py-1.5 border-b border-surface-border last:border-0">
@@ -183,7 +309,7 @@ export default function AdminDashboard() {
           {stats.topProducts.length === 0 ? (
             <div className="text-center py-4 text-dim text-xs">لا يوجد بيانات بعد</div>
           ) : (
-            stats.topProducts.map((p: any, i: number) => (
+            stats.topProducts.map((p, i: number) => (
               <div key={p.id} className="flex items-center justify-between py-1.5 border-b border-surface-border last:border-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-muted text-[10px]">{p.sold || 0} مبيع</span>

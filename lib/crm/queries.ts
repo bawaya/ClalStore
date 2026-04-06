@@ -36,10 +36,16 @@ type Nullable<T> = { [K in keyof T]: T[K] | null };
 const db = () => createAdminSupabase();
 
 // ===== Dashboard =====
-export async function getCRMDashboard() {
+export async function getCRMDashboard(filters?: { dateFrom?: string; dateTo?: string }) {
   const s = db();
+
+  let ordersQuery = s.from("orders").select("id, status, source, total, created_at, customer_id, assigned_to").order("created_at", { ascending: false });
+  if (filters?.dateFrom) ordersQuery = ordersQuery.gte("created_at", filters.dateFrom);
+  if (filters?.dateTo) ordersQuery = ordersQuery.lte("created_at", filters.dateTo + "T23:59:59.999Z");
+  ordersQuery = ordersQuery.limit(500);
+
   const [orders, customers, tasks, pipeline] = await Promise.all([
-    s.from("orders").select("id, status, source, total, created_at, customer_id, assigned_to").order("created_at", { ascending: false }).limit(200),
+    ordersQuery,
     s.from("customers").select("id, name, phone, segment, total_orders, total_spent, last_order_at").limit(200),
     s.from("tasks").select("id, status, priority, due_date, assigned_to").limit(500),
     s.from("pipeline_deals").select("id, stage, value").limit(500),
@@ -50,7 +56,26 @@ export async function getCRMDashboard() {
   const t = tasks.data || [];
   const p = pipeline.data || [];
 
-  const revenue = o.filter((x: DashboardOrder) => !["rejected", "new"].includes(x.status)).reduce((s: number, x: DashboardOrder) => s + Number(x.total), 0);
+  const revenueOrders = o.filter((x: DashboardOrder) => !["rejected", "new"].includes(x.status));
+  const revenue = revenueOrders.reduce((s: number, x: DashboardOrder) => s + Number(x.total), 0);
+
+  // Compute previous period revenue for truthful change %
+  let prevRevenue: number | null = null;
+  if (filters?.dateFrom && filters?.dateTo) {
+    const from = new Date(filters.dateFrom);
+    const to = new Date(filters.dateTo);
+    const rangeDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86400000));
+    const prevTo = new Date(from.getTime() - 1); // day before current range start
+    const prevFrom = new Date(prevTo.getTime() - rangeDays * 86400000);
+    const { data: prevOrders } = await s.from("orders")
+      .select("total, status")
+      .gte("created_at", prevFrom.toISOString())
+      .lte("created_at", prevTo.toISOString() + "T23:59:59.999Z")
+      .limit(500);
+    prevRevenue = (prevOrders || [])
+      .filter((x: { total: number; status: string }) => !["rejected", "new"].includes(x.status))
+      .reduce((s: number, x: { total: number }) => s + Number(x.total), 0);
+  }
   const byStatus: Record<string, number> = {};
   const bySource: Record<string, number> = {};
   o.forEach((x: DashboardOrder) => { byStatus[x.status] = (byStatus[x.status] || 0) + 1; bySource[x.source] = (bySource[x.source] || 0) + 1; });
@@ -80,7 +105,7 @@ export async function getCRMDashboard() {
     .slice(0, 10);
 
   return {
-    totalOrders: o.length, revenue, newCount, noReply, noReply3,
+    totalOrders: o.length, revenue, prevRevenue, newCount, noReply, noReply3,
     totalCustomers: c.length, vipCount: c.filter((x: DashboardCustomer) => x.segment === "vip").length,
     openTasks, pipelineValue, pipelineDeals: p.length,
     byStatus, bySource, alerts,

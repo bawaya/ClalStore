@@ -19,12 +19,13 @@ cp .env.example .env.local
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` ← من Supabase Dashboard
 - `SUPABASE_SERVICE_ROLE_KEY` ← من Supabase Dashboard
 
-### المتغيرات الاختيارية (تعمل بدونها):
+### المتغيرات الاختيارية (تعمل ب��ونها):
 - `RIVHIT_API_KEY` + `RIVHIT_BUSINESS_ID` ← بوابة الدفع
-- `SENDGRID_API_KEY` ← إيميلات تلقائية
+- `SENDGRID_API_KEY` ← إيميلات تل��ائية
 - `YCLOUD_API_KEY` + `WHATSAPP_PHONE_ID` ← بوت واتساب
 - `TEAM_WHATSAPP_NUMBERS` ← تنبيهات الفريق
 - `WEBHOOK_VERIFY_TOKEN` ← تحقق webhook واتساب
+- `COMMISSION_API_TOKEN` ← توكن API خارجي لوحدة العمولات (للتطبيق المحلي)
 
 ## الخطوة 3: تشغيل محلي
 ```bash
@@ -33,10 +34,11 @@ npm run dev
 # افتح http://localhost:3000
 ```
 
-### تحقق:
-- [ ] الصفحة الرئيسية تظهر
+### ��حقق:
+- [ ] الصفح�� الرئيسية تظهر
 - [ ] `/store` يعرض المنتجات
-- [ ] `/admin` يفتح لوحة الإدارة
+- [ ] `/admin` يفت�� لوحة الإدارة
+- [ ] `/admin/commissions` يفتح لوحة العمولات
 - [ ] `/crm` يفتح CRM
 - [ ] `/api/health` يرجع status: "healthy" أو "degraded"
 - [ ] WebChat widget يظهر أسفل يسار الصفحة
@@ -87,6 +89,10 @@ npm run dev
 - [ ] واتساب: أرسل "CLM-00001" → حالة الطلب
 - [ ] الإيميل يوصل بعد الطلب
 - [ ] الدفع يعمل (test mode أولاً)
+- [ ] العمولات: `/admin/commissions` يعرض الداشبورد
+- [ ] العمولات: أضف مبيعة يدوية وتحقق من الحساب
+- [ ] ��لعمولات: `curl -H "Authorization: Bearer TOKEN" https://clalmobile.com/api/admin/commissions/summary` يرجع JSON
+- [ ] العمولات: شغّل migrations 025 + 026 في Supabase
 
 ## الخطوة 9: SEO
 - [ ] تحقق https://clalmobile.com/sitemap.xml
@@ -113,7 +119,7 @@ clalmobile/
 │   ├── legal/                ← الشروط (Israeli compliant)
 │   ├── contact/              ← تواصل معنا + فورم
 │   ├── store/                ← المتجر (S1)
-│   ├── admin/                ← لوحة الإدارة (S2)
+│   ├── admin/                ← لوحة الإدارة (S2) + عمولات
 │   ├── crm/                  ← CRM (S3)
 │   │   ├── orders/
 │   │   ├── customers/
@@ -124,7 +130,7 @@ clalmobile/
 │   └── api/
 │       ├── orders/           ← Order creation
 │       ├── coupons/          ← Coupon validation
-│       ├── admin/            ← Admin CRUD (S2)
+│       ├─�� admin/            ← Admin CRUD (S2) + commissions (8 endpoints)
 │       ├── crm/              ← CRM data (S3)
 │       ├── webhook/whatsapp/ ← WhatsApp webhook (S4)
 │       ├── chat/             ← WebChat API (S4)
@@ -145,6 +151,7 @@ clalmobile/
 │   ├── utils.ts              ← Shared utilities (S0)
 │   ├── store/                ← Store queries (S1)
 │   ├── admin/                ← Admin queries (S2)
+│   ├── commissions/          ← Commission calculator engine
 │   ├── crm/                  ← CRM queries (S3)
 │   ├── bot/                  ← Bot engine + WA + notifications (S4)
 │   └── integrations/         ← Provider hub + Rivhit + SendGrid (S6)

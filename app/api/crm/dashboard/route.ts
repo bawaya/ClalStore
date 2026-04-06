@@ -8,7 +8,10 @@ export async function GET(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-    const data = await getCRMDashboard();
+    const url = new URL(req.url);
+    const dateFrom = url.searchParams.get("dateFrom") || undefined;
+    const dateTo = url.searchParams.get("dateTo") || undefined;
+    const data = await getCRMDashboard({ dateFrom, dateTo });
     return apiSuccess(data);
   } catch (err: unknown) {
     return apiError(errMsg(err, "Unknown error"), 500);
