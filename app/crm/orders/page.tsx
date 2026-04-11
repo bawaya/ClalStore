@@ -346,6 +346,12 @@ export default function OrdersPage() {
                   <div className="text-muted text-[10px] mb-1">👤 الزبون</div>
                   <div className="font-bold text-sm">{selected.customers?.name || "—"}</div>
                   <div className="text-muted text-xs">{selected.customers?.phone || "—"}</div>
+                  {selected.customers?.customer_code && (
+                    <div className="flex justify-between mt-1.5 pt-1.5 border-t border-surface-border">
+                      <span className="text-brand font-bold text-xs tracking-widest" dir="ltr">{selected.customers.customer_code}</span>
+                      <span className="text-dim text-[10px]">🎖️ كود</span>
+                    </div>
+                  )}
                   {selected.customers?.id_number && (
                     <div className="flex justify-between mt-1.5 pt-1.5 border-t border-surface-border">
                       <span className="text-brand font-bold text-xs" dir="ltr">{selected.customers.id_number}</span>

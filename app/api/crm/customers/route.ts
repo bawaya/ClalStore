@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
     const filters = {
       segment: searchParams.get("segment") || undefined,
       search: searchParams.get("search") || undefined,
+      hotMobileId: searchParams.get("hot_mobile_id") || undefined,
       limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
       offset: searchParams.get("offset") ? Number(searchParams.get("offset")) : undefined,
     };

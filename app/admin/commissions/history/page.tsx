@@ -20,7 +20,19 @@ interface Sale {
   device_sale_amount: number;
   commission_amount: number;
   notes: string | null;
+  match_status?: string | null;
+  customer_id?: string | null;
+  store_customer_code_snapshot?: string | null;
 }
+
+const MATCH_STATUS_INFO: Record<string, { label: string; color: string; icon: string }> = {
+  matched: { label: "מתואם", color: "#22c55e", icon: "✓" },
+  pending: { label: "ממתין", color: "#9ca3af", icon: "⏳" },
+  unmatched: { label: "לא מתואם", color: "#ef4444", icon: "⚠" },
+  ambiguous: { label: "עמום", color: "#f59e0b", icon: "?" },
+  conflict: { label: "סתירה", color: "#ef4444", icon: "!" },
+  manual: { label: "ידני", color: "#3b82f6", icon: "✎" },
+};
 
 export default function HistoryPage() {
   const scr = useScreen();
@@ -34,6 +46,7 @@ export default function HistoryPage() {
   // Filters
   const [filterType, setFilterType] = useState("");
   const [filterSource, setFilterSource] = useState("");
+  const [filterMatch, setFilterMatch] = useState("");
   const [filterFrom, setFilterFrom] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -83,11 +96,15 @@ export default function HistoryPage() {
           (s.device_name || "").toLowerCase().includes(q)
         );
       }
+      // Client-side match_status filter
+      if (filterMatch) {
+        items = items.filter((s: Sale) => (s.match_status || "pending") === filterMatch);
+      }
       setSales(items);
       setTotal(d.total || 0);
     } catch { show("שגיאה בטעינת היסטוריה", "error"); }
     finally { setLoading(false); }
-  }, [filterType, filterSource, filterFrom, filterTo, page, search, show]);
+  }, [filterType, filterSource, filterFrom, filterTo, page, search, filterMatch, show]);
 
   useEffect(() => { fetchSales(); }, [fetchSales]);
 
@@ -199,6 +216,15 @@ export default function HistoryPage() {
               <option value="csv_import">CSV</option>
             </select>
           </div>
+          <div style={{ minWidth: 120 }}>
+            <label className="text-muted text-[10px] font-semibold block mb-1">מצב התאמה</label>
+            <select className="input" style={{ fontSize: 11 }} value={filterMatch} onChange={(e) => { setFilterMatch(e.target.value); setPage(1); }}>
+              <option value="">הכל</option>
+              {Object.entries(MATCH_STATUS_INFO).map(([k, v]) => (
+                <option key={k} value={k}>{v.icon} {v.label}</option>
+              ))}
+            </select>
+          </div>
           <div style={{ flex: 1, minWidth: 150 }}>
             <label className="text-muted text-[10px] font-semibold block mb-1">חיפוש</label>
             <input className="input" style={{ fontSize: 11 }} placeholder="שם לקוח / טלפון / מכשיר" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -219,6 +245,7 @@ export default function HistoryPage() {
                 <tr className="text-muted border-b border-surface-border">
                   <th className="py-1.5 font-semibold">פעולות</th>
                   <th className="py-1.5 font-semibold">מקור</th>
+                  <th className="py-1.5 font-semibold">התאמה</th>
                   <th className="py-1.5 font-semibold">עמלה</th>
                   <th className="py-1.5 font-semibold">סכום</th>
                   <th className="py-1.5 font-semibold">לקוח/מכשיר</th>
@@ -234,6 +261,16 @@ export default function HistoryPage() {
                     </td>
                     <td className="py-1.5 text-[9px]">
                       {s.source === "auto_sync" ? "🔄" : s.source === "csv_import" ? "📄" : "✏️"}
+                    </td>
+                    <td className="py-1.5">
+                      {(() => {
+                        const info = MATCH_STATUS_INFO[s.match_status || "pending"] || MATCH_STATUS_INFO.pending;
+                        return (
+                          <span className="badge text-[9px]" style={{ background: `${info.color}20`, color: info.color }} title={s.store_customer_code_snapshot || undefined}>
+                            {info.icon} {info.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-1.5 font-bold" style={{ color: "#22c55e" }}>{formatCurrency(s.commission_amount)}</td>
                     <td className="py-1.5">{formatCurrency(s.sale_type === "line" ? s.package_price : s.device_sale_amount)}</td>

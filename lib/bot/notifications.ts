@@ -33,7 +33,8 @@ export async function notifyNewOrder(
   customerName: string,
   customerPhone: string,
   total: number,
-  source: string
+  source: string,
+  customerCode?: string | null
 ): Promise<{ sent: boolean }> {
   try {
     // 1. Notify admin + team (from report phone)
@@ -42,7 +43,8 @@ export async function notifyNewOrder(
     await notifyTeam(teamMsg);
 
     // 2. Confirm to customer (with template fallback)
-    const custMsg = `✅ *تم استلام طلبك!*\n\n📦 رقم الطلب: ${orderId}\n💰 المبلغ: ₪${total.toLocaleString()}\n\nالفريق سيتواصل معك قريباً.\nللاستفسار أرسل رقم طلبك في أي وقت.`;
+    const codeLine = customerCode ? `\n🎖️ كود الزبون: *${customerCode}*  (احتفظ فيه لطلباتك القادمة)` : "";
+    const custMsg = `✅ *تم استلام طلبك!*\n\n📦 رقم الطلب: ${orderId}\n💰 المبلغ: ₪${total.toLocaleString()}${codeLine}\n\nالفريق سيتواصل معك قريباً.\nللاستفسار أرسل رقم طلبك في أي وقت.`;
     const custSent = await sendToCustomer(customerPhone, custMsg, "clal_order_confirmation", [orderId, `₪${total.toLocaleString()}`]);
     return { sent: custSent };
   } catch (err) {

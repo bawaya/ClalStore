@@ -130,7 +130,7 @@ export async function getCRMOrders(filters?: {
   const limit = filters?.limit || 100;
   const offset = filters?.offset || 0;
 
-  let query = s.from("orders").select(`*, order_items(*), order_notes(*), customers(name, phone, segment, id_number)`, { count: "exact" }).order("created_at", { ascending: false });
+  let query = s.from("orders").select(`*, order_items(*), order_notes(*), customers(name, phone, segment, id_number, customer_code)`, { count: "exact" }).order("created_at", { ascending: false });
   if (filters?.status) {
     if (filters.status === "no_reply_all") query = query.like("status", "no_reply%");
     else query = query.eq("status", filters.status);
@@ -224,16 +224,33 @@ export async function deleteOrderCompletely(orderId: string, userName: string) {
 }
 
 // ===== Customers =====
-export async function getCRMCustomers(filters?: { segment?: string; search?: string; limit?: number; offset?: number }) {
+export async function getCRMCustomers(filters?: { segment?: string; search?: string; hotMobileId?: string; limit?: number; offset?: number }) {
   const s = db();
   const limit = filters?.limit || 100;
   const offset = filters?.offset || 0;
 
   let query = s.from("customers").select("*", { count: "exact" }).order("total_spent", { ascending: false });
   if (filters?.segment) query = query.eq("segment", filters.segment);
+
+  // Filter by HOT Mobile ID via customer_hot_accounts lookup
+  if (filters?.hotMobileId) {
+    const hotId = filters.hotMobileId.trim();
+    const { data: hotMatch } = await s
+      .from("customer_hot_accounts")
+      .select("customer_id")
+      .eq("hot_mobile_id", hotId)
+      .in("status", ["pending", "active", "inactive"])
+      .limit(50);
+    const customerIds = (hotMatch || []).map((h: { customer_id: string }) => h.customer_id);
+    if (customerIds.length === 0) {
+      return { data: [], total: 0 };
+    }
+    query = query.in("id", customerIds);
+  }
+
   if (filters?.search) {
     const q = filters.search.trim();
-    query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`);
+    query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,customer_code.ilike.%${q}%`);
   }
   query = query.range(offset, offset + limit - 1);
   const { data, count } = await query;

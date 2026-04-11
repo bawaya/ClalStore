@@ -53,7 +53,7 @@ export async function PUT(req: NextRequest) {
       .from("customers")
       .update(updates)
       .eq("id", (customer as any).id)
-      .select("id, name, phone, email, city, address")
+      .select("id, name, phone, email, city, address, customer_code")
       .single();
 
     if (error) {

@@ -8,6 +8,18 @@ import { CUSTOMER_SEGMENT } from "@/lib/constants";
 import { formatCurrency, formatDate, timeAgo } from "@/lib/utils";
 import { Modal } from "@/components/admin/shared";
 
+type HotAccount = {
+  id: string;
+  customer_id: string;
+  hot_mobile_id: string;
+  hot_customer_code?: string | null;
+  line_phone?: string | null;
+  label?: string | null;
+  status: "pending" | "active" | "inactive" | "cancelled" | "transferred";
+  is_primary: boolean;
+  ended_at?: string | null;
+};
+
 export default function CustomersPage() {
   const scr = useScreen();
   const [customers, setCustomers] = useState<any[]>([]);
@@ -17,6 +29,12 @@ export default function CustomersPage() {
   const debouncedSearch = useDebounce(search, 300);
   const [selected, setSelected] = useState<any>(null);
   const [custOrders, setCustOrders] = useState<any[]>([]);
+  const [hotAccounts, setHotAccounts] = useState<HotAccount[]>([]);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const [saving, setSaving] = useState(false);
+  const [addingHot, setAddingHot] = useState(false);
+  const [newHot, setNewHot] = useState({ hot_mobile_id: "", label: "", is_primary: false });
   const [error, setError] = useState("");
 
   const fetchCustomers = useCallback(async () => {
@@ -43,8 +61,34 @@ export default function CustomersPage() {
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
+  const loadHotAccounts = async (customerId: string) => {
+    try {
+      const res = await fetch(`/api/crm/customers/${customerId}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      const cd = json.data ?? json;
+      setHotAccounts(cd.hotAccounts || []);
+      // Keep selected synced with latest customer row (includes customer_code)
+      if (cd.customer) setSelected((prev: any) => ({ ...prev, ...cd.customer }));
+    } catch {
+      // non-fatal
+    }
+  };
+
   const openCustomer = async (c: any) => {
     setSelected(c);
+    setEditMode(false);
+    setAddingHot(false);
+    setNewHot({ hot_mobile_id: "", label: "", is_primary: false });
+    setEditForm({
+      name: c.name || "",
+      email: c.email || "",
+      city: c.city || "",
+      address: c.address || "",
+      id_number: c.id_number || "",
+      notes: c.notes || "",
+      segment: c.segment || "new",
+    });
     try {
       const res = await fetch(`/api/crm/customers?customerId=${c.id}`);
       if (!res.ok) {
@@ -54,6 +98,80 @@ export default function CustomersPage() {
       const json = await res.json();
       const cd = json.data ?? json;
       setCustOrders(cd.orders || []);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطأ");
+    }
+    // Load HOT accounts + customer_code
+    await loadHotAccounts(c.id);
+  };
+
+  const saveCustomer = async () => {
+    if (!selected) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/crm/customers/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "خطأ في الحفظ");
+      const updated = (j.data ?? j).customer;
+      setSelected({ ...selected, ...updated });
+      await fetchCustomers();
+      setEditMode(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطأ");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addHotAccount = async () => {
+    if (!selected || !newHot.hot_mobile_id.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/crm/customers/${selected.id}/hot-accounts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newHot),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "خطأ في الإضافة");
+      await loadHotAccounts(selected.id);
+      setAddingHot(false);
+      setNewHot({ hot_mobile_id: "", label: "", is_primary: false });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطأ");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setPrimaryHot = async (accountId: string) => {
+    if (!selected) return;
+    try {
+      await fetch(`/api/crm/customers/${selected.id}/hot-accounts/${accountId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_primary: true }),
+      });
+      await loadHotAccounts(selected.id);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطأ");
+    }
+  };
+
+  const cancelHot = async (accountId: string) => {
+    if (!selected) return;
+    if (!window.confirm("هل تريد إغلاق هذا الحساب؟ (سيبقى السجل في القاعدة)")) return;
+    try {
+      await fetch(`/api/crm/customers/${selected.id}/hot-accounts/${accountId}`, {
+        method: "DELETE",
+      });
+      await loadHotAccounts(selected.id);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطأ");
     }
@@ -123,7 +241,18 @@ export default function CustomersPage() {
         )}
 
       {/* Customer Detail Modal */}
-      <Modal open={!!selected} onClose={() => { setSelected(null); setCustOrders([]); }} title={`👤 ${selected?.name || ""}`} wide>
+      <Modal
+        open={!!selected}
+        onClose={() => {
+          setSelected(null);
+          setCustOrders([]);
+          setHotAccounts([]);
+          setEditMode(false);
+          setAddingHot(false);
+        }}
+        title={`👤 ${selected?.name || ""}`}
+        wide
+      >
         {selected && (() => {
           const seg = CUSTOMER_SEGMENT[selected.segment as keyof typeof CUSTOMER_SEGMENT];
           return (
@@ -147,20 +276,208 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              <div className="card mb-3" style={{ padding: scr.mobile ? 10 : 14 }}>
-                <div className="font-bold text-right mb-1.5 text-xs">📋 معلومات</div>
-                <div className="grid gap-1" style={{ gridTemplateColumns: "1fr 1fr" }}>
-                  <div className="text-muted text-xs">📞 {selected.phone}</div>
-                  <div className="text-muted text-xs">📧 {selected.email || "—"}</div>
-                  <div className="text-muted text-xs">🏙️ {selected.city || "—"}</div>
-                  <div className="text-muted text-xs">🪪 {selected.id_number || "—"}</div>
+              {/* Customer code */}
+              <div className="card mb-3 p-3 text-center">
+                <div className="text-muted text-[10px] mb-1">🎖️ كود الزبون</div>
+                <div className="text-brand font-black tracking-widest" style={{ fontSize: scr.mobile ? 16 : 20, letterSpacing: "0.18em" }}>
+                  {selected.customer_code || "—"}
                 </div>
-                {selected.tags?.length > 0 && (
-                  <div className="flex gap-1 mt-2 flex-wrap">
-                    {selected.tags.map((t: string) => (
-                      <span key={t} className="badge bg-brand/10 text-brand">{t}</span>
-                    ))}
+              </div>
+
+              {/* HOT accounts */}
+              <div className="card mb-3" style={{ padding: scr.mobile ? 10 : 14 }}>
+                <div className="flex justify-between items-center mb-2">
+                  <button
+                    onClick={() => setAddingHot(true)}
+                    className="text-brand border border-brand/40 rounded-lg"
+                    style={{ fontSize: scr.mobile ? 10 : 12, padding: "4px 8px" }}
+                  >
+                    + إضافة
+                  </button>
+                  <div className="font-bold text-xs">📱 أكواد HOT ({hotAccounts.length})</div>
+                </div>
+
+                {addingHot && (
+                  <div className="mb-3 p-2 bg-surface-elevated rounded-lg">
+                    <input
+                      className="input w-full mb-2"
+                      dir="ltr"
+                      placeholder="رقم HOT Mobile"
+                      value={newHot.hot_mobile_id}
+                      onChange={(e) => setNewHot({ ...newHot, hot_mobile_id: e.target.value })}
+                    />
+                    <input
+                      className="input w-full mb-2"
+                      placeholder="وصف (اختياري)"
+                      value={newHot.label}
+                      onChange={(e) => setNewHot({ ...newHot, label: e.target.value })}
+                    />
+                    <label className="flex items-center gap-2 text-xs mb-2 justify-end">
+                      <span>الحساب الرئيسي</span>
+                      <input
+                        type="checkbox"
+                        checked={newHot.is_primary}
+                        onChange={(e) => setNewHot({ ...newHot, is_primary: e.target.checked })}
+                      />
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={addHotAccount}
+                        disabled={saving || !newHot.hot_mobile_id.trim()}
+                        className="btn-primary flex-1 text-xs"
+                      >
+                        {saving ? "..." : "حفظ"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAddingHot(false);
+                          setNewHot({ hot_mobile_id: "", label: "", is_primary: false });
+                        }}
+                        className="text-xs border border-surface-border rounded-lg px-3"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
                   </div>
+                )}
+
+                {hotAccounts.length === 0 ? (
+                  <div className="text-center text-dim text-xs py-3">لا توجد حسابات</div>
+                ) : (
+                  hotAccounts.map((acc) => (
+                    <div key={acc.id} className="flex justify-between items-center py-1.5 border-b border-surface-border last:border-0">
+                      <div className="flex gap-1">
+                        {!acc.is_primary && acc.status === "active" && (
+                          <button
+                            onClick={() => setPrimaryHot(acc.id)}
+                            className="text-[10px] text-muted"
+                            title="جعله الرئيسي"
+                          >
+                            ☆
+                          </button>
+                        )}
+                        {acc.status === "active" && (
+                          <button
+                            onClick={() => cancelHot(acc.id)}
+                            className="text-[10px] text-red-400"
+                            title="إغلاق"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold" dir="ltr">
+                          {acc.is_primary && <span className="text-brand">★ </span>}
+                          {acc.hot_mobile_id}
+                        </div>
+                        <div className="text-[10px] text-muted">
+                          {acc.label || "—"} • {acc.status}
+                          {acc.ended_at ? ` • ended ${acc.ended_at.slice(0, 10)}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Info (view or edit) */}
+              <div className="card mb-3" style={{ padding: scr.mobile ? 10 : 14 }}>
+                <div className="flex justify-between items-center mb-1.5">
+                  {editMode ? (
+                    <div className="flex gap-2">
+                      <button onClick={saveCustomer} disabled={saving} className="btn-primary text-xs px-4">
+                        {saving ? "..." : "💾 حفظ"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditMode(false);
+                          setEditForm({
+                            name: selected.name || "",
+                            email: selected.email || "",
+                            city: selected.city || "",
+                            address: selected.address || "",
+                            id_number: selected.id_number || "",
+                            notes: selected.notes || "",
+                            segment: selected.segment || "new",
+                          });
+                        }}
+                        className="text-xs border border-surface-border rounded-lg px-3"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setEditMode(true)}
+                      className="text-brand border border-brand/40 rounded-lg text-[10px] px-2 py-1"
+                    >
+                      ✏️ تعديل
+                    </button>
+                  )}
+                  <div className="font-bold text-right text-xs">📋 معلومات</div>
+                </div>
+
+                {editMode ? (
+                  <div className="space-y-2 text-right">
+                    <input
+                      className="input w-full"
+                      placeholder="الاسم"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    />
+                    <div className="text-[10px] text-dim">
+                      📞 {selected.phone} <span className="text-dim">(غير قابل للتعديل حالياً — اتصل بالإدارة للتصحيح)</span>
+                    </div>
+                    <input
+                      className="input w-full"
+                      placeholder="البريد الإلكتروني"
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    />
+                    <input
+                      className="input w-full"
+                      placeholder="المدينة"
+                      value={editForm.city}
+                      onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                    />
+                    <input
+                      className="input w-full"
+                      placeholder="العنوان"
+                      value={editForm.address}
+                      onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    />
+                    <input
+                      className="input w-full"
+                      placeholder="رقم الهوية"
+                      value={editForm.id_number}
+                      onChange={(e) => setEditForm({ ...editForm, id_number: e.target.value })}
+                      dir="ltr"
+                      maxLength={9}
+                    />
+                    <textarea
+                      className="input w-full min-h-[50px]"
+                      placeholder="ملاحظات"
+                      value={editForm.notes}
+                      onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-1" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                      <div className="text-muted text-xs">📞 {selected.phone}</div>
+                      <div className="text-muted text-xs">📧 {selected.email || "—"}</div>
+                      <div className="text-muted text-xs">🏙️ {selected.city || "—"}</div>
+                      <div className="text-muted text-xs">🪪 {selected.id_number || "—"}</div>
+                    </div>
+                    {selected.tags?.length > 0 && (
+                      <div className="flex gap-1 mt-2 flex-wrap">
+                        {selected.tags.map((t: string) => (
+                          <span key={t} className="badge bg-brand/10 text-brand">{t}</span>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

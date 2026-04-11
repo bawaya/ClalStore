@@ -18,6 +18,8 @@ interface OrderResult {
   installments: number;
   monthlyAmount: number;
   bankName: string;
+  customerCode?: string | null;
+  isNewCustomer?: boolean;
 }
 
 export function ConfirmStep({ order }: { order: OrderResult | null }) {
@@ -41,6 +43,26 @@ export function ConfirmStep({ order }: { order: OrderResult | null }) {
             : "✅ تم تأكيد الطلب — قيد التجهيز للشحن"}
         </div>
       </div>
+
+      {order?.customerCode && order?.isNewCustomer && (
+        <div
+          className="glass-card-static mb-3 p-4 text-center border border-brand/40"
+          style={{ background: "linear-gradient(135deg, rgba(196,16,64,0.06), rgba(255,120,60,0.04))" }}
+        >
+          <div className="text-muted mb-1" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+            🎖️ كود الزبون الخاص بك
+          </div>
+          <div
+            className="font-black text-brand"
+            style={{ fontSize: scr.mobile ? 22 : 30, letterSpacing: "0.22em" }}
+          >
+            {order.customerCode}
+          </div>
+          <div className="text-dim mt-1" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+            احتفظ به لطلباتك القادمة
+          </div>
+        </div>
+      )}
 
       <div className="glass-card-static text-right mb-3" style={{ padding: scr.mobile ? 14 : 20 }}>
         <div className="font-bold mb-2" style={{ fontSize: scr.mobile ? 12 : 14 }}>

@@ -41,9 +41,93 @@ export const GET = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =>
   return apiSuccess({ sales: data || [], total: count || 0, page, limit });
 });
 
+// Identity matching for manual / CSV sales entries
+// Priority: hot_mobile_id (via customer_hot_accounts) → customer_phone → unmatched
+async function matchSaleIdentity(
+  db: SupabaseClient,
+  input: { hot_mobile_id?: string | null; customer_phone?: string | null },
+): Promise<{
+  customer_id: string | null;
+  customer_hot_account_id: string | null;
+  hot_mobile_id_snapshot: string | null;
+  store_customer_code_snapshot: string | null;
+  match_status: "matched" | "ambiguous" | "unmatched" | "manual";
+  match_method: string | null;
+  match_confidence: number | null;
+}> {
+  const empty = {
+    customer_id: null,
+    customer_hot_account_id: null,
+    hot_mobile_id_snapshot: input.hot_mobile_id?.trim() || null,
+    store_customer_code_snapshot: null,
+    match_status: "unmatched" as const,
+    match_method: null,
+    match_confidence: null,
+  };
+
+  // 1. Try HOT mobile id
+  const hotId = input.hot_mobile_id?.trim();
+  if (hotId) {
+    const { data: hotRows } = await db
+      .from("customer_hot_accounts")
+      .select("id, customer_id, hot_mobile_id")
+      .eq("hot_mobile_id", hotId)
+      .in("status", ["pending", "active", "inactive"])
+      .limit(5);
+    const rows = hotRows || [];
+    if (rows.length === 1) {
+      const hit = rows[0];
+      const { data: cust } = await db
+        .from("customers")
+        .select("customer_code")
+        .eq("id", hit.customer_id)
+        .maybeSingle();
+      return {
+        customer_id: hit.customer_id,
+        customer_hot_account_id: hit.id,
+        hot_mobile_id_snapshot: hit.hot_mobile_id,
+        store_customer_code_snapshot: cust?.customer_code || null,
+        match_status: "matched",
+        match_method: "hot_mobile_id",
+        match_confidence: 1.0,
+      };
+    }
+    if (rows.length > 1) {
+      return { ...empty, match_status: "ambiguous", match_method: "hot_mobile_id" };
+    }
+  }
+
+  // 2. Fall back to phone
+  const phone = input.customer_phone?.trim();
+  if (phone) {
+    const cleanPhone = phone.replace(/[\s\-.]/g, "");
+    const { data: customers } = await db
+      .from("customers")
+      .select("id, customer_code")
+      .eq("phone", cleanPhone)
+      .limit(5);
+    const rows = customers || [];
+    if (rows.length === 1) {
+      return {
+        ...empty,
+        customer_id: rows[0].id,
+        store_customer_code_snapshot: rows[0].customer_code || null,
+        match_status: "matched",
+        match_method: "phone",
+        match_confidence: 0.9,
+      };
+    }
+    if (rows.length > 1) {
+      return { ...empty, match_status: "ambiguous", match_method: "phone" };
+    }
+  }
+
+  return empty;
+}
+
 export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) => {
   const body = await req.json();
-  const { sale_type, sale_date, customer_name, customer_phone, package_price, has_valid_hk, device_name, device_sale_amount, notes, employee_id } = body;
+  const { sale_type, sale_date, customer_name, customer_phone, hot_mobile_id, package_price, has_valid_hk, device_name, device_sale_amount, notes, employee_id } = body;
 
   if (!sale_type || !sale_date) return apiError("sale_type and sale_date required", 400);
 
@@ -61,6 +145,9 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =
     profile,
   );
 
+  // Identity lookup (PR6)
+  const identity = await matchSaleIdentity(db, { hot_mobile_id, customer_phone });
+
   const { data, error } = await db.from("commission_sales").insert({
     sale_type,
     sale_date,
@@ -77,6 +164,14 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =
     notes: notes || null,
     loyalty_status: sale_type === "line" ? "pending" : "pending",
     loyalty_start_date: sale_type === "line" ? sale_date : null,
+    // Identity linking (PR6)
+    customer_id: identity.customer_id,
+    customer_hot_account_id: identity.customer_hot_account_id,
+    hot_mobile_id_snapshot: identity.hot_mobile_id_snapshot,
+    store_customer_code_snapshot: identity.store_customer_code_snapshot,
+    match_status: identity.match_status,
+    match_method: identity.match_method,
+    match_confidence: identity.match_confidence,
   }).select().single();
 
   if (error) return apiError(error.message, 500);

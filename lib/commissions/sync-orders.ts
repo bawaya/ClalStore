@@ -21,10 +21,10 @@ export async function syncOrdersToCommissions(
 
   const result = { synced: 0, skipped: 0, totalAmount: 0, errors: [] as string[] };
 
-  // Fetch completed orders in date range (include assigned_to for employee attribution)
+  // Fetch completed orders in date range (include assigned_to + customer_id for identity linking)
   const { data: orders, error } = await db
     .from('orders')
-    .select('id, total, items_total, discount_amount, status, created_at, assigned_to')
+    .select('id, total, items_total, discount_amount, status, created_at, assigned_to, customer_id')
     .gte('created_at', startDate)
     .lte('created_at', endDate + 'T23:59:59.999Z')
     .in('status', COMPLETED_STATUSES)
@@ -53,6 +53,31 @@ export async function syncOrdersToCommissions(
     }
   }
 
+  // Preload customer snapshots + primary HOT accounts for all order customers
+  const customerIds = [...new Set(orders.map((o: any) => o.customer_id).filter(Boolean))];
+  const customerCodeMap = new Map<string, string | null>();
+  const primaryHotMap = new Map<string, { id: string; hot_mobile_id: string }>();
+
+  if (customerIds.length > 0) {
+    const { data: customers } = await db
+      .from('customers')
+      .select('id, customer_code')
+      .in('id', customerIds);
+    for (const c of (customers || [])) {
+      customerCodeMap.set(c.id, c.customer_code || null);
+    }
+
+    const { data: hotAccounts } = await db
+      .from('customer_hot_accounts')
+      .select('id, customer_id, hot_mobile_id')
+      .in('customer_id', customerIds)
+      .eq('is_primary', true)
+      .in('status', ['pending', 'active']);
+    for (const h of (hotAccounts || [])) {
+      primaryHotMap.set(h.customer_id, { id: h.id, hot_mobile_id: h.hot_mobile_id });
+    }
+  }
+
   for (const order of orders) {
     // Check if already synced
     const { data: existing } = await db
@@ -68,11 +93,15 @@ export async function syncOrdersToCommissions(
 
     const netAmount = Number(order.total) || 0;
     const employeeId = (order as any).assigned_to || null;
+    const customerId = (order as any).customer_id || null;
     const profile = employeeId ? profileMap.get(employeeId) || null : null;
 
     const { contractCommission, employeeCommission } = calcDualCommission(
       'device', netAmount, true, profile,
     );
+
+    const primaryHot = customerId ? primaryHotMap.get(customerId) : undefined;
+    const customerCode = customerId ? customerCodeMap.get(customerId) : null;
 
     const { error: insertError } = await db
       .from('commission_sales')
@@ -86,6 +115,14 @@ export async function syncOrdersToCommissions(
         device_sale_amount: netAmount,
         commission_amount: employeeId ? employeeCommission : contractCommission,
         contract_commission: contractCommission,
+        // Identity linking (PR6)
+        customer_id: customerId,
+        customer_hot_account_id: primaryHot?.id || null,
+        hot_mobile_id_snapshot: primaryHot?.hot_mobile_id || null,
+        store_customer_code_snapshot: customerCode || null,
+        match_status: customerId ? 'matched' : 'unmatched',
+        match_method: customerId ? 'order_sync' : null,
+        match_confidence: customerId ? 1.0 : null,
       });
 
     if (insertError) {

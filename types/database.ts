@@ -315,6 +315,7 @@ export type Customer = {
   city?: string;
   address?: string;
   id_number?: string;     // Israeli ID
+  customer_code?: string; // Store-issued code (CLAL-XXXXXX), DB-generated on INSERT
   total_orders: number;
   total_spent: number;
   avg_order_value: number;
@@ -324,6 +325,28 @@ export type Customer = {
   tags: string[];
   auth_token?: string;
   last_login?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CustomerHotAccount = {
+  id: string;
+  customer_id: string;
+  hot_mobile_id: string;
+  hot_customer_code?: string;
+  line_phone?: string;
+  label?: string;
+  status: 'pending' | 'active' | 'inactive' | 'cancelled' | 'transferred';
+  is_primary: boolean;
+  source: 'admin_manual' | 'sales_doc' | 'order_sync' | 'import';
+  source_order_id?: string;
+  verified_at?: string;
+  verified_by_id?: string;
+  verified_by_name?: string;
+  ended_at?: string;
+  notes?: string;
+  created_by_id?: string;
+  created_by_name?: string;
   created_at: string;
   updated_at: string;
 }

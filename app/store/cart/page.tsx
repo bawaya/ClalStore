@@ -30,6 +30,8 @@ interface OrderResult {
   city: string; address: string; customer: string; phone: string;
   notes: string; hasDevice: boolean; date: string;
   installments: number; monthlyAmount: number; bankName: string;
+  customerCode?: string | null;
+  isNewCustomer?: boolean;
 }
 
 const lbl = "block text-muted text-[10px] desktop:text-xs font-semibold mb-1";
@@ -242,6 +244,9 @@ export default function CartPage() {
   const [order, setOrder] = useState<OrderResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [couponInput, setCouponInput] = useState("");
+  const [returningLoaded, setReturningLoaded] = useState(false);
+  const [retBannerOpen, setRetBannerOpen] = useState(true);
+  const [hasReturningToken, setHasReturningToken] = useState(false);
   const bankOptions: ChoiceOption[] = BANKS.map((bank) => ({
     value: bank.id,
     label: bank.name_ar,
@@ -256,6 +261,67 @@ export default function CartPage() {
 
   // Styles
   const inp = "input";
+
+  // === Returning customer detection (token present?) ===
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = localStorage.getItem("clal_customer_token");
+    setHasReturningToken(!!t);
+  }, []);
+
+  // === Returning customer prefill (after OTP redirect back to cart) ===
+  useEffect(() => {
+    if (typeof window === "undefined" || returningLoaded) return;
+    const token = localStorage.getItem("clal_customer_token");
+    if (!token) return;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/customer/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          // Token invalid/expired — clean stale entries
+          if (res.status === 401) {
+            localStorage.removeItem("clal_customer_token");
+            localStorage.removeItem("clal_customer");
+            setHasReturningToken(false);
+          }
+          return;
+        }
+        const json = await res.json();
+        const c = json.data?.customer || json.customer;
+        if (!c) return;
+
+        // Warn if user already typed something before auto-filling
+        const hasInput = !!(info.name || info.city || info.address);
+        if (hasInput) {
+          const ok = window.confirm("سيتم استبدال البيانات الحالية ببيانات حسابك. هل أنت متأكد؟");
+          if (!ok) {
+            setReturningLoaded(true); // don't re-prompt this session
+            return;
+          }
+        }
+
+        setInfo((prev) => ({
+          ...prev,
+          name: c.name || prev.name,
+          phone: c.phone || prev.phone,
+          email: c.email || prev.email,
+          city: c.city || prev.city,
+          address: c.address || prev.address,
+          // idNumber NOT auto-filled by design (security — id_number is not in public profile)
+          // notes preserved
+        }));
+        setReturningLoaded(true);
+        setRetBannerOpen(false);
+        show(`✨ مرحباً بعودتك${c.name ? "، " + c.name : ""}!`, "success");
+      } catch {
+        // silent — user can fill manually
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returningLoaded]);
 
   // === Coupon ===
   const handleCoupon = async () => {
@@ -403,6 +469,8 @@ export default function CartPage() {
         installments: pay.installments,
         monthlyAmount: pay.installments > 1 ? Math.ceil(total / pay.installments) : total,
         bankName: selectedBank?.name_ar || pay.bank,
+        customerCode: data.customerCode || null,
+        isNewCustomer: !!data.isNewCustomer,
       });
       setStep(3);
       cart.clearCart();
@@ -504,6 +572,33 @@ export default function CartPage() {
   const InfoStep = () => (
     <div>
       <h2 className="font-black text-right mb-3" style={{ fontSize: scr.mobile ? 16 : 20 }}>📝 معلوماتك</h2>
+      {retBannerOpen && !returningLoaded && !hasReturningToken && (
+        <div className="card mb-3 p-3 border border-brand/30" style={{ background: "linear-gradient(135deg, rgba(196,16,64,0.04), rgba(255,120,60,0.03))" }}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>✨ هل اشتريت من قبل؟</span>
+            <button
+              type="button"
+              onClick={() => setRetBannerOpen(false)}
+              className="text-muted bg-transparent border-0"
+              style={{ fontSize: scr.mobile ? 14 : 16 }}
+              aria-label="إغلاق"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="text-muted mb-2" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+            سجّل دخولك ونعبّئ بياناتك تلقائياً
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push(`/store/auth?return=${encodeURIComponent("/store/cart")}`)}
+            className="btn-primary w-full"
+            style={{ fontSize: scr.mobile ? 12 : 14 }}
+          >
+            استرجاع بياناتي
+          </button>
+        </div>
+      )}
       <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
         <div style={{ display: scr.mobile ? "block" : "flex", gap: 10 }}>
           <div className="flex-1"><Field label="الاسم الكامل *" error={errors.name}><input className={inp} value={info.name} onChange={(e) => setInfo({ ...info, name: e.target.value })} placeholder="محمد أحمد" /></Field></div>

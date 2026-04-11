@@ -22,7 +22,7 @@ export async function authenticateCustomer(req: NextRequest) {
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, name, phone, email, city, address")
+    .select("id, name, phone, email, city, address, customer_code")
     .eq("auth_token", hashedToken)
     .single();
 

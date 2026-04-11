@@ -73,6 +73,7 @@ export function orderConfirmationEmail(
   paymentMethod?: string,
   shippingCity?: string,
   shippingAddress?: string,
+  customerCode?: string | null,
 ): { subject: string; html: string } {
   const itemRows = items.map((i) =>
     `<tr>
@@ -94,7 +95,16 @@ export function orderConfirmationEmail(
     <span style="font-size:12px;color:#6b7280">رقم الطلب:</span>
     <span style="font-size:18px;font-weight:800;color:${BRAND_COLOR};margin-right:8px">${orderId}</span>
   </div>
-  
+
+  ${customerCode ? `
+  <!-- Customer Code (new customer welcome) -->
+  <div style="background:linear-gradient(135deg,#fff7ed,#fef2f2);border:2px dashed rgba(196,16,64,0.35);border-radius:12px;padding:18px;margin-bottom:20px;text-align:center">
+    <div style="font-size:11px;color:#6b7280;margin-bottom:6px">🎖️ كود الزبون الخاص بك</div>
+    <div style="font-size:26px;font-weight:900;color:${BRAND_COLOR};letter-spacing:0.18em">${customerCode}</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:6px">احتفظ به لطلباتك القادمة</div>
+  </div>
+  ` : ""}
+
   <!-- Items Table -->
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:16px">
     <thead>

@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
             last_login: new Date().toISOString(),
           })
           .eq("id", existingCustomer.id)
-          .select("id, name, phone, email, city, address")
+          .select("id, name, phone, email, city, address, customer_code")
           .single();
         customer = updated || existingCustomer;
       } else {
@@ -302,7 +302,7 @@ export async function POST(req: NextRequest) {
             auth_token_expires_at: tokenExpiresAt,
             last_login: new Date().toISOString(),
           } as any)
-          .select("id, name, phone, email, city, address")
+          .select("id, name, phone, email, city, address, customer_code")
           .single();
         customer = newCust;
       }
@@ -316,6 +316,7 @@ export async function POST(req: NextRequest) {
           email: (customer as any)?.email || "",
           city: (customer as any)?.city || "",
           address: (customer as any)?.address || "",
+          customer_code: (customer as any)?.customer_code || "",
         },
       });
     }

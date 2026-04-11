@@ -88,14 +88,18 @@ export async function POST(req: NextRequest) {
 
     const { data: existingCustomer } = await supabase
       .from("customers")
-      .select("id")
+      .select("id, customer_code")
       .eq("phone", cleanPhone)
       .single();
 
     let customerId: string;
+    let assignedCode: string | null = null;
+    let isNewCustomer = false;
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
+      assignedCode = (existingCustomer as { customer_code?: string | null }).customer_code ?? null;
+
       // Update customer info
       await supabase
         .from("customers")
@@ -107,7 +111,16 @@ export async function POST(req: NextRequest) {
           id_number: customer.idNumber || undefined,
         })
         .eq("id", customerId);
+
+      // Trickle-in backfill for legacy customers without a code
+      if (!assignedCode) {
+        const { data: coded } = await supabase.rpc("assign_code_to_existing_customer", {
+          p_customer_id: customerId,
+        });
+        if (coded) assignedCode = coded as string;
+      }
     } else {
+      isNewCustomer = true;
       const { data: newCustomer, error: custErr } = await supabase
         .from("customers")
         .insert({
@@ -118,15 +131,35 @@ export async function POST(req: NextRequest) {
           address: customer.address,
           id_number: customer.idNumber || undefined,
           segment: "new",
+          // customer_code NOT provided — DB trigger generates it
         } as Record<string, unknown>)
-        .select("id")
+        .select("id, customer_code")
         .single();
 
       if (custErr || !newCustomer) {
-        console.error("Customer creation error:", custErr);
-        return apiError("خطأ في تسجيل الزبون", 500);
+        // 23505 on phone = race condition (someone else created it concurrently)
+        if ((custErr as { code?: string } | null)?.code === "23505") {
+          const { data: existsNow } = await supabase
+            .from("customers")
+            .select("id, customer_code")
+            .eq("phone", cleanPhone)
+            .single();
+          if (existsNow) {
+            customerId = existsNow.id;
+            assignedCode = (existsNow as { customer_code?: string | null }).customer_code ?? null;
+            isNewCustomer = false;
+          } else {
+            console.error("Customer creation race condition unresolved:", custErr);
+            return apiError("خطأ في تسجيل الزبون", 500);
+          }
+        } else {
+          console.error("Customer creation error:", custErr);
+          return apiError("خطأ في تسجيل الزبون", 500);
+        }
+      } else {
+        customerId = newCustomer.id;
+        assignedCode = (newCustomer as { customer_code?: string | null }).customer_code ?? null;
       }
-      customerId = newCustomer.id;
     }
 
     // === 2. Verify prices from DB ===
@@ -224,7 +257,14 @@ export async function POST(req: NextRequest) {
     // === 7. WhatsApp Notifications (Season 4) ===
     try {
       const { notifyNewOrder } = await import("@/lib/bot/notifications");
-      await notifyNewOrder(orderId, customer.name, customer.phone, total, source || "store");
+      await notifyNewOrder(
+        orderId,
+        customer.name,
+        customer.phone,
+        total,
+        source || "store",
+        isNewCustomer ? assignedCode : null,
+      );
     } catch (notifErr) {
       console.error("WhatsApp notification failed:", notifErr);
     }
@@ -263,6 +303,7 @@ export async function POST(req: NextRequest) {
             hasDevice ? "bank" : "credit",
             customer.city,
             customer.address,
+            isNewCustomer ? assignedCode : null,
           );
           await emailProvider.send({
             to: customer.email,
@@ -281,6 +322,8 @@ export async function POST(req: NextRequest) {
       status: hasDevice ? "new" : "pending_payment",
       // Only accessories get Rivhit payment redirect
       needsPayment: !hasDevice,
+      customerCode: assignedCode,
+      isNewCustomer,
       message: hasDevice
         ? "تم استلام الطلب — الفريق سيتواصل معك"
         : "جاري تحويلك لصفحة الدفع الآمنة...",
