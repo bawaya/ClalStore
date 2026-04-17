@@ -1,0 +1,57 @@
+name: Lighthouse CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "styles/**"
+      - "lib/**"
+      - "next.config.js"
+      - "lighthouserc.json"
+
+jobs:
+  lighthouse:
+    name: Lighthouse budgets
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: test-service-key
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci --legacy-peer-deps
+      - name: Install @lhci/cli
+        run: npm i -g @lhci/cli@0.14.x
+
+      - name: Start mock Supabase
+        run: node tests/ci/mock-supabase.mjs > /tmp/mock-sb.log 2>&1 &
+      - run: npx wait-on --timeout 30000 http://127.0.0.1:54321
+
+      - name: Build + start Next.js (production)
+        run: |
+          npm run build:next
+          npm run start > /tmp/next.log 2>&1 &
+      - run: npx wait-on --timeout 120000 http://localhost:3000
+
+      - name: Run Lighthouse CI (collect + assert)
+        run: lhci autorun --config=lighthouserc.json
+
+      - name: Dump Next.js log on failure
+        if: failure()
+        run: tail -200 /tmp/next.log || true
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/
+          retention-days: 14

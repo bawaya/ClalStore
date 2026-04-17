@@ -1,6 +1,16 @@
-import { test, expect, devices } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
-test.use({ ...devices["iPad Mini"] });
+// Use chromium-based tablet emulation (viewport + userAgent) instead of
+// devices["iPad Mini"] which forces WebKit and breaks in CI where only
+// chromium is installed. The actual tablet assertion is about layout at
+// tablet width, not browser engine fidelity.
+test.use({
+  viewport: { width: 768, height: 1024 },
+  userAgent: "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148",
+  hasTouch: true,
+  isMobile: true,
+  deviceScaleFactor: 2,
+});
 
 test.describe("Tablet flow", () => {
   test.beforeEach(async ({ context }) => {

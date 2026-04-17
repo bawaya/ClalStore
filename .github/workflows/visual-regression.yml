@@ -1,0 +1,96 @@
+name: Visual Regression
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "compare = diff vs baseline · update = regenerate baselines"
+        required: true
+        default: "compare"
+        type: choice
+        options:
+          - compare
+          - update
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "styles/**"
+      - "tailwind.config.ts"
+      - "next.config.js"
+      - "tests/e2e/visual-regression.spec.ts"
+
+jobs:
+  visual:
+    name: Visual regression
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: test-service-key
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci --legacy-peer-deps
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: pw-${{ runner.os }}-
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start mock Supabase
+        run: node tests/ci/mock-supabase.mjs > /tmp/mock-sb.log 2>&1 &
+      - run: npx wait-on --timeout 30000 http://127.0.0.1:54321
+
+      - name: Build and start Next.js
+        run: |
+          npm run build:next
+          npm run start > /tmp/next.log 2>&1 &
+      - run: npx wait-on --timeout 120000 http://localhost:3000
+
+      - name: Run visual regression (compare)
+        if: github.event.inputs.mode != 'update'
+        run: npx playwright test --grep "@visual" --project=chromium-desktop
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          PW_RUN_VISUAL: "1"
+
+      - name: Run visual regression (update baselines)
+        if: github.event.inputs.mode == 'update'
+        run: npx playwright test --grep "@visual" --project=chromium-desktop --update-snapshots
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          PW_RUN_VISUAL: "1"
+
+      - name: Commit updated baselines
+        if: github.event.inputs.mode == 'update'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tests/e2e/visual-regression.spec.ts-snapshots/ || true
+          if git diff --cached --quiet; then
+            echo "No baseline changes"
+          else
+            git commit -m "chore(visual): regenerate baselines via workflow"
+            git push
+          fi
+
+      - name: Upload diff report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
