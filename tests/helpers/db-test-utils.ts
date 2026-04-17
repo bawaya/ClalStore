@@ -16,13 +16,23 @@ let cachedClient: SupabaseClient | null = null;
 export function getTestSupabaseClient(): SupabaseClient {
   if (cachedClient) return cachedClient;
 
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  const url = rawUrl?.trim();
+  const key = rawKey?.trim();
 
   if (!url || !key) {
     throw new Error(
       "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for staging tests. " +
       "Set them in your environment or GitHub Actions secrets.",
+    );
+  }
+
+  if (!/^https?:\/\//.test(url)) {
+    throw new Error(
+      `SUPABASE_URL is not a valid URL (got "${url.slice(0, 20)}..."). ` +
+      "Check the secret value in GitHub Actions.",
     );
   }
 

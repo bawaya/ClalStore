@@ -61,7 +61,15 @@
       "Bash(npm ls *)",
       "Bash(npx playwright *)",
       "Bash(node -e \"import\\('./vitest.staging.config.ts'\\).then\\(\\(\\) => console.log\\('OK'\\)\\).catch\\(e => console.log\\('ERROR:', e.message\\)\\)\")",
-      "Bash(node tests/monitor/check.js)"
+      "Bash(node tests/monitor/check.js)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "Bash(bash -c ' *)",
+      "Bash(gh secret *)",
+      "Bash(gh run *)",
+      "Bash(gh workflow *)",
+      "Bash(gh api *)"
     ]
   }
 }
