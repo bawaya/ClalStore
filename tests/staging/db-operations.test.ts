@@ -177,8 +177,8 @@ describe.skipIf(skipReason)("Layer 3 · Supabase CRUD", () => {
     it("records each status transition in order_status_history", async () => {
       const db = getTestSupabaseClient();
       const transitions: Array<[string, string]> = [
-        ["new", "confirmed"],
-        ["confirmed", "shipped"],
+        ["new", "approved"],
+        ["approved", "shipped"],
         ["shipped", "delivered"],
       ];
 
@@ -207,7 +207,7 @@ describe.skipIf(skipReason)("Layer 3 · Supabase CRUD", () => {
       expect((data ?? []).length).toBeGreaterThanOrEqual(4); // initial + 3 transitions
       const statuses = (data ?? []).map((r: any) => r.new_status);
       expect(statuses).toEqual(
-        expect.arrayContaining(["new", "confirmed", "shipped", "delivered"]),
+        expect.arrayContaining(["new", "approved", "shipped", "delivered"]),
       );
 
       const { data: order } = await db
