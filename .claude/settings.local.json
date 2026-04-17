@@ -71,7 +71,9 @@
       "Bash(gh workflow *)",
       "Bash(gh api *)",
       "Bash(xxd)",
-      "Bash(awk -F= '/^[A-Z_]+=/ { print $1 \" = \" length\\($0\\)-length\\($1\\)-1 \" chars\" }' .env.local)"
+      "Bash(awk -F= '/^[A-Z_]+=/ { print $1 \" = \" length\\($0\\)-length\\($1\\)-1 \" chars\" }' .env.local)",
+      "Bash(curl -sS -o /tmp/resend-test.json -w 'HTTP %{http_code}\\\\n' -X GET https://api.resend.com/domains -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(RESEND_API_KEY=\"re_TYfbvSfk_Q8ya8dp95wwb4gXxd6xm897D\" RESEND_FROM=\"ClalMobile Alerts <alerts@clalmobile.com>\" ALERT_EMAIL=\"bawaya@icloud.com\" GITHUB_SERVER_URL=\"https://github.com\" GITHUB_REPOSITORY=\"bawaya/ClalStore\" GITHUB_RUN_ID=\"test-run\" node tests/monitor/alert.js)"
     ]
   }
 }
