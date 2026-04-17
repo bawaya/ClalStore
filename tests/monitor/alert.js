@@ -9,8 +9,8 @@ const YCLOUD_API_KEY = process.env.YCLOUD_API_KEY;
 const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || "";
 const ALERT_WHATSAPP = process.env.ALERT_WHATSAPP;
 const ALERT_EMAIL = process.env.ALERT_EMAIL;
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const SENDGRID_FROM = process.env.SENDGRID_FROM || "noreply@clalmobile.com";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = process.env.RESEND_FROM || "ClalMobile Alerts <alerts@clalmobile.com>";
 
 const runUrl = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
   ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
@@ -50,21 +50,26 @@ async function sendWhatsApp() {
 }
 
 async function sendEmail() {
-  if (!SENDGRID_API_KEY || !ALERT_EMAIL) {
-    console.log("[alert] SendGrid config missing — skipping email");
+  if (!RESEND_API_KEY || !ALERT_EMAIL) {
+    console.log("[alert] Resend config missing — skipping email");
     return;
   }
   try {
-    const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SENDGRID_API_KEY}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: ALERT_EMAIL }] }],
-        from: { email: SENDGRID_FROM },
+        from: RESEND_FROM,
+        to: [ALERT_EMAIL],
         subject: "🔴 ClalMobile — Production monitor failed",
-        content: [{ type: "text/plain", value: TEXT }],
+        text: TEXT,
       }),
     });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[alert] Resend responded ${res.status}: ${body.slice(0, 200)}`);
+      return;
+    }
     console.log(`[alert] Email sent — status ${res.status}`);
   } catch (err) {
     console.error("[alert] Email failed:", err.message);

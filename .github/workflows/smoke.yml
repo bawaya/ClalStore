@@ -31,6 +31,6 @@ jobs:
           WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
           ALERT_WHATSAPP: ${{ secrets.ADMIN_PERSONAL_PHONE }}
           ALERT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          SENDGRID_FROM: ${{ secrets.SENDGRID_FROM }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
         run: node tests/smoke/alert.js

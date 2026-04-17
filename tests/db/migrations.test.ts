@@ -248,6 +248,49 @@ describe("database migrations", () => {
       // This test documents the current state; tighten_rls should have fixed most
       expect(flagged).toBeDefined(); // always passes — informational
     });
+
+    describe("sub_pages hardening", () => {
+      const hardeningFile = "20260417000001_fix_sub_pages_rls.sql";
+
+      it("has a sub_pages hardening migration", () => {
+        const file = files.find((f) => f.includes("fix_sub_pages_rls"));
+        expect(file).toBe(hardeningFile);
+      });
+
+      it("drops the open sub_pages_authenticated_all policy", () => {
+        const sql = readMigration(hardeningFile);
+        expect(sql).toMatch(/DROP POLICY IF EXISTS "sub_pages_authenticated_all"/i);
+      });
+
+      it("installs role-scoped SELECT policies for anon and authenticated", () => {
+        const sql = readMigration(hardeningFile);
+        // anon SELECT on visible only
+        expect(sql).toMatch(/CREATE POLICY "sub_pages_anon_read"[\s\S]*?FOR SELECT[\s\S]*?TO anon[\s\S]*?USING \(is_visible = true\)/i);
+        // authenticated SELECT on visible only
+        expect(sql).toMatch(/CREATE POLICY "sub_pages_authenticated_read"[\s\S]*?FOR SELECT[\s\S]*?TO authenticated[\s\S]*?USING \(is_visible = true\)/i);
+      });
+
+      it("scopes FOR ALL access to service_role only, with auth.role() guard", () => {
+        const sql = readMigration(hardeningFile);
+        expect(sql).toMatch(/CREATE POLICY "sub_pages_service_all"[\s\S]*?FOR ALL[\s\S]*?TO service_role[\s\S]*?USING \(auth\.role\(\) = 'service_role'\)/i);
+      });
+
+      it("revokes INSERT/UPDATE/DELETE from anon and authenticated", () => {
+        const sql = readMigration(hardeningFile);
+        expect(sql).toMatch(/REVOKE INSERT, UPDATE, DELETE ON sub_pages FROM anon/i);
+        expect(sql).toMatch(/REVOKE INSERT, UPDATE, DELETE ON sub_pages FROM authenticated/i);
+      });
+
+      it("contains no new USING(true) patterns outside service_role policy", () => {
+        const sql = readMigration(hardeningFile);
+        // Strip `-- …` SQL line comments so references to `USING(true)`
+        // inside the comment block (e.g. "we used to have USING(true)") don't
+        // count as a policy definition.
+        const code = sql.replace(/--[^\n]*/g, "");
+        const bareTrue = code.match(/USING\s*\(\s*true\s*\)/gi) || [];
+        expect(bareTrue.length).toBe(0);
+      });
+    });
   });
 
   // =========================================================================

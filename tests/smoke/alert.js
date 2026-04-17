@@ -3,7 +3,7 @@
  * Production smoke-test alert script.
  * Runs via GitHub Actions when smoke tests fail.
  *
- * Sends a WhatsApp message (yCloud) and an email (SendGrid) to the admin
+ * Sends a WhatsApp message (yCloud) and an email (Resend) to the admin
  * with failure details and a link to the failed workflow.
  *
  * This is the ONLY script that sends real outbound messages — and only
@@ -14,8 +14,8 @@ const YCLOUD_API_KEY = process.env.YCLOUD_API_KEY;
 const ALERT_WHATSAPP = process.env.ALERT_WHATSAPP;
 const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || "";
 const ALERT_EMAIL = process.env.ALERT_EMAIL;
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const SENDGRID_FROM = process.env.SENDGRID_FROM || "noreply@clalmobile.com";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = process.env.RESEND_FROM || "ClalMobile Alerts <alerts@clalmobile.com>";
 
 const CONTEXT = {
   repo: process.env.GITHUB_REPOSITORY || "clalmobile",
@@ -63,36 +63,36 @@ async function sendWhatsApp() {
 }
 
 async function sendEmail() {
-  if (!SENDGRID_API_KEY || !ALERT_EMAIL) {
-    console.log("[alert] SendGrid config missing — skipping email alert");
+  if (!RESEND_API_KEY || !ALERT_EMAIL) {
+    console.log("[alert] Resend config missing — skipping email alert");
     return;
   }
   try {
-    const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${SENDGRID_API_KEY}`,
+        Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: ALERT_EMAIL }] }],
-        from: { email: SENDGRID_FROM },
+        from: RESEND_FROM,
+        to: [ALERT_EMAIL],
         subject: "🔴 ClalMobile — Production smoke test FAILED",
-        content: [
-          { type: "text/plain", value: TEXT },
-          {
-            type: "text/html",
-            value: `
-              <h2 style="color:#dc2626">🔴 ClalMobile — Production smoke test FAILED</h2>
-              <p><strong>Workflow:</strong> ${CONTEXT.workflow}</p>
-              <p><strong>Time:</strong> ${CONTEXT.when}</p>
-              <p><strong>Run:</strong> <a href="${CONTEXT.runUrl}">${CONTEXT.runUrl}</a></p>
-              <p>Please check the workflow logs for what broke.</p>
-            `,
-          },
-        ],
+        text: TEXT,
+        html: `
+          <h2 style="color:#dc2626">🔴 ClalMobile — Production smoke test FAILED</h2>
+          <p><strong>Workflow:</strong> ${CONTEXT.workflow}</p>
+          <p><strong>Time:</strong> ${CONTEXT.when}</p>
+          <p><strong>Run:</strong> <a href="${CONTEXT.runUrl}">${CONTEXT.runUrl}</a></p>
+          <p>Please check the workflow logs for what broke.</p>
+        `,
       }),
     });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[alert] Resend responded ${res.status}: ${body.slice(0, 200)}`);
+      return;
+    }
     console.log(`[alert] Email sent — status ${res.status}`);
   } catch (err) {
     console.error("[alert] Email send failed:", err.message);
