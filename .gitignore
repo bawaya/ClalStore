@@ -59,3 +59,6 @@ woocommerce-gateway-upay/
 scripts/check-stock-fn.js
 scripts/update-fn.js
 node_modules
+
+# Claude Code worktrees (session-local, not part of the repo)
+.claude/worktrees/
