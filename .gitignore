@@ -62,3 +62,8 @@ node_modules
 
 # Claude Code worktrees (session-local, not part of the repo)
 .claude/worktrees/
+
+# Test output
+coverage/
+playwright-report/
+test-results/
