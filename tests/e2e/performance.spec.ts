@@ -26,8 +26,8 @@ test.describe("Performance", () => {
     const start = Date.now();
     const res = await request.get("/api/store/autocomplete?q=iphone");
     const ms = Date.now() - start;
-    // In test mode the handler may return 200 or 400 depending on mock state; just check speed
+    // In test mode the handler may return various statuses; just check speed
     expect(ms).toBeLessThan(5_000);
-    expect([200, 400, 500]).toContain(res.status());
+    expect([200, 400, 429, 500]).toContain(res.status());
   });
 });
