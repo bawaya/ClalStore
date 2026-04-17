@@ -69,7 +69,9 @@
       "Bash(gh secret *)",
       "Bash(gh run *)",
       "Bash(gh workflow *)",
-      "Bash(gh api *)"
+      "Bash(gh api *)",
+      "Bash(xxd)",
+      "Bash(awk -F= '/^[A-Z_]+=/ { print $1 \" = \" length\\($0\\)-length\\($1\\)-1 \" chars\" }' .env.local)"
     ]
   }
 }

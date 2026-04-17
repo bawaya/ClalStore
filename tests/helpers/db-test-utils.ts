@@ -52,6 +52,12 @@ export async function createStagingData(): Promise<{
 }> {
   const db = getTestSupabaseClient();
 
+  // Pre-clean any leftover TEST_ rows from previous runs (unique-constraint safety)
+  await cleanupStagingData().catch(() => {});
+
+  // Unique suffix so re-runs don't collide on phone/email unique constraints
+  const uniq = Date.now().toString(36);
+
   // 1. Products (5)
   const productsData = [
     { type: "device", brand: "Apple", name_ar: `${TEST_PREFIX}iPhone 15`, name_he: `${TEST_PREFIX}iPhone 15 HE`, price: 3499, cost: 2500, stock: 10, sold: 0, gallery: [], colors: [], storage_options: [], variants: [], specs: {}, active: true, featured: false },
@@ -63,35 +69,38 @@ export async function createStagingData(): Promise<{
   const { data: products, error: pErr } = await db.from("products").insert(productsData).select();
   if (pErr) throw new Error(`Failed to create test products: ${pErr.message}`);
 
-  // 2. Customers (3)
+  // 2. Customers (3) — use time-based unique phone suffixes to avoid collisions on re-runs
+  const phone1 = `050999${uniq.slice(-4)}1`;
+  const phone2 = `050999${uniq.slice(-4)}2`;
+  const phone3 = `050999${uniq.slice(-4)}3`;
   const customersData = [
-    { name: `${TEST_PREFIX}Ahmad`, phone: "0501110001", customer_code: `${TEST_PREFIX}C001`, city: "חיפה", email: `${TEST_PREFIX.toLowerCase()}a@test.com`, total_orders: 0, total_spent: 0, avg_order_value: 0, segment: "new", tags: [] },
-    { name: `${TEST_PREFIX}Sara`, phone: "0501110002", customer_code: `${TEST_PREFIX}C002`, city: "תל אביב", email: `${TEST_PREFIX.toLowerCase()}s@test.com`, total_orders: 2, total_spent: 5000, avg_order_value: 2500, segment: "active", tags: ["vip"] },
-    { name: `${TEST_PREFIX}Yosef`, phone: "0501110003", customer_code: `${TEST_PREFIX}C003`, city: "ירושלים", email: `${TEST_PREFIX.toLowerCase()}y@test.com`, total_orders: 0, total_spent: 0, avg_order_value: 0, segment: "new", tags: [] },
+    { name: `${TEST_PREFIX}Ahmad`, phone: phone1, customer_code: `${TEST_PREFIX}C${uniq}1`, city: "חיפה", email: `${TEST_PREFIX.toLowerCase()}a${uniq}@test.com`, total_orders: 0, total_spent: 0, avg_order_value: 0, segment: "new", tags: [] },
+    { name: `${TEST_PREFIX}Sara`, phone: phone2, customer_code: `${TEST_PREFIX}C${uniq}2`, city: "תל אביב", email: `${TEST_PREFIX.toLowerCase()}s${uniq}@test.com`, total_orders: 2, total_spent: 5000, avg_order_value: 2500, segment: "active", tags: ["vip"] },
+    { name: `${TEST_PREFIX}Yosef`, phone: phone3, customer_code: `${TEST_PREFIX}C${uniq}3`, city: "ירושלים", email: `${TEST_PREFIX.toLowerCase()}y${uniq}@test.com`, total_orders: 0, total_spent: 0, avg_order_value: 0, segment: "new", tags: [] },
   ];
   const { data: customers, error: cErr } = await db.from("customers").insert(customersData).select();
   if (cErr) throw new Error(`Failed to create test customers: ${cErr.message}`);
 
-  // 3. Orders (2)
+  // 3. Orders (2) — valid statuses are defined in migration 022: new|approved|processing|shipped|delivered|cancelled|rejected|returned|no_reply_1..3
   const ordersData = [
-    { id: `${TEST_PREFIX}ORD001`, customer_id: customers![0].id, status: "new", source: "store", items_total: 3499, discount_amount: 0, total: 3499, payment_method: "credit", payment_details: {}, shipping_city: "חיפה", shipping_address: "Test 1", commission_synced: false },
-    { id: `${TEST_PREFIX}ORD002`, customer_id: customers![1].id, status: "confirmed", source: "whatsapp", items_total: 2999, discount_amount: 100, total: 2899, payment_method: "bank", payment_details: {}, shipping_city: "תל אביב", shipping_address: "Test 2", commission_synced: false },
+    { id: `${TEST_PREFIX}ORD${uniq}1`, customer_id: customers![0].id, status: "new", source: "store", items_total: 3499, discount_amount: 0, total: 3499, payment_method: "credit", payment_details: {}, shipping_city: "חיפה", shipping_address: "Test 1", commission_synced: false },
+    { id: `${TEST_PREFIX}ORD${uniq}2`, customer_id: customers![1].id, status: "approved", source: "whatsapp", items_total: 2999, discount_amount: 100, total: 2899, payment_method: "bank", payment_details: {}, shipping_city: "תל אביב", shipping_address: "Test 2", commission_synced: false },
   ];
   const { data: orders, error: oErr } = await db.from("orders").insert(ordersData).select();
   if (oErr) throw new Error(`Failed to create test orders: ${oErr.message}`);
 
   // 4. Inbox conversations (3)
   const conversationsData = [
-    { customer_phone: "0501110001", customer_name: `${TEST_PREFIX}Ahmad`, channel: "whatsapp", status: "active", priority: "normal", pinned: false, is_blocked: false, unread_count: 1, last_message_text: `${TEST_PREFIX}conversation`, last_message_at: new Date().toISOString(), last_message_direction: "inbound", source: "direct", metadata: {} },
-    { customer_phone: "0501110002", customer_name: `${TEST_PREFIX}Sara`, channel: "webchat", status: "waiting", priority: "high", pinned: true, is_blocked: false, unread_count: 0, last_message_text: `${TEST_PREFIX}waiting`, last_message_at: new Date().toISOString(), last_message_direction: "outbound", source: "direct", metadata: {} },
-    { customer_phone: "0501110003", customer_name: `${TEST_PREFIX}Yosef`, channel: "whatsapp", status: "resolved", priority: "low", pinned: false, is_blocked: false, unread_count: 0, last_message_text: `${TEST_PREFIX}resolved`, last_message_at: new Date().toISOString(), last_message_direction: "outbound", source: "direct", metadata: {} },
+    { customer_phone: phone1, customer_name: `${TEST_PREFIX}Ahmad`, channel: "whatsapp", status: "active", priority: "normal", pinned: false, is_blocked: false, unread_count: 1, last_message_text: `${TEST_PREFIX}conversation`, last_message_at: new Date().toISOString(), last_message_direction: "inbound", source: "direct", metadata: {} },
+    { customer_phone: phone2, customer_name: `${TEST_PREFIX}Sara`, channel: "webchat", status: "waiting", priority: "high", pinned: true, is_blocked: false, unread_count: 0, last_message_text: `${TEST_PREFIX}waiting`, last_message_at: new Date().toISOString(), last_message_direction: "outbound", source: "direct", metadata: {} },
+    { customer_phone: phone3, customer_name: `${TEST_PREFIX}Yosef`, channel: "whatsapp", status: "resolved", priority: "low", pinned: false, is_blocked: false, unread_count: 0, last_message_text: `${TEST_PREFIX}resolved`, last_message_at: new Date().toISOString(), last_message_direction: "outbound", source: "direct", metadata: {} },
   ];
   const { data: conversations, error: convErr } = await db.from("inbox_conversations").insert(conversationsData).select();
   if (convErr) throw new Error(`Failed to create test conversations: ${convErr.message}`);
 
-  // 5. Coupon (1)
+  // 5. Coupon (1) — unique code per run
   const couponsData = [
-    { code: `${TEST_PREFIX}SAVE10`, type: "percent", value: 10, min_order: 0, max_uses: 100, used_count: 0, active: true },
+    { code: `${TEST_PREFIX}SAVE${uniq}`, type: "percent", value: 10, min_order: 0, max_uses: 100, used_count: 0, active: true },
   ];
   const { data: coupons, error: couErr } = await db.from("coupons").insert(couponsData).select();
   if (couErr) throw new Error(`Failed to create test coupons: ${couErr.message}`);
