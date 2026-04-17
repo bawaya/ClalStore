@@ -327,3 +327,396 @@ describe("allocateDeviceCommissionRows", () => {
     expect(allocations.get(2)!.contract_commission).toBe(4000);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Async DB-backed functions — mock the Supabase client locally
+// ═══════════════════════════════════════════════════════════════════
+
+import { vi } from "vitest";
+import {
+  resolveCommissionEmployeeFilter,
+  getCommissionTarget,
+  resolveLinkedAppUserId,
+  recalculateDeviceCommissionsForMonths,
+} from "@/lib/commissions/ledger";
+
+/**
+ * Tiny chainable Supabase mock — each handler keyed by table name.
+ * Supports .select/.eq/.in/.is/.gte/.lte/.limit/.maybeSingle and await-on-chain.
+ */
+interface TableMock {
+  selectResult?: { data: any; error: any };
+  singleResult?: { data: any; error: any };
+  onUpdate?: (payload: any) => { error: any };
+}
+
+function makeDb(tables: Record<string, TableMock>) {
+  const calls: { table: string; action: "select" | "update"; payload?: any }[] = [];
+  const from = (tableName: string) => {
+    const t = tables[tableName] || {};
+    const selectResult = t.selectResult ?? { data: [], error: null };
+    const singleResult = t.singleResult ?? { data: null, error: null };
+    const builder: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      single: vi.fn().mockImplementation(async () => {
+        calls.push({ table: tableName, action: "select" });
+        return singleResult;
+      }),
+      maybeSingle: vi.fn().mockImplementation(async () => {
+        calls.push({ table: tableName, action: "select" });
+        return singleResult;
+      }),
+      then: (resolve: any) => {
+        calls.push({ table: tableName, action: "select" });
+        return resolve(selectResult);
+      },
+      update: vi.fn((payload: any) => {
+        calls.push({ table: tableName, action: "update", payload });
+        const result = t.onUpdate?.(payload) ?? { error: null };
+        return {
+          eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockReturnThis(),
+          then: (resolve: any) => resolve(result),
+        };
+      }),
+    };
+    return builder;
+  };
+  return { from: vi.fn(from), __calls: calls };
+}
+
+// ─── resolveLinkedAppUserId ──────────────────────────────────────────
+
+describe("resolveLinkedAppUserId", () => {
+  it("returns null for empty input", async () => {
+    const db = makeDb({});
+    expect(await resolveLinkedAppUserId(db as any, null)).toBeNull();
+    expect(await resolveLinkedAppUserId(db as any, "")).toBeNull();
+    expect(await resolveLinkedAppUserId(db as any, undefined)).toBeNull();
+  });
+
+  it("returns the id when a direct users.id match exists", async () => {
+    const db = makeDb({
+      users: { singleResult: { data: { id: "user-1" }, error: null } },
+    });
+    const id = await resolveLinkedAppUserId(db as any, "user-1");
+    expect(id).toBe("user-1");
+  });
+
+  it("falls back to auth_id lookup when direct lookup misses", async () => {
+    // first maybeSingle returns null, second returns the resolved id
+    let call = 0;
+    const db: any = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockImplementation(async () => {
+          call += 1;
+          if (call === 1) return { data: null, error: null };
+          return { data: { id: "app-42" }, error: null };
+        }),
+      })),
+    };
+    const id = await resolveLinkedAppUserId(db, "auth-uuid");
+    expect(id).toBe("app-42");
+  });
+
+  it("returns null when neither lookup resolves", async () => {
+    const db: any = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      })),
+    };
+    const id = await resolveLinkedAppUserId(db, "nonexistent");
+    expect(id).toBeNull();
+  });
+});
+
+// ─── getCommissionTarget ─────────────────────────────────────────────
+
+describe("getCommissionTarget", () => {
+  const scopedRow = { user_id: "user-1", month: "2026-04", target_total: 10000 };
+  const nullRow = { user_id: null, month: "2026-04", target_total: 5000 };
+  const otherRow = { user_id: "other", month: "2026-04", target_total: 4000 };
+
+  it("returns target scoped to the first matching preferred key", async () => {
+    const db = makeDb({
+      commission_targets: {
+        selectResult: { data: [otherRow, scopedRow], error: null },
+      },
+    });
+    const target = await getCommissionTarget(db as any, "2026-04", ["user-1", "other"]);
+    expect(target?.user_id).toBe("user-1");
+  });
+
+  it("falls back to null-scoped (global) target when no preferred key matches", async () => {
+    // First SELECT returns no rows for the preferred keys. The second maybeSingle
+    // returns the global row.
+    let queryIdx = 0;
+    const db: any = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockImplementation(async () => {
+          queryIdx += 1;
+          return { data: nullRow, error: null };
+        }),
+        then: (resolve: any) => {
+          queryIdx += 1;
+          return resolve({ data: [], error: null });
+        },
+      })),
+    };
+    const target = await getCommissionTarget(db, "2026-04", ["unknown-user"]);
+    expect(target?.target_total).toBe(5000);
+  });
+
+  it("returns null when no global target and ambiguous fallback rows", async () => {
+    let stage = 0;
+    const db: any = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        then: (resolve: any) => {
+          stage += 1;
+          if (stage === 1) return resolve({ data: [], error: null }); // no preferred matches
+          if (stage === 2) return resolve({ data: [scopedRow, otherRow], error: null }); // 2 rows → ambiguous
+          return resolve({ data: [], error: null });
+        },
+      })),
+    };
+    // no preferred keys → skip first branch
+    const target = await getCommissionTarget(db, "2026-04", [null, undefined, ""]);
+    expect(target).toBeNull();
+  });
+
+  it("throws when the initial query returns an error", async () => {
+    const db: any = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        then: (resolve: any) => resolve({ data: null, error: new Error("bad query") }),
+      })),
+    };
+    await expect(getCommissionTarget(db, "2026-04", ["user-1"])).rejects.toThrow();
+  });
+});
+
+// ─── resolveCommissionEmployeeFilter ─────────────────────────────────
+
+describe("resolveCommissionEmployeeFilter", () => {
+  it("treats __contract__ targetKey as null employeeKey and returns bare filter", async () => {
+    const db = makeDb({});
+    const f = await resolveCommissionEmployeeFilter(db as any, {
+      targetKey: COMMISSION_CONTRACT_TARGET_KEY,
+    });
+    expect(f.employeeId).toBeNull();
+    expect(f.employeeKey).toBeNull();
+    // targetKeys should include the contract key from getCommissionTargetKeys
+    expect(f.targetKeys).toContain(COMMISSION_CONTRACT_TARGET_KEY);
+  });
+
+  it("looks up commission employee via emp: prefixed employeeKey", async () => {
+    const db: any = {
+      from: vi.fn((table: string) => {
+        if (table === "commission_employees") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 7, name: "Sami", user_id: "app-1" },
+              error: null,
+            }),
+          };
+        }
+        // users lookup for resolveLinkedAppUserId
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: { id: "app-1" }, error: null }),
+        };
+      }),
+    };
+    const f = await resolveCommissionEmployeeFilter(db, { employeeKey: "emp:7" });
+    expect(f.commissionEmployeeId).toBe("7");
+    expect(f.employeeName).toBe("Sami");
+    expect(f.targetKeys).toContain("emp:7");
+    expect(f.notFound).toBe(false);
+  });
+
+  it("flags notFound when emp: id does not exist in registry", async () => {
+    const db: any = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      })),
+    };
+    const f = await resolveCommissionEmployeeFilter(db, { employeeKey: "emp:999" });
+    expect(f.notFound).toBe(true);
+  });
+
+  it("looks up commission employee by token when employeeToken is provided", async () => {
+    const db: any = {
+      from: vi.fn((table: string) => {
+        if (table === "commission_employees") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 3, name: "Ahmad", user_id: null },
+              error: null,
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        };
+      }),
+    };
+    const f = await resolveCommissionEmployeeFilter(db, { employeeToken: "secret-token" });
+    expect(f.commissionEmployeeId).toBe("3");
+    expect(f.employeeName).toBe("Ahmad");
+    // When no linked app user, employeeKey should be "emp:3"
+    expect(f.employeeKey).toBe("emp:3");
+  });
+
+  it("resolves a plain employeeKey via users table", async () => {
+    let call = 0;
+    const db: any = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockImplementation(async () => {
+          call += 1;
+          // first call: direct users.id lookup succeeds
+          if (call === 1) return { data: { id: "user-42" }, error: null };
+          return { data: null, error: null };
+        }),
+      })),
+    };
+    const f = await resolveCommissionEmployeeFilter(db, { employeeKey: "user-42" });
+    expect(f.employeeId).toBe("user-42");
+    expect(f.employeeKey).toBe("user-42");
+    expect(f.notFound).toBe(false);
+  });
+});
+
+// ─── recalculateDeviceCommissionsForMonths ───────────────────────────
+
+describe("recalculateDeviceCommissionsForMonths", () => {
+  it("is a no-op when months array is empty or only falsy values", async () => {
+    const db = makeDb({});
+    await recalculateDeviceCommissionsForMonths(db as any, []);
+    await recalculateDeviceCommissionsForMonths(db as any, ["", null as any, undefined as any]);
+    expect(db.from).not.toHaveBeenCalled();
+  });
+
+  it("deduplicates months and fetches rows only once per unique month", async () => {
+    const db = makeDb({
+      commission_sales: { selectResult: { data: [], error: null } },
+      employee_commission_profiles: { selectResult: { data: [], error: null } },
+    });
+    await recalculateDeviceCommissionsForMonths(db as any, ["2026-04", "2026-04", "2026-04"]);
+    // commission_sales should be queried exactly once (one unique month)
+    const csSelects = db.__calls.filter(
+      (c) => c.table === "commission_sales" && c.action === "select",
+    );
+    expect(csSelects.length).toBe(1);
+  });
+
+  it("updates commission_sales rows with calculated allocations", async () => {
+    const db = makeDb({
+      commission_sales: {
+        selectResult: {
+          data: [
+            { id: 1, sale_date: "2026-04-01", device_sale_amount: 20000, employee_id: null },
+          ],
+          error: null,
+        },
+      },
+      employee_commission_profiles: { selectResult: { data: [], error: null } },
+    });
+    await recalculateDeviceCommissionsForMonths(db as any, ["2026-04"]);
+    const updates = db.__calls.filter(
+      (c) => c.table === "commission_sales" && c.action === "update",
+    );
+    expect(updates.length).toBe(1);
+    const payload = updates[0].payload;
+    expect(payload.commission_amount).toBe(1000); // 20000 * 0.05 (DEFAULT contract rate)
+    expect(payload.contract_commission).toBe(1000);
+    expect(payload.updated_at).toBeTruthy();
+  });
+
+  it("throws when commission_sales SELECT errors", async () => {
+    const db = makeDb({
+      commission_sales: {
+        selectResult: { data: null, error: new Error("perm denied") },
+      },
+    });
+    await expect(
+      recalculateDeviceCommissionsForMonths(db as any, ["2026-04"]),
+    ).rejects.toThrow();
+  });
+
+  it("throws when employee_commission_profiles SELECT errors", async () => {
+    let cs = 0;
+    const db: any = {
+      from: vi.fn((table: string) => {
+        if (table === "commission_sales") {
+          const callIdx = cs++;
+          if (callIdx === 0) {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              is: vi.fn().mockReturnThis(),
+              gte: vi.fn().mockReturnThis(),
+              lte: vi.fn().mockReturnThis(),
+              then: (r: any) =>
+                r({
+                  data: [{ id: 1, sale_date: "2026-04-01", device_sale_amount: 20000, employee_id: "emp-1" }],
+                  error: null,
+                }),
+            };
+          }
+          // second call wouldn't happen because profiles throws first
+          return {};
+        }
+        if (table === "employee_commission_profiles") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            then: (r: any) => r({ data: null, error: new Error("profiles failed") }),
+          };
+        }
+        return {};
+      }),
+    };
+    await expect(
+      recalculateDeviceCommissionsForMonths(db, ["2026-04"]),
+    ).rejects.toThrow("profiles failed");
+  });
+});
