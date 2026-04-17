@@ -41,6 +41,20 @@ supabase/.temp/
 # Backup files
 *.bak
 
+# Build cache
+tsconfig.tsbuildinfo
+
+# OCR data
+*.traineddata
+
+# Temp output
+test-output.txt
+models.txt
+scripts/ocr-output*.txt
+
+# WooCommerce plugin (not part of Next.js project)
+woocommerce-gateway-upay/
+
 # Scripts
 scripts/check-stock-fn.js
 scripts/update-fn.js

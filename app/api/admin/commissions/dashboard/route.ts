@@ -2,18 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
-import { calcMonthlySummary, calcDeviceCommission, calcLoyaltyBonus, calcLineCommission, COMMISSION } from "@/lib/commissions/calculator";
+import { calcMonthlySummary, calcDeviceCommission, calcLoyaltyBonus } from "@/lib/commissions/calculator";
 import { getLastSyncInfo } from "@/lib/commissions/sync-orders";
+import {
+  getCommissionTarget,
+  resolveCommissionEmployeeFilter,
+} from "@/lib/commissions/ledger";
+
+const ALLOWED_ORIGINS = (process.env.COMMISSION_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+
+function corsHeaders(origin?: string | null): Record<string, string> {
+  if (ALLOWED_ORIGINS.length === 0) return {};
+  const allowed = (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  };
+}
 
 // OPTIONS preflight — handled by middleware OPEN_CORS_PATHS, but keep as fallback
-export async function OPTIONS() {
+export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    },
+    headers: corsHeaders(req.headers.get("origin")),
   });
 }
 
@@ -47,44 +59,106 @@ export async function GET(req: NextRequest) {
   const db = createAdminSupabase();
   if (!db) return apiError("DB unavailable", 500);
 
+  try {
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get("month") || new Date().toISOString().slice(0, 7);
-  const employeeId = searchParams.get("employee_id"); // optional: filter by employee
+  const requestedMonth = searchParams.get("month")?.trim() || null;
+  const scope = await resolveCommissionEmployeeFilter(db, {
+    employeeId: searchParams.get("employee_id"),
+    employeeName: searchParams.get("employee_name"),
+    employeeKey: searchParams.get("employee_key"),
+    employeeToken: searchParams.get("employee_token"),
+    targetKey: searchParams.get("target_key"),
+  });
 
-  const monthStart = `${month}-01`;
-  const monthEnd = `${month}-31`;
+  let month = requestedMonth;
+  if (!month) {
+    let latestSaleMonthQuery = db.from("commission_sales")
+      .select("sale_date")
+      .is("deleted_at", null)
+      .order("sale_date", { ascending: false })
+      .limit(1);
+
+    if (scope.notFound) {
+      latestSaleMonthQuery = latestSaleMonthQuery.eq("id", -1);
+    } else if (scope.employeeId) {
+      latestSaleMonthQuery = latestSaleMonthQuery.eq("employee_id", scope.employeeId);
+    } else if (scope.employeeName) {
+      latestSaleMonthQuery = latestSaleMonthQuery.eq("employee_name", scope.employeeName);
+    }
+
+    const { data: latestSales, error: latestSalesError } = await latestSaleMonthQuery;
+    if (latestSalesError) {
+      console.error("Commission dashboard latest-month error:", latestSalesError.message);
+      return apiError("فشل في تحديد الشهر الافتراضي", 500);
+    }
+
+    month = latestSales?.[0]?.sale_date?.slice(0, 7) || new Date().toISOString().slice(0, 7);
+  }
+
+  const resolvedMonth = month || new Date().toISOString().slice(0, 7);
+
+  const monthStart = `${resolvedMonth}-01`;
+  const monthEnd = `${resolvedMonth}-31`;
 
   // Build queries with optional employee filter
   let salesQuery = db.from("commission_sales")
     .select("*")
+    .is("deleted_at", null)
     .gte("sale_date", monthStart)
     .lte("sale_date", monthEnd)
-    .order("sale_date", { ascending: false });
+    .order("sale_date", { ascending: false })
+    .limit(5000);
 
   let sanctionsQuery = db.from("commission_sanctions")
     .select("*")
+    .is("deleted_at", null)
     .gte("sanction_date", monthStart)
-    .lte("sanction_date", monthEnd);
+    .lte("sanction_date", monthEnd)
+    .limit(5000);
 
-  let targetQuery = db.from("commission_targets")
+  let historicalRecentSalesQuery = db.from("commission_sales")
     .select("*")
-    .eq("month", month);
+    .is("deleted_at", null)
+    .order("sale_date", { ascending: false })
+    .limit(10);
 
-  if (employeeId) {
-    salesQuery = salesQuery.eq("employee_id", employeeId);
-    sanctionsQuery = sanctionsQuery.eq("employee_id", employeeId);
-    targetQuery = targetQuery.eq("user_id", employeeId);
+  let unassignedAutoSyncEmployeeQuery = db.from("commission_sales")
+    .select("id", { count: "exact", head: true })
+    .eq("source", "auto_sync")
+    .is("deleted_at", null)
+    .is("employee_id", null);
+
+  if (scope.notFound) {
+    salesQuery = salesQuery.eq("id", -1);
+    sanctionsQuery = sanctionsQuery.eq("id", -1);
+    historicalRecentSalesQuery = historicalRecentSalesQuery.eq("id", -1);
+    unassignedAutoSyncEmployeeQuery = unassignedAutoSyncEmployeeQuery.eq("id", -1);
+  } else if (scope.employeeId) {
+    salesQuery = salesQuery.eq("employee_id", scope.employeeId);
+    sanctionsQuery = sanctionsQuery.eq("employee_id", scope.employeeId);
+    historicalRecentSalesQuery = historicalRecentSalesQuery.eq("employee_id", scope.employeeId);
+    unassignedAutoSyncEmployeeQuery = unassignedAutoSyncEmployeeQuery.eq("employee_id", scope.employeeId);
+  } else if (scope.employeeName) {
+    salesQuery = salesQuery.eq("employee_name", scope.employeeName);
+    sanctionsQuery = sanctionsQuery.eq("employee_name", scope.employeeName);
+    historicalRecentSalesQuery = historicalRecentSalesQuery.eq("employee_name", scope.employeeName);
+    unassignedAutoSyncEmployeeQuery = unassignedAutoSyncEmployeeQuery.eq("employee_name", scope.employeeName);
   }
 
   // Fetch sales, sanctions, target in parallel
-  const [salesRes, sanctionsRes, targetRes, syncInfo] = await Promise.all([
+  const [salesRes, sanctionsRes, targetRes, syncInfo, historicalRecentSalesRes, unassignedAutoSyncEmployeeRes] = await Promise.all([
     salesQuery,
     sanctionsQuery,
-    targetQuery.maybeSingle(),
+    getCommissionTarget(db, resolvedMonth, scope.targetKeys),
     getLastSyncInfo(),
+    historicalRecentSalesQuery,
+    unassignedAutoSyncEmployeeQuery,
   ]);
 
-  if (salesRes.error) return apiError(salesRes.error.message, 500);
+  if (salesRes.error) {
+    console.error("Commission dashboard DB error:", salesRes.error.message);
+    return apiError("فشل في جلب بيانات لوحة التحكم", 500);
+  }
 
   interface SaleRow { id: number; sale_type: string; sale_date: string; commission_amount: number; device_sale_amount: number; loyalty_start_date: string | null; loyalty_status: string | null; source: string; customer_name: string | null; device_name: string | null; package_price: number; }
   interface SanctionRow { amount: number; }
@@ -92,7 +166,9 @@ export async function GET(req: NextRequest) {
 
   const sales: SaleRow[] = salesRes.data || [];
   const sanctions: SanctionRow[] = sanctionsRes.data || [];
-  const target = targetRes.data as TargetRow | null;
+  const target = targetRes as TargetRow | null;
+  const historicalRecentSales: SaleRow[] = historicalRecentSalesRes.data || [];
+  const unassignedAutoSyncEmployeeCount = unassignedAutoSyncEmployeeRes.count || 0;
 
   // Calculate device milestones from total device sales this month
   const totalDeviceSales = sales
@@ -121,7 +197,7 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // ===== Pace Tracking =====
-  const [yearStr, monthStr] = month.split("-");
+  const [yearStr, monthStr] = resolvedMonth.split("-");
   const monthYear = parseInt(yearStr);
   const monthNum = parseInt(monthStr);
   const monthStartDate = new Date(monthYear, monthNum - 1, 1);
@@ -272,9 +348,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // If viewing aggregate (no employee), also compute owner profit
+  // If viewing aggregate (no employee), also compute owner profit + employee breakdown
   let ownerProfit = null;
-  if (!employeeId) {
+  let employeeBreakdown: { name: string; lines: number; devices: number; commission: number; pct: number }[] = [];
+  if (!scope.employeeId && !scope.employeeName) {
     const totalContractCommission = sales.reduce((sum: number, s: SaleRow) => sum + ((s as any).contract_commission || s.commission_amount || 0), 0);
     const totalEmployeeCommission = sales.reduce((sum: number, s: SaleRow) => {
       if (!(s as any).employee_id) return sum;
@@ -285,6 +362,20 @@ export async function GET(req: NextRequest) {
       employeeCosts: totalEmployeeCommission,
       netProfit: totalContractCommission - totalEmployeeCommission,
     };
+
+    // Build per-employee breakdown
+    const byEmp: Record<string, { lines: number; devices: number; commission: number }> = {};
+    for (const s of sales) {
+      const name = (s as any).employee_name || "ללא שיוך";
+      if (!byEmp[name]) byEmp[name] = { lines: 0, devices: 0, commission: 0 };
+      if (s.sale_type === "line") byEmp[name].lines++;
+      else byEmp[name].devices++;
+      byEmp[name].commission += s.commission_amount || 0;
+    }
+    const totalComm = Object.values(byEmp).reduce((s, e) => s + e.commission, 0) || 1;
+    employeeBreakdown = Object.entries(byEmp)
+      .map(([name, d]) => ({ name, ...d, pct: Math.round((d.commission / totalComm) * 100) }))
+      .sort((a, b) => b.commission - a.commission);
   }
 
   return apiSuccess({
@@ -294,9 +385,16 @@ export async function GET(req: NextRequest) {
     alerts,
     syncInfo,
     recentSales: sales.slice(0, 10),
-    month,
-    employeeId: employeeId || null,
+    historicalRecentSales,
+    historicalSummary: {
+      latestSaleDate: historicalRecentSales[0]?.sale_date || null,
+      unassignedAutoSyncEmployeeCount,
+    },
+    month: resolvedMonth,
+    employeeId: scope.employeeId,
+    employeeName: scope.employeeName,
     ownerProfit,
+    employeeBreakdown,
     paceTracking,
     targetDetails: target ? {
       target_total: target.target_total || 0,
@@ -308,4 +406,8 @@ export async function GET(req: NextRequest) {
       locked_at: target.locked_at || null,
     } : null,
   });
+  } catch (err) {
+    console.error("[CommissionDashboard]", err);
+    return apiError("خطأ داخلي في لوحة التحكم", 500);
+  }
 }

@@ -142,6 +142,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("Analytics API error:", err);
-    return apiError(errMsg(err, "Unknown error"), 500);
+    return apiError("فشل في جلب التحليلات", 500);
   }
 }

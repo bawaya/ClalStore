@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
       .from("orders")
       .select("*")
       .eq("customer_id", customer.id)
-      .order("created_at", { ascending: false });
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(200);
 
     if (error) {
       console.error("Fetch customer orders error:", error);

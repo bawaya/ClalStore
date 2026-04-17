@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 // Send push to all subscribers + history
 // =====================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { csrfHeaders } from "@/lib/csrf-client";
 import { PageHeader, FormField, EmptyState } from "@/components/admin/shared";
@@ -35,9 +35,7 @@ export default function AdminPushPage() {
   const [body, setBody] = useState("");
   const [url, setUrl] = useState("https://clalmobile.com");
 
-  useEffect(() => { load(); }, []);
-
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/push/send");
@@ -45,7 +43,9 @@ export default function AdminPushPage() {
       setNotifications(json.notifications || []);
     } catch {}
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const send = async () => {
     if (!title.trim() || !body.trim()) {
@@ -57,7 +57,7 @@ export default function AdminPushPage() {
     try {
       const res = await fetch("/api/push/send", {
         method: "POST",
-        headers: csrfHeaders(),
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ title, body, url }),
       });
 

@@ -20,7 +20,6 @@ function getServiceKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
 
 // ===== Browser Client (for React components) =====

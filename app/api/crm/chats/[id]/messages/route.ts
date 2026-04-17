@@ -18,7 +18,8 @@ export async function GET(
     const messages = await getChatMessages(id);
     return apiSuccess(messages);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Chat messages GET error:", err);
+    return apiError("فشل في جلب الرسائل", 500);
   }
 }
 
@@ -44,6 +45,7 @@ export async function PUT(
     }
     return apiError("Unknown action", 400);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Chat messages PUT error:", err);
+    return apiError("فشل في تحديث المحادثة", 500);
   }
 }

@@ -2,10 +2,12 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit";
 import { generateCsrfToken, setCsrfCookie, validateCsrf } from "@/lib/csrf";
+import { getPublicSiteUrl } from "@/lib/public-site-url";
 
 const PUBLIC_API = ["/api/webhook", "/api/health", "/api/payment/callback", "/api/contact", "/api/auth", "/api/email", "/api/store", "/api/chat", "/api/reports", "/api/admin/commissions/summary"];
 const WEBHOOK_PATHS = ["/api/webhook", "/api/payment/callback"];
-const OPEN_CORS_PATHS = ["/api/admin/commissions/summary", "/api/admin/commissions/dashboard"];
+const OPEN_CORS_PATHS = ["/api/admin/commissions/summary", "/api/admin/commissions/dashboard", "/api/admin/commissions/employees/list", "/api/admin/commissions/sales"];
+const COMMISSION_ALLOWED_ORIGINS = (process.env.COMMISSION_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
 const WEBHOOK_ORIGINS = [
   "https://api.ycloud.com",
   "https://api.twilio.com",
@@ -17,19 +19,32 @@ export async function middleware(request: NextRequest) {
   // === Open CORS for token-authed API endpoints (local app sync) ===
   const isOpenCors = OPEN_CORS_PATHS.some((p) => pathname.startsWith(p));
   if (isOpenCors) {
+    const origin = request.headers.get("origin") || "";
+
+    if (COMMISSION_ALLOWED_ORIGINS.length === 0) {
+      // No origins configured — let requests through without CORS headers.
+      // Route handlers enforce their own auth (requireAdmin / bearer token).
+      // Cross-origin requests will be blocked by the browser (no CORS headers).
+      if (request.method === "OPTIONS") {
+        return new NextResponse(null, { status: 204 });
+      }
+      return NextResponse.next();
+    }
+
+    const allowedOrigin = COMMISSION_ALLOWED_ORIGINS.includes(origin) ? origin : COMMISSION_ALLOWED_ORIGINS[0];
     if (request.method === "OPTIONS") {
       return new NextResponse(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Origin": allowedOrigin,
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Authorization, Content-Type",
         },
       });
     }
-    // For GET — let the route handler run and add CORS headers
+    // Let the route handler run and add CORS headers
     const response = NextResponse.next();
-    response.headers.set("Access-Control-Allow-Origin", "*");
+    response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
     return response;
   }
 
@@ -69,6 +84,18 @@ export async function middleware(request: NextRequest) {
   } else if (pathname === "/api/contact" || pathname.startsWith("/api/email")) {
     rlConfig = { maxRequests: 5, windowMs: 300_000 };
     rlPrefix = "contact";
+  } else if (pathname.startsWith("/api/payment")) {
+    rlConfig = { maxRequests: 30, windowMs: 60_000 };
+    rlPrefix = "payment";
+  } else if (pathname.startsWith("/api/reviews")) {
+    rlConfig = { maxRequests: 10, windowMs: 60_000 };
+    rlPrefix = "reviews";
+  } else if (pathname.startsWith("/api/push")) {
+    rlConfig = { maxRequests: 10, windowMs: 60_000 };
+    rlPrefix = "push";
+  } else if (pathname.startsWith("/api/notifications")) {
+    rlConfig = { maxRequests: 15, windowMs: 60_000 };
+    rlPrefix = "notif";
   } else if (pathname === "/api/chat") {
     rlConfig = { maxRequests: 30, windowMs: 60_000 };
     rlPrefix = "chat";
@@ -132,15 +159,26 @@ export async function middleware(request: NextRequest) {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  const scriptSrcParts = [
+    "'self'",
+    "'unsafe-inline'",
+    ...(process.env.NODE_ENV !== "production" ? ["'unsafe-eval'"] : []),
+    "https://www.googletagmanager.com",
+    "https://connect.facebook.net",
+    "https://www.google-analytics.com",
+    "https://cdn.mxpnl.com",
+    "https://*.mixpanel.com",
+    "https://static.cloudflareinsights.com",
+  ];
   response.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://connect.facebook.net https://www.google-analytics.com https://cdn.mxpnl.com https://*.mixpanel.com https://static.cloudflareinsights.com",
+      `script-src ${scriptSrcParts.join(" ")}`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https: http:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.ycloud.com https://api.anthropic.com https://www.google-analytics.com https://connect.facebook.net https://*.mixpanel.com https://api-js.mixpanel.com https://static.cloudflareinsights.com https://cloudflareinsights.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.ycloud.com https://api.anthropic.com https://www.google-analytics.com https://connect.facebook.net https://www.facebook.com https://*.mixpanel.com https://api-js.mixpanel.com https://static.cloudflareinsights.com https://cloudflareinsights.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -154,7 +192,7 @@ export async function middleware(request: NextRequest) {
       const allowedOrigin = WEBHOOK_ORIGINS.includes(origin) ? origin : WEBHOOK_ORIGINS[0];
       response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
     } else {
-      const siteOrigin = process.env.NEXT_PUBLIC_APP_URL || "https://clalmobile.com";
+      const siteOrigin = getPublicSiteUrl();
       const allowedOrigin = origin === siteOrigin ? origin : siteOrigin;
       response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
     }
@@ -192,7 +230,9 @@ export async function middleware(request: NextRequest) {
 
   const isProtectedRoute =
     request.nextUrl.pathname.startsWith("/admin") ||
-    request.nextUrl.pathname.startsWith("/crm");
+    request.nextUrl.pathname.startsWith("/crm") ||
+    request.nextUrl.pathname.startsWith("/m") ||
+    request.nextUrl.pathname.startsWith("/sales-pwa");
 
   // Allow change-password page for authenticated users (must_change_password flow)
   if (request.nextUrl.pathname === "/change-password") {
@@ -206,7 +246,8 @@ export async function middleware(request: NextRequest) {
 
   const isProtectedApi =
     request.nextUrl.pathname.startsWith("/api/admin") ||
-    request.nextUrl.pathname.startsWith("/api/crm");
+    request.nextUrl.pathname.startsWith("/api/crm") ||
+    request.nextUrl.pathname.startsWith("/api/pwa");
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
 
@@ -238,14 +279,14 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/admin/:path*", "/crm/:path*", "/login", "/change-password",
-    "/api/admin/:path*", "/api/crm/:path*",
+    "/admin/:path*", "/crm/:path*", "/m/:path*", "/sales-pwa/:path*", "/login", "/change-password",
+    "/api/admin/:path*", "/api/crm/:path*", "/api/pwa/:path*",
     "/api/webhook/:path*", "/api/health", "/api/payment/callback",
     "/api/contact", "/api/auth/:path*", "/api/email/:path*", "/api/store/:path*",
     "/api/chat", "/api/reports/:path*", "/api/cron/:path*",
     "/api/push/:path*", "/api/orders", "/api/payment",
     "/api/coupons/:path*", "/api/customer/:path*",
     "/api/reviews/:path*", "/api/cart/:path*", "/api/notifications/:path*",
-    "/api/csrf",
+    "/api/csrf", "/api/settings/:path*",
   ],
 };

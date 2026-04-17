@@ -64,11 +64,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return apiSuccess({
+    const res = apiSuccess({
       products,
       brands: [...brandSet],
       categories,
     });
+    res.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=30");
+    return res;
   } catch (err) {
     console.error("Autocomplete error:", err);
     return apiSuccess({ products: [], brands: [], categories: [] });

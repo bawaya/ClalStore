@@ -22,7 +22,7 @@ export interface CompareProduct {
   image_url?: string;
   specs: Record<string, string>;
   stock: number;
-  colors: any[];
+  colors: { hex: string; name_ar: string; name_he: string; image?: string }[];
   storage_options: string[];
 }
 

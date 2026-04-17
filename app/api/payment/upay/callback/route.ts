@@ -8,10 +8,39 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { getPublicSiteUrl } from "@/lib/public-site-url";
+
+async function buildSuccessRedirect(
+  appUrl: string,
+  orderId: string,
+  value?: number,
+) {
+  const params = new URLSearchParams({ order: orderId });
+
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    params.set("value", String(value));
+  }
+
+  const supabase = createAdminSupabase();
+  if (supabase) {
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, customers(customer_code)")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    const customerCode = (order?.customers as { customer_code?: string } | null)?.customer_code;
+    if (customerCode) {
+      params.set("customer_code", customerCode);
+    }
+  }
+
+  return `${appUrl}/store/checkout/success?${params.toString()}`;
+}
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+  const appUrl = getPublicSiteUrl();
 
   const orderId = params.get("order_id");
   const transactionId = params.get("transactionid");
@@ -41,9 +70,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (existingOrder.payment_status === "paid") {
-      return NextResponse.redirect(
-        `${appUrl}/store/checkout/success?order=${orderId}`
-      );
+      return NextResponse.redirect(await buildSuccessRedirect(appUrl, orderId));
     }
 
     if (errorMessage) {
@@ -210,9 +237,7 @@ export async function GET(req: NextRequest) {
       console.error("[UPay] Notification error for order:", orderId);
     }
 
-    return NextResponse.redirect(
-      `${appUrl}/store/checkout/success?order=${orderId}&value=${parsedAmount}`
-    );
+    return NextResponse.redirect(await buildSuccessRedirect(appUrl, orderId, parsedAmount));
   } catch {
     console.error("[UPay Callback] Internal error for order:", orderId);
     return NextResponse.redirect(

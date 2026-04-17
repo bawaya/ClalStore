@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ photos, total: data.total_results || 0 });
   } catch (err: unknown) {
-    return apiError(errMsg(err, "فشل في البحث"), 500);
+    console.error("Pexels search error:", err);
+    return apiError("فشل في البحث", 500);
   }
 }

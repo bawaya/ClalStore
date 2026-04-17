@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -26,13 +25,13 @@ export async function GET(req: NextRequest) {
     }
 
     const { data, error } = await query;
-    if (error) return apiError(error.message, 500);
+    if (error) { console.error("Notifications GET error:", error); return apiError("فشل في جلب الإشعارات", 500); }
 
     const unreadCount = (data ?? []).filter((n: { read: boolean }) => !n.read).length;
     return apiSuccess({ notifications: data ?? [], unreadCount });
   } catch (err: unknown) {
-    console.error("[Notifications GET]", err);
-    return apiError("Failed to load notifications");
+    console.error("Notifications GET error:", err);
+    return apiError("فشل في جلب الإشعارات", 500);
   }
 }
 
@@ -63,11 +62,11 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (error) return apiError(error.message, 500);
+    if (error) { console.error("Notifications POST error:", error); return apiError("فشل في إنشاء الإشعار", 500); }
     return apiSuccess(data);
   } catch (err: unknown) {
-    console.error("[Notifications POST]", err);
-    return apiError("Failed to create notification");
+    console.error("Notifications POST error:", err);
+    return apiError("فشل في إنشاء الإشعار", 500);
   }
 }
 
@@ -88,7 +87,7 @@ export async function PATCH(req: NextRequest) {
         .or(`user_id.eq.${body.user_id},user_id.is.null`)
         .eq("read", false);
 
-      if (error) return apiError(error.message, 500);
+      if (error) { console.error("Notifications mark_all error:", error); return apiError("فشل في تحديث الإشعارات", 500); }
       return apiSuccess(null);
     }
 
@@ -98,13 +97,13 @@ export async function PATCH(req: NextRequest) {
         .update({ read: true })
         .eq("id", body.id);
 
-      if (error) return apiError(error.message, 500);
+      if (error) { console.error("Notifications read error:", error); return apiError("فشل في تحديث الإشعار", 500); }
       return apiSuccess(null);
     }
 
     return apiError("Provide id or { user_id, mark_all: true }", 400);
   } catch (err: unknown) {
-    console.error("[Notifications PATCH]", err);
-    return apiError("Failed to update notifications");
+    console.error("Notifications PATCH error:", err);
+    return apiError("فشل في تحديث الإشعارات", 500);
   }
 }

@@ -30,10 +30,28 @@ export type Database = {
         Update: Partial<Omit<OrderNote, "id">>;
         Relationships: [];
       };
+      order_status_history: {
+        Row: OrderStatusHistory;
+        Insert: Omit<OrderStatusHistory, "id" | "created_at">;
+        Update: Partial<Omit<OrderStatusHistory, "id">>;
+        Relationships: [];
+      };
       customers: {
         Row: Customer;
         Insert: Omit<Customer, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Customer, "id">>;
+        Relationships: [];
+      };
+      customer_notes: {
+        Row: CustomerNote;
+        Insert: Omit<CustomerNote, "id" | "created_at">;
+        Update: Partial<Omit<CustomerNote, "id">>;
+        Relationships: [];
+      };
+      customer_hot_accounts: {
+        Row: CustomerHotAccount;
+        Insert: Omit<CustomerHotAccount, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<CustomerHotAccount, "id">>;
         Relationships: [];
       };
       coupons: {
@@ -88,6 +106,12 @@ export type Database = {
         Row: PipelineDeal;
         Insert: Omit<PipelineDeal, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<PipelineDeal, "id">>;
+        Relationships: [];
+      };
+      pipeline_stages: {
+        Row: PipelineStage;
+        Insert: Omit<PipelineStage, "id" | "created_at">;
+        Update: Partial<Omit<PipelineStage, "id">>;
         Relationships: [];
       };
       audit_log: {
@@ -198,6 +222,72 @@ export type Database = {
         Update: Partial<Omit<LoyaltyTransaction, "id">>;
         Relationships: [];
       };
+      commission_sales: {
+        Row: CommissionSale;
+        Insert: Omit<CommissionSale, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<CommissionSale, "id">>;
+        Relationships: [];
+      };
+      commission_targets: {
+        Row: CommissionTarget;
+        Insert: Omit<CommissionTarget, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<CommissionTarget, "id">>;
+        Relationships: [];
+      };
+      commission_sanctions: {
+        Row: CommissionSanction;
+        Insert: Omit<CommissionSanction, "id" | "created_at">;
+        Update: Partial<Omit<CommissionSanction, "id">>;
+        Relationships: [];
+      };
+      commission_sync_log: {
+        Row: CommissionSyncLog;
+        Insert: Omit<CommissionSyncLog, "id" | "sync_date">;
+        Update: Partial<Omit<CommissionSyncLog, "id">>;
+        Relationships: [];
+      };
+      employee_commission_profiles: {
+        Row: EmployeeCommissionProfile;
+        Insert: Omit<EmployeeCommissionProfile, "created_at" | "updated_at">;
+        Update: Partial<Omit<EmployeeCommissionProfile, "user_id">>;
+        Relationships: [];
+      };
+      commission_employees: {
+        Row: CommissionEmployee;
+        Insert: Omit<CommissionEmployee, "id" | "created_at" | "updated_at" | "token"> & { token?: string };
+        Update: Partial<Omit<CommissionEmployee, "id">>;
+        Relationships: [];
+      };
+      sales_docs: {
+        Row: SalesDoc;
+        Insert: Omit<SalesDoc, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<SalesDoc, "id">>;
+        Relationships: [];
+      };
+      sales_doc_items: {
+        Row: SalesDocItem;
+        Insert: Omit<SalesDocItem, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<SalesDocItem, "id">>;
+        Relationships: [];
+      };
+      sales_doc_attachments: {
+        Row: SalesDocAttachment;
+        Insert: Omit<SalesDocAttachment, "id" | "created_at">;
+        Update: Partial<Omit<SalesDocAttachment, "id">>;
+        Relationships: [];
+      };
+      sales_doc_events: {
+        Row: SalesDocEvent;
+        Insert: Omit<SalesDocEvent, "id" | "created_at">;
+        Update: Partial<Omit<SalesDocEvent, "id">>;
+        Relationships: [];
+      };
+      sales_doc_sync_queue: {
+        Row: SalesDocSyncQueue;
+        Insert: Omit<SalesDocSyncQueue, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<SalesDocSyncQueue, "id">>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -231,6 +321,7 @@ export type Product = {
   category_id?: string;
   active: boolean;
   featured: boolean;
+  sort_position?: number;
   created_at: string;
   updated_at: string;
 }
@@ -281,6 +372,10 @@ export type Order = {
   customer_notes?: string;
   internal_notes?: string;
   assigned_to?: string;    // user_id
+  created_by_id?: string;
+  created_by_name?: string;
+  deal_id?: string;
+  commission_synced?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -307,10 +402,22 @@ export type OrderNote = {
   created_at: string;
 }
 
+export type OrderStatusHistory = {
+  id: string;
+  order_id: string;
+  old_status?: string;
+  new_status: string;
+  changed_by_id?: string;
+  changed_by_name?: string;
+  notes?: string;
+  created_at: string;
+}
+
 export type Customer = {
   id: string;
   name: string;
   phone: string;
+  customer_code?: string;
   email?: string;
   city?: string;
   address?: string;
@@ -322,10 +429,49 @@ export type Customer = {
   segment: string;         // CustomerSegment
   birthday?: string;
   tags: string[];
+  source?: string;
+  assigned_to?: string;
+  created_by_id?: string;
+  created_by_name?: string;
+  gender?: string;
+  preferred_language?: string;
+  notes?: string;
   auth_token?: string;
+  auth_token_expires_at?: string;
   last_login?: string;
   created_at: string;
   updated_at: string;
+}
+
+export type CustomerHotAccount = {
+  id: string;
+  customer_id: string;
+  hot_mobile_id?: string;
+  hot_customer_code?: string;
+  line_phone?: string;
+  label?: string;
+  status: "pending" | "verified" | "active" | "inactive" | "conflict" | "transferred";
+  is_primary: boolean;
+  source: string;
+  source_order_id?: string;
+  verified_at?: string;
+  verified_by_id?: string;
+  verified_by_name?: string;
+  notes?: string;
+  created_by_id?: string;
+  created_by_name?: string;
+  ended_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CustomerNote = {
+  id: string;
+  customer_id: string;
+  user_id?: string;
+  user_name: string;
+  text: string;
+  created_at: string;
 }
 
 export type Coupon = {
@@ -442,25 +588,51 @@ export type Task = {
 export type PipelineDeal = {
   id: string;
   customer_id?: string;
-  customer_name?: string;
+  customer_name: string;
+  customer_phone?: string;
+  customer_email?: string;
   product_summary?: string;
+  product_name?: string;
+  product_id?: string;
   value: number;
-  stage: string;           // PipelineStage
+  estimated_value?: number;
+  stage: string;           // legacy stage mirror
+  stage_id?: number;
   source: string;          // OrderSource
   assigned_to?: string;    // user_id
+  employee_id?: string;
+  employee_name?: string;
   notes?: string;
+  order_id?: string;
+  converted_at?: string;
+  lost_reason?: string;
   created_at: string;
   updated_at: string;
+}
+
+export type PipelineStage = {
+  id: number;
+  name: string;
+  name_he: string;
+  name_ar?: string;
+  sort_order: number;
+  color?: string;
+  is_won?: boolean;
+  is_lost?: boolean;
+  created_at: string;
 }
 
 export type AuditEntry = {
   id: string;
   user_id?: string;
   user_name: string;
+  user_role?: string;
   action: string;
+  module?: string;
   entity_type: string;     // "order", "product", "customer", etc
   entity_id?: string;
   details?: Record<string, any>;
+  ip_address?: string;
   created_at: string;
 }
 
@@ -781,4 +953,179 @@ export type LoyaltyTransaction = {
   description: string | null;
   order_id: string | null;
   created_at: string;
+}
+
+export type CommissionSale = {
+  id: number;
+  user_id?: string | null;
+  sale_date: string;
+  sale_type: "line" | "device";
+  source: "manual" | "auto_sync" | "csv_import";
+  order_id?: string | null;
+  customer_id?: string | null;
+  customer_hot_account_id?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  hot_mobile_id_snapshot?: string | null;
+  store_customer_code_snapshot?: string | null;
+  match_status?: "pending" | "matched" | "ambiguous" | "unmatched" | "conflict" | "manual" | null;
+  match_method?: string | null;
+  match_confidence?: number | null;
+  package_price: number;
+  multiplier?: number;
+  has_valid_hk: boolean;
+  loyalty_status?: "pending" | "active" | "churned" | "cancelled" | null;
+  loyalty_start_date?: string | null;
+  device_name?: string | null;
+  device_sale_amount: number;
+  commission_amount: number;
+  contract_commission?: number;
+  employee_id?: string | null;
+  employee_name?: string | null;
+  notes?: string | null;
+  deleted_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CommissionTarget = {
+  id: number;
+  user_id?: string | null;
+  month: string;
+  target_lines_amount: number;
+  target_devices_amount: number;
+  target_total: number;
+  target_lines_count?: number;
+  target_devices_count?: number;
+  is_locked?: boolean;
+  locked_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CommissionSanction = {
+  id: number;
+  user_id?: string | null;
+  employee_id?: string | null;
+  sanction_date: string;
+  sanction_type: string;
+  amount: number;
+  has_sale_offset?: boolean;
+  description?: string | null;
+  deleted_at?: string | null;
+  created_at: string;
+}
+
+export type CommissionSyncLog = {
+  id: number;
+  sync_date: string;
+  orders_synced: number;
+  orders_skipped: number;
+  total_amount: number;
+  status: string;
+  error_message?: string | null;
+}
+
+export type EmployeeCommissionProfile = {
+  user_id: string;
+  line_multiplier: number;
+  device_rate: number;
+  device_milestone_bonus: number;
+  min_package_price: number;
+  loyalty_bonuses: Record<string, number>;
+  notes?: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CommissionEmployee = {
+  id: number;
+  name: string;
+  phone?: string | null;
+  token: string;
+  role?: string | null;
+  active: boolean;
+  notes?: string | null;
+  user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SalesDoc = {
+  id: number;
+  doc_uuid: string;
+  employee_user_id?: string | null;
+  employee_key: string;
+  customer_id?: string | null;
+  order_id?: string | null;
+  sale_type: "line" | "device" | "mixed";
+  status: "draft" | "submitted" | "verified" | "rejected" | "synced_to_commissions";
+  sale_date?: string | null;
+  total_amount: number;
+  currency: string;
+  source: string;
+  created_by: string;
+  submitted_at?: string | null;
+  verified_at?: string | null;
+  rejected_at?: string | null;
+  synced_at?: string | null;
+  rejection_reason?: string | null;
+  notes?: string | null;
+  device_client_id?: string | null;
+  idempotency_key?: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+export type SalesDocItem = {
+  id: number;
+  sales_doc_id: number;
+  item_type: "line" | "device" | "accessory";
+  product_id?: string | null;
+  product_name?: string | null;
+  qty: number;
+  unit_price: number;
+  line_total: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+export type SalesDocAttachment = {
+  id: number;
+  sales_doc_id: number;
+  attachment_type: string;
+  file_path: string;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  sha256?: string | null;
+  uploaded_by: string;
+  created_at: string;
+  deleted_at?: string | null;
+}
+
+export type SalesDocEvent = {
+  id: number;
+  sales_doc_id: number;
+  event_type: string;
+  actor_user_id?: string | null;
+  actor_role?: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export type SalesDocSyncQueue = {
+  id: number;
+  sales_doc_id: number;
+  sync_target: string;
+  status: "pending" | "processing" | "done" | "failed";
+  attempts: number;
+  last_error?: string | null;
+  next_retry_at?: string | null;
+  created_at: string;
+  updated_at: string;
 }

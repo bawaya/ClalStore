@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     const result = await sendWhatsAppText(to, text);
     return apiSuccess({ ok: true, mode: "text", result, diagnostics });
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("WhatsApp test error:", err);
+    return apiError("فشل في اختبار WhatsApp", 500);
   }
 }

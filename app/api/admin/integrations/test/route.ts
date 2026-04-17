@@ -1,4 +1,3 @@
-
 // =====================================================
 // ClalMobile — Integration Test API
 // POST: Test integration connection by type
@@ -8,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getIntegrations } from "@/lib/admin/queries";
 import { requireAdmin } from "@/lib/admin/auth";
-import { apiSuccess, apiError, errMsg, errDetail } from "@/lib/api-response";
+import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 
 const MASK = "••••••••";
 
@@ -62,41 +61,26 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       }
       return { ok: false, message: data.error_message || `Rivhit error: ${data.error_code || "unknown"}` };
     } catch (err: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
     }
   },
 
-  // ===== Email — Resend (primary) or SendGrid (fallback) =====
+  // ===== Email — SendGrid =====
   email: async (cfg) => {
     const apiKey = cfg.api_key;
-    if (!apiKey) return { ok: false, message: "مفتاح API مفقود" };
-
-    // Detect provider: Resend keys start with "re_", SendGrid keys start with "SG."
-    const isResend = apiKey.startsWith("re_");
-    const isSendGrid = apiKey.startsWith("SG.");
+    if (!apiKey) return { ok: false, message: "مفتاح SendGrid API مفقود" };
 
     try {
-      if (isResend) {
-        const res = await fetch("https://api.resend.com/domains", {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(10000),
-        });
-        if (res.ok) return { ok: true, message: "✅ Resend متصل بنجاح" };
-        if (res.status === 401) return { ok: false, message: "مفتاح Resend API غير صالح" };
-        return { ok: false, message: `Resend responded with ${res.status}` };
-      } else if (isSendGrid) {
-        const res = await fetch("https://api.sendgrid.com/v3/user/profile", {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(10000),
-        });
-        if (res.ok) return { ok: true, message: "✅ SendGrid متصل بنجاح" };
-        if (res.status === 401) return { ok: false, message: "مفتاح SendGrid API غير صالح" };
-        return { ok: false, message: `SendGrid responded with ${res.status}` };
-      } else {
-        return { ok: false, message: "مفتاح API غير معروف — يجب أن يبدأ بـ re_ (Resend) أو SG. (SendGrid)" };
-      }
+      // Light validate: check API key by fetching user profile
+      const res = await fetch("https://api.sendgrid.com/v3/user/profile", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) return { ok: true, message: "✅ SendGrid متصل بنجاح" };
+      if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
+      return { ok: false, message: `SendGrid responded with ${res.status}` };
     } catch (err: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
     }
   },
 
@@ -115,7 +99,7 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
       return { ok: false, message: `yCloud responded with ${res.status}` };
     } catch (err: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
     }
   },
 
@@ -156,7 +140,7 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
       }
       return { ok: false, message: `Twilio responded with ${res.status}` };
     } catch (err: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errDetail(err, "Unknown error")}` };
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(err, "Unknown error")}` };
     }
   },
 
@@ -170,17 +154,6 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
   analytics: async (cfg) => {
     if (!cfg.tracking_id && !cfg.api_key) return { ok: false, message: "معرف التتبع مفقود" };
     return { ok: true, message: "✅ بيانات التحليلات محفوظة" };
-  },
-
-  // ===== AI =====
-  ai_chat: async (cfg) => {
-    if (!cfg.api_key) return { ok: false, message: "مفتاح API مفقود" };
-    return { ok: true, message: "✅ تم حفظ مفتاح الذكاء الاصطناعي (يتم فحص أدائه حياً من الشات)" };
-  },
-
-  ai_admin: async (cfg) => {
-    if (!cfg.api_key) return { ok: false, message: "مفتاح API مفقود" };
-    return { ok: true, message: "✅ تم التفعيل (ذكاء الآدمن)" };
   },
 };
 
@@ -205,6 +178,7 @@ export async function POST(req: NextRequest) {
     const result = await testFn(resolvedConfig);
     return apiSuccess(result);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"), 500);
+    console.error("Integration test error:", err);
+    return apiError("فشل في اختبار التكامل", 500);
   }
 }

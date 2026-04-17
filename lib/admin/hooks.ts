@@ -194,7 +194,7 @@ export function useAdminSettings() {
     }
   };
 
-  const updateIntegration = async (id: string, updates: any) => {
+  const updateIntegration = async (id: string, updates: Record<string, unknown>) => {
     setError("");
     try {
       const res = await fetch("/api/admin/settings", {

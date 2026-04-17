@@ -7,6 +7,7 @@ import { useScreen, useToast } from "@/lib/hooks";
 import { TASK_PRIORITY } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import { Modal, FormField, PageHeader, EmptyState, ConfirmDialog } from "@/components/admin/shared";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const STATUS_MAP: Record<string, { icon: string; label: string; color: string }> = {
   open: { icon: "🔵", label: "مفتوحة", color: "#3b82f6" },
@@ -49,10 +50,10 @@ export default function TasksPage() {
       if (!payload.due_date) delete payload.due_date;
       if (editId) {
         const { id: _id, customers: _customers, orders: _orders, created_at: _created_at, updated_at: _updated_at, ...updates } = payload;
-        await fetch("/api/crm/tasks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...updates }) });
+        await fetch("/api/crm/tasks", { method: "PUT", headers: csrfHeaders(), body: JSON.stringify({ id: editId, ...updates }) });
         show("✅ تم التعديل");
       } else {
-        await fetch("/api/crm/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        await fetch("/api/crm/tasks", { method: "POST", headers: csrfHeaders(), body: JSON.stringify(payload) });
         show("✅ تم الإضافة");
       }
       setModal(false); fetchTasks();
@@ -61,15 +62,25 @@ export default function TasksPage() {
 
   const toggleStatus = async (task: any) => {
     const next = task.status === "open" ? "in_progress" : task.status === "in_progress" ? "done" : "open";
-    await fetch("/api/crm/tasks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: task.id, status: next }) });
-    show(`${STATUS_MAP[next].icon} ${STATUS_MAP[next].label}`);
-    fetchTasks();
+    try {
+      const res = await fetch("/api/crm/tasks", { method: "PUT", headers: csrfHeaders(), body: JSON.stringify({ id: task.id, status: next }) });
+      if (!res.ok) throw new Error();
+      show(`${STATUS_MAP[next].icon} ${STATUS_MAP[next].label}`);
+      fetchTasks();
+    } catch {
+      show("❌ خطأ في تحديث الحالة", "error");
+    }
   };
 
   const handleDelete = async () => {
     if (!confirm) return;
-    await fetch(`/api/crm/tasks?id=${confirm}`, { method: "DELETE" });
-    show("🗑️ تم"); setConfirm(null); fetchTasks();
+    try {
+      const res = await fetch(`/api/crm/tasks?id=${confirm}`, { method: "DELETE", headers: csrfHeaders() });
+      if (!res.ok) throw new Error();
+      show("🗑️ تم"); setConfirm(null); fetchTasks();
+    } catch {
+      show("❌ خطأ في الحذف", "error");
+    }
   };
 
   const filtered = statusFilter === "all" ? tasks : tasks.filter((t) => t.status === statusFilter);

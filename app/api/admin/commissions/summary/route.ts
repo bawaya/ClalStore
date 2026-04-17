@@ -7,20 +7,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { calcDeviceCommission, calcLoyaltyBonus } from "@/lib/commissions/calculator";
 import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  getCommissionTarget,
+  resolveCommissionEmployeeFilter,
+} from "@/lib/commissions/ledger";
 
 const RATE_LIMIT = { maxRequests: 60, windowMs: 3600_000 }; // 60/hour
 
-function corsHeaders() {
+const ALLOWED_ORIGINS = (process.env.COMMISSION_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+
+function corsHeaders(origin?: string | null): Record<string, string> {
+  if (ALLOWED_ORIGINS.length === 0) return {};
+  const allowed = (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
   return {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
   };
 }
 
 // CORS preflight
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(req.headers.get("origin")) });
 }
 
 export async function GET(req: NextRequest) {
@@ -47,15 +55,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "DB unavailable" }, { status: 500, headers: corsHeaders() });
   }
 
+  try {
   const month = req.nextUrl.searchParams.get("month") || new Date().toISOString().slice(0, 7);
+  const scope = await resolveCommissionEmployeeFilter(db, {
+    employeeToken: req.nextUrl.searchParams.get("employee_token"),
+    employeeId: req.nextUrl.searchParams.get("employee_id"),
+    employeeName: req.nextUrl.searchParams.get("employee_name"),
+    employeeKey: req.nextUrl.searchParams.get("employee_key"),
+    targetKey: req.nextUrl.searchParams.get("target_key"),
+  });
   const monthStart = `${month}-01`;
   const monthEnd = `${month}-31`;
 
+  if (scope.notFound && req.nextUrl.searchParams.get("employee_token")) {
+    return NextResponse.json({ error: "Invalid employee token" }, { status: 403, headers: corsHeaders() });
+  }
+
+  // Build queries with optional employee filter
+  let salesQ = db.from("commission_sales").select("*").is("deleted_at", null).gte("sale_date", monthStart).lte("sale_date", monthEnd).limit(5000);
+  let sanctionsQ = db.from("commission_sanctions").select("*").is("deleted_at", null).gte("sanction_date", monthStart).lte("sanction_date", monthEnd).limit(5000);
+
+  if (scope.notFound) {
+    salesQ = salesQ.eq("id", -1);
+    sanctionsQ = sanctionsQ.eq("id", -1);
+  } else if (scope.employeeId) {
+    salesQ = salesQ.eq("employee_id", scope.employeeId);
+    sanctionsQ = sanctionsQ.eq("employee_id", scope.employeeId);
+  } else if (scope.employeeName) {
+    salesQ = salesQ.eq("employee_name", scope.employeeName);
+    sanctionsQ = sanctionsQ.eq("employee_name", scope.employeeName);
+  }
+
   // Parallel queries
   const [salesRes, sanctionsRes, targetRes] = await Promise.all([
-    db.from("commission_sales").select("*").gte("sale_date", monthStart).lte("sale_date", monthEnd),
-    db.from("commission_sanctions").select("*").gte("sanction_date", monthStart).lte("sanction_date", monthEnd),
-    db.from("commission_targets").select("*").eq("month", month).maybeSingle(),
+    salesQ,
+    sanctionsQ,
+    getCommissionTarget(db, month, scope.targetKeys),
   ]);
 
   interface SaleRow { sale_type: string; sale_date: string; commission_amount: number; device_sale_amount: number; loyalty_start_date: string | null; loyalty_status: string | null; }
@@ -64,7 +99,7 @@ export async function GET(req: NextRequest) {
 
   const sales: SaleRow[] = salesRes.data || [];
   const sanctions: SanctionRow[] = sanctionsRes.data || [];
-  const target = targetRes.data as TargetRow | null;
+  const target = targetRes as TargetRow | null;
 
   // Aggregate
   const linesSales = sales.filter((s: SaleRow) => s.sale_type === "line");
@@ -85,7 +120,8 @@ export async function GET(req: NextRequest) {
     return sum + lb.earnedSoFar;
   }, 0);
 
-  const netCommission = linesCommission + deviceCalc.total + loyaltyBonus - sanctionsTotal;
+  const devicesCommission = devicesSales.reduce((sum: number, s: SaleRow) => sum + (s.commission_amount || 0), 0);
+  const netCommission = linesCommission + devicesCommission + loyaltyBonus - sanctionsTotal;
   const targetTotal = target?.target_total || 0;
   const targetProgress = targetTotal > 0 ? Math.min(100, Math.round((netCommission / targetTotal) * 100)) : 0;
 
@@ -98,12 +134,31 @@ export async function GET(req: NextRequest) {
     else salesByDay[day].devices += s.device_sale_amount || 0;
   }
 
+  // Employee breakdown (only in aggregate / admin view)
+  let employee_breakdown: { name: string; lines: number; devices: number; commission: number; pct: number }[] | undefined;
+  if (!scope.employeeId && !scope.employeeName) {
+    const byEmp: Record<string, { lines: number; devices: number; commission: number }> = {};
+    for (const s of sales) {
+      const name = (s as any).employee_name || "ללא שיוך";
+      if (!byEmp[name]) byEmp[name] = { lines: 0, devices: 0, commission: 0 };
+      if (s.sale_type === "line") byEmp[name].lines++;
+      else byEmp[name].devices++;
+      byEmp[name].commission += s.commission_amount || 0;
+    }
+    const total = Object.values(byEmp).reduce((s, e) => s + e.commission, 0) || 1;
+    employee_breakdown = Object.entries(byEmp)
+      .map(([name, d]) => ({ name, ...d, pct: Math.round((d.commission / total) * 100) }))
+      .sort((a, b) => b.commission - a.commission);
+  }
+
   const body = {
     month,
+    employee_id: scope.employeeId,
+    employee_name: scope.employeeName,
     lines_count: linesCount,
     lines_commission: linesCommission,
     device_sales: totalDeviceSalesAmount,
-    devices_commission: deviceCalc.total,
+    devices_commission: devicesCommission,
     devices_milestones: deviceCalc.milestoneCount,
     devices_milestone_bonus: deviceCalc.milestoneBonus,
     sanctions_total: sanctionsTotal,
@@ -115,8 +170,13 @@ export async function GET(req: NextRequest) {
     target_progress: targetProgress,
     is_locked: target?.is_locked || false,
     sales_by_day: salesByDay,
+    employee_breakdown,
     last_updated: new Date().toISOString(),
   };
 
   return NextResponse.json(body, { status: 200, headers: corsHeaders() });
+  } catch (err) {
+    console.error("[CommissionSummary]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: corsHeaders() });
+  }
 }

@@ -65,13 +65,11 @@ export async function callClaude(req: ClaudeRequest): Promise<ClaudeResponse | n
     const text = data.content?.[0]?.text || "";
     const duration = Date.now() - start;
 
-    // Token tracking
+    // Token tracking (debug only)
     const tokens = {
       input: data.usage?.input_tokens || 0,
       output: data.usage?.output_tokens || 0,
     };
-
-    console.log(`[AI] Claude: ${tokens.input}+${tokens.output} tokens, ${duration}ms`);
 
     // Parse JSON if requested
     let json: Record<string, unknown> | undefined;

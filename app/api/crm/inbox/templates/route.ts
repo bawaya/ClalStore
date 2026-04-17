@@ -4,12 +4,16 @@
 // GET/POST/PUT/DELETE /api/crm/inbox/templates
 // =====================================================
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
@@ -35,10 +39,12 @@ export async function GET(req: NextRequest) {
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
 
-    return apiSuccess({
+    const res = apiSuccess({
       templates: templates || [],
       quick_replies: quick_replies || [],
     });
+    res.headers.set("Cache-Control", "private, s-maxage=300, stale-while-revalidate=60");
+    return res;
   } catch {
     return apiError("خطأ في السيرفر", 500);
   }
@@ -46,6 +52,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
@@ -67,7 +76,7 @@ export async function POST(req: NextRequest) {
         } as any)
         .select("*")
         .single();
-      if (error) return apiError(error.message, 500);
+      if (error) { console.error("Template quick_reply insert error:", error); return apiError("فشل في إنشاء الرد السريع", 500); }
       return apiSuccess({ quick_reply: data });
     }
 
@@ -82,7 +91,7 @@ export async function POST(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error) return apiError(error.message, 500);
+    if (error) { console.error("Template insert error:", error); return apiError("فشل في إنشاء القالب", 500); }
     return apiSuccess({ template: data });
   } catch {
     return apiError("خطأ في السيرفر", 500);
@@ -91,6 +100,9 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
@@ -104,7 +116,8 @@ export async function PUT(req: NextRequest) {
       if (content !== undefined) updates.content = content;
       if (category !== undefined) updates.category = category;
       if (is_active !== undefined) updates.is_active = is_active;
-      await supabase.from("inbox_quick_replies").update(updates).eq("id", id);
+      const { error } = await supabase.from("inbox_quick_replies").update(updates).eq("id", id);
+      if (error) { console.error("Quick reply update error:", error); return apiError("فشل في تحديث الرد السريع", 500); }
       return apiSuccess({ ok: true });
     }
 
@@ -115,7 +128,8 @@ export async function PUT(req: NextRequest) {
     if (variables !== undefined) updates.variables = variables;
     if (is_active !== undefined) updates.is_active = is_active;
 
-    await supabase.from("inbox_templates").update(updates).eq("id", id);
+    const { error } = await supabase.from("inbox_templates").update(updates).eq("id", id);
+    if (error) { console.error("Template update error:", error); return apiError("فشل في تحديث القالب", 500); }
     return apiSuccess({ ok: true });
   } catch {
     return apiError("خطأ في السيرفر", 500);
@@ -124,6 +138,9 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (auth instanceof NextResponse) return auth;
+
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
@@ -133,9 +150,11 @@ export async function DELETE(req: NextRequest) {
     if (!id) return apiError("ID مطلوب", 400);
 
     if (type === "quick_reply") {
-      await supabase.from("inbox_quick_replies").delete().eq("id", id);
+      const { error } = await supabase.from("inbox_quick_replies").delete().eq("id", id);
+      if (error) { console.error("Quick reply delete error:", error); return apiError("فشل في حذف الرد السريع", 500); }
     } else {
-      await supabase.from("inbox_templates").delete().eq("id", id);
+      const { error } = await supabase.from("inbox_templates").delete().eq("id", id);
+      if (error) { console.error("Template delete error:", error); return apiError("فشل في حذف القالب", 500); }
     }
 
     return apiSuccess({ ok: true });

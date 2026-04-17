@@ -8,10 +8,11 @@ export const dynamic = 'force-dynamic';
 // Generate realistic AI reviews with Arab + Jewish Israeli names
 // =====================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { PageHeader, Modal, FormField, EmptyState, ConfirmDialog } from "@/components/admin/shared";
 import type { Product } from "@/types/database";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface Review {
   id: string;
@@ -52,17 +53,15 @@ export default function AdminReviewsPage() {
   const [manualDist, setManualDist] = useState(false);
   const [dist, setDist] = useState({ star5: 6, star4: 3, star3: 1, star2: 0, star1: 0 });
 
-  useEffect(() => { load(); loadProducts(); }, []);
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/products");
       const json = await res.json();
       setProducts(json.products || json.data || []);
     } catch {}
-  };
+  }, []);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/reviews?admin=true");
@@ -70,13 +69,15 @@ export default function AdminReviewsPage() {
       setReviews(json.reviews || []);
     } catch {}
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => { load(); loadProducts(); }, [load, loadProducts]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
       const res = await fetch("/api/reviews", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ id, status }),
       });
       if (!res.ok) throw new Error();
@@ -92,7 +93,7 @@ export default function AdminReviewsPage() {
     try {
       const res = await fetch("/api/reviews", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ id: replyReview.id, admin_reply: replyText }),
       });
       if (!res.ok) throw new Error();
@@ -108,7 +109,7 @@ export default function AdminReviewsPage() {
   const handleDelete = async () => {
     if (!deleteReview) return;
     try {
-      await fetch(`/api/reviews?id=${deleteReview.id}`, { method: "DELETE" });
+      await fetch(`/api/reviews?id=${deleteReview.id}`, { method: "DELETE", headers: csrfHeaders() });
       show("🗑️ تم الحذف");
       setDeleteReview(null);
       load();
@@ -126,7 +127,7 @@ export default function AdminReviewsPage() {
       if (manualDist) payload.distribution = dist;
       const res = await fetch("/api/admin/reviews/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -144,7 +145,7 @@ export default function AdminReviewsPage() {
     try {
       const productReviews = reviews.filter(r => r.product_id === productId);
       for (const r of productReviews) {
-        await fetch(`/api/reviews?id=${r.id}`, { method: "DELETE" });
+        await fetch(`/api/reviews?id=${r.id}`, { method: "DELETE", headers: csrfHeaders() });
       }
       show(`🗑️ تم حذف ${productReviews.length} تقييم`);
       load();

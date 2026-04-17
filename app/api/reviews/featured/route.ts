@@ -34,7 +34,9 @@ export async function GET() {
       product_name: productMap[r.product_id]?.name_ar || productMap[r.product_id]?.name_he || "منتج",
     }));
 
-    return apiSuccess({ reviews: enriched });
+    const res = apiSuccess({ reviews: enriched });
+    res.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
+    return res;
   } catch {
     return apiSuccess({ reviews: [] });
   }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useScreen, useToast } from "@/lib/hooks";
 import { StatCard, Modal, FormField, ToastContainer, ConfirmDialog } from "@/components/admin/shared";
 import { formatCurrency } from "@/lib/utils";
@@ -55,6 +56,25 @@ interface TargetDetails {
   locked_at: string | null;
 }
 
+interface DashboardSale {
+  id: number;
+  sale_date: string;
+  sale_type: string;
+  customer_name?: string;
+  device_name?: string;
+  commission_amount: number;
+  source: string;
+  package_price?: number;
+  device_sale_amount?: number;
+  order_id?: string | null;
+  store_customer_code_snapshot?: string | null;
+  match_status?: string | null;
+  match_method?: string | null;
+  match_confidence?: number | null;
+  employee_id?: string | null;
+  customer_hot_account_id?: string | null;
+}
+
 interface DashboardData {
   summary: {
     linesCommission: number;
@@ -79,17 +99,12 @@ interface DashboardData {
   dailyBreakdown: Array<{ date: string; lines: number; devices: number }>;
   alerts: Array<{ text: string; color: string }>;
   syncInfo: { lastSync: string; ordersSynced: number; status: string } | null;
-  recentSales: Array<{
-    id: number;
-    sale_date: string;
-    sale_type: string;
-    customer_name?: string;
-    device_name?: string;
-    commission_amount: number;
-    source: string;
-    package_price?: number;
-    device_sale_amount?: number;
-  }>;
+  recentSales: DashboardSale[];
+  historicalRecentSales: DashboardSale[];
+  historicalSummary: {
+    latestSaleDate: string | null;
+    unassignedAutoSyncEmployeeCount: number;
+  };
   month: string;
   paceTracking: PaceTracking;
   targetDetails: TargetDetails | null;
@@ -107,9 +122,14 @@ interface Employee { id: string; name: string; role: string; }
 export default function CommissionsDashboard() {
   const scr = useScreen();
   const { toasts, show, dismiss } = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+  const parsedSearchParams = new URLSearchParams(searchParamsKey);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => parsedSearchParams.get("month") || "");
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [targetAmount, setTargetAmount] = useState("");
   const [targetLinesCount, setTargetLinesCount] = useState("");
@@ -118,36 +138,77 @@ export default function CommissionsDashboard() {
   const [showLockConfirm, setShowLockConfirm] = useState(false);
   const [locking, setLocking] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
+  const [selectedEmployee, setSelectedEmployee] = useState<string>(() => parsedSearchParams.get("employee_key") || "");
 
-  // Load employees list once
+  // Load employees from commission_employees table (standalone) + profiles (user-linked)
   useEffect(() => {
-    fetch("/api/admin/commissions/profiles")
-      .then(r => r.json())
-      .then(json => {
-        const list = (json.data?.employees || []).map((e: any) => ({
-          id: e.id, name: e.name, role: e.role,
-        }));
-        setEmployees(list);
-      })
-      .catch(() => {});
+    Promise.all([
+      fetch("/api/admin/commissions/employees").then(r => r.json()).catch(() => ({ data: { employees: [] } })),
+      fetch("/api/admin/commissions/profiles").then(r => r.json()).catch(() => ({ data: { employees: [] } })),
+    ]).then(([empRes, profRes]) => {
+      const commEmps = (empRes.data?.employees || []).map((e: any) => ({
+        id: `emp:${e.id}`, name: e.name, role: e.role || "sales",
+      }));
+      const profileEmps = (profRes.data?.employees || []).map((e: any) => ({
+        id: e.id, name: e.name, role: e.role,
+      }));
+      // Merge: commission_employees first, then profile-based (avoid duplicates by name)
+      const nameSet = new Set(commEmps.map((e: Employee) => e.name));
+      const merged = [...commEmps, ...profileEmps.filter((e: Employee) => !nameSet.has(e.name))];
+      setEmployees(merged);
+    });
   }, []);
 
-  const fetchDashboard = useCallback(async (m: string, empId?: string) => {
+  const fetchDashboard = useCallback(async (m: string, empKey?: string) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ month: m });
-      if (empId) params.set("employee_id", empId);
+      const params = new URLSearchParams();
+      if (m) {
+        params.set("month", m);
+      }
+      if (empKey) {
+        // emp:123 = commission_employees id — resolve to name for filtering
+        params.set("employee_key", empKey);
+      }
       const res = await fetch(`/api/admin/commissions/dashboard?${params}`);
       if (!res.ok) throw new Error("Failed to load");
       const json = await res.json();
-      setData(json.data || json);
+      const nextData = json.data || json;
+      setData(nextData);
+      if (nextData?.month && nextData.month !== m) {
+        setMonth(nextData.month);
+      }
     } catch {
       show("שגיאה בטעינת הנתונים", "error");
     } finally {
       setLoading(false);
     }
   }, [show]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParamsKey);
+
+    setMonth(params.get("month") || "");
+    setSelectedEmployee(params.get("employee_key") || "");
+  }, [searchParamsKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    if (month) {
+      params.set("month", month);
+    }
+    if (selectedEmployee) {
+      params.set("employee_key", selectedEmployee);
+    }
+
+    const nextSearchParamsKey = params.toString();
+    if (nextSearchParamsKey === searchParamsKey) {
+      return;
+    }
+
+    router.replace(nextSearchParamsKey ? `${pathname}?${nextSearchParamsKey}` : pathname, { scroll: false });
+  }, [month, pathname, router, searchParamsKey, selectedEmployee]);
 
   useEffect(() => { fetchDashboard(month, selectedEmployee); }, [month, selectedEmployee, fetchDashboard]);
 
@@ -160,6 +221,7 @@ export default function CommissionsDashboard() {
         headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
         body: JSON.stringify({
           month,
+          employee_key: selectedEmployee || undefined,
           target_total: amt,
           target_lines_count: parseInt(targetLinesCount) || 0,
           target_devices_count: parseInt(targetDevicesCount) || 0,
@@ -174,7 +236,7 @@ export default function CommissionsDashboard() {
       setTargetAmount("");
       setTargetLinesCount("");
       setTargetDevicesCount("");
-      fetchDashboard(month);
+      fetchDashboard(month, selectedEmployee);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "שגיאה בשמירת היעד";
       show(msg, "error");
@@ -189,12 +251,16 @@ export default function CommissionsDashboard() {
       const res = await fetch("/api/admin/commissions/targets", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
-        body: JSON.stringify({ month, action: isLocked ? "unlock" : "lock" }),
+        body: JSON.stringify({
+          month,
+          action: isLocked ? "unlock" : "lock",
+          employee_key: selectedEmployee || undefined,
+        }),
       });
       if (!res.ok) throw new Error();
       show(isLocked ? "היעד שוחרר לעריכה" : "היעד ננעל בהצלחה", "success");
       setShowLockConfirm(false);
-      fetchDashboard(month);
+      fetchDashboard(month, selectedEmployee);
     } catch {
       show("שגיאה בעדכון נעילה", "error");
     } finally {
@@ -216,7 +282,7 @@ export default function CommissionsDashboard() {
       const json = await res.json();
       const d = json.data || json;
       show(`סונכרנו ${d.synced} הזמנות (${d.skipped} דולגו)`, "success");
-      fetchDashboard(month);
+      fetchDashboard(month, selectedEmployee);
     } catch { show("שגיאה בסנכרון", "error"); }
     finally { setSyncing(false); }
   };
@@ -229,6 +295,27 @@ export default function CommissionsDashboard() {
   const td = data.targetDetails;
   const isLocked = td?.is_locked || false;
   const maxDaily = Math.max(...data.dailyBreakdown.map((d) => d.lines + d.devices), 1);
+  const displayedSales = data.recentSales.length > 0 ? data.recentSales : data.historicalRecentSales;
+  const showingHistoricalFallback = data.recentSales.length === 0 && data.historicalRecentSales.length > 0;
+  const buildHistoryHref = (options?: { source?: string; includeEmployee?: boolean }) => {
+    const params = new URLSearchParams();
+    const historyMonth = month || data.month;
+
+    if (historyMonth) {
+      params.set("month", historyMonth);
+    }
+    if (options?.includeEmployee !== false && selectedEmployee) {
+      params.set("employee_key", selectedEmployee);
+    }
+    if (options?.source) {
+      params.set("source", options.source);
+    }
+
+    const query = params.toString();
+    return query ? `/admin/commissions/history?${query}` : "/admin/commissions/history";
+  };
+  const historyHref = buildHistoryHref();
+  const autoSyncHistoryHref = buildHistoryHref({ source: "auto_sync", includeEmployee: false });
 
   return (
     <div dir="rtl" className="font-hebrew">
@@ -261,6 +348,7 @@ export default function CommissionsDashboard() {
             className="input"
             style={{ width: scr.mobile ? 130 : 160, fontSize: 12, padding: "6px 10px" }}
           />
+          <Link href={historyHref} className="chip text-[10px]">📋 היסטוריה</Link>
           <Link href="/admin/commissions/calculator" className="chip chip-active text-[10px]">🧮 מחשבון</Link>
         </div>
       </div>
@@ -270,10 +358,11 @@ export default function CommissionsDashboard() {
         <Link href="/admin/commissions" className="chip chip-active">לוח בקרה</Link>
         <Link href="/admin/commissions/calculator" className="chip">מחשבון</Link>
         <Link href="/admin/commissions/sanctions" className="chip">סנקציות</Link>
-        <Link href="/admin/commissions/history" className="chip">היסטוריה</Link>
+        <Link href={historyHref} className="chip">היסטוריה</Link>
         <Link href="/admin/commissions/import" className="chip">ייבוא</Link>
         <Link href="/admin/commissions/analytics" className="chip">ניתוח</Link>
         <Link href="/admin/commissions/team" className="chip">צוות</Link>
+        <Link href="/admin/commissions/live" className="chip">📊 לוח חי</Link>
       </div>
 
       {/* Summary Cards */}
@@ -298,6 +387,42 @@ export default function CommissionsDashboard() {
               <div>עמלות חוזה: {formatCurrency((data as any).ownerProfit.contractTotal)}</div>
               <div>עלות עובדים: {formatCurrency((data as any).ownerProfit.employeeCosts)}</div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Employee Performance Breakdown — aggregate view only */}
+      {!selectedEmployee && (data as any).employeeBreakdown?.length > 1 && (
+        <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 16 }}>
+          <div className="flex items-center justify-between mb-3">
+            <Link href="/admin/commissions/team" className="text-brand text-[10px] font-bold">לוח מובילים ←</Link>
+            <h3 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>👥 ביצועי עובדים</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right" style={{ fontSize: scr.mobile ? 10 : 11 }}>
+              <thead>
+                <tr className="text-muted border-b border-surface-border">
+                  <th className="py-1.5 font-semibold text-center">%</th>
+                  <th className="py-1.5 font-semibold text-center">עמלה</th>
+                  <th className="py-1.5 font-semibold text-center">מכשירים</th>
+                  <th className="py-1.5 font-semibold text-center">קווים</th>
+                  <th className="py-1.5 font-semibold">עובד</th>
+                </tr>
+              </thead>
+              <tbody>
+                {((data as any).employeeBreakdown as Array<{ name: string; lines: number; devices: number; commission: number; pct: number }>).map((emp, i) => (
+                  <tr key={emp.name} className="border-b border-surface-border/50">
+                    <td className="py-1.5 text-center text-muted">{emp.pct}%</td>
+                    <td className="py-1.5 text-center font-bold" style={{ color: "#22c55e" }}>{formatCurrency(emp.commission)}</td>
+                    <td className="py-1.5 text-center">{emp.devices}</td>
+                    <td className="py-1.5 text-center">{emp.lines}</td>
+                    <td className="py-1.5 font-bold">
+                      {i === 0 && "🥇 "}{i === 1 && "🥈 "}{i === 2 && "🥉 "}{emp.name}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -630,13 +755,19 @@ export default function CommissionsDashboard() {
       {/* Recent Sales */}
       <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18 }}>
         <div className="flex items-center justify-between mb-2">
-          <Link href="/admin/commissions/history" className="text-brand text-[10px] font-bold">הצג הכל ←</Link>
+          <Link href={historyHref} className="text-brand text-[10px] font-bold">הצג הכל ←</Link>
           <h3 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>📋 מכירות אחרונות</h3>
         </div>
-        {data.recentSales.length === 0 ? (
-          <div className="text-center text-dim text-xs py-4">אין מכירות החודש</div>
+        {displayedSales.length === 0 ? (
+          <div className="text-center text-dim text-xs py-4">אין מכירות עדיין</div>
         ) : (
           <div className="overflow-x-auto">
+            {showingHistoricalFallback && (
+              <div className="mb-3 rounded-xl border border-state-warning/30 bg-state-warning/10 px-3 py-2 text-right text-[10px] text-state-warning">
+                אין מכירות בחודש זה. מוצגות המכירות האחרונות מחודשים קודמים
+                {data.historicalSummary.latestSaleDate ? ` (آخر مبيع: ${data.historicalSummary.latestSaleDate})` : ""}.
+              </div>
+            )}
             <table className="w-full text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>
               <thead>
                 <tr className="text-muted border-b border-surface-border">
@@ -649,14 +780,30 @@ export default function CommissionsDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {data.recentSales.map((sale) => (
+                {displayedSales.map((sale) => (
                   <tr key={sale.id} className="border-b border-surface-border/50">
                     <td className="py-1.5">
                       <span className="text-[9px]">{sale.source === "auto_sync" ? "🔄" : "✏️"}</span>
                     </td>
                     <td className="py-1.5 font-bold" style={{ color: "#22c55e" }}>{formatCurrency(sale.commission_amount)}</td>
                     <td className="py-1.5">{formatCurrency(sale.sale_type === "line" ? (sale.package_price || 0) : (sale.device_sale_amount || 0))}</td>
-                    <td className="py-1.5">{sale.sale_type === "line" ? (sale.customer_name || "—") : (sale.device_name || "—")}</td>
+                    <td className="py-1.5">
+                      <div>{sale.sale_type === "line" ? (sale.customer_name || "—") : (sale.device_name || "—")}</div>
+                      {(sale.order_id || sale.store_customer_code_snapshot) && (
+                        <div className="mt-1 text-[9px] text-muted">
+                          {sale.order_id ? `#${sale.order_id}` : ""}
+                          {sale.order_id && sale.store_customer_code_snapshot ? " · " : ""}
+                          {sale.store_customer_code_snapshot || ""}
+                        </div>
+                      )}
+                      {sale.source === "auto_sync" && !sale.employee_id && (
+                        <div className="mt-1 flex flex-wrap justify-end gap-1 text-[9px]">
+                          <span className="badge" style={{ background: "#f59e0b20", color: "#f59e0b" }}>
+                            ללא עובד
+                          </span>
+                        </div>
+                      )}
+                    </td>
                     <td className="py-1.5">
                       <span className="badge text-[9px]" style={{ background: sale.sale_type === "line" ? "#3b82f620" : "#ef444420", color: sale.sale_type === "line" ? "#3b82f6" : "#ef4444" }}>
                         {sale.sale_type === "line" ? "קו" : "מכשיר"}
@@ -691,6 +838,16 @@ export default function CommissionsDashboard() {
             <span>🔄 סנכרון: {s.autoSyncedCount}</span>
             <span>✏️ ידני: {s.manualEntryCount}</span>
           </div>
+          {data.historicalSummary.unassignedAutoSyncEmployeeCount > 0 && (
+            <div className="mt-3 rounded-xl border border-state-warning/30 bg-state-warning/10 px-3 py-2 text-right">
+              <div className="text-[10px] font-bold text-state-warning">
+                {data.historicalSummary.unassignedAutoSyncEmployeeCount} מכירות auto-sync עדיין ללא שיוך עובד
+              </div>
+              <Link href={autoSyncHistoryHref} className="mt-1 inline-block text-[10px] font-bold text-brand">
+                פתח היסטוריה לטיפול ←
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Contract Info Widget */}

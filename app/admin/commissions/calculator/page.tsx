@@ -45,6 +45,8 @@ export default function CalculatorPage() {
         <Link href="/admin/commissions/history" className="chip">היסטוריה</Link>
         <Link href="/admin/commissions/import" className="chip">ייבוא</Link>
         <Link href="/admin/commissions/analytics" className="chip">ניתוח</Link>
+        <Link href="/admin/commissions/team" className="chip">צוות</Link>
+        <Link href="/admin/commissions/live" className="chip">📊 לוח חי</Link>
       </div>
 
       {/* Tabs */}
@@ -467,17 +469,16 @@ function SimulationCalculator() {
       if (!res.ok) throw new Error();
       const json = await res.json();
       const d = json.data || json;
-      const sales = d.recentSales || [];
-      const deviceTotal = sales
-        .filter((s: { sale_type: string }) => s.sale_type === "device")
-        .reduce((sum: number, s: { device_sale_amount?: number }) => sum + (s.device_sale_amount || 0), 0);
+      // Use paceTracking.devices.totalSalesAmount for the full month total,
+      // NOT recentSales which is limited to 10 items
+      const deviceTotal = d.paceTracking?.devices?.totalSalesAmount || 0;
       setCurrentData({
         linesCommission: d.summary.linesCommission,
         devicesCommission: d.summary.devicesCommission,
         loyaltyBonus: d.summary.loyaltyBonus,
         totalSanctions: d.summary.totalSanctions,
         netCommission: d.summary.netCommission,
-        currentLinesSold: sales.filter((s: { sale_type: string }) => s.sale_type === "line").length,
+        currentLinesSold: d.paceTracking?.lines?.achieved || 0,
         currentDevicesSalesAmount: deviceTotal,
       });
     } catch {

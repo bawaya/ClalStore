@@ -4,7 +4,7 @@ import { getProducts, getHeroes, getLinePlans } from "@/lib/store/queries";
 import { StoreClient } from "@/components/store/StoreClient";
 import { getStoreMetadata } from "@/lib/seo";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
   return getStoreMetadata();
@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function StorePage() {
   const [products, heroes, linePlans] = await Promise.all([
-    getProducts(),
+    getProducts({ limit: 500 }),
     getHeroes(),
     getLinePlans(),
   ]);

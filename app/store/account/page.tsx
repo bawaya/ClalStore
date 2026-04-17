@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "@/components/store/StoreHeader";
@@ -22,6 +23,19 @@ interface CustomerData {
   email: string;
   city: string;
   address: string;
+  customer_code?: string;
+}
+
+interface HotAccountData {
+  id: string;
+  hot_mobile_id?: string;
+  hot_customer_code?: string;
+  line_phone?: string;
+  label?: string;
+  status: string;
+  is_primary: boolean;
+  source?: string;
+  created_at: string;
 }
 
 interface OrderData {
@@ -48,13 +62,46 @@ interface OrderData {
   }[];
 }
 
-const STATUS_CONFIG: Record<string, { label_ar: string; label_he: string; color: string; icon: string }> = {
-  pending: { label_ar: "قيد الانتظار", label_he: "ממתין", color: "text-amber-600 bg-amber-50", icon: "⏳" },
-  confirmed: { label_ar: "مؤكد", label_he: "מאושר", color: "text-blue-600 bg-blue-50", icon: "✅" },
-  processing: { label_ar: "قيد التجهيز", label_he: "בעיבוד", color: "text-purple-600 bg-purple-50", icon: "📦" },
-  shipped: { label_ar: "تم الشحن", label_he: "נשלח", color: "text-indigo-600 bg-indigo-50", icon: "🚚" },
-  delivered: { label_ar: "تم التوصيل", label_he: "נמסר", color: "text-green-600 bg-green-50", icon: "✅" },
-  cancelled: { label_ar: "ملغي", label_he: "בוטל", color: "text-red-600 bg-red-50", icon: "❌" },
+const STATUS_CONFIG: Record<
+  string,
+  { label_ar: string; label_he: string; color: string; icon: string }
+> = {
+  pending: {
+    label_ar: "قيد الانتظار",
+    label_he: "ממתין",
+    color: "text-amber-600 bg-amber-50",
+    icon: "⏳",
+  },
+  confirmed: {
+    label_ar: "مؤكد",
+    label_he: "מאושר",
+    color: "text-blue-600 bg-blue-50",
+    icon: "✅",
+  },
+  processing: {
+    label_ar: "قيد التجهيز",
+    label_he: "בעיבוד",
+    color: "text-purple-600 bg-purple-50",
+    icon: "📦",
+  },
+  shipped: {
+    label_ar: "تم الشحن",
+    label_he: "נשלח",
+    color: "text-indigo-600 bg-indigo-50",
+    icon: "🚚",
+  },
+  delivered: {
+    label_ar: "تم التوصيل",
+    label_he: "נמסר",
+    color: "text-green-600 bg-green-50",
+    icon: "✅",
+  },
+  cancelled: {
+    label_ar: "ملغي",
+    label_he: "בוטל",
+    color: "text-red-600 bg-red-50",
+    icon: "❌",
+  },
 };
 
 export default function AccountPage() {
@@ -66,6 +113,7 @@ export default function AccountPage() {
 
   const [tab, setTab] = useState<TabKey>("orders");
   const [customer, setCustomer] = useState<CustomerData | null>(null);
+  const [hotAccounts, setHotAccounts] = useState<HotAccountData[]>([]);
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -74,13 +122,11 @@ export default function AccountPage() {
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [token, setToken] = useState("");
 
-  // Profile form
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [formCity, setFormCity] = useState("");
   const [formAddress, setFormAddress] = useState("");
 
-  // Auth guard
   useEffect(() => {
     const savedToken = localStorage.getItem("clal_customer_token");
     const savedCustomer = localStorage.getItem("clal_customer");
@@ -100,7 +146,9 @@ export default function AccountPage() {
         setFormEmail(parsed.email || "");
         setFormCity(parsed.city || "");
         setFormAddress(parsed.address || "");
-      } catch {}
+      } catch {
+        // ignore corrupted local data
+      }
     }
   }, [router]);
 
@@ -110,7 +158,6 @@ export default function AccountPage() {
     router.replace("/store/auth");
   }, [router]);
 
-  // Fetch orders
   const fetchOrders = useCallback(async () => {
     if (!token) return;
     setLoadingOrders(true);
@@ -125,11 +172,12 @@ export default function AccountPage() {
       } else if (res.status === 401) {
         handleLogout();
       }
-    } catch {}
+    } catch {
+      // ignore transient failures
+    }
     setLoadingOrders(false);
   }, [token, handleLogout]);
 
-  // Fetch profile
   const fetchProfile = useCallback(async () => {
     if (!token) return;
     setLoadingProfile(true);
@@ -141,6 +189,7 @@ export default function AccountPage() {
       const pData = pJson.data ?? pJson;
       if (pJson.success && pData.customer) {
         setCustomer(pData.customer);
+        setHotAccounts(pData.hotAccounts || []);
         setFormName(pData.customer.name || "");
         setFormEmail(pData.customer.email || "");
         setFormCity(pData.customer.city || "");
@@ -149,7 +198,9 @@ export default function AccountPage() {
       } else if (res.status === 401) {
         handleLogout();
       }
-    } catch {}
+    } catch {
+      // ignore transient failures
+    }
     setLoadingProfile(false);
   }, [token, handleLogout]);
 
@@ -175,15 +226,17 @@ export default function AccountPage() {
           address: formAddress,
         }),
       });
-      const uJson = await res.json();
-      const uData = uJson.data ?? uJson;
-      if (uJson.success && uData.customer) {
-        setCustomer(uData.customer);
-        localStorage.setItem("clal_customer", JSON.stringify(uData.customer));
+      const json = await res.json();
+      const data = json.data ?? json;
+
+      if (json.success && data.customer) {
+        setCustomer(data.customer);
+        setHotAccounts(data.hotAccounts || hotAccounts);
+        localStorage.setItem("clal_customer", JSON.stringify(data.customer));
         setProfileMsg(lang === "he" ? "נשמר בהצלחה!" : "تم الحفظ بنجاح!");
         setTimeout(() => setProfileMsg(""), 3000);
       } else {
-        setProfileMsg(uJson.error || uData.error || (lang === "he" ? "שגיאה" : "خطأ"));
+        setProfileMsg(json.error || data.error || (lang === "he" ? "שגיאה" : "خطأ"));
       }
     } catch {
       setProfileMsg(lang === "he" ? "שגיאה" : "خطأ في الاتصال");
@@ -204,7 +257,6 @@ export default function AccountPage() {
     });
   };
 
-  const _isRTL = true;
   const isMob = scr.mobile;
 
   const tabs: { key: TabKey; label_ar: string; label_he: string; icon: string }[] = [
@@ -218,67 +270,63 @@ export default function AccountPage() {
   return (
     <>
       <StoreHeader />
-      <main
-        dir="rtl"
-        className="min-h-screen pt-20 pb-24 px-4 bg-surface-bg text-white"
-      >
-        <div className="max-w-4xl mx-auto">
-          {/* Page Header */}
-          <div className="flex items-center justify-between mb-6">
+      <main dir="rtl" className="min-h-screen bg-surface-bg px-4 pb-24 pt-20 text-white">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-6 flex items-center justify-between">
             <h1 className="text-2xl font-black text-white">
               {lang === "he" ? "החשבון שלי" : "حسابي"}
             </h1>
             <button
               onClick={handleLogout}
-              className="text-sm text-muted hover:text-state-error transition"
+              className="text-sm text-muted transition hover:text-state-error"
             >
               {lang === "he" ? "התנתק" : "تسجيل خروج"}
             </button>
           </div>
 
-          {/* Customer Welcome */}
           {customer?.name && (
-            <p className="text-muted mb-4">
-              {lang === "he" ? `שלום ${customer.name}` : `مرحباً ${customer.name}`} 👋
-            </p>
+            <div className="mb-4">
+              <p className="text-muted">
+                {lang === "he" ? `שלום ${customer.name}` : `مرحباً ${customer.name}`} 👋
+              </p>
+              {customer.customer_code && (
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/10 px-3 py-1 text-xs font-bold text-brand">
+                  <span>🎟️</span>
+                  <span>{customer.customer_code}</span>
+                </div>
+              )}
+            </div>
           )}
 
-          {/* Tabs */}
-          <div className="flex gap-1 mb-6 rounded-xl overflow-hidden card">
-            {tabs.map((t) => (
+          <div className="card mb-6 flex overflow-hidden rounded-xl">
+            {tabs.map((item) => (
               <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
+                key={item.key}
+                onClick={() => setTab(item.key)}
                 className={`flex-1 py-3 text-sm font-bold transition-all ${
-                  tab === t.key
-                    ? "text-white bg-brand"
-                    : "text-muted hover:bg-surface-elevated"
+                  tab === item.key ? "bg-brand text-white" : "text-muted hover:bg-surface-elevated"
                 }`}
               >
-                <span className="mr-1">{t.icon}</span>
-                {lang === "he" ? t.label_he : t.label_ar}
+                <span className="mr-1">{item.icon}</span>
+                {lang === "he" ? item.label_he : item.label_ar}
               </button>
             ))}
           </div>
 
-          {/* ===== ORDERS TAB ===== */}
           {tab === "orders" && (
             <div>
               {loadingOrders ? (
-                <div className="text-center py-16 text-muted">
-                  <div className="animate-spin text-3xl mb-2">⏳</div>
+                <div className="py-16 text-center text-muted">
+                  <div className="mb-2 text-3xl">⏳</div>
                   {lang === "he" ? "טוען..." : "جاري التحميل..."}
                 </div>
               ) : orders.length === 0 ? (
-                <div className="text-center py-16 card" style={{ borderRadius: 16 }}>
-                  <div className="text-5xl mb-4">📦</div>
-                  <p className="text-muted text-lg">
+                <div className="card py-16 text-center" style={{ borderRadius: 16 }}>
+                  <div className="mb-4 text-5xl">📦</div>
+                  <p className="text-lg text-muted">
                     {lang === "he" ? "אין הזמנות עדיין" : "لا توجد طلبات بعد"}
                   </p>
-                  <button
-                    onClick={() => router.push("/store")}
-                    className="mt-4 btn-primary"
-                  >
+                  <button onClick={() => router.push("/store")} className="btn-primary mt-4">
                     {lang === "he" ? "התחל לקנות" : "ابدأ التسوق"}
                   </button>
                 </div>
@@ -287,54 +335,70 @@ export default function AccountPage() {
                   {orders.map((order) => {
                     const statusConf = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
                     const isExpanded = expandedOrder === order.id;
+
                     return (
-                      <div
-                        key={order.id}
-                        className="card rounded-xl overflow-hidden"
-                      >
-                        {/* Order Header — clickable */}
+                      <div key={order.id} className="card overflow-hidden rounded-xl">
                         <button
                           onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
-                          className="w-full p-4 flex items-center justify-between text-right"
+                          className="flex w-full items-center justify-between p-4 text-right"
                         >
                           <div className="flex items-center gap-3">
                             <span className="text-xl">{statusConf.icon}</span>
                             <div>
-                              <p className="font-bold text-sm">{order.id}</p>
+                              <p className="text-sm font-bold">{order.id}</p>
                               <p className="text-xs text-gray-400">
-                                {new Date(order.created_at).toLocaleDateString(lang === "he" ? "he-IL" : "ar-EG")}
+                                {new Date(order.created_at).toLocaleDateString(
+                                  lang === "he" ? "he-IL" : "ar-EG",
+                                )}
                               </p>
                             </div>
                           </div>
+
                           <div className="flex items-center gap-3">
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusConf.color}`}>
+                            <span
+                              className={`rounded-full px-2 py-1 text-xs font-medium ${statusConf.color}`}
+                            >
                               {lang === "he" ? statusConf.label_he : statusConf.label_ar}
                             </span>
-                            <span className="font-bold text-sm text-white">₪{order.total}</span>
-                            <span className={`text-muted transition-transform ${isExpanded ? "rotate-180" : ""}`}>▼</span>
+                            <span className="text-sm font-bold text-white">₪{order.total}</span>
+                            <span
+                              className={`text-muted transition-transform ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                            >
+                              ▼
+                            </span>
                           </div>
                         </button>
 
-                        {/* Order Details — expanded */}
                         {isExpanded && (
-                          <div className="px-4 pb-4 border-t border-surface-border">
-                            {/* Items */}
+                          <div className="border-t border-surface-border px-4 pb-4">
                             <div className="mt-3 space-y-2">
                               {order.items.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between text-sm">
+                                <div
+                                  key={item.id}
+                                  className="flex items-center justify-between text-sm"
+                                >
                                   <div>
-                                    <span className="font-medium text-white">{item.product_name}</span>
-                                    {item.color && <span className="text-muted mr-2">({item.color})</span>}
-                                    {item.storage && <span className="text-muted mr-1">{item.storage}</span>}
+                                    <span className="font-medium text-white">
+                                      {item.product_name}
+                                    </span>
+                                    {item.color && (
+                                      <span className="mr-2 text-muted">({item.color})</span>
+                                    )}
+                                    {item.storage && (
+                                      <span className="mr-1 text-muted">{item.storage}</span>
+                                    )}
                                     <span className="text-muted"> ×{item.quantity}</span>
                                   </div>
-                                  <span className="font-medium text-brand">₪{item.price * item.quantity}</span>
+                                  <span className="font-medium text-brand">
+                                    ₪{item.price * item.quantity}
+                                  </span>
                                 </div>
                               ))}
                             </div>
 
-                            {/* Summary */}
-                            <div className="mt-3 pt-3 border-t border-surface-border text-sm space-y-1">
+                            <div className="mt-3 space-y-1 border-t border-surface-border pt-3 text-sm">
                               {order.discount_amount > 0 && (
                                 <div className="flex justify-between text-state-success">
                                   <span>{lang === "he" ? "הנחה" : "خصم"}</span>
@@ -342,14 +406,24 @@ export default function AccountPage() {
                                 </div>
                               )}
                               {order.coupon_code && (
-                                <div className="flex justify-between text-muted text-xs">
+                                <div className="flex justify-between text-xs text-muted">
                                   <span>{lang === "he" ? "קופון" : "كوبون"}</span>
                                   <span>{order.coupon_code}</span>
                                 </div>
                               )}
                               <div className="flex justify-between text-white">
                                 <span>{lang === "he" ? "שיטת תשלום" : "طريقة الدفع"}</span>
-                                <span>{order.payment_method === "credit" ? (lang === "he" ? "אשראי" : "بطاقة ائتمان") : order.payment_method === "bank" ? (lang === "he" ? "העברה בנקאית" : "تحويل بنكي") : order.payment_method}</span>
+                                <span>
+                                  {order.payment_method === "credit"
+                                    ? lang === "he"
+                                      ? "אשראי"
+                                      : "بطاقة ائتمان"
+                                    : order.payment_method === "bank"
+                                      ? lang === "he"
+                                        ? "העברה בנקאית"
+                                        : "تحويل بنكي"
+                                      : order.payment_method}
+                                </span>
                               </div>
                               {order.shipping_city && (
                                 <div className="flex justify-between text-muted">
@@ -360,7 +434,9 @@ export default function AccountPage() {
                               {order.shipping_address && (
                                 <div className="flex justify-between text-xs text-dim">
                                   <span>{lang === "he" ? "כתובת" : "العنوان"}</span>
-                                  <span className="max-w-[200px] truncate">{order.shipping_address}</span>
+                                  <span className="max-w-[200px] truncate">
+                                    {order.shipping_address}
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -374,99 +450,163 @@ export default function AccountPage() {
             </div>
           )}
 
-          {/* ===== PROFILE TAB ===== */}
           {tab === "profile" && (
             <div className="card rounded-xl p-6">
               {loadingProfile ? (
-                <div className="text-center py-8 text-muted">
+                <div className="py-8 text-center text-muted">
                   {lang === "he" ? "טוען..." : "جاري التحميل..."}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Phone — readonly */}
+                  <div className="rounded-xl border border-brand/20 bg-brand/5 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-right">
+                        <div className="text-xs font-semibold text-muted">
+                          {lang === "he" ? "זהות הלקוח" : "هوية العميل"}
+                        </div>
+                        <div className="mt-1 text-sm font-black text-brand" dir="ltr">
+                          {customer?.customer_code || (lang === "he" ? "לא קיים" : "لا يوجد بعد")}
+                        </div>
+                      </div>
+                      <div className="text-2xl">🎟️</div>
+                    </div>
+
+                    <div className="mt-4 border-t border-white/5 pt-4">
+                      <div className="mb-2 text-xs font-semibold text-muted">
+                        {lang === "he" ? "חשבונות HOT מקושרים" : "حسابات HOT المرتبطة"}
+                      </div>
+
+                      {hotAccounts.length === 0 ? (
+                        <div className="text-xs text-dim">
+                          {lang === "he"
+                            ? "עדיין לא קושרו חשבונות HOT לחשבון זה."
+                            : "لا توجد حسابات HOT مرتبطة بهذا الحساب بعد."}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {hotAccounts.map((account) => (
+                            <div
+                              key={account.id}
+                              className="rounded-xl border border-white/5 bg-black/10 px-3 py-2 text-right"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-xs font-bold text-white">
+                                  {account.label ||
+                                    account.hot_customer_code ||
+                                    account.hot_mobile_id ||
+                                    "HOT"}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {account.is_primary && (
+                                    <span className="rounded-full bg-yellow-500/15 px-2 py-0.5 text-[10px] font-bold text-yellow-400">
+                                      {lang === "he" ? "ראשי" : "رئيسي"}
+                                    </span>
+                                  )}
+                                  <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand">
+                                    {account.status}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="mt-1 text-[11px] text-muted" dir="ltr">
+                                {[account.hot_mobile_id, account.hot_customer_code, account.line_phone]
+                                  .filter(Boolean)
+                                  .join(" • ")}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-xs font-semibold text-muted mb-1">
+                    <label className="mb-1 block text-xs font-semibold text-muted">
                       {lang === "he" ? "טלפון" : "الهاتف"}
                     </label>
                     <input
                       type="text"
                       value={customer?.phone || ""}
                       readOnly
-                      className="input opacity-60 cursor-not-allowed"
+                      className="input cursor-not-allowed opacity-60"
                       dir="ltr"
                     />
                   </div>
 
-                  {/* Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-muted mb-1">
+                    <label className="mb-1 block text-xs font-semibold text-muted">
                       {lang === "he" ? "שם" : "الاسم"}
                     </label>
                     <input
                       type="text"
                       value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
+                      onChange={(event) => setFormName(event.target.value)}
                       className="input"
                       placeholder={lang === "he" ? "הזן שם" : "أدخل اسمك"}
                     />
                   </div>
 
-                  {/* Email */}
                   <div>
-                    <label className="block text-xs font-semibold text-muted mb-1">
+                    <label className="mb-1 block text-xs font-semibold text-muted">
                       {lang === "he" ? "אימייל" : "البريد الإلكتروني"}
                     </label>
                     <input
                       type="email"
                       value={formEmail}
-                      onChange={(e) => setFormEmail(e.target.value)}
+                      onChange={(event) => setFormEmail(event.target.value)}
                       className="input"
                       placeholder="example@email.com"
                       dir="ltr"
                     />
                   </div>
 
-                  {/* City */}
                   <div>
-                    <label className="block text-xs font-semibold text-muted mb-1">
+                    <label className="mb-1 block text-xs font-semibold text-muted">
                       {lang === "he" ? "עיר" : "المدينة"}
                     </label>
                     <input
                       type="text"
                       value={formCity}
-                      onChange={(e) => setFormCity(e.target.value)}
+                      onChange={(event) => setFormCity(event.target.value)}
                       className="input"
                       placeholder={lang === "he" ? "הזן עיר" : "أدخل المدينة"}
                     />
                   </div>
 
-                  {/* Address */}
                   <div>
-                    <label className="block text-xs font-semibold text-muted mb-1">
+                    <label className="mb-1 block text-xs font-semibold text-muted">
                       {lang === "he" ? "כתובת" : "العنوان"}
                     </label>
                     <textarea
                       value={formAddress}
-                      onChange={(e) => setFormAddress(e.target.value)}
+                      onChange={(event) => setFormAddress(event.target.value)}
                       className="input resize-none"
                       rows={2}
                       placeholder={lang === "he" ? "הזן כתובת" : "أدخل العنوان"}
                     />
                   </div>
 
-                  {/* Save */}
                   <button
                     onClick={handleSaveProfile}
                     disabled={savingProfile}
                     className="btn-primary w-full disabled:opacity-50"
                   >
                     {savingProfile
-                      ? (lang === "he" ? "שומר..." : "جاري الحفظ...")
-                      : (lang === "he" ? "שמור שינויים" : "حفظ التعديلات")}
+                      ? lang === "he"
+                        ? "שומר..."
+                        : "جاري الحفظ..."
+                      : lang === "he"
+                        ? "שמור שינויים"
+                        : "حفظ التعديلات"}
                   </button>
 
                   {profileMsg && (
-                    <p className={`text-center text-sm font-medium ${profileMsg.includes("بنجاح") || profileMsg.includes("בהצלחה") ? "text-state-success" : "text-state-error"}`}>
+                    <p
+                      className={`text-center text-sm font-medium ${
+                        profileMsg.includes("نجاح") || profileMsg.includes("הצלחה")
+                          ? "text-state-success"
+                          : "text-state-error"
+                      }`}
+                    >
                       {profileMsg}
                     </p>
                   )}
@@ -475,38 +615,37 @@ export default function AccountPage() {
             </div>
           )}
 
-          {/* ===== WISHLIST TAB ===== */}
           {tab === "wishlist" && (
             <div>
               {wishlist.items.length === 0 ? (
-                <div className="card text-center py-16">
-                  <div className="text-5xl mb-4">🤍</div>
-                  <p className="text-muted text-lg">
+                <div className="card py-16 text-center">
+                  <div className="mb-4 text-5xl">🤍</div>
+                  <p className="text-lg text-muted">
                     {lang === "he" ? "אין מועדפים עדיין" : "لا توجد منتجات مفضلة"}
                   </p>
                   <button
                     onClick={() => router.push("/store")}
-                    className="btn-primary mt-4 px-6 py-2 rounded-xl text-sm"
+                    className="btn-primary mt-4 rounded-xl px-6 py-2 text-sm"
                   >
                     {lang === "he" ? "גלה מוצרים" : "تصفح المنتجات"}
                   </button>
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="mb-4 flex items-center justify-between">
                     <p className="text-sm text-muted">
                       {wishlist.items.length} {lang === "he" ? "מוצרים" : "منتج"}
                     </p>
                     <div className="flex gap-2">
                       <button
                         onClick={handleAddAllWishlistToCart}
-                        className="btn-primary text-xs px-3 py-1.5 rounded-lg"
+                        className="btn-primary rounded-lg px-3 py-1.5 text-xs"
                       >
                         {lang === "he" ? "הוסף הכל לסל" : "أضف الكل للسلة"}
                       </button>
                       <button
                         onClick={() => wishlist.clearAll()}
-                        className="text-xs px-3 py-1.5 rounded-lg text-state-error bg-state-error/10 font-medium"
+                        className="rounded-lg bg-state-error/10 px-3 py-1.5 text-xs font-medium text-state-error"
                       >
                         {lang === "he" ? "נקה הכל" : "مسح الكل"}
                       </button>
@@ -515,48 +654,53 @@ export default function AccountPage() {
 
                   <div className={`grid gap-3 ${isMob ? "grid-cols-2" : "grid-cols-3"}`}>
                     {wishlist.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="card rounded-xl overflow-hidden relative group"
-                      >
-                        {/* Image */}
+                      <div key={item.id} className="card group relative overflow-hidden rounded-xl">
                         <div className="relative aspect-square bg-surface-elevated">
                           {item.image_url ? (
-                            <img src={item.image_url} alt={lang === "he" ? item.name_he : item.name_ar}
-                                 className="w-full h-full object-contain p-2" />
+                            <Image
+                              src={item.image_url}
+                              alt={lang === "he" ? item.name_he : item.name_ar}
+                              fill
+                              className="object-contain p-2"
+                            />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-4xl text-dim">📱</div>
+                            <div className="flex h-full w-full items-center justify-center text-4xl text-dim">
+                              📱
+                            </div>
                           )}
-                          {/* Remove button */}
                           <button
                             onClick={() => wishlist.removeItem(item.id)}
-                            className="absolute top-2 left-2 w-7 h-7 rounded-full bg-state-error/10 text-state-error flex items-center justify-center text-sm hover:bg-state-error/20 transition"
+                            className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-state-error/10 text-sm text-state-error transition hover:bg-state-error/20"
                           >
                             ✕
                           </button>
                         </div>
-                        {/* Info */}
+
                         <div className="p-3">
                           <p className="text-xs text-muted">{item.brand}</p>
-                          <p className="text-sm font-bold text-white line-clamp-1">
+                          <p className="line-clamp-1 text-sm font-bold text-white">
                             {lang === "he" ? item.name_he : item.name_ar}
                           </p>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm text-brand">₪{item.price}</span>
+                          <div className="mt-2 flex items-center justify-between">
+                            <span className="text-sm font-bold text-brand">₪{item.price}</span>
                             {item.old_price && item.old_price > item.price && (
-                              <span className="text-xs text-dim line-through">₪{item.old_price}</span>
+                              <span className="text-xs text-dim line-through">
+                                ₪{item.old_price}
+                              </span>
                             )}
                           </div>
                           <button
-                            onClick={() => cart.addItem({
-                              productId: item.id,
-                              name: lang === "he" ? item.name_he : item.name_ar,
-                              brand: item.brand,
-                              price: item.price,
-                              image: item.image_url,
-                              type: item.type,
-                            })}
-                            className="btn-primary mt-2 w-full py-2 rounded-lg text-xs"
+                            onClick={() =>
+                              cart.addItem({
+                                productId: item.id,
+                                name: lang === "he" ? item.name_he : item.name_ar,
+                                brand: item.brand,
+                                price: item.price,
+                                image: item.image_url,
+                                type: item.type,
+                              })
+                            }
+                            className="btn-primary mt-2 w-full rounded-lg py-2 text-xs"
                           >
                             {lang === "he" ? "הוסף לסל" : "أضف للسلة"}
                           </button>

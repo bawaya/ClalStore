@@ -444,8 +444,8 @@ export default function OrdersPage() {
               {selected.order_items?.length > 0 && (
                 <div className="card mb-3" style={{ padding: scr.mobile ? 10 : 14 }}>
                   <div className="font-bold text-right mb-1.5 text-xs">📋 المنتجات</div>
-                  {selected.order_items.map((it: any) => (
-                    <div key={`${it.product_id}-${it.storage || "base"}`} className="flex justify-between py-1.5 border-b border-surface-border last:border-0">
+                  {selected.order_items.map((it: any, i: number) => (
+                    <div key={i} className="flex justify-between py-1.5 border-b border-surface-border last:border-0">
                       <span className="text-brand text-sm">{formatCurrency(it.price)}</span>
                       <div className="text-right">
                         <span className="text-sm">{it.product_name}</span>

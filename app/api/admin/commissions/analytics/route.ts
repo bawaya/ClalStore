@@ -1,7 +1,11 @@
 import { NextRequest } from "next/server";
 import { withAdminAuth } from "@/lib/admin/auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
-import { calcMonthlySummary, calcDeviceCommission, calcLoyaltyBonus } from "@/lib/commissions/calculator";
+import { calcMonthlySummary, calcLoyaltyBonus } from "@/lib/commissions/calculator";
+import {
+  COMMISSION_CONTRACT_TARGET_KEY,
+  getCommissionTarget,
+} from "@/lib/commissions/ledger";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface MonthlyAnalytics {
@@ -40,23 +44,33 @@ export const GET = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =>
   const [salesRes, sanctionsRes, targetsRes] = await Promise.all([
     db.from("commission_sales")
       .select("*")
+      .is("deleted_at", null)
       .gte("sale_date", startDate)
       .lte("sale_date", endDate)
       .order("sale_date", { ascending: true }),
     db.from("commission_sanctions")
       .select("*")
+      .is("deleted_at", null)
       .gte("sanction_date", startDate)
       .lte("sanction_date", endDate),
-    db.from("commission_targets")
-      .select("*")
-      .in("month", months),
+    Promise.all(
+      months.map(async (month) => ({
+        month,
+        target: await getCommissionTarget(db, month, [COMMISSION_CONTRACT_TARGET_KEY]),
+      })),
+    ),
   ]);
 
-  if (salesRes.error) return apiError(salesRes.error.message, 500);
+  if (salesRes.error) {
+    console.error("Commission analytics DB error:", salesRes.error.message);
+    return apiError("فشل في جلب بيانات التحليلات", 500);
+  }
 
   const allSales = salesRes.data || [];
   const allSanctions = sanctionsRes.data || [];
-  const allTargets = targetsRes.data || [];
+  const allTargets = new Map(
+    (targetsRes || []).map((entry) => [entry.month, entry.target || null]),
+  );
 
   // Build monthly analytics
   const monthlyData: MonthlyAnalytics[] = months.map((month) => {
@@ -65,11 +79,7 @@ export const GET = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =>
 
     const sales = allSales.filter((s) => s.sale_date >= monthStart && s.sale_date <= monthEnd);
     const sanctions = allSanctions.filter((s) => s.sanction_date >= monthStart && s.sanction_date <= monthEnd);
-    const target = allTargets.find((t) => t.month === month);
-
-    const totalDeviceSales = sales
-      .filter((s) => s.sale_type === "device")
-      .reduce((sum, s) => sum + (s.device_sale_amount || 0), 0);
+    const target = allTargets.get(month) || null;
 
     const activeLines = sales.filter((s) => s.sale_type === "line" && s.loyalty_start_date && s.loyalty_status === "active");
     const loyaltyBonuses = activeLines.reduce((sum, line) => {

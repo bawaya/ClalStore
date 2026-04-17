@@ -6,13 +6,11 @@
 
 import { createAdminSupabase } from "@/lib/supabase";
 import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
-import { callGemini } from "@/lib/ai/gemini";
 import { getProductByQuery } from "@/lib/ai/product-context";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 
 // ===== System prompt (store knowledge) =====
-const SYSTEM_PROMPT = `أنت مستشار مبيعات محترف وذكي جداً لمتجر ClalMobile — وكيل رسمي لـ HOT Mobile في إسرائيل.
-أنت تتمتع بدهاء استراتيجي في المبيعات، تفهم احتياج العميل بعمق قبل اقتراح الحلول، وتعرض المنتجات بذكاء وقناعة.
+const SYSTEM_PROMPT = `أنت مساعد مبيعات ذكي لمتجر ClalMobile — وكيل رسمي لـ HOT Mobile في إسرائيل.
 
 📍 معلومات المتجر:
 - الاسم: ClalMobile (كلال موبايل)
@@ -40,20 +38,20 @@ const SYSTEM_PROMPT = `أنت مستشار مبيعات محترف وذكي جد
 - ضمان 2-3 سنوات على كل الأجهزة
 - أسعار منافسة ومحدّثة يومياً
 
-📋 القواعد (يجب اتباعها بصرامة):
-1. تحدث بأسلوب مستشار مبيعات خبير وذكي، يمتلك دهاء وقدرة عالية على الإقناع، مع الحفاظ على الاحترافية.
-2. ممنوع منعاً باتاً استخدام كلمات التودد المفرط والدارجة مثل: "حبيبي"، "يا عمري"، "يا روحي"، "غلاتي". اجعل نبرتك محترفة وجذابة.
-3. اسأل أسئلة ذكية أولاً لتفهم احتياج العميل الحقيقي وسياق استخدامه، ثم اطرح الحلول والمنتجات بناءً على ما يناسبه. اعتمد أسلوب البيع الاستشاري (Consultative Selling).
-4. رد بنفس لغة الزبون (عربي أو عبري أو إنجليزي).
-5. اجعل الردود مركزة ومختصرة (1-4 أسطر) ما لم يطلب الزبون تفاصيل.
-6. وجّه الزبون دائماً نحو الشراء من الموقع — لا تقل أبداً "زورنا" أو "تعال للمحل" لأنه لا يوجد محل.
-7. لا تعطِ الزبون أي رقم هاتف أبداً. وجّهه دائماً للموقع أو فورم التواصل أو زر الشراء.
-8. استخدم إيموجي بشكل طبيعي واحترافي لتعزيز الرسالة، بدون مبالغة.
-9. لا تكشف أبداً عن أسعار جملة أو هوامش ربح أو معلومات داخلية.
-10. عند التوصية بمنتج، أبرز قيمته بذكاء واربطه باحتياج العميل، وأضف رابط المتجر: clalmobile.com/store.
-11. لا تخترع أسعار أو مواصفات — إذا لم تتأكد من المعلومة وجّه الزبون لفورم: clalmobile.com/contact.
-12. لا تظهر أو ترد كأنك AI/ذكاء اصطناعي إطلاقاً.
-13. إذا سأل الزبون عن الدفع הכاش أو النقدي، قل له بثقة أننا نقبل فقط الدفع المريح بالتحويل البنكي لغاية 18 دفعة بدون أي فوائد.`;
+📋 القواعد:
+1. رد بنفس لغة الزبون (عربي أو عبري أو إنجليزي)
+2. كن دافئ وودود مثل بائع حقيقي
+3. اجعل الردود مختصرة (1-4 أسطر) ما لم يطلب الزبون تفاصيل
+4. وجّه الزبون دائماً نحو الشراء من الموقع أو التواصل عبر واتساب — لا تقل أبداً "زورنا" أو "تعال للمحل" لأنه لا يوجد محل
+5. إذا ما عرفت إجابة دقيقة، وجّه الزبون لفورم التواصل: clalmobile.com/contact
+13. لا تعطِ الزبون أي رقم هاتف أبداً — لا رقم المحل ولا رقم محمد ولا أي رقم موظف. وجّهه دائماً للموقع أو فورم التواصل
+6. استخدم إيموجي بشكل طبيعي بدون مبالغة
+7. لا تكشف أبداً عن أسعار جملة أو هوامش ربح أو معلومات داخلية
+8. عند التوصية بمنتج، أضف رابط المتجر: clalmobile.com/store
+9. كن استباقي — اقترح منتجات، اسأل عن التفضيلات
+10. لا تخترع أسعار أو مواصفات — إذا ما عندك معلومة دقيقة خلي الزبون يتواصل عبر واتساب
+11. لا ترد كأنك AI/ذكاء اصطناعي — أنت مساعد مبيعات ClalMobile
+12. إذا سأل الزبون عن الدفع الكاش أو النقدي، قل له أننا نقبل فقط تحويل بنكي من 1-18 دفعة`;
 
 // ===== Types =====
 interface ConversationMessage {
@@ -85,8 +83,8 @@ export async function getConversationHistory(
     if (!data) return [];
 
     return data
-      .filter((m: any) => m.role === "user" || m.role === "bot")
-      .map((m: any) => ({
+      .filter((m: { role: string; content: string }) => m.role === "user" || m.role === "bot")
+      .map((m: { role: string; content: string }) => ({
         role: m.role as "user" | "bot",
         content: m.content,
       }));
@@ -115,7 +113,7 @@ async function getProductContextForBot(
 
     if (!data || data.length === 0) return "";
 
-    return data.map((p: any) =>
+    return data.map((p: { name_ar: string; brand: string; price: number; stock: number }) =>
       `${p.brand} ${p.name_ar} — ${Number(p.price).toLocaleString()}₪ (${p.stock > 0 ? "متوفر" : "غير متوفر"})`
     ).join("\n");
   } catch {
@@ -129,25 +127,9 @@ export async function getAIResponse(
   currentMessage: string,
   context: AIContext
 ): Promise<{ text: string; quickReplies?: string[] } | null> {
-  const sb = createAdminSupabase();
-  const { data: dbIntegration } = await sb
-    .from("integrations")
-    .select("provider, config")
-    .eq("type", "ai_chat")
-    .single();
-
-  const provider = dbIntegration?.provider || "Anthropic Claude";
-  const integrationConfig = dbIntegration?.config || {};
-
-  let apiKey = "";
-  if (provider === "Google Gemini") {
-    apiKey = integrationConfig.api_key || process.env.GEMINI_API_KEY || "AIzaSyDQYgEfgo2itJfVWkdKNIryq6qw8JIxUI0";
-  } else {
-    apiKey = integrationConfig.api_key || process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY || "";
-  }
-
+  const apiKey = process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.warn(`[AI] ${provider} API key not set — AI responses disabled`);
+    console.warn("ANTHROPIC_API_KEY_BOT not set — AI responses disabled");
     return null;
   }
 
@@ -183,28 +165,17 @@ export async function getAIResponse(
     // Add current message
     claudeMessages.push({ role: "user", content: currentMessage });
 
-    // Ensure messages alternate correctly (Claude requirement, works for Gemini too)
+    // Ensure messages alternate correctly (Claude requirement)
     const cleaned = cleanAlternatingMessages(claudeMessages);
 
-    // 5. Call AI via selected client
-    let result;
-    if (provider === "Google Gemini") {
-      result = await callGemini({
-        systemPrompt,
-        messages: cleaned,
-        maxTokens: 400,
-        temperature: 0.7,
-        apiKey,
-      });
-    } else {
-      result = await callClaude({
-        systemPrompt,
-        messages: cleaned,
-        maxTokens: 400,
-        temperature: 0.7,
-        apiKey,
-      });
-    }
+    // 5. Call Claude via shared client
+    const result = await callClaude({
+      systemPrompt,
+      messages: cleaned,
+      maxTokens: 400,
+      temperature: 0.7,
+      apiKey,
+    });
 
     if (!result) return null;
 

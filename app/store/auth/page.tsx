@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
@@ -28,12 +28,14 @@ export default function AuthPage() {
   const [countdown, setCountdown] = useState(0);
   const [sentChannel, setSentChannel] = useState<Channel>("sms");
 
-  const otpRefs = [
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-  ];
+  const otpRef0 = useRef<HTMLInputElement>(null);
+  const otpRef1 = useRef<HTMLInputElement>(null);
+  const otpRef2 = useRef<HTMLInputElement>(null);
+  const otpRef3 = useRef<HTMLInputElement>(null);
+  const otpRefs = useMemo(
+    () => [otpRef0, otpRef1, otpRef2, otpRef3],
+    [],
+  );
 
   // Countdown timer
   useEffect(() => {

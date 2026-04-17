@@ -158,7 +158,7 @@ export function useInboxConversations(params: {
   const [stats, setStats] = useState<InboxStats | null>(null);
   const [loading, setLoading] = useState(true);
   const paramsRef = useRef(params);
-  paramsRef.current = params;
+  useEffect(() => { paramsRef.current = params; });
 
   const load = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
@@ -210,7 +210,7 @@ export function useInboxMessages(conversationId: string | null, pollInterval = F
   const lastMsgCount = useRef(0);
   const [newMessageArrived, setNewMessageArrived] = useState(false);
   const convIdRef = useRef(conversationId);
-  convIdRef.current = conversationId;
+  useEffect(() => { convIdRef.current = conversationId; });
 
   const load = useCallback(async (showLoading = false) => {
     if (!convIdRef.current) return;

@@ -16,14 +16,16 @@ Next.js 14 App Router · TypeScript (strict) · Tailwind CSS 3 · Supabase (Post
 | **DB Types** | `types/database.ts` | 35+ table types — single source of truth for the Supabase schema |
 | **Migrations** | `supabase/migrations/` | 26 SQL migrations defining the full schema (001-026) |
 | **i18n** | `locales/` | Hebrew (`he.json`) + Arabic (`ar.json`) — RTL bilingual UI |
+| **Fonts** | `app/fonts.ts` | `next/font/google` (Heebo, Tajawal, David Libre) — applied on `<html>` in `app/layout.tsx` |
+| **Public URL helper** | `lib/public-site-url.ts` | `getPublicSiteUrl()` for redirects, webhooks, admin links (not for PDF print popups — those may still load Google Fonts) |
 
 ## Build & Test
 ```
 npm install              # Node >=18.17.0
 npm run dev              # Dev server
 npm run build            # Production build
-npm run build:cf         # Cloudflare Pages build
-npm run deploy:cf        # Build + deploy to CF Pages
+npm run build:cf         # OpenNext Cloudflare bundle (run `npm run build` first unless using deploy:cf)
+npm run deploy:cf        # `next build` + OpenNext + `wrangler deploy`
 npm run lint             # ESLint
 npm run format           # Prettier write
 npm run format:check     # Prettier check
@@ -60,6 +62,7 @@ npm run db:reset         # Reset DB
 - CSRF exempt: `/api/webhook/*`, `/api/cron/*`, `/api/payment/callback`, `/api/csrf`, `/api/orders`.
 - Open CORS (no session required): `/api/admin/commissions/summary`, `/api/admin/commissions/dashboard` — these accept bearer token auth via `COMMISSION_API_TOKEN` env var.
 - Never hardcode secrets — use env vars. Integration configs stored in `integrations` table.
+- Public absolute URLs (payment redirects, webhooks, admin links): use `getPublicSiteUrl()` from `lib/public-site-url.ts` (`NEXT_PUBLIC_APP_URL`, then legacy `NEXT_PUBLIC_SITE_URL`). Production CSP omits `unsafe-eval` (still allowed in development).
 
 ### Database
 - All table types in `types/database.ts` — update this file when adding/modifying tables.

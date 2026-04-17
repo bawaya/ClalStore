@@ -2,45 +2,93 @@ import { NextRequest } from "next/server";
 import { withAdminAuth } from "@/lib/admin/auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  COMMISSION_CONTRACT_TARGET_KEY,
+  getCommissionTarget,
+  getCommissionTargetKey,
+  resolveLinkedAppUserId,
+} from "@/lib/commissions/ledger";
 
-export const GET = withAdminAuth(async (req: NextRequest, db: SupabaseClient) => {
+async function resolveTargetKey(
+  db: SupabaseClient,
+  params: {
+    target_key?: string | null;
+    employee_key?: string | null;
+    employee_id?: string | null;
+  },
+) {
+  const employeeId =
+    (await resolveLinkedAppUserId(db, params.employee_id)) || params.employee_id || null;
+
+  return getCommissionTargetKey({
+    targetKey: params.target_key,
+    employeeKey: params.employee_key,
+    employeeId,
+  });
+}
+
+export const GET = withAdminAuth(async (req: NextRequest, db: SupabaseClient, user) => {
   const { searchParams } = new URL(req.url);
   const month = searchParams.get("month");
   if (!month) return apiError("month param required (e.g. 2026-04)", 400);
+  const hasScopedTarget =
+    Boolean(searchParams.get("target_key")) ||
+    Boolean(searchParams.get("employee_key")) ||
+    Boolean(searchParams.get("employee_id"));
 
-  const { data, error } = await db
-    .from("commission_targets")
-    .select("*")
-    .eq("month", month)
-    .maybeSingle();
+  const targetKey = await resolveTargetKey(db, {
+    target_key: searchParams.get("target_key"),
+    employee_key: searchParams.get("employee_key"),
+    employee_id: searchParams.get("employee_id"),
+  });
 
-  if (error) return apiError(error.message, 500);
-  return apiSuccess(data);
+  try {
+    const preferredKeys = hasScopedTarget
+      ? [targetKey]
+      : [targetKey, COMMISSION_CONTRACT_TARGET_KEY, user.appUserId || null, user.id];
+    const data = await getCommissionTarget(db, month, preferredKeys);
+    return apiSuccess(data);
+  } catch (error) {
+    console.error("Targets GET error:", error);
+    return apiError("ÙØ´Ù„ ÙÙŠ Ø¬Ù„Ø¨ Ø§Ù„Ø£Ù‡Ø¯Ø§Ù", 500);
+  }
 });
 
-export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient, user) => {
+export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) => {
   const body = await req.json();
-  const { month, target_lines_amount, target_devices_amount, target_total, target_lines_count, target_devices_count } = body;
+  const {
+    month,
+    target_lines_amount,
+    target_devices_amount,
+    target_total,
+    target_lines_count,
+    target_devices_count,
+  } = body;
 
   if (!month) return apiError("month required", 400);
 
-  // Check if target exists and is locked
+  const targetKey = await resolveTargetKey(db, {
+    target_key: body.target_key,
+    employee_key: body.employee_key,
+    employee_id: body.employee_id,
+  });
+
   const { data: existing } = await db
     .from("commission_targets")
     .select("id, is_locked")
-    .eq("user_id", user.id)
+    .eq("user_id", targetKey)
     .eq("month", month)
     .maybeSingle();
 
   if (existing?.is_locked) {
-    return apiError("היעד לחודש זה נעול ולא ניתן לעריכה", 403);
+    return apiError("×”×™×¢×“ ×œ×—×•×“×© ×–×” × ×¢×•×œ ×•×œ× × ×™×ª×Ÿ ×œ×¢×¨×™×›×”", 403);
   }
 
   const { data, error } = await db
     .from("commission_targets")
     .upsert(
       {
-        user_id: user.id,
+        user_id: targetKey,
         month,
         target_lines_amount: target_lines_amount || 0,
         target_devices_amount: target_devices_amount || 0,
@@ -49,31 +97,41 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient, u
         target_devices_count: target_devices_count || 0,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id,month" }
+      { onConflict: "user_id,month" },
     )
     .select()
     .single();
 
-  if (error) return apiError(error.message, 500);
+  if (error) {
+    console.error("Targets POST error:", error);
+    return apiError("ÙØ´Ù„ ÙÙŠ Ø­ÙØ¸ Ø§Ù„Ù‡Ø¯Ù", 500);
+  }
   return apiSuccess(data);
 });
 
-// PATCH — Lock/Unlock target
-export const PATCH = withAdminAuth(async (req: NextRequest, db: SupabaseClient, user) => {
+export const PATCH = withAdminAuth(async (req: NextRequest, db: SupabaseClient) => {
   const body = await req.json();
   const { month, action } = body;
 
   if (!month) return apiError("month required", 400);
-  if (!action || !["lock", "unlock"].includes(action)) return apiError("action must be 'lock' or 'unlock'", 400);
+  if (!action || !["lock", "unlock"].includes(action)) {
+    return apiError("action must be 'lock' or 'unlock'", 400);
+  }
+
+  const targetKey = await resolveTargetKey(db, {
+    target_key: body.target_key,
+    employee_key: body.employee_key,
+    employee_id: body.employee_id,
+  });
 
   const { data: existing } = await db
     .from("commission_targets")
     .select("id, is_locked")
-    .eq("user_id", user.id)
+    .eq("user_id", targetKey)
     .eq("month", month)
     .maybeSingle();
 
-  if (!existing) return apiError("לא קיים יעד לחודש זה", 404);
+  if (!existing) return apiError("×œ× ×§×™×™× ×™×¢×“ ×œ×—×•×“×© ×–×”", 404);
 
   const isLocking = action === "lock";
 
@@ -88,6 +146,9 @@ export const PATCH = withAdminAuth(async (req: NextRequest, db: SupabaseClient, 
     .select()
     .single();
 
-  if (error) return apiError(error.message, 500);
+  if (error) {
+    console.error("Targets PATCH error:", error);
+    return apiError("ÙØ´Ù„ ÙÙŠ ØªØ­Ø¯ÙŠØ« Ø­Ø§Ù„Ø© Ø§Ù„Ù‡Ø¯Ù", 500);
+  }
   return apiSuccess(data);
 });

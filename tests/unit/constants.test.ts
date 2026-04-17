@@ -17,6 +17,7 @@ describe("Constants", () => {
       "delivered",
       "cancelled",
       "rejected",
+      "returned",
       "no_reply_1",
       "no_reply_2",
       "no_reply_3",

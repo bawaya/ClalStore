@@ -30,16 +30,16 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     .from("users")
     .select("*")
     .eq("auth_id", user.id)
-    .single() as { data: any };
+    .single() as { data: Record<string, unknown> | null };
 
   if (!profile) return null;
 
   return {
-    id: profile.id,
+    id: profile.id as string,
     email: user.email || "",
-    name: profile.name,
+    name: profile.name as string,
     role: profile.role as UserRole,
-    avatar_url: profile.avatar_url || undefined,
+    avatar_url: (profile.avatar_url as string) || undefined,
   };
 }
 

@@ -56,7 +56,7 @@ export function Navbar() {
 
         {/* Mobile menu */}
         {scr.mobile && (
-          <button onClick={() => setMenuOpen(!menuOpen)} className="text-white bg-transparent border-0 cursor-pointer text-xl">☰</button>
+          <button onClick={() => setMenuOpen(!menuOpen)} aria-label="القائمة" aria-expanded={menuOpen} className="text-white bg-transparent border-0 cursor-pointer text-xl">☰</button>
         )}
       </div>
 
@@ -297,6 +297,7 @@ export function FAQSection({ faqs, cms }: { faqs?: { q: string; a: string }[]; c
         <div className="space-y-1.5">
           {defaultFaqs.map((f: { q: string; a: string }, i: number) => (
             <div key={i} className="card cursor-pointer" onClick={() => setOpenIdx(openIdx === i ? null : i)}
+              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenIdx(openIdx === i ? null : i); } }}
               style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}>
               <div className="flex items-center justify-between">
                 <span className="text-brand transition-transform" style={{ transform: openIdx === i ? "rotate(45deg)" : "rotate(0)", fontSize: 16 }}>+</span>

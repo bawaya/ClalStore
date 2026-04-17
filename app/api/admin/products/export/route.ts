@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createServerSupabase } from "@/lib/supabase";
+import { apiError } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
@@ -60,9 +61,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    console.error("Product export error:", err);
+    return apiError("فشل في تصدير المنتجات", 500);
   }
 }

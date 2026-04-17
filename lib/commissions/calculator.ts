@@ -126,7 +126,11 @@ export function calcLoyaltyBonus(loyaltyStartDate: string, now?: string): {
   const current = now ? new Date(now) : new Date();
   const diffMs = current.getTime() - start.getTime();
   const diffDays = Math.floor(diffMs / 86400000);
-  const monthsActive = Math.floor(diffDays / 30);
+  // Calendar-based month calculation (accurate for 12-15 month loyalty periods)
+  const monthsActive =
+    (current.getFullYear() - start.getFullYear()) * 12 +
+    (current.getMonth() - start.getMonth()) +
+    (current.getDate() >= start.getDate() ? 0 : -1);
   const isInLoyaltyPeriod = diffDays <= COMMISSION.LOYALTY_PERIOD_DAYS;
   const daysRemaining = Math.max(0, COMMISSION.LOYALTY_PERIOD_DAYS - diffDays);
 
@@ -147,7 +151,7 @@ export function calcLoyaltyBonus(loyaltyStartDate: string, now?: string): {
   for (const m of milestones) {
     if (monthsActive < m.months) {
       const nextDate = new Date(start);
-      nextDate.setDate(nextDate.getDate() + m.months * 30);
+      nextDate.setMonth(nextDate.getMonth() + m.months);
       nextBonus = { months: m.months, amount: m.amount, date: nextDate.toISOString().slice(0, 10) };
       break;
     }
@@ -247,8 +251,10 @@ export function calcRequiredForTarget(
 }
 
 // Total monthly summary
+// Monthly summaries should read the persisted ledger values directly.
+// Device rows are already allocated month-by-month during sync/update flows.
 export function calcMonthlySummary(
-  sales: Array<{ sale_type: string; commission_amount: number; source: string }>,
+  sales: Array<{ sale_type: string; commission_amount: number; source: string; device_sale_amount?: number }>,
   sanctions: Array<{ amount: number }>,
   loyaltyBonuses: number,
   target: { target_total: number } | null
@@ -270,7 +276,7 @@ export function calcMonthlySummary(
 
   const devicesCommission = sales
     .filter((s) => s.sale_type === 'device')
-    .reduce((sum, s) => sum + s.commission_amount, 0);
+    .reduce((sum, s) => sum + (s.commission_amount || 0), 0);
 
   const grossCommission = linesCommission + devicesCommission + loyaltyBonuses;
   const totalSanctions = sanctions.reduce((sum, s) => sum + s.amount, 0);
@@ -280,7 +286,7 @@ export function calcMonthlySummary(
   const targetProgress = targetAmount > 0 ? Math.min(100, Math.round((netCommission / targetAmount) * 100)) : 0;
 
   const autoSyncedCount = sales.filter((s) => s.source === 'auto_sync').length;
-  const manualEntryCount = sales.filter((s) => s.source === 'manual').length;
+  const manualEntryCount = sales.filter((s) => s.source !== 'auto_sync').length;
 
   return {
     linesCommission,

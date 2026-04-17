@@ -6,10 +6,10 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
 import { removeBackgroundFromBuffer } from "@/lib/integrations/removebg";
 import { uploadToR2 } from "@/lib/storage-r2";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { requireAdmin } from "@/lib/admin/auth";
 
 /** Detect image MIME type from magic bytes in the buffer */
 function detectImageType(buffer: ArrayBuffer): string {

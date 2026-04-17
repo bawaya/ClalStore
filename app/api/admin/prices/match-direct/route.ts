@@ -158,6 +158,7 @@ export async function POST(req: NextRequest) {
       provider: "direct",
     });
   } catch (err: unknown) {
-    return apiError(errMsg(err, String(err)));
+    console.error("Price match-direct error:", err);
+    return apiError("فشل في مطابقة الأسعار", 500);
   }
 }

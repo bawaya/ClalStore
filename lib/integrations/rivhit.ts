@@ -7,6 +7,7 @@
 
 import type { PaymentProvider, ChargeParams, ChargeResult, PaymentStatus, RefundResult } from "./hub";
 import { getIntegrationConfig } from "./hub";
+import { getPublicSiteUrl } from "@/lib/public-site-url";
 
 const ICREDIT_LIVE = "https://icredit.rivhit.co.il/API/PaymentPageRequest.svc";
 const ICREDIT_TEST = "https://testicredit.rivhit.co.il/API/PaymentPageRequest.svc";
@@ -74,7 +75,7 @@ export async function createPaymentPage(params: {
   currency?: string;
 }): Promise<{ success: boolean; paymentUrl?: string; privateSaleToken?: string; publicSaleToken?: string; error?: string }> {
   const cfg = await getIcreditConfig();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+  const appUrl = getPublicSiteUrl();
   const baseUrl = getBaseUrl(cfg.testMode);
 
   const nameParts = params.customerName.trim().split(/\s+/);

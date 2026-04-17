@@ -119,11 +119,29 @@ export function ChatPanel({
           setSummaryStale(false);
         }
       } else {
-        // Auto-generate
-        loadSummary();
+        // Auto-generate — called below after declaration
+        doLoadSummary();
       }
     } else {
       setSummary(null);
+    }
+
+    async function doLoadSummary() {
+      setSummaryLoading(true);
+      try {
+        const res = await fetch(`/api/crm/inbox/${conversation.id}/summary`, {
+          method: "POST",
+          headers: csrfHeaders(),
+          body: JSON.stringify({ force: false }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSummary(data.summary);
+          setSummaryStale(false);
+          setSummaryCollapsed(false);
+        }
+      } catch {}
+      setSummaryLoading(false);
     }
   }, [conversation.id, messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 

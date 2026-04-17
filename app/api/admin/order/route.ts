@@ -1,74 +1,63 @@
 export const dynamic = "force-dynamic";
 
-import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin/auth";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { NextRequest } from "next/server";
+import { withPermission, logAudit } from "@/lib/admin/auth";
+import { apiError, apiSuccess } from "@/lib/api-response";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-const SETTINGS_KEY = "product_sort_rules";
+export const GET = withPermission(
+  "products",
+  "view",
+  async (_req: NextRequest, db: SupabaseClient) => {
+    const { data, error } = await db
+      .from("products")
+      .select("id, brand, name_ar, name_he, image_url, active, type, sort_position, created_at")
+      .order("sort_position", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(500);
 
-export async function GET(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
-    const supabase = createAdminSupabase();
-    if (!supabase) return apiError("DB unavailable", 500);
-
-    const [settingsRes, brandsRes] = await Promise.all([
-      supabase.from("settings").select("value").eq("key", SETTINGS_KEY).single(),
-      supabase.from("products").select("brand").eq("active", true).eq("type", "device"),
-    ]);
-
-    const allBrands = [...new Set((brandsRes.data || []).map((r: { brand: string }) => r.brand).filter(Boolean))].sort();
-
-    let config = null;
-    try {
-      if (settingsRes.data?.value) config = JSON.parse(settingsRes.data.value);
-    } catch {}
-
-    return apiSuccess({ config, allBrands });
-  } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
-  }
-}
-
-export async function PUT(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
-    const body = await req.json();
-    const config = body.config;
-
-    if (!config?.rules || !Array.isArray(config.rules) || config.rules.length !== 3) {
-      return apiError("يجب تحديد 3 معايير ترتيب", 400);
+    if (error) {
+      console.error("Order GET error:", error);
+      return apiError("فشل في جلب المنتجات", 500);
     }
 
-    const validFields = new Set(["price", "brand", "has_image"]);
-    const validDirs = new Set(["asc", "desc"]);
-    for (const r of config.rules) {
-      if (!validFields.has(r.field) || !validDirs.has(r.direction) || typeof r.enabled !== "boolean") {
-        return apiError("معايير غير صالحة", 400);
+    return apiSuccess({ products: data || [] });
+  },
+);
+
+export const PUT = withPermission(
+  "products",
+  "edit",
+  async (req: NextRequest, db: SupabaseClient, user) => {
+    const body = await req.json();
+    const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.filter(Boolean) : [];
+
+    if (!orderedIds.length) {
+      return apiError("orderedIds is required", 400);
+    }
+
+    for (const [index, productId] of orderedIds.entries()) {
+      const { error } = await db
+        .from("products")
+        .update({ sort_position: index + 1 })
+        .eq("id", productId);
+
+      if (error) {
+        console.error("Order PUT reorder error:", error);
+        return apiError("فشل في ترتيب المنتجات", 500);
       }
     }
 
-    const supabase = createAdminSupabase();
-    if (!supabase) return apiError("DB unavailable", 500);
-
-    const value = JSON.stringify({
-      rules: config.rules,
-      brandOrder: Array.isArray(config.brandOrder) ? config.brandOrder : [],
+    await logAudit(db, {
+      userId: user.appUserId,
+      userName: user.name,
+      userRole: user.role,
+      action: "reorder",
+      module: "products",
+      entityType: "product",
+      details: { count: orderedIds.length },
     });
 
-    const { data: existing } = await supabase.from("settings").select("key").eq("key", SETTINGS_KEY).single();
-
-    if (existing) {
-      await supabase.from("settings").update({ value }).eq("key", SETTINGS_KEY);
-    } else {
-      await supabase.from("settings").insert({ key: SETTINGS_KEY, value, type: "json" });
-    }
-
-    return apiSuccess(null);
-  } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
-  }
-}
+    return apiSuccess({ ok: true });
+  },
+);

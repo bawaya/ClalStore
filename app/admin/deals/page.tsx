@@ -71,9 +71,7 @@ export default function AdminDealsPage() {
       const res = await fetch("/api/admin/deals?admin=true");
       const json = await res.json();
       setDeals(json.deals || []);
-    } catch (err) {
-      console.error("Failed to load deals:", err);
-    }
+    } catch {}
     setLoading(false);
   };
 
@@ -129,7 +127,9 @@ export default function AdminDealsPage() {
         body: JSON.stringify({ id: deal.id, active: !deal.active }),
       });
       load();
-    } catch {}
+    } catch {
+      show("❌ خطأ في تحديث العرض", "error");
+    }
   };
 
   if (loading) return <div className="text-center py-20 text-muted">⏳</div>;
@@ -152,7 +152,7 @@ export default function AdminDealsPage() {
               {/* Image */}
               <div className="w-12 h-12 bg-surface-elevated rounded-lg flex items-center justify-center flex-shrink-0">
                 {d.image_url ? (
-                  <img src={d.image_url} alt="" className="w-10 h-10 object-contain" />
+                  <img src={d.image_url} alt={d.title_ar || "عرض"} className="w-10 h-10 object-contain" />
                 ) : (
                   <span className="text-2xl">🔥</span>
                 )}

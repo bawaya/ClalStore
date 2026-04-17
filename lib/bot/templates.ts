@@ -97,10 +97,13 @@ export async function getTemplate(key: string, lang: "ar" | "he" | "en", vars?: 
 
   let text = lang === "he" ? t.he : t.ar;
 
-  // Replace variables
+  // Replace variables (use string replace to avoid regex injection)
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
-      text = text.replace(new RegExp(`\\{${k}\\}`, "g"), v);
+      const placeholder = `{${k}}`;
+      while (text.includes(placeholder)) {
+        text = text.replace(placeholder, v);
+      }
     }
   }
 

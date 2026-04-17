@@ -115,6 +115,8 @@ export default function AnalyticsPage() {
         <Link href="/admin/commissions/history" className="chip">היסטוריה</Link>
         <Link href="/admin/commissions/import" className="chip">ייבוא</Link>
         <Link href="/admin/commissions/analytics" className="chip chip-active">ניתוח</Link>
+        <Link href="/admin/commissions/team" className="chip">צוות</Link>
+        <Link href="/admin/commissions/live" className="chip">📊 לוח חי</Link>
       </div>
 
       {/* KPI Cards */}

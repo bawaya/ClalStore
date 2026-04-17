@@ -36,8 +36,8 @@ const config: Config = {
         dim: "#3f3f46",
       },
       fontFamily: {
-        arabic: ["Tajawal", "sans-serif"],
-        hebrew: ["David Libre", "Heebo", "serif"],
+        arabic: ["var(--font-tajawal)", "var(--font-heebo)", "sans-serif"],
+        hebrew: ["var(--font-david-libre)", "var(--font-heebo)", "var(--font-tajawal)", "serif"],
       },
       borderRadius: {
         card: "14px",

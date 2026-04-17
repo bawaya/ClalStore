@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
-import { csrfHeaders } from "@/lib/csrf-client";
 import { StoreHeader } from "@/components/store/StoreHeader";
 
 export default function StoreContactPage() {
@@ -24,7 +23,7 @@ export default function StoreContactPage() {
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
-        headers: csrfHeaders(),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
           phone: form.phone,
@@ -104,8 +103,6 @@ export default function StoreContactPage() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder={t("storeContact.namePH")}
-                  required
-                  minLength={2}
                 />
               </div>
 
@@ -119,8 +116,6 @@ export default function StoreContactPage() {
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   placeholder="05X-XXXXXXX"
                   dir="ltr"
-                  required
-                  pattern="^0[0-9]{8,9}$"
                 />
               </div>
 

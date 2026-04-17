@@ -99,6 +99,14 @@ export function maskAccount(account: string): string {
 
 // ===== Order ID Generator =====
 export function generateOrderId(): string {
-  const num = 10000 + Math.floor(Math.random() * 89999);
-  return `CLM-${num}`;
+  const ts = Date.now().toString(36).slice(-4).toUpperCase();
+  const rnd = Math.floor(Math.random() * 9000 + 1000);
+  return `CLM-${ts}${rnd}`;
+}
+
+// ===== Customer Code Generator =====
+export function generateCustomerCode(): string {
+  const ts = Date.now().toString(36).slice(-4).toUpperCase();
+  const rnd = Math.floor(Math.random() * 900 + 100);
+  return `CLAL-${ts}${rnd}`;
 }

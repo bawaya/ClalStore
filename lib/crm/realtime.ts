@@ -1,123 +1,68 @@
 // =====================================================
-// ClalMobile — Supabase Realtime for CRM Inbox
-// Replaces polling with live subscriptions on
-// inbox_conversations and inbox_messages tables.
-// Handles connection drops and reconnection gracefully.
+// ClalMobile — CRM Inbox Realtime (Supabase Realtime)
+// Subscribes to inbox_conversations + inbox_messages changes
 // =====================================================
 
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
-import { createBrowserSupabase } from "@/lib/supabase";
-import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { useEffect, useRef, useState } from "react";
+import { getSupabase } from "@/lib/supabase";
 
-export type RealtimeEvent = {
+export interface RealtimeEvent {
   table: string;
   eventType: "INSERT" | "UPDATE" | "DELETE";
   new: Record<string, unknown>;
   old: Record<string, unknown>;
-};
+}
 
-type RealtimeCallback = (event: RealtimeEvent) => void;
+type RealtimeHandler = (event: RealtimeEvent) => void;
 
-/**
- * Hook: subscribe to Supabase Realtime on inbox tables.
- * Fires `onEvent` for INSERT/UPDATE on inbox_conversations and inbox_messages.
- * Automatically reconnects on connection drops.
- */
-export function useInboxRealtime(onEvent: RealtimeCallback) {
-  const callbackRef = useRef(onEvent);
-  callbackRef.current = onEvent;
-
-  const channelRef = useRef<RealtimeChannel | null>(null);
+export function useInboxRealtime(onEvent: RealtimeHandler): { connected: boolean } {
   const [connected, setConnected] = useState(false);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handlerRef = useRef(onEvent);
 
-  const cleanup = useCallback(() => {
-    if (reconnectTimer.current) {
-      clearTimeout(reconnectTimer.current);
-      reconnectTimer.current = null;
-    }
-    if (channelRef.current) {
-      const supabase = createBrowserSupabase();
-      if (supabase) {
-        supabase.removeChannel(channelRef.current);
-      }
-      channelRef.current = null;
-    }
-    setConnected(false);
-  }, []);
+  useEffect(() => {
+    handlerRef.current = onEvent;
+  });
 
-  const subscribe = useCallback(() => {
-    const supabase = createBrowserSupabase();
+  useEffect(() => {
+    const supabase = getSupabase();
     if (!supabase) return;
 
-    // Clean up any existing channel
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-
     const channel = supabase
-      .channel("crm-inbox-realtime", {
-        config: { broadcast: { self: false } },
-      })
-      // Listen for changes on inbox_conversations
+      .channel("inbox-realtime")
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "inbox_conversations",
-        },
-        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          callbackRef.current({
+        { event: "*", schema: "public", table: "inbox_conversations" },
+        (payload: any) => {
+          handlerRef.current({
             table: "inbox_conversations",
-            eventType: payload.eventType as RealtimeEvent["eventType"],
-            new: (payload.new || {}) as Record<string, unknown>,
-            old: (payload.old || {}) as Record<string, unknown>,
+            eventType: payload.eventType,
+            new: payload.new || {},
+            old: payload.old || {},
           });
         }
       )
-      // Listen for changes on inbox_messages
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "inbox_messages",
-        },
-        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          callbackRef.current({
+        { event: "*", schema: "public", table: "inbox_messages" },
+        (payload: any) => {
+          handlerRef.current({
             table: "inbox_messages",
-            eventType: payload.eventType as RealtimeEvent["eventType"],
-            new: (payload.new || {}) as Record<string, unknown>,
-            old: (payload.old || {}) as Record<string, unknown>,
+            eventType: payload.eventType,
+            new: payload.new || {},
+            old: payload.old || {},
           });
         }
       )
       .subscribe((status: string) => {
-        if (status === "SUBSCRIBED") {
-          setConnected(true);
-        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
-          setConnected(false);
-          // Reconnect after a delay
-          if (!reconnectTimer.current) {
-            reconnectTimer.current = setTimeout(() => {
-              reconnectTimer.current = null;
-              subscribe();
-            }, 5000);
-          }
-        }
+        setConnected(status === "SUBSCRIBED");
       });
 
-    channelRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
-
-  useEffect(() => {
-    subscribe();
-    return cleanup;
-  }, [subscribe, cleanup]);
 
   return { connected };
 }

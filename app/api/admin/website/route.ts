@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
     return apiSuccess(data || []);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Website GET error:", err);
+    return apiError("فشل في جلب المحتوى", 500);
   }
 }
 
@@ -47,6 +48,7 @@ export async function PUT(req: NextRequest) {
     if (error) throw error;
     return apiSuccess(data);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Website PUT error:", err);
+    return apiError("فشل في تحديث المحتوى", 500);
   }
 }

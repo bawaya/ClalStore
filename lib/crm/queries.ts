@@ -39,19 +39,20 @@ const db = () => createAdminSupabase();
 export async function getCRMDashboard(filters?: { dateFrom?: string; dateTo?: string }) {
   const s = db();
 
-  let ordersQuery = s.from("orders").select("id, status, source, total, created_at, customer_id, assigned_to").order("created_at", { ascending: false });
+  let ordersQuery = s.from("orders").select("id, status, source, total, created_at, customer_id, assigned_to", { count: "exact" }).is("deleted_at", null).order("created_at", { ascending: false });
   if (filters?.dateFrom) ordersQuery = ordersQuery.gte("created_at", filters.dateFrom);
   if (filters?.dateTo) ordersQuery = ordersQuery.lte("created_at", filters.dateTo + "T23:59:59.999Z");
-  ordersQuery = ordersQuery.limit(500);
+  ordersQuery = ordersQuery.limit(5000);
 
   const [orders, customers, tasks, pipeline] = await Promise.all([
     ordersQuery,
-    s.from("customers").select("id, name, phone, segment, total_orders, total_spent, last_order_at").limit(200),
+    s.from("customers").select("id, name, phone, segment, total_orders, total_spent, last_order_at", { count: "exact" }).limit(200),
     s.from("tasks").select("id, status, priority, due_date, assigned_to").limit(500),
     s.from("pipeline_deals").select("id, stage, value").limit(500),
   ]);
 
   const o = orders.data || [];
+  const totalOrderCount = orders.count ?? o.length;
   const c = customers.data || [];
   const t = tasks.data || [];
   const p = pipeline.data || [];
@@ -67,11 +68,12 @@ export async function getCRMDashboard(filters?: { dateFrom?: string; dateTo?: st
     const rangeDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86400000));
     const prevTo = new Date(from.getTime() - 1); // day before current range start
     const prevFrom = new Date(prevTo.getTime() - rangeDays * 86400000);
-    const { data: prevOrders } = await s.from("orders")
-      .select("total, status")
+    const { data: prevOrders, count: prevCount } = await s.from("orders")
+      .select("total, status", { count: "exact" })
+      .is("deleted_at", null)
       .gte("created_at", prevFrom.toISOString())
       .lte("created_at", prevTo.toISOString() + "T23:59:59.999Z")
-      .limit(500);
+      .limit(5000);
     prevRevenue = (prevOrders || [])
       .filter((x: { total: number; status: string }) => !["rejected", "new"].includes(x.status))
       .reduce((s: number, x: { total: number }) => s + Number(x.total), 0);
@@ -105,8 +107,8 @@ export async function getCRMDashboard(filters?: { dateFrom?: string; dateTo?: st
     .slice(0, 10);
 
   return {
-    totalOrders: o.length, revenue, prevRevenue, newCount, noReply, noReply3,
-    totalCustomers: c.length, vipCount: c.filter((x: DashboardCustomer) => x.segment === "vip").length,
+    totalOrders: totalOrderCount, revenue, prevRevenue, newCount, noReply, noReply3,
+    totalCustomers: customers.count ?? c.length, vipCount: c.filter((x: DashboardCustomer) => x.segment === "vip").length,
     openTasks, pipelineValue, pipelineDeals: p.length,
     byStatus, bySource, alerts,
     recentOrders: o.slice(0, 5),
@@ -130,7 +132,7 @@ export async function getCRMOrders(filters?: {
   const limit = filters?.limit || 100;
   const offset = filters?.offset || 0;
 
-  let query = s.from("orders").select(`*, order_items(*), order_notes(*), customers(name, phone, segment, id_number)`, { count: "exact" }).order("created_at", { ascending: false });
+  let query = s.from("orders").select(`*, order_items(*), order_notes(*), customers(name, phone, segment, id_number)`, { count: "exact" }).is("deleted_at", null).order("created_at", { ascending: false });
   if (filters?.status) {
     if (filters.status === "no_reply_all") query = query.like("status", "no_reply%");
     else query = query.eq("status", filters.status);
@@ -178,27 +180,19 @@ export async function deleteOrderCompletely(orderId: string, userName: string) {
     .single();
   if (orderErr || !order) throw new Error("الطلب غير موجود");
 
-  // Keep audit history clean when removing an order entirely.
-  await s.from("audit_log").delete().eq("entity_id", orderId);
-
-  // Delete order items first (foreign key dependency)
-  await s.from("order_items").delete().eq("order_id", orderId);
-
-  // Loyalty transactions may reference order_id. Ignore missing-table setups.
-  try {
-    await s.from("loyalty_transactions").delete().eq("order_id", orderId);
-  } catch {
-    // no-op
-  }
-
-  const { error: delErr } = await s.from("orders").delete().eq("id", orderId);
+  // Soft delete: set deleted_at instead of hard delete
+  const { error: delErr } = await s
+    .from("orders")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", orderId);
   if (delErr) throw delErr;
 
-  // Recalculate customer KPIs because current trigger only handles INSERT/UPDATE.
+  // Recalculate customer KPIs excluding soft-deleted orders
   const { data: remaining } = await s
     .from("orders")
     .select("total, status, created_at")
-    .eq("customer_id", order.customer_id);
+    .eq("customer_id", order.customer_id)
+    .is("deleted_at", null);
   const rows: OrderTotalRow[] = remaining || [];
   const nonRejected = rows.filter((r) => r.status !== "rejected");
   const billable = rows.filter((r) => !["rejected", "new"].includes(r.status));
@@ -216,10 +210,10 @@ export async function deleteOrderCompletely(orderId: string, userName: string) {
 
   await s.from("audit_log").insert({
     user_name: userName,
-    action: `🗑️ حذف نهائي للطلب ${orderId}`,
+    action: `🗑️ حذف الطلب ${orderId}`,
     entity_type: "order_delete",
     entity_id: orderId,
-    details: { deleted: true },
+    details: { soft_deleted: true },
   });
 }
 
@@ -240,19 +234,26 @@ export async function getCRMCustomers(filters?: { segment?: string; search?: str
   return { data: data || [], total: count || 0 };
 }
 
-export async function getCustomerOrders(customerId: string) {
+export async function getCustomerOrders(customerId: string, opts?: { limit?: number }) {
   const s = db();
-  const { data } = await s.from("orders").select("*, order_items(*)").eq("customer_id", customerId).order("created_at", { ascending: false });
+  const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
+  const { data } = await s
+    .from("orders")
+    .select("*, order_items(*)")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
   return data || [];
 }
 
 // ===== Tasks =====
-export async function getCRMTasks(filters?: { status?: string; assignedTo?: string }) {
+export async function getCRMTasks(filters?: { status?: string; assignedTo?: string; limit?: number }) {
   const s = db();
+  const limit = Math.min(Math.max(filters?.limit ?? 200, 1), 500);
   let query = s.from("tasks").select("*, customers(name), orders(id)").order("created_at", { ascending: false });
   if (filters?.status) query = query.eq("status", filters.status);
   if (filters?.assignedTo) query = query.eq("assigned_to", filters.assignedTo);
-  const { data } = await query;
+  const { data } = await query.limit(limit);
   return data || [];
 }
 
@@ -298,7 +299,7 @@ export async function deleteDeal(id: string) {
 // ===== Users =====
 export async function getCRMUsers() {
   const s = db();
-  const { data: users } = await s.from("users").select("*").order("created_at");
+  const { data: users } = await s.from("users").select("id, auth_id, name, email, phone, role, status, is_active, avatar_url, created_at").order("created_at").limit(500);
   const list: AppUser[] = users || [];
   if (list.length === 0) return [];
 
@@ -361,8 +362,12 @@ export async function getCRMChats(filters?: { channel?: string; status?: string;
   let query = s.from("bot_conversations").select("*").order("updated_at", { ascending: false });
   if (filters?.channel) query = query.eq("channel", filters.channel);
   if (filters?.status) query = query.eq("status", filters.status);
-  if (filters?.limit) query = query.limit(filters.limit);
-  if (filters?.offset) query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+  const pageSize = filters?.limit || 50;
+  if (filters?.offset) {
+    query = query.range(filters.offset, filters.offset + pageSize - 1);
+  } else {
+    query = query.limit(pageSize);
+  }
   const { data } = await query;
   type ConvoResult = BotConversation & {
     last_message?: { content: string | null; role: string; created_at: string } | null;

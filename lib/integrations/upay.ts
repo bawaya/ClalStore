@@ -12,6 +12,7 @@ import type {
   RefundResult,
 } from "./hub";
 import { getIntegrationConfig } from "./hub";
+import { getPublicSiteUrl } from "@/lib/public-site-url";
 
 const UPAY_API = "https://app.upay.co.il/API6/clientsecure/json.php";
 const UPAY_PUBLIC_API = "https://app.upay.co.il/API6/client/json.php";
@@ -120,7 +121,7 @@ export async function createUpayPaymentPage(params: {
   description?: string;
 }): Promise<{ success: boolean; paymentUrl?: string; error?: string }> {
   const cfg = await getUpayConfig();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+  const appUrl = getPublicSiteUrl();
 
   const callbackUrl = `${appUrl}/api/payment/upay/callback`;
 

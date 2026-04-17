@@ -32,13 +32,13 @@ async function smartFetch(url: string): Promise<string | null> {
       const html = await res.text();
       // Check for CloudFlare challenge page
       if (html.includes("cf-browser-verification") || html.includes("cf_chl_opt") || html.includes("Just a moment...")) {
-        console.log("[GSMArena] CloudFlare challenge detected, trying proxy...");
+        console.warn("[GSMArena] CloudFlare challenge detected, trying proxy...");
       } else {
         return html;
       }
     }
   } catch (e) {
-    console.log("[GSMArena] Direct fetch failed:", e);
+    console.warn("[GSMArena] Direct fetch failed");
   }
 
   // Attempt 2: CORS proxy fallbacks

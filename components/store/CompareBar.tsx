@@ -7,6 +7,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useCompare, hydrateCompareStore } from "@/lib/store/compare";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
@@ -36,9 +37,10 @@ export function CompareBar() {
       }}
     >
       <div
-        className="max-w-[1200px] mx-auto flex items-center justify-between gap-2"
+        className="max-w-[1200px] mx-auto"
         style={{ padding: scr.mobile ? "8px 12px" : "10px 24px" }}
       >
+        <div className={`flex ${scr.mobile && items.length >= 3 ? "flex-col gap-1.5" : "items-center justify-between gap-2"}`}>
         {/* Right: Thumbnails */}
         <div className="flex items-center gap-2 flex-1 overflow-x-auto">
           {items.map((item) => (
@@ -46,15 +48,16 @@ export function CompareBar() {
               key={item.id}
               className="relative flex-shrink-0 bg-[#1a1a1e] rounded-lg border border-surface-border overflow-hidden"
               style={{
-                width: scr.mobile ? 44 : 52,
-                height: scr.mobile ? 44 : 52,
+                width: scr.mobile ? 40 : 52,
+                height: scr.mobile ? 40 : 52,
               }}
             >
               {item.image_url ? (
-                <img
+                <Image
                   src={item.image_url}
                   alt={item.name_he || item.name_ar}
-                  className="w-full h-full object-contain p-1"
+                  fill
+                  className="object-contain p-1"
                 />
               ) : (
                 <span className="flex items-center justify-center w-full h-full text-lg opacity-30">📱</span>
@@ -63,6 +66,7 @@ export function CompareBar() {
                 onClick={() => removeItem(item.id)}
                 className="absolute -top-0.5 -left-0.5 w-4 h-4 rounded-full bg-red-600 text-white border-0 cursor-pointer flex items-center justify-center"
                 style={{ fontSize: 8, lineHeight: 1 }}
+                aria-label="إزالة من المقارنة"
               >
                 ✕
               </button>
@@ -99,6 +103,7 @@ export function CompareBar() {
           >
             {t("compare.compare")} ({items.length})
           </Link>
+        </div>
         </div>
       </div>
     </div>

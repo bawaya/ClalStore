@@ -19,7 +19,9 @@ export async function GET() {
     const { data } = await s.from("settings").select("key, value").in("key", PUBLIC_KEYS);
     const map: Record<string, string> = {};
     (data || []).forEach((s: any) => { map[s.key] = s.value; });
-    return apiSuccess({ settings: map });
+    const res = apiSuccess({ settings: map });
+    res.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    return res;
   } catch {
     return apiSuccess({ settings: {} });
   }

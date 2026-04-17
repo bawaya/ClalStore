@@ -19,6 +19,38 @@ interface CsvRow {
   error?: string;
 }
 
+function parseCsvLine(line: string) {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === "\"") {
+      if (inQuotes && next === "\"") {
+        current += "\"";
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
 export default function ImportPage() {
   const scr = useScreen();
   const { toasts, show, dismiss } = useToast();
@@ -47,14 +79,19 @@ export default function ImportPage() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+      const lines = text
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
       if (lines.length < 2) { show("הקובץ ריק או חסרת כותרות", "warning"); return; }
 
-      const headers = lines[0].split(",").map((h) => h.trim().replace(/^\uFEFF/, ""));
+      const headers = parseCsvLine(lines[0]).map((h) => h.trim().replace(/^\uFEFF/, ""));
       const parsed: CsvRow[] = [];
 
       for (let i = 1; i < lines.length; i++) {
-        const cells = lines[i].split(",").map((c) => c.trim());
+        const cells = parseCsvLine(lines[i]);
         const obj: Record<string, string> = {};
         headers.forEach((h, j) => { obj[h] = cells[j] || ""; });
 
@@ -137,6 +174,8 @@ export default function ImportPage() {
         <Link href="/admin/commissions/history" className="chip">היסטוריה</Link>
         <Link href="/admin/commissions/import" className="chip chip-active">ייבוא</Link>
         <Link href="/admin/commissions/analytics" className="chip">ניתוח</Link>
+        <Link href="/admin/commissions/team" className="chip">צוות</Link>
+        <Link href="/admin/commissions/live" className="chip">📊 לוח חי</Link>
       </div>
 
       {/* Upload Section */}

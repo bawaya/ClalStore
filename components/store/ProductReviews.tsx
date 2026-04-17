@@ -9,6 +9,28 @@ import { useState, useEffect } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { csrfHeaders } from "@/lib/csrf-client";
 
+function Stars({ value, onChange, mobile }: { value: number; onChange?: (v: number) => void; mobile?: boolean }) {
+  return (
+    <div className="flex gap-0.5" style={{ direction: "ltr" }}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onChange?.(i)}
+          className="transition-transform"
+          style={{
+            fontSize: mobile ? 18 : 22,
+            cursor: onChange ? "pointer" : "default",
+            transform: onChange && i === value ? "scale(1.2)" : "scale(1)",
+          }}
+        >
+          {i <= value ? "⭐" : "☆"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 interface Review {
   id: string;
   customer_name: string;
@@ -97,26 +119,6 @@ export function ProductReviews({ productId }: { productId: string }) {
 
   if (!enabled || loading) return null;
 
-  const Stars = ({ value, onChange }: { value: number; onChange?: (v: number) => void }) => (
-    <div className="flex gap-0.5" style={{ direction: "ltr" }}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onChange?.(i)}
-          className="transition-transform"
-          style={{
-            fontSize: scr.mobile ? 18 : 22,
-            cursor: onChange ? "pointer" : "default",
-            transform: onChange && i === value ? "scale(1.2)" : "scale(1)",
-          }}
-        >
-          {i <= value ? "⭐" : "☆"}
-        </button>
-      ))}
-    </div>
-  );
-
   return (
     <div className="card mt-4 p-4">
       {/* Header */}
@@ -133,7 +135,7 @@ export function ProductReviews({ productId }: { productId: string }) {
           </h3>
           {count > 0 && (
             <div className="flex items-center gap-1.5 justify-end">
-              <Stars value={Math.round(avg)} />
+              <Stars value={Math.round(avg)} mobile={scr.mobile} />
               <span className="text-muted text-xs">{avg}/5</span>
             </div>
           )}
@@ -145,7 +147,7 @@ export function ProductReviews({ productId }: { productId: string }) {
         <div className="bg-surface-elevated rounded-xl p-3 mb-3 space-y-2.5">
           <div className="text-right">
             <label className="text-xs font-bold text-muted">التقييم</label>
-            <Stars value={rating} onChange={setRating} />
+            <Stars value={rating} onChange={setRating} mobile={scr.mobile} />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -195,14 +197,14 @@ export function ProductReviews({ productId }: { productId: string }) {
           <div key={r.id} className="bg-surface-elevated rounded-xl p-3">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1">
-                <Stars value={r.rating} />
+                <Stars value={r.rating} mobile={scr.mobile} />
                 {r.verified_purchase && (
                   <span className="text-state-success text-[9px] font-bold">✅ مشترٍ حقيقي</span>
                 )}
               </div>
               <div className="text-right">
                 <span className="font-bold text-xs">{r.customer_name}</span>
-                <span className="text-muted text-[9px] mr-2">
+                <span className="text-muted text-[9px] me-2">
                   {new Date(r.created_at).toLocaleDateString("ar")}
                 </span>
               </div>

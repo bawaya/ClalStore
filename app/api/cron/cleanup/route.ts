@@ -1,4 +1,3 @@
-
 // =====================================================
 // ClalMobile — Cron Cleanup
 // POST /api/cron/cleanup — Clean up expired rate limit entries
@@ -28,13 +27,14 @@ export async function POST(req: NextRequest) {
       .lt("reset_at", new Date().toISOString())
       .select("key", { count: "exact", head: true });
 
-    if (error) return apiError(error.message, 500);
+    if (error) return apiError("فشل في عملية التنظيف", 500);
 
     return apiSuccess({
       cleaned: count ?? 0,
       timestamp: new Date().toISOString(),
     });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Cleanup cron error:", err);
+    return apiError("فشل في عملية التنظيف", 500);
   }
 }

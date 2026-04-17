@@ -1,10 +1,10 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { getCRMUsers, updateUser, getAuditLog } from "@/lib/crm/queries";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase";
 import { logAction } from "@/lib/admin/queries";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { getPublicSiteUrl } from "@/lib/public-site-url";
 
 /** Generate a secure random temporary password (16 chars) */
 function generateTempPassword(): string {
@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
     const data = await getCRMUsers();
     return apiSuccess(data);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Users GET error:", err);
+    return apiError("فشل في جلب المستخدمين", 500);
   }
 }
 
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     if (authError || !authData.user) {
       console.error("[UserCreate] Auth error:", authError);
-      return apiError(authError?.message || "فشل في إنشاء حساب المستخدم", 500);
+      return apiError("فشل في إنشاء حساب المستخدم", 500);
     }
 
     // Insert into users table
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
       // Cleanup: delete the auth user if DB insert fails
       await supabase.auth.admin.deleteUser(authData.user.id);
       console.error("[UserCreate] DB error:", JSON.stringify(dbError));
-      return apiError(`فشل في حفظ بيانات المستخدم: ${dbError.message || dbError.code || "unknown"}`, 500);
+      return apiError("فشل في حفظ بيانات المستخدم", 500);
     }
 
     // Log the action
@@ -118,8 +119,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Send credentials via available channels
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
-    const loginUrl = `${baseUrl}/login`;
+    const loginUrl = `${getPublicSiteUrl()}/login`;
     const credentialMessage = [
       `مرحباً ${name}! 👋`,
       ``,
@@ -166,11 +166,20 @@ export async function POST(req: NextRequest) {
       notificationResults.push({ channel: "email", success: false });
     }
 
-    // Try WhatsApp if phone provided
+    // Try WhatsApp if phone provided — welcome via approved template, credentials via email only
     if (phone?.trim()) {
       try {
-        const { sendWhatsAppText } = await import("@/lib/bot/whatsapp");
-        await sendWhatsAppText(phone.trim(), credentialMessage);
+        const { sendWhatsAppText, sendWhatsAppTemplate } = await import("@/lib/bot/whatsapp");
+        try {
+          // Try direct text first (works within 24h messaging window)
+          await sendWhatsAppText(phone.trim(), credentialMessage);
+        } catch {
+          // Outside 24h window — use approved welcome template (no credentials)
+          const roleLabel = role === "admin" ? "مدير" : role === "sales" ? "مبيعات" : role === "support" ? "دعم" : role || "عضو";
+          await sendWhatsAppTemplate(phone.trim(), "movili_welcome_ar", [
+            name.trim(), roleLabel,
+          ]);
+        }
         notificationResults.push({ channel: "whatsapp", success: true });
       } catch (waErr) {
         console.warn("[UserCreate] WhatsApp send failed:", waErr);
@@ -186,7 +195,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("[UserCreate] Error:", err);
-    return apiError(errMsg(err), 500);
+    return apiError("فشل في إنشاء المستخدم", 500);
   }
 }
 
@@ -199,7 +208,8 @@ export async function PUT(req: NextRequest) {
     await updateUser(id, updates);
     return apiSuccess({ ok: true });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Users PUT error:", err);
+    return apiError("فشل في تحديث المستخدم", 500);
   }
 }
 
@@ -241,6 +251,7 @@ export async function DELETE(req: NextRequest) {
 
     return apiSuccess({ ok: true });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Users DELETE error:", err);
+    return apiError("فشل في حذف المستخدم", 500);
   }
 }

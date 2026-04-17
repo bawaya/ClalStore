@@ -107,7 +107,7 @@ export function parseQualificationAnswer(field: string, answer: string): string 
     if (/بطارية|battery|סוללה/i.test(clean)) return "battery";
     if (/أداء|ألعاب|gaming|performance|ביצועים/i.test(clean)) return "performance";
     if (/سعر|اقتصادي|رخيص|budget|כלכלי|מחיר/i.test(clean)) return "budget";
-    return "camera"; // fallback
+    return null; // don't assume — re-ask
   }
 
   if (field === "brand") {
@@ -163,25 +163,21 @@ export async function searchByModel(model: string, storage?: string): Promise<Pr
   const s = db();
   if (!s) return [];
 
-  // Try name_ar, name_he, then name_en — covers all language variants
-  for (const field of ["name_ar", "name_he", "name_en"] as const) {
-    const { data } = await s.from("products").select("*")
-      .eq("active", true).gt("stock", 0)
-      .ilike(field, `%${model}%`)
-      .order("price", { ascending: true }).limit(5);
+  // Single OR query across all language columns
+  const { data } = await s.from("products").select("*")
+    .eq("active", true).gt("stock", 0)
+    .or(`name_ar.ilike.%${model}%,name_he.ilike.%${model}%,name_en.ilike.%${model}%`)
+    .order("price", { ascending: true }).limit(5);
 
-    if (data && data.length > 0) {
-      if (storage) {
-        const exact = (data as Product[]).filter(p =>
-          (p.name_he || p.name_ar || "").toLowerCase().includes(storage.toLowerCase())
-        );
-        if (exact.length > 0) return exact;
-      }
-      return data as Product[];
-    }
+  if (!data || data.length === 0) return [];
+
+  if (storage) {
+    const exact = (data as Product[]).filter(p =>
+      (p.name_he || p.name_ar || "").toLowerCase().includes(storage.toLowerCase())
+    );
+    if (exact.length > 0) return exact;
   }
-
-  return [];
+  return data as Product[];
 }
 
 // ===== Recommend based on qualification =====

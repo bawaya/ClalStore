@@ -202,6 +202,7 @@ export async function POST(req: NextRequest) {
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Price apply error:", err);
+    return apiError("فشل في تطبيق الأسعار", 500);
   }
 }

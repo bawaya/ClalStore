@@ -14,6 +14,17 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 async function subscribeToPush(reg: ServiceWorkerRegistration) {
   try {
     const res = await fetch("/api/push/vapid");
@@ -27,7 +38,7 @@ async function subscribeToPush(reg: ServiceWorkerRegistration) {
 
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: publicKey,
+      applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
     });
 
     await fetch("/api/push/subscribe", {
@@ -59,30 +70,25 @@ export function PWAInstallPrompt() {
       navigator.serviceWorker
         .register("/sw.js")
         .then(async (reg) => {
-          console.log("SW registered:", reg.scope);
           // Auto-subscribe to push if permission already granted
           if (Notification.permission === "granted") {
             subscribeToPush(reg);
           }
         })
-        .catch((err) => {
-          console.log("SW registration failed:", err);
+        .catch(() => {
+          // SW registration failed — ignore silently
         });
     }
 
-    // Check if already installed
+    // Check if already installed (standalone mode or previously accepted install)
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
 
-    if (isStandalone) return;
+    if (isStandalone || localStorage.getItem("pwa_installed")) return;
 
-    // Check if dismissed recently
-    const dismissed = localStorage.getItem("pwa_dismissed");
-    if (dismissed) {
-      const ts = parseInt(dismissed, 10);
-      if (Date.now() - ts < 3 * 24 * 60 * 60 * 1000) return; // 3 days
-    }
+    // Only show once per session
+    if (sessionStorage.getItem("pwa_dismissed")) return;
 
     // Detect iOS
     const iosCheck = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
@@ -97,16 +103,28 @@ export function PWAInstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", handler);
 
+    // Mark as installed when the browser confirms installation
+    const installedHandler = () => {
+      localStorage.setItem("pwa_installed", "1");
+      setShowBanner(false);
+      setDeferredPrompt(null);
+    };
+    window.addEventListener("appinstalled", installedHandler);
+
     // Show iOS banner after 5 seconds
     if (iosCheck) {
       const timer = setTimeout(() => setShowBanner(true), 5000);
       return () => {
         clearTimeout(timer);
         window.removeEventListener("beforeinstallprompt", handler);
+        window.removeEventListener("appinstalled", installedHandler);
       };
     }
 
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installedHandler);
+    };
   }, []);
 
   const handleInstall = async () => {
@@ -114,6 +132,7 @@ export function PWAInstallPrompt() {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === "accepted") {
+        localStorage.setItem("pwa_installed", "1");
         setShowBanner(false);
         // Request push permission after install
         if ("Notification" in window && Notification.permission === "default") {
@@ -133,7 +152,7 @@ export function PWAInstallPrompt() {
   const handleDismiss = () => {
     setShowBanner(false);
     setShowIOSGuide(false);
-    localStorage.setItem("pwa_dismissed", Date.now().toString());
+    sessionStorage.setItem("pwa_dismissed", "1");
   };
 
   if (!showBanner) return null;

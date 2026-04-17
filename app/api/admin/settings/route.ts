@@ -47,7 +47,8 @@ export async function GET(req: NextRequest) {
     }));
     return apiSuccess({ settings, integrations: safeIntegrations });
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Settings GET error:", err);
+    return apiError("فشل في جلب الإعدادات", 500);
   }
 }
 
@@ -98,6 +99,7 @@ export async function PUT(req: NextRequest) {
 
     return apiSuccess(null);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Settings PUT error:", err);
+    return apiError("فشل في تحديث الإعدادات", 500);
   }
 }

@@ -1,4 +1,3 @@
-
 // =====================================================
 // ClalMobile — Send Message via Inbox
 // POST /api/crm/inbox/[id]/send
@@ -9,21 +8,18 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
 import { sendWhatsAppText, sendWhatsAppImage, sendWhatsAppDocument } from "@/lib/bot/whatsapp";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
-import { inboxSendSchema, validateBody } from "@/lib/admin/validators";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-
     const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
 
     const convId = id;
-    const v = validateBody(await req.json(), inboxSendSchema);
-    if (!v.success) return apiError(v.error, 400);
-    const { type = "text", content, template_name, template_params, media_url, media_filename, reply_to } = v.data;
+    const body = await req.json();
+    const { type = "text", content, template_name, template_params, media_url, reply_to } = body;
 
     // Get conversation
     const { data: conv } = await supabase
@@ -41,10 +37,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Check 24-hour window for non-template messages
+    // Must check last INBOUND message time, not just last message
     if (type !== "template") {
-      const lastInbound = (conv as any).last_message_at;
-      if (lastInbound && (conv as any).last_message_direction === "inbound") {
-        const hoursSince = (Date.now() - new Date(lastInbound).getTime()) / (1000 * 60 * 60);
+      const { data: lastInboundMsg } = await supabase
+        .from("inbox_messages")
+        .select("created_at")
+        .eq("conversation_id", convId)
+        .eq("direction", "inbound")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastInboundMsg) {
+        const hoursSince = (Date.now() - new Date(lastInboundMsg.created_at).getTime()) / (1000 * 60 * 60);
         if (hoursSince > 24) {
           return apiError("مر 24 ساعة — يمكنك فقط إرسال قالب معتمد", 400);
         }
@@ -70,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         waMessageId = result?.id || null;
         messageContent = messageContent || "[صورة]";
       } else if (type === "document" && media_url) {
-        const filename = media_filename || "document";
+        const filename = body.media_filename || "document";
         const result = await sendWhatsAppDocument(phone, media_url, filename, messageContent || undefined);
         waMessageId = result?.id || null;
         messageContent = messageContent || `[مستند: ${filename}]`;
@@ -82,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     } catch (sendErr: unknown) {
       console.error("Send message error:", sendErr);
       msgStatus = "failed";
-      errorMessage = errMsg(sendErr, "فشل الإرسال");
+      errorMessage = "فشل الإرسال";
     }
 
     // Save message to DB
@@ -111,7 +116,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Update conversation
-    await supabase
+    const { error: convErr } = await supabase
       .from("inbox_conversations")
       .update({
         last_message_text: messageContent.slice(0, 200),
@@ -120,6 +125,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         status: "active",
       } as any)
       .eq("id", convId);
+
+    if (convErr) {
+      console.error("Update conversation error:", convErr);
+    }
 
     // Update template usage count
     if (type === "template" && template_name) {

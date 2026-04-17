@@ -55,7 +55,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .single();
 
     if (error) {
-      return apiError(error.message, 500);
+      console.error("Notes POST error:", error);
+      return apiError("فشل في حفظ الملاحظة", 500);
     }
 
     // Also save as note-type message so it appears in chat

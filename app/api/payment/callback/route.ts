@@ -1,4 +1,3 @@
-
 // =====================================================
 // ClalMobile — iCredit IPN Callback
 // iCredit sends POST with sale results after payment
@@ -59,9 +58,9 @@ export async function POST(req: NextRequest) {
       return apiError("Missing order ID", 400);
     }
 
-    const supabase = createAdminSupabase();
+    const db = createAdminSupabase();
 
-    const { data: existingOrder } = await supabase.from("orders")
+    const { data: existingOrder } = await db.from("orders")
       .select("id, status, payment_status")
       .eq("id", orderId)
       .single();
@@ -76,19 +75,16 @@ export async function POST(req: NextRequest) {
       return apiSuccess({ received: true, note: "already_paid" });
     }
 
-    // Idempotency: reject duplicate IPN by sale_id
+    // Replay protection: reject duplicate saleId
     if (saleId) {
-      const { data: existingIpn } = await supabase.from("audit_log")
+      const { data: dupOrder } = await db.from("orders")
         .select("id")
-        .eq("entity_type", "payment")
-        .eq("entity_id", orderId)
-        .ilike("action", `%${saleId}%`)
-        .limit(1)
-        .maybeSingle();
-
-      if (existingIpn) {
-        console.warn("iCredit IPN: duplicate sale_id:", saleId, "for order:", orderId);
-        return apiSuccess({ received: true, note: "duplicate_ipn" });
+        .neq("id", orderId)
+        .eq("payment_transaction_id", String(saleId))
+        .single();
+      if (dupOrder) {
+        console.warn("iCredit IPN: duplicate saleId:", saleId, "already used by order:", dupOrder.id);
+        return apiError("Duplicate transaction", 409);
       }
     }
 
@@ -109,9 +105,12 @@ export async function POST(req: NextRequest) {
 
     // Block unverified payments (except J5 holds)
     if (!verified && !isJ5) {
-      await supabase.from("orders").update({
-        payment_status: "pending",
-        payment_details: {
+      await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
+        p_order_id: orderId,
+        p_payment_status: "pending",
+        p_order_status: "",
+        p_transaction_id: "",
+        p_payment_details: {
           type: "credit",
           provider: "icredit",
           sale_id: saleId,
@@ -119,53 +118,62 @@ export async function POST(req: NextRequest) {
           verified: false,
           error: "IPN verification failed",
         },
-      }).eq("id", orderId);
-
-      await supabase.from("audit_log").insert({
-        user_name: "iCredit",
-        action: `⚠️ دفع غير مُتحقق: ${orderId} — ₪${amount}`,
-        entity_type: "payment",
-        entity_id: orderId,
-        details: { sale_id: saleId, amount, verified: false },
+        p_audit_action: `⚠️ دفع غير مُتحقق: ${orderId} — ₪${amount}`,
+        p_audit_details: { sale_id: saleId, amount, verified: false },
       });
 
       return apiSuccess({ received: true, verified: false });
     }
 
     if (saleId && amount > 0 && !isJ5) {
-      await supabase.from("orders").update({
-        payment_status: "paid",
-        payment_transaction_id: String(customerTransactionId || saleId),
-        status: "approved",
-        payment_details: {
+      await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
+        p_order_id: orderId,
+        p_payment_status: "paid",
+        p_order_status: "approved",
+        p_transaction_id: String(customerTransactionId || saleId),
+        p_payment_details: {
           type: "credit",
           provider: "icredit",
-          card: cardLast4 ? `****${cardLast4}` : undefined,
+          card: cardLast4,
           installments: numPayments,
           sale_id: saleId,
           customer_transaction_id: customerTransactionId,
+          token: token,
           amount: amount,
           verified: verified,
         },
-      }).eq("id", orderId);
-
-      await supabase.from("audit_log").insert({
-        user_name: "iCredit",
-        action: `💳 دفع ناجح: ${orderId} — ₪${amount} ${cardLast4 ? `(****${cardLast4})` : ""} ${numPayments > 1 ? `${numPayments} תשלומים` : ""}`,
-        entity_type: "payment",
-        entity_id: orderId,
-        details: {
+        p_audit_action: `💳 دفع ناجح: ${orderId} — ₪${amount} ${cardLast4 ? `(****${cardLast4})` : ""} ${numPayments > 1 ? `${numPayments} תשלומים` : ""}`,
+        p_audit_details: {
           sale_id: saleId, customer_transaction_id: customerTransactionId,
           amount, card: cardLast4, installments: numPayments, verified,
         },
       });
 
-      // Note: Customer + admin WhatsApp notifications were already sent at order creation
-      // (POST /api/orders). No need to re-send here to avoid duplicate notifications.
+      try {
+        // Payment confirmed — send status notification (NOT duplicate new-order notification)
+        const { notifyStatusChange } = await import("@/lib/bot/notifications");
+        const { data: order, error: orderErr } = await db
+          .from("orders")
+          .select("*, customers(name, phone)")
+          .eq("id", orderId)
+          .maybeSingle();
+
+        if (!orderErr && order?.customers) {
+          const phone = (order.customers as any).phone;
+          if (phone) {
+            await notifyStatusChange(orderId, phone, "approved");
+          }
+        }
+      } catch {
+        console.error("Payment notification failed for order:", orderId);
+      }
     } else if (isJ5) {
-      await supabase.from("orders").update({
-        payment_status: "pending_capture",
-        payment_details: {
+      await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
+        p_order_id: orderId,
+        p_payment_status: "pending_capture",
+        p_order_status: "",
+        p_transaction_id: "",
+        p_payment_details: {
           type: "credit",
           provider: "icredit",
           sale_id: saleId,
@@ -174,33 +182,24 @@ export async function POST(req: NextRequest) {
           amount: amount,
           status: "j5_hold",
         },
-      }).eq("id", orderId);
-
-      await supabase.from("audit_log").insert({
-        user_name: "iCredit",
-        action: `⏳ دفع معلّق (J5): ${orderId} — ₪${amount}`,
-        entity_type: "payment",
-        entity_id: orderId,
-        details: { sale_id: saleId, amount, status: "j5_hold" },
+        p_audit_action: `⏳ دفع معلّق (J5): ${orderId} — ₪${amount}`,
+        p_audit_details: { sale_id: saleId, amount, status: "j5_hold" },
       });
     } else {
-      await supabase.from("orders").update({
-        payment_status: "failed",
-        payment_details: {
+      await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
+        p_order_id: orderId,
+        p_payment_status: "failed",
+        p_order_status: "",
+        p_transaction_id: "",
+        p_payment_details: {
           type: "credit",
           provider: "icredit",
           sale_id: saleId,
           amount: amount,
           error: "Payment not completed",
         },
-      }).eq("id", orderId);
-
-      await supabase.from("audit_log").insert({
-        user_name: "iCredit",
-        action: `❌ فشل الدفع: ${orderId}`,
-        entity_type: "payment",
-        entity_id: orderId,
-        details: { sale_id: saleId, amount },
+        p_audit_action: `❌ فشل الدفع: ${orderId}`,
+        p_audit_details: { sale_id: saleId, amount },
       });
     }
 

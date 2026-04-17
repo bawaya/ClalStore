@@ -5,6 +5,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useId,
   type KeyboardEvent,
 } from "react";
 import Image from "next/image";
@@ -50,6 +51,7 @@ export function SmartSearchBar({ value, onChange, onBrandSelect, onSubmit }: Pro
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
 
   const [focused, setFocused] = useState(false);
   const [results, setResults] = useState<AutocompleteResult | null>(null);
@@ -227,6 +229,7 @@ export function SmartSearchBar({ value, onChange, onBrandSelect, onSubmit }: Pro
     lang === "he" ? (p.name_he || p.name_ar) : p.name_ar;
 
   const items = flatItems();
+  const listboxOpen = showDropdown && items.length > 0;
 
   return (
     <div className="relative w-full">
@@ -261,6 +264,7 @@ export function SmartSearchBar({ value, onChange, onBrandSelect, onSubmit }: Pro
         <input
           ref={inputRef}
           type="text"
+          role="combobox"
           className="flex-1 bg-transparent border-none text-white outline-none placeholder:text-[#52525b]"
           style={{ fontSize: scr.mobile ? 13 : 14 }}
           placeholder={t("store2.searchPlaceholder")}
@@ -269,7 +273,9 @@ export function SmartSearchBar({ value, onChange, onBrandSelect, onSubmit }: Pro
           onFocus={() => setFocused(true)}
           onKeyDown={handleKeyDown}
           aria-label={t("store.search")}
-          aria-expanded={showDropdown}
+          aria-autocomplete="list"
+          aria-expanded={listboxOpen}
+          aria-controls={listboxOpen ? listboxId : undefined}
           aria-haspopup="listbox"
           autoComplete="off"
         />
@@ -292,6 +298,7 @@ export function SmartSearchBar({ value, onChange, onBrandSelect, onSubmit }: Pro
       {showDropdown && items.length > 0 && (
         <div
           ref={dropdownRef}
+          id={listboxId}
           className="absolute z-50 w-full mt-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
           style={{
             background: "rgba(17,17,20,0.97)",

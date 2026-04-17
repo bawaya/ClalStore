@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 import { createServerSupabase } from "@/lib/supabase";
+import { validateBody, categorySchema, categoryUpdateSchema } from "@/lib/admin/validators";
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +18,8 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
     return apiSuccess(data);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Categories GET error:", err);
+    return apiError("فشل في جلب التصنيفات", 500);
   }
 }
 
@@ -27,18 +29,20 @@ export async function POST(req: NextRequest) {
     if (auth instanceof NextResponse) return auth;
 
     const body = await req.json();
+    const { data: validated, error: valErr } = validateBody(body, categorySchema);
+    if (valErr || !validated) return apiError(valErr || "Validation failed", 400);
     const sb = createServerSupabase();
 
     const { data, error } = await sb
       .from("categories")
       .insert({
-        name_ar: body.name_ar,
-        name_he: body.name_he,
-        type: body.type || "manual",
-        rule: body.rule || null,
-        product_ids: body.product_ids || [],
-        sort_order: body.sort_order || 0,
-        active: body.active !== false,
+        name_ar: validated.name_ar,
+        name_he: validated.name_he,
+        type: validated.type,
+        rule: validated.rule,
+        product_ids: validated.product_ids,
+        sort_order: validated.sort_order,
+        active: validated.active,
       })
       .select()
       .single();
@@ -46,7 +50,8 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     return apiSuccess(data);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Categories POST error:", err);
+    return apiError("فشل في إضافة التصنيف", 500);
   }
 }
 
@@ -60,10 +65,13 @@ export async function PUT(req: NextRequest) {
     
     if (!id) return apiError("معرف التصنيف مفقود", 400);
 
+    const { data: validated, error: valErr } = validateBody(updates, categoryUpdateSchema);
+    if (valErr || !validated) return apiError(valErr || "Validation failed", 400);
+
     const sb = createServerSupabase();
     const { data, error } = await sb
       .from("categories")
-      .update(updates)
+      .update(validated)
       .eq("id", id)
       .select()
       .single();
@@ -71,7 +79,8 @@ export async function PUT(req: NextRequest) {
     if (error) throw error;
     return apiSuccess(data);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Categories PUT error:", err);
+    return apiError("فشل في تحديث التصنيف", 500);
   }
 }
 
@@ -94,6 +103,7 @@ export async function DELETE(req: NextRequest) {
     if (error) throw error;
     return apiSuccess({ success: true });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Categories DELETE error:", err);
+    return apiError("فشل في حذف التصنيف", 500);
   }
 }

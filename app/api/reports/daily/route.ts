@@ -33,10 +33,10 @@ export async function GET(req: NextRequest) {
 
   // === Fetch Data ===
   const [ordersRes, customersRes, conversationsRes, handoffsRes] = await Promise.all([
-    supabase.from("orders").select("*, order_items(*)").gte("created_at", startOfDay).lte("created_at", endOfDay).order("created_at", { ascending: false }),
-    supabase.from("customers").select("*").gte("created_at", startOfDay).lte("created_at", endOfDay),
-    supabase.from("bot_conversations").select("*").gte("created_at", startOfDay).lte("created_at", endOfDay),
-    supabase.from("bot_handoffs").select("*").gte("created_at", startOfDay).lte("created_at", endOfDay),
+    supabase.from("orders").select("*, order_items(*)").gte("created_at", startOfDay).lte("created_at", endOfDay).order("created_at", { ascending: false }).limit(1000),
+    supabase.from("customers").select("*").gte("created_at", startOfDay).lte("created_at", endOfDay).limit(1000),
+    supabase.from("bot_conversations").select("*").gte("created_at", startOfDay).lte("created_at", endOfDay).limit(1000),
+    supabase.from("bot_handoffs").select("*").gte("created_at", startOfDay).lte("created_at", endOfDay).limit(1000),
   ]);
 
   const orders = ordersRes.data || [];

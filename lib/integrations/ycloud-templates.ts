@@ -164,8 +164,8 @@ export const REQUIRED_TEMPLATES = [
     components: [
       {
         type: "BODY",
-        text: "✅ طلب مكتمل\n\nرقم الطلب: {{1}}\nالزبون: {{2}}\nالمبلغ: {{3}}\nالحالة: {{4}}\n\nراجع الطلب في CRM.",
-        example: { body_text: [["ORD-1234", "محمد أحمد", "₪500", "delivered"]] },
+        text: "✅ طلب مكتمل\n\n{{1}}\n\nالمبلغ: {{2}}\n\n{{3}}",
+        example: { body_text: [["رقم الطلب: ORD-1234\nالزبون: محمد أحمد", "₪500 | delivered", "https://clalmobile.com/crm/orders?search=ORD-1234"]] },
       },
     ],
   },
@@ -224,8 +224,8 @@ export const REQUIRED_TEMPLATES = [
     components: [
       {
         type: "BODY",
-        text: "📊 التقرير اليومي {{1}}\n\nعرض التقرير: {{2}}\nPDF: {{3}}\n\nيوم موفق.",
-        example: { body_text: [["2026-03-12", "https://clalmobile.com/api/reports/daily?date=2026-03-12", "https://clalmobile.com/api/reports/daily?date=2026-03-12&format=pdf"]] },
+        text: "📊 التقرير اليومي {{1}}\n\nعرض التقرير:\n{{2}}\n\nيوم موفق.",
+        example: { body_text: [["2026-03-12", "https://clalmobile.com/api/reports/daily?date=2026-03-12"]] },
       },
     ],
   },
@@ -236,8 +236,8 @@ export const REQUIRED_TEMPLATES = [
     components: [
       {
         type: "BODY",
-        text: "📈 التقرير الأسبوعي {{1}}\n\nعرض التقرير: {{2}}\nPDF: {{3}}\n\nأسبوع موفق.",
-        example: { body_text: [["2026-03-12", "https://clalmobile.com/api/reports/weekly?date=2026-03-12", "https://clalmobile.com/api/reports/weekly?date=2026-03-12&format=pdf"]] },
+        text: "📈 التقرير الأسبوعي {{1}}\n\nعرض التقرير:\n{{2}}\n\nأسبوع موفق.",
+        example: { body_text: [["2026-03-12", "https://clalmobile.com/api/reports/weekly?date=2026-03-12"]] },
       },
     ],
   },

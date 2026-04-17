@@ -80,7 +80,7 @@ export async function POST(
     }
 
     trackAIUsage({
-      feature: "summary",
+      feature: "auto_label",
       inputTokens: result.tokens.input,
       outputTokens: result.tokens.output,
       durationMs: result.duration,
@@ -104,6 +104,6 @@ export async function POST(
     return apiSuccess({ labels: enriched });
   } catch (err: unknown) {
     console.error("Auto-label error:", err);
-    return apiError(errMsg(err), 500);
+    return apiError("فشل في تصنيف المحادثة تلقائياً", 500);
   }
 }

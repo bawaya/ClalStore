@@ -127,7 +127,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
         <div
           className="absolute top-0 z-10 font-extrabold text-white text-center leading-tight"
           style={{
-            right: 0,
+            insetInlineEnd: 0,
             background: "#c41040",
             fontSize: scr.mobile ? 8 : 10,
             padding: scr.mobile ? "3px 8px" : "4px 12px",
@@ -147,7 +147,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
             fontSize: scr.mobile ? 9 : 11,
             padding: scr.mobile ? "2px 5px" : "3px 8px",
             top: scr.mobile ? 32 : 36,
-            left: scr.mobile ? 6 : 8,
+            insetInlineStart: scr.mobile ? 6 : 8,
           }}
         >
           -{disc}%
@@ -159,9 +159,10 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
         onClick={handleWishlist}
         className={`glass-icon-btn absolute z-10 transition-all ${inWishlist ? "text-brand" : "text-white"}`}
         title={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
+        aria-label={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
         style={{
           top: scr.mobile ? 6 : 8,
-          left: scr.mobile ? 6 : 8,
+          insetInlineStart: scr.mobile ? 6 : 8,
           transform: wishAnim ? "scale(1.3)" : "scale(1)",
         }}
       >
@@ -215,7 +216,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
             className="absolute font-bold text-white rounded-full flex items-center justify-center text-center leading-tight gap-0.5"
             style={{
               bottom: scr.mobile ? 4 : 8,
-              left: scr.mobile ? 4 : 8,
+              insetInlineStart: scr.mobile ? 4 : 8,
               width: scr.mobile ? 44 : 56,
               height: scr.mobile ? 44 : 56,
               background: "linear-gradient(135deg, #c41040 0%, #ff3366 100%)",
@@ -236,9 +237,10 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
           onClick={handleCompare}
           className={`glass-icon-btn absolute z-10 ${inCompare ? "glass-icon-btn-active" : ""}`}
           title={inCompare ? t("compare.inCompare") : t("compare.add")}
+          aria-label={inCompare ? t("compare.inCompare") : t("compare.add")}
           style={{
             bottom: scr.mobile ? 4 : 8,
-            right: scr.mobile ? 4 : 8,
+            insetInlineEnd: scr.mobile ? 4 : 8,
           }}
         >
           <Scale size={scr.mobile ? 14 : 16} />
@@ -353,7 +355,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
             <span className="text-[#a78bfa] font-semibold">
               ₪{(activeVariant?.monthly_price ?? Math.ceil(displayPrice / 36)).toLocaleString()} × 36
             </span>
-            <span className="text-[#a1a1aa] mr-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>{t("store2.monthly")}</span>
+            <span className="text-[#a1a1aa] me-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>{t("store2.monthly")}</span>
           </div>
         )}
 

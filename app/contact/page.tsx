@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
-import { csrfHeaders } from "@/lib/csrf-client";
 import { Navbar, Footer } from "@/components/website/sections";
 
 export default function ContactPage() {
@@ -24,7 +23,7 @@ export default function ContactPage() {
       // Send WhatsApp notification to admin (primary notification)
       const notifyRes = await fetch('/api/contact', {
         method: 'POST',
-        headers: csrfHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name,
           phone: form.phone,
@@ -38,7 +37,7 @@ export default function ContactPage() {
       // Send email (non-blocking, best-effort)
       fetch('/api/email', {
         method: 'POST',
-        headers: csrfHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: 'info@clalmobile.com',
           subject: `Contact from ${form.name}`,
@@ -137,21 +136,21 @@ export default function ContactPage() {
 
             <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}>
               <div>
-                <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.name")} <span className="text-brand">*</span></label>
-                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required minLength={2} />
+                <label htmlFor="contact-name" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.name")} <span className="text-brand">*</span></label>
+                <input id="contact-name" className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("contact.name")} />
               </div>
               <div>
-                <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.phone")} <span className="text-brand">*</span></label>
-                <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05X-XXXXXXX" dir="ltr" required pattern="^0[0-9]{8,9}$" />
+                <label htmlFor="contact-phone" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.phone")} <span className="text-brand">*</span></label>
+                <input id="contact-phone" className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05X-XXXXXXX" dir="ltr" />
               </div>
             </div>
             <div className="mt-2">
-              <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.email")}</label>
-              <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" />
+              <label htmlFor="contact-email" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.email")}</label>
+              <input id="contact-email" className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder={t("contact.email")} dir="ltr" />
             </div>
             <div className="mt-2">
-              <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.subject")}</label>
-              <select className="input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}>
+              <label htmlFor="contact-subject" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.subject")}</label>
+              <select id="contact-subject" title={t("contact.subject")} className="input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}>
                 <option value="">{t("contact.choose")}</option>
                 <option value="order">{t("contact.subOrder")}</option>
                 <option value="product">{t("contact.subProduct")}</option>
@@ -162,8 +161,8 @@ export default function ContactPage() {
               </select>
             </div>
             <div className="mt-2">
-              <label className="block text-muted text-[10px] font-semibold mb-1">{t("contact.message")} <span className="text-brand">*</span></label>
-              <textarea className="input min-h-[80px] resize-y" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+              <label htmlFor="contact-message" className="block text-muted text-[10px] font-semibold mb-1">{t("contact.message")} <span className="text-brand">*</span></label>
+              <textarea id="contact-message" className="input min-h-[80px] resize-y" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder={t("contact.message")} />
             </div>
 
             <button onClick={handleSubmit} disabled={sending} className="btn-primary w-full mt-3" style={{ fontSize: scr.mobile ? 12 : 14 }}>

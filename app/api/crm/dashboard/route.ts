@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
     const data = await getCRMDashboard({ dateFrom, dateTo });
     return apiSuccess(data);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"), 500);
+    console.error("CRM Dashboard error:", err);
+    return apiError("فشل في جلب بيانات اللوحة", 500);
   }
 }

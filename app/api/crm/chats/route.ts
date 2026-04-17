@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
     const result = await getCRMChats(filters);
     return apiSuccess({ conversations: result.data, total: result.total });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Chats GET error:", err);
+    return apiError("فشل في جلب المحادثات", 500);
   }
 }

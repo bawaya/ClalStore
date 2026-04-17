@@ -12,6 +12,7 @@ function SuccessContent() {
   const router = useRouter();
   const params = useSearchParams();
   const orderId = params.get("order") || "";
+  const customerCode = params.get("customer_code") || "";
   const valueParam = params.get("value");
   const value = valueParam ? parseFloat(valueParam) : 0;
   const documentId = params.get("document_id") || "";
@@ -20,9 +21,15 @@ function SuccessContent() {
   const tracked = useRef(false);
 
   useEffect(() => {
-    clearCart();
-    try { sessionStorage.removeItem("clal_pending_order"); } catch {}
-  }, [clearCart]);
+    try {
+      sessionStorage.removeItem("clal_pending_order");
+    } catch {
+      /* ignore */
+    }
+    if (orderId) {
+      clearCart();
+    }
+  }, [clearCart, orderId]);
 
   useEffect(() => {
     if (orderId && value > 0 && !tracked.current) {
@@ -56,6 +63,12 @@ function SuccessContent() {
           {orderId && (
             <div className="font-black text-brand mb-2" style={{ fontSize: scr.mobile ? 28 : 42 }}>
               {orderId}
+            </div>
+          )}
+          {customerCode && (
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/10 px-4 py-2 text-brand font-bold" style={{ fontSize: scr.mobile ? 11 : 13 }}>
+              <span>🎟️</span>
+              <span>{customerCode}</span>
             </div>
           )}
           <div className="text-muted" style={{ fontSize: scr.mobile ? 12 : 15 }}>

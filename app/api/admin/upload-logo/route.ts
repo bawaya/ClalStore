@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     return apiSuccess({ url });
   } catch (err: unknown) {
     console.error("Upload logo error:", err);
-    return apiError(errMsg(err, "فشل رفع الشعار"));
+    return apiError("فشل رفع الشعار", 500);
   }
 }
 
@@ -58,6 +58,7 @@ export async function DELETE(req: NextRequest) {
 
     return apiSuccess(null);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "فشل حذف الشعار"));
+    console.error("Delete logo error:", err);
+    return apiError("فشل حذف الشعار", 500);
   }
 }

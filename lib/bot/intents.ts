@@ -124,11 +124,16 @@ function extractPriceRange(text: string): { min?: number; max?: number } {
   return {};
 }
 
+// ===== Strip emojis for clean matching =====
+function stripEmojis(text: string): string {
+  return text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, "").trim();
+}
+
 // ===== Main Intent Detection =====
 export function detectIntent(message: string): DetectedIntent {
-  const text = message.trim();
+  const text = stripEmojis(message.trim());
   const lower = text.toLowerCase();
-  const lang = detectLanguage(text);
+  const lang = detectLanguage(message.trim());
 
   // 1. CSAT response
   if (/^(👍|👎|نعم|لا|כן)$/i.test(text.trim())) {
@@ -187,12 +192,21 @@ export function detectIntent(message: string): DetectedIntent {
 
   // 6. Compare
   if (/فرق|مقارنة|ولا|أفضل|احسن|השוואה|מה ההבדל|compare|vs|versus/i.test(lower)) {
-    // Try to extract two brands/models
+    // Try to extract specific models first
+    const models: string[] = [];
+    for (const mp of MODEL_PATTERNS) {
+      const m = mp.pattern.exec(text);
+      if (m) {
+        const model = mp.model.includes("$1") && m[1] ? mp.model.replace("$1", m[1]) : mp.model;
+        if (!models.includes(model)) models.push(model);
+      }
+    }
+    // Fallback to brand extraction
     const brands: string[] = [];
     for (const [kw, brand] of Object.entries(BRAND_MAP)) {
       if (lower.includes(kw) && !brands.includes(brand)) brands.push(brand);
     }
-    return { intent: "compare", params: { brands: brands.join(",") }, confidence: 0.8, language: lang };
+    return { intent: "compare", params: { brands: brands.join(","), models: models.join(",") }, confidence: 0.8, language: lang };
   }
 
   // 7. Installment info

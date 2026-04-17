@@ -90,6 +90,6 @@ export async function POST(
     return apiSuccess({ sentiment, confidence, reason });
   } catch (err: unknown) {
     console.error("Sentiment API error:", err);
-    return apiError(errMsg(err), 500);
+    return apiError("فشل في تحليل المشاعر", 500);
   }
 }

@@ -20,7 +20,7 @@ export interface WishlistProduct {
   old_price?: number;
   image_url?: string;
   stock: number;
-  colors: any[];
+  colors: { hex: string; name_ar: string; name_he: string; image?: string }[];
   storage_options: string[];
   specs: Record<string, string>;
   featured: boolean;

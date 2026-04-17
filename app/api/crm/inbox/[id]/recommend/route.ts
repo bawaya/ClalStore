@@ -108,6 +108,6 @@ ${catalog}
     return apiSuccess({ recommendations: enriched });
   } catch (err: unknown) {
     console.error("Recommend API error:", err);
-    return apiError(errMsg(err), 500);
+    return apiError("فشل في اقتراح المنتجات", 500);
   }
 }

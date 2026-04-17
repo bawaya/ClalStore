@@ -60,8 +60,8 @@ describe("Cart Store", () => {
 
     it("is configured with persist middleware for localStorage", () => {
       // Verify persist middleware is active and uses correct storage key
-      expect(useCart.persist).toBeDefined();
-      expect(useCart.persist.getOptions().name).toBe("clal_cart");
+      expect((useCart as unknown as { persist?: unknown }).persist).toBeDefined();
+      expect((useCart as unknown as { persist: { getOptions: () => { name: string } } }).persist.getOptions().name).toBe("clal_cart");
     });
   });
 

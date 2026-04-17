@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#06060c">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<title>لوحة البيانات الحية — HOT Mobile</title>
+<style>
+:root{--bg:#06060c;--bg2:#111118;--bg3:#1a1a24;--card:#14141e;--border:#2a2a3a;--accent:#FF0050;--green:#00c853;--orange:#ff9100;--blue:#448aff;--yellow:#ffd600;--text:#eee;--text2:#999;--text3:#666;--radius:16px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;width:100vw}
+::-webkit-scrollbar{display:none}
+
+/* Setup */
+#setup{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px}
+#setup h1{font-size:48px;font-weight:900;color:var(--accent)}
+#setup p{color:var(--text2);font-size:16px}
+#setup input{width:100%;max-width:400px;padding:14px;font-size:16px;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:12px;font-family:inherit;direction:ltr;text-align:center}
+#setup input:focus{border-color:var(--accent);outline:none}
+#setup button{width:100%;max-width:400px;padding:16px;background:var(--accent);color:#fff;font-size:18px;font-weight:700;border:none;border-radius:12px;cursor:pointer;font-family:inherit}
+
+/* Dashboard Layout */
+#dashboard{display:none;height:100vh;padding:20px;gap:20px;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto 1fr auto}
+#dashboard.active{display:grid}
+
+/* Header */
+.header{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;padding:10px 0}
+.header .logo{font-size:28px;font-weight:900;color:var(--accent)}
+.header .meta{text-align:left;color:var(--text2);font-size:14px}
+.header .live-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-left:6px;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Cards */
+.dash-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;overflow:hidden}
+.dash-card h3{font-size:14px;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.dash-card h3 .icon{font-size:18px}
+
+/* Today Stats */
+.today-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;grid-column:1/-1}
+.today-stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:center}
+.today-stat .val{font-size:42px;font-weight:900;line-height:1}
+.today-stat .lbl{font-size:13px;color:var(--text2);margin-top:6px}
+.today-stat.accent .val{color:var(--accent)}
+.today-stat.green .val{color:var(--green)}
+.today-stat.blue .val{color:var(--blue)}
+.today-stat.orange .val{color:var(--orange)}
+
+/* Leaderboard */
+.lb-item{display:flex;align-items:center;gap:14px;padding:12px;border-radius:12px;margin-bottom:8px;transition:.3s}
+.lb-item:nth-child(1){background:linear-gradient(135deg,#3a2a00 0%,#2a1a00 100%);border:1px solid #664400}
+.lb-item:nth-child(2){background:linear-gradient(135deg,#2a2a30 0%,#1a1a24 100%);border:1px solid #444}
+.lb-item:nth-child(3){background:linear-gradient(135deg,#2a1a00 0%,#1a1210 100%);border:1px solid #553300}
+.lb-item:nth-child(n+4){background:var(--bg3);border:1px solid var(--border)}
+.lb-rank{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;flex-shrink:0}
+.lb-item:nth-child(1) .lb-rank{background:var(--yellow);color:#000}
+.lb-item:nth-child(2) .lb-rank{background:#aaa;color:#000}
+.lb-item:nth-child(3) .lb-rank{background:#cd7f32;color:#000}
+.lb-item:nth-child(n+4) .lb-rank{background:var(--bg3);color:var(--text3)}
+.lb-info{flex:1}
+.lb-name{font-weight:700;font-size:15px}
+.lb-detail{font-size:12px;color:var(--text2)}
+.lb-comm{font-size:18px;font-weight:900;color:var(--green)}
+
+/* Progress Bars */
+.target-bar{margin-bottom:14px}
+.target-bar .bar-header{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+.target-bar .bar-header .pct{color:var(--accent);font-weight:700}
+.target-bar .bar-track{height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.target-bar .bar-fill{height:100%;border-radius:4px;transition:width 1s ease}
+
+/* CRM Status */
+.crm-stat{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
+.crm-stat:last-child{border:none}
+.crm-stat .c-val{font-weight:800;font-size:18px}
+
+/* Sync Gaps Alert */
+.gap-alert{background:#3a1020;border:1px solid var(--accent);border-radius:12px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:14px}
+.gap-alert .gap-count{font-size:28px;font-weight:900;color:var(--accent)}
+
+/* Milestones */
+.ms-item{display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:10px;margin-bottom:6px;font-size:13px}
+.ms-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ms-dot.done{background:var(--green)}
+.ms-dot.next{background:var(--yellow);animation:blink 1.5s infinite}
+.ms-dot.far{background:var(--text3)}
+
+/* Footer */
+.footer{grid-column:1/-1;text-align:center;font-size:12px;color:var(--text3);padding:8px 0}
+
+/* Responsive — if smaller screen, rearrange */
+@media(max-width:1200px){
+  #dashboard{grid-template-columns:1fr 1fr}
+  .today-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:768px){
+  #dashboard{grid-template-columns:1fr}
+  .today-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup">
+  <h1>📊 لوحة البيانات الحية</h1>
+  <p>HOT Mobile — Live Store Dashboard</p>
+  <input id="s-url" placeholder="رابط المتجر" value="https://clalmobile.com">
+  <input id="s-token" placeholder="API Token">
+  <input id="s-refresh" placeholder="معدل التحديث (ثواني)" value="60" type="number">
+  <button onclick="startDashboard()">🚀 ابدأ العرض</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="logo">HOT Mobile <span class="live-dot"></span></div>
+      <div style="font-size:13px;color:var(--text2)" id="dash-month"></div>
+    </div>
+    <div class="meta">
+      <div id="dash-clock" style="font-size:24px;font-weight:700"></div>
+      <div id="dash-date"></div>
+      <div id="dash-refresh" style="font-size:11px;color:var(--text3)"></div>
+    </div>
+  </div>
+
+  <!-- Today Stats -->
+  <div class="today-grid">
+    <div class="today-stat accent"><div class="val" id="t-sales">0</div><div class="lbl">مبيعات اليوم</div></div>
+    <div class="today-stat green"><div class="val" id="t-comm">0</div><div class="lbl">عمولات اليوم ₪</div></div>
+    <div class="today-stat blue"><div class="val" id="t-lines">0</div><div class="lbl">خطوط اليوم</div></div>
+    <div class="today-stat orange"><div class="val" id="t-devices">0</div><div class="lbl">أجهزة اليوم ₪</div></div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="dash-card">
+    <h3><span class="icon">🏆</span> ترتيب الموظفين — الشهر الحالي</h3>
+    <div id="leaderboard"></div>
+  </div>
+
+  <!-- Commission Summary -->
+  <div class="dash-card">
+    <h3><span class="icon">💰</span> ملخص العمولات</h3>
+    <div id="comm-targets"></div>
+    <div style="margin-top:14px">
+      <div class="crm-stat"><span>عمولة خطوط</span><span class="c-val" id="c-lines" style="color:var(--blue)">0 ₪</span></div>
+      <div class="crm-stat"><span>عمولة أجهزة</span><span class="c-val" id="c-devices" style="color:var(--green)">0 ₪</span></div>
+      <div class="crm-stat"><span>بونص مراحل</span><span class="c-val" id="c-milestones" style="color:var(--yellow)">0 ₪</span></div>
+      <div class="crm-stat"><span>ولاء</span><span class="c-val" id="c-loyalty" style="color:var(--orange)">0 ₪</span></div>
+      <div class="crm-stat"><span>خصومات</span><span class="c-val" id="c-sanctions" style="color:var(--accent)">0 ₪</span></div>
+      <div class="crm-stat" style="border-top:2px solid var(--accent);padding-top:14px"><span style="font-weight:700">صافي العمولة</span><span class="c-val" id="c-net" style="color:var(--green);font-size:24px">0 ₪</span></div>
+    </div>
+  </div>
+
+  <!-- CRM Status -->
+  <div class="dash-card">
+    <h3><span class="icon">📦</span> حالة الطلبات — CRM</h3>
+    <div id="sync-gaps"></div>
+    <div style="margin-top:10px">
+      <div class="crm-stat"><span>إجمالي الطلبات</span><span class="c-val" id="crm-total">0</span></div>
+      <div class="crm-stat"><span>مكتملة</span><span class="c-val" id="crm-delivered" style="color:var(--green)">0</span></div>
+      <div class="crm-stat"><span>متزامنة مع العمولات</span><span class="c-val" id="crm-synced" style="color:var(--blue)">0</span></div>
+      <div class="crm-stat"><span>إيرادات الشهر</span><span class="c-val" id="crm-revenue" style="color:var(--yellow)">0 ₪</span></div>
+    </div>
+  </div>
+
+  <!-- Device Milestones -->
+  <div class="dash-card">
+    <h3><span class="icon">🎯</span> مراحل الأجهزة (بونص 2,500₪ لكل 50K)</h3>
+    <div id="milestones"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    HOT Mobile Commission Dashboard v1.0 — Auto-refresh <span id="f-interval">60</span>s
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'hot_dashboard_config';
+let config = {};
+let refreshTimer = null;
+
+function fmt(n) { return new Intl.NumberFormat('en-US').format(Math.round(n)); }
+
+function startDashboard() {
+  const url = document.getElementById('s-url').value.trim();
+  const token = document.getElementById('s-token').value.trim();
+  const refresh = parseInt(document.getElementById('s-refresh').value) || 60;
+  if (!url || !token) { alert('أدخل رابط المتجر و API Token'); return; }
+  config = { url: url.replace(/\/$/, ''), token, refresh };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); } catch {}
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('dashboard').classList.add('active');
+  document.getElementById('f-interval').textContent = refresh;
+  startClock();
+  fetchData();
+  refreshTimer = setInterval(fetchData, refresh * 1000);
+}
+
+function startClock() {
+  function tick() {
+    const now = new Date();
+    document.getElementById('dash-clock').textContent = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('dash-date').textContent = now.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+async function fetchData() {
+  document.getElementById('dash-refresh').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
+  try {
+    const res = await fetch(config.url + '/api/admin/commissions/bridge?view=dashboard', {
+      headers: { 'Authorization': 'Bearer ' + config.token }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'API Error');
+    render(json.data);
+  } catch (e) {
+    document.getElementById('dash-refresh').textContent = '❌ خطأ: ' + e.message;
+  }
+}
+
+function render(d) {
+  // Month label
+  const [y, m] = d.month.split('-');
+  const mNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  document.getElementById('dash-month').textContent = mNames[parseInt(m) - 1] + ' ' + y;
+
+  // Today
+  document.getElementById('t-sales').textContent = d.today.sales;
+  document.getElementById('t-comm').textContent = fmt(d.today.commission);
+  document.getElementById('t-lines').textContent = d.today.lines;
+  document.getElementById('t-devices').textContent = fmt(d.today.devices_revenue);
+
+  // Commissions
+  const cm = d.commissions;
+  document.getElementById('c-lines').textContent = fmt(cm.lines_commission) + ' ₪';
+  document.getElementById('c-devices').textContent = fmt(cm.devices_commission) + ' ₪';
+  document.getElementById('c-milestones').textContent = cm.milestones + ' × 2,500₪ = ' + fmt(cm.milestones * 2500) + ' ₪';
+  document.getElementById('c-loyalty').textContent = fmt(cm.loyalty_bonus) + ' ₪';
+  document.getElementById('c-sanctions').textContent = '-' + fmt(cm.sanctions_total) + ' ₪';
+  document.getElementById('c-net').textContent = fmt(cm.net_commission) + ' ₪';
+
+  // CRM
+  document.getElementById('crm-total').textContent = d.crm.total_orders;
+  document.getElementById('crm-delivered').textContent = d.crm.delivered_orders;
+  document.getElementById('crm-synced').textContent = d.crm.synced_orders;
+  document.getElementById('crm-revenue').textContent = fmt(d.crm.total_revenue) + ' ₪';
+
+  // Sync gaps
+  const gapsEl = document.getElementById('sync-gaps');
+  if (d.crm.unsynced_orders > 0) {
+    gapsEl.innerHTML = `<div class="gap-alert"><div class="gap-count">${d.crm.unsynced_orders}</div><div>طلبات مكتملة <strong>غير متزامنة</strong> مع منظومة العمولات</div></div>`;
+  } else {
+    gapsEl.innerHTML = `<div style="padding:10px;text-align:center;color:var(--green);font-size:14px">✅ جميع الطلبات متزامنة</div>`;
+  }
+
+  // Leaderboard
+  const lbEl = document.getElementById('leaderboard');
+  if (d.leaderboard && d.leaderboard.length) {
+    lbEl.innerHTML = d.leaderboard.slice(0, 8).map((e, i) => `
+      <div class="lb-item">
+        <div class="lb-rank">${i + 1}</div>
+        <div class="lb-info">
+          <div class="lb-name">${e.name}</div>
+          <div class="lb-detail">${e.lines} خط • ${e.devices} جهاز</div>
+        </div>
+        <div class="lb-comm">${fmt(e.commission)} ₪</div>
+      </div>
+    `).join('');
+  } else {
+    lbEl.innerHTML = '<div style="text-align:center;color:var(--text3);padding:20px">لا بيانات بعد</div>';
+  }
+
+  // Device Milestones
+  const deviceRev = cm.device_sales;
+  const msEl = document.getElementById('milestones');
+  const milestones = [50000, 100000, 150000, 200000, 250000, 300000];
+  msEl.innerHTML = milestones.map(ms => {
+    const done = deviceRev >= ms;
+    const next = !done && deviceRev >= (ms - 50000);
+    const pct = Math.min(100, Math.round((deviceRev / ms) * 100));
+    return `<div class="ms-item">
+      <div class="ms-dot ${done ? 'done' : next ? 'next' : 'far'}"></div>
+      <div style="flex:1">
+        <div style="font-weight:700">${fmt(ms)} ₪ — بونص 2,500₪</div>
+        <div style="height:4px;background:var(--bg);border-radius:2px;margin-top:4px"><div style="height:100%;width:${done ? 100 : pct}%;background:${done ? 'var(--green)' : 'var(--yellow)'};border-radius:2px;transition:width 1s"></div></div>
+      </div>
+      <div style="font-weight:800;color:${done ? 'var(--green)' : 'var(--text3)'}">${done ? '✅' : fmt(ms - deviceRev) + '₪ باقي'}</div>
+    </div>`;
+  }).join('');
+
+  // Targets progress
+  const tEl = document.getElementById('comm-targets');
+  const linesPct = d.commissions.lines_count > 0 ? Math.min(100, Math.round((d.commissions.lines_count / Math.max(1, d.commissions.lines_count)) * 100)) : 0;
+  tEl.innerHTML = `
+    <div class="target-bar">
+      <div class="bar-header"><span>خطوط: ${d.commissions.lines_count}</span><span class="pct">${fmt(cm.lines_commission)} ₪</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--blue)"></div></div>
+    </div>
+    <div class="target-bar">
+      <div class="bar-header"><span>أجهزة: ${fmt(cm.device_sales)} ₪</span><span class="pct">${fmt(cm.devices_commission)} ₪</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.round(cm.device_sales / 3000))}%;background:var(--green)"></div></div>
+    </div>`;
+}
+
+// Auto-start if config saved
+try {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  if (saved && saved.url && saved.token) {
+    // Migrate old domain
+    if (saved.url.includes('bawaya-2019.workers.dev')) {
+      saved.url = 'https://clalmobile.com';
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    }
+    document.getElementById('s-url').value = saved.url;
+    document.getElementById('s-token').value = saved.token;
+    document.getElementById('s-refresh').value = saved.refresh || 60;
+    startDashboard();
+  }
+} catch {}
+</script>
+</body>
+</html>

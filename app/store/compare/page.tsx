@@ -6,6 +6,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCompare } from "@/lib/store/compare";
 import { useCart } from "@/lib/store/cart";
 import { useScreen } from "@/lib/hooks";
@@ -143,11 +144,11 @@ export default function ComparePage() {
                   >
                     <div className="flex flex-col items-center gap-1">
                       <div
-                        className="bg-[#1a1a1e] rounded-lg flex items-center justify-center overflow-hidden mx-auto"
+                        className="relative bg-[#1a1a1e] rounded-lg flex items-center justify-center overflow-hidden mx-auto"
                         style={{ width: scr.mobile ? 80 : 120, height: scr.mobile ? 80 : 120 }}
                       >
                         {item.image_url ? (
-                          <img src={item.image_url} alt={getProductName(item, lang)} className="max-w-full max-h-full object-contain p-1" />
+                          <Image src={item.image_url} alt={getProductName(item, lang)} fill className="object-contain p-1" />
                         ) : (
                           <span className="opacity-20 text-3xl">📱</span>
                         )}
@@ -231,8 +232,8 @@ export default function ComparePage() {
                 {items.map((item) => (
                   <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 6 : 10 }}>
                     <div className="flex justify-center gap-1 flex-wrap">
-                      {(item.colors || []).slice(0, 5).map((c: any) => (
-                        <span key={c?.hex || Math.random()} className="inline-block rounded-full border border-surface-border" style={{ width: 16, height: 16, background: c?.hex || "#888" }} title={getColorName(c, lang)} />
+                      {(item.colors || []).slice(0, 5).map((c: any, i: number) => (
+                        <span key={i} className="inline-block rounded-full border border-surface-border" style={{ width: 16, height: 16, background: c?.hex || "#888" }} title={getColorName(c, lang)} />
                       ))}
                       {(!item.colors || item.colors.length === 0) && <span className="text-muted">—</span>}
                     </div>

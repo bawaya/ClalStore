@@ -52,20 +52,40 @@ export async function getAdminProducts(opts?: { limit?: number; offset?: number 
 
   if (limit > 0) {
     const [{ data, error }, { count }] = await Promise.all([
-      db().from("products").select("*").order("created_at", { ascending: false }).range(offset, offset + limit - 1),
+      db().from("products").select("*").order("sort_position", { ascending: true }).order("created_at", { ascending: false }).range(offset, offset + limit - 1),
       db().from("products").select("id", { count: "exact", head: true }),
     ]);
     if (error) throw error;
     return { data: (data || []) as Product[], total: count ?? 0 };
   }
 
-  // No pagination — return all with safety limit (backward compat)
-  const { data } = await db().from("products").select("*").order("created_at", { ascending: false }).limit(500);
-  return { data: (data || []) as Product[], total: (data || []).length };
+  // No pagination — safety cap + exact total count (avoid misleading totals when > 500 rows)
+  const [{ data }, { count }] = await Promise.all([
+    db()
+      .from("products")
+      .select("*")
+      .order("sort_position", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(500),
+    db().from("products").select("id", { count: "exact", head: true }),
+  ]);
+  return { data: (data || []) as Product[], total: count ?? (data || []).length };
 }
 
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
-  const { data, error } = await db().from("products").insert(product).select().single();
+  const nextProduct = { ...product } as Omit<Product, "id" | "created_at" | "updated_at">;
+
+  if (nextProduct.sort_position == null) {
+    const { data: lastProduct } = await db()
+      .from("products")
+      .select("sort_position")
+      .order("sort_position", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    nextProduct.sort_position = Number(lastProduct?.sort_position || 0) + 1;
+  }
+
+  const { data, error } = await db().from("products").insert(nextProduct).select().single();
   if (error) throw error;
   return data;
 }

@@ -1,0 +1,36 @@
+name: Production Smoke Tests
+
+on:
+  deployment_status:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *" # daily at 06:00 UTC
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    # Only run for successful deployments or when manually/scheduled
+    if: github.event.deployment_status.state == 'success' || github.event_name != 'deployment_status'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Run smoke tests
+        id: smoke
+        env:
+          SMOKE_TEST_URL: ${{ secrets.SMOKE_TEST_URL || 'https://clalmobile.com' }}
+        run: npx vitest run tests/smoke/ --config vitest.smoke.config.ts
+      - name: Alert on failure
+        if: failure()
+        env:
+          YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
+          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+          ALERT_WHATSAPP: ${{ secrets.ADMIN_PERSONAL_PHONE }}
+          ALERT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_FROM: ${{ secrets.SENDGRID_FROM }}
+        run: node tests/smoke/alert.js

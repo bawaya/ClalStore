@@ -1,23 +1,20 @@
-
 // =====================================================
 // ClalMobile — Admin AI Enhance API (OpenAI GPT-4o-mini)
 // POST: translate name, generate descriptions, classify, SEO
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { requireAdmin } from "@/lib/admin/auth";
 
-function getOpenAIKey() {
-  return process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
-}
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getOpenAIKey()}`,
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
@@ -44,8 +41,7 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-
-    if (!getOpenAIKey()) {
+    if (!OPENAI_API_KEY) {
       return apiError("OpenAI API key not configured", 500);
     }
 
@@ -113,6 +109,6 @@ ${specsText ? `المواصفات التفصيلية: ${specsText}` : "لا تو
     });
   } catch (err: unknown) {
     console.error("[AI Enhance Error]", err);
-    return apiError(errMsg(err, "AI processing failed"), 500);
+    return apiError("فشل في معالجة AI", 500);
   }
 }

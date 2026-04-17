@@ -4,7 +4,7 @@
 // =====================================================
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 export interface CartItem {
   cartId: string;
@@ -45,68 +45,69 @@ interface CartStore {
 export const useCart = create<CartStore>()(
   persist(
     (set, get) => ({
-  items: [],
-  couponCode: "",
-  discountAmount: 0,
+      items: [],
+      couponCode: "",
+      discountAmount: 0,
 
-  addItem: (item) => {
-    const cartId = `cart_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    set((state) => {
-      const newItems = [...state.items, { ...item, cartId, quantity: 1 }];
-      // Fire-and-forget: save abandoned cart to API
-      _trackAbandonedCart(newItems);
-      return { items: newItems };
-    });
-  },
+      addItem: (item) => {
+        const cartId = `cart_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        set((state) => {
+          const newItems = [...state.items, { ...item, cartId, quantity: 1 }];
+          // Fire-and-forget: save abandoned cart to API
+          _trackAbandonedCart(newItems);
+          return { items: newItems };
+        });
+      },
 
-  removeItem: (cartId) => {
-    set((state) => ({
-      items: state.items.filter((i) => i.cartId !== cartId),
-    }));
-  },
+      removeItem: (cartId) => {
+        set((state) => ({
+          items: state.items.filter((i) => i.cartId !== cartId),
+        }));
+      },
 
-  updateQuantity: (cartId, quantity) => {
-    if (quantity <= 0) {
-      get().removeItem(cartId);
-      return;
-    }
-    set((state) => ({
-      items: state.items.map((i) =>
-        i.cartId === cartId ? { ...i, quantity } : i
-      ),
-    }));
-  },
+      updateQuantity: (cartId, quantity) => {
+        if (quantity <= 0) {
+          get().removeItem(cartId);
+          return;
+        }
+        set((state) => ({
+          items: state.items.map((i) =>
+            i.cartId === cartId ? { ...i, quantity } : i,
+          ),
+        }));
+      },
 
-  clearCart: () => {
-    // Mark cart as recovered when user clears (checkout complete)
-    _markCartRecovered();
-    set({ items: [], couponCode: "", discountAmount: 0 });
-  },
+      clearCart: () => {
+        // Mark cart as recovered when user clears (checkout complete)
+        _markCartRecovered();
+        set({ items: [], couponCode: "", discountAmount: 0 });
+      },
 
-  applyCoupon: (code, discount) => {
-    set({ couponCode: code, discountAmount: discount });
-  },
+      applyCoupon: (code, discount) => {
+        set({ couponCode: code, discountAmount: discount });
+      },
 
-  clearCoupon: () => {
-    set({ couponCode: "", discountAmount: 0 });
-  },
+      clearCoupon: () => {
+        set({ couponCode: "", discountAmount: 0 });
+      },
 
-  getItemCount: () => get().items.reduce((s, i) => s + i.quantity, 0),
+      getItemCount: () => get().items.reduce((s, i) => s + i.quantity, 0),
 
-  getSubtotal: () =>
-    get().items.reduce((s, i) => s + i.price * i.quantity, 0),
+      getSubtotal: () =>
+        get().items.reduce((s, i) => s + i.price * i.quantity, 0),
 
-  getTotal: () => Math.max(0, get().getSubtotal() - get().discountAmount),
+      getTotal: () => Math.max(0, get().getSubtotal() - get().discountAmount),
 
-  hasDevices: () => get().items.some((i) => i.type === "device"),
+      hasDevices: () => get().items.some((i) => i.type === "device"),
 
-  hasOnlyAccessories: () => {
-    const items = get().items;
-    return items.length > 0 && items.every((i) => i.type === "accessory");
-  },
-}),
+      hasOnlyAccessories: () => {
+        const items = get().items;
+        return items.length > 0 && items.every((i) => i.type === "accessory");
+      },
+    }),
     {
       name: "clal_cart",
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         items: state.items,
         couponCode: state.couponCode,
@@ -117,6 +118,18 @@ export const useCart = create<CartStore>()(
 );
 
 // ===== Abandoned Cart Tracking (fire-and-forget) =====
+function _abandonedCartHeaders(): Record<string, string> {
+  if (typeof document === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  const token = match ? match[1] : "";
+  return {
+    "Content-Type": "application/json",
+    "x-csrf-token": token,
+  };
+}
+
 function _getVisitorId(): string {
   if (typeof window === "undefined") return "server";
   let id = localStorage.getItem("clal_visitor_id");
@@ -133,7 +146,7 @@ function _trackAbandonedCart(items: CartItem[]) {
     const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
     fetch("/api/cart/abandoned", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: _abandonedCartHeaders(),
       body: JSON.stringify({
         visitor_id: _getVisitorId(),
         items: items.map((i) => ({
@@ -154,6 +167,9 @@ function _trackAbandonedCart(items: CartItem[]) {
 function _markCartRecovered() {
   if (typeof window === "undefined") return;
   try {
-    fetch(`/api/cart/abandoned?visitor_id=${_getVisitorId()}`, { method: "DELETE" }).catch(() => {});
+    fetch(`/api/cart/abandoned?visitor_id=${encodeURIComponent(_getVisitorId())}`, {
+      method: "DELETE",
+      headers: _abandonedCartHeaders(),
+    }).catch(() => {});
   } catch {}
 }

@@ -1,0 +1,30 @@
+name: Hourly Monitor
+
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour on the hour
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Health check
+        id: health
+        env:
+          MONITOR_URL: ${{ secrets.MONITOR_URL || 'https://clalmobile.com' }}
+        run: node tests/monitor/check.js
+      - name: Alert on failure
+        if: failure()
+        env:
+          YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
+          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+          ALERT_WHATSAPP: ${{ secrets.ADMIN_PERSONAL_PHONE }}
+          ALERT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_FROM: ${{ secrets.SENDGRID_FROM }}
+        run: node tests/monitor/alert.js

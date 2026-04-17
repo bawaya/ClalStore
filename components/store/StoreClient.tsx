@@ -156,7 +156,7 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
                 <span className="text-purple-400 text-xs animate-pulse">🧠</span>
               )}
               {search && (
-                <button onClick={smartResults ? clearSmartSearch : () => setSearch("")} className="text-muted text-xs cursor-pointer">✕</button>
+                <button onClick={smartResults ? clearSmartSearch : () => setSearch("")} className="text-muted text-xs cursor-pointer" aria-label="مسح البحث">✕</button>
               )}
             </div>
             {isSmartQuery(search) && !smartSearching && (

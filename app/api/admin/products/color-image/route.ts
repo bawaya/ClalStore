@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ colors, total: colors.length });
   } catch (err: unknown) {
-    return apiError(errMsg(err, "فشل في البحث"), 500);
+    console.error("Color image error:", err);
+    return apiError("فشل في البحث", 500);
   }
 }

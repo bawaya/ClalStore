@@ -44,19 +44,16 @@ async function saveToInbox(
 
     const phone = normalizePhone(rawPhone).replace(/^\+/, "");
     const phoneWithPlus = "+" + phone;
+    const phones = [...new Set([phone, phoneWithPlus, rawPhone])];
 
-    let existing: { id: string; unread_count?: number } | null = null;
-    for (const ph of [phone, phoneWithPlus, rawPhone]) {
-      const { data } = await sb
-        .from("inbox_conversations")
-        .select("id, unread_count")
-        .eq("customer_phone", ph)
-        .neq("status", "archived")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      if (data) { existing = data as any; break; }
-    }
+    const { data: existing } = await sb
+      .from("inbox_conversations")
+      .select("id, unread_count")
+      .in("customer_phone", phones)
+      .neq("status", "archived")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     const displayText = inboundText
       || (media?.type === "image" ? "📷 صورة" : "")
@@ -79,12 +76,13 @@ async function saveToInbox(
       if (customerName && customerName.trim().length > 1) {
         updateData.customer_name = customerName.trim();
       }
-      await sb
+      const { error: updateErr } = await sb
         .from("inbox_conversations")
         .update(updateData as any)
         .eq("id", convId);
+      if (updateErr) console.error("Inbox update error:", updateErr.message);
     } else {
-      const { data: newConv } = await sb
+      const { data: newConv, error: insertErr } = await sb
         .from("inbox_conversations")
         .insert({
           customer_phone: phone,
@@ -97,6 +95,7 @@ async function saveToInbox(
         } as any)
         .select("id")
         .single();
+      if (insertErr) console.error("Inbox insert error:", insertErr.message);
 
       convId = newConv?.id;
       if (!convId) return;
@@ -147,14 +146,13 @@ export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
 
-    // HMAC signature verification
-    const signature =
-      req.headers.get("x-ycloud-signature") ||
-      req.headers.get("x-hub-signature-256");
-    const webhookSecret =
-      process.env.WEBHOOK_SECRET || process.env.WEBHOOK_VERIFY_TOKEN;
+    // HMAC signature verification (only when WEBHOOK_SECRET is explicitly set)
+    const webhookSecret = process.env.WEBHOOK_SECRET;
 
     if (webhookSecret) {
+      const signature =
+        req.headers.get("x-ycloud-signature") ||
+        req.headers.get("x-hub-signature-256");
       if (!signature) {
         console.error("WhatsApp webhook: missing signature header — rejecting");
         return apiError("Missing webhook signature", 401);
@@ -192,17 +190,14 @@ export async function POST(req: NextRequest) {
         response.text = "عذراً، حدث خطأ. حاول مرة ثانية 🙏";
       }
     } else if (isMedia) {
-      // Media without caption — acknowledge receipt
+      // Media without caption — acknowledge receipt with quick replies
       const { getTemplate } = await import("@/lib/bot/templates");
       response.text = await getTemplate("media_received", "ar") ||
         "شكراً على الرسالة! 📎 كيف بقدر أساعدك؟";
+      response.quickReplies = ["📱 المنتجات", "📡 الباقات", "👤 كلم موظف"];
     }
 
-    if (response.text) {
-      await sendBotResponse(msg.from, response);
-    }
-
-    // Save to inbox (with media info if applicable)
+    // Save to inbox FIRST (before sending reply — so messages are never lost)
     const mediaInfo = isMedia ? {
       type: msg.type as "image" | "document" | "audio" | "video",
       url: msg.mediaUrl,
@@ -218,6 +213,15 @@ export async function POST(req: NextRequest) {
       response.text || null,
       mediaInfo,
     );
+
+    // Send bot reply (non-blocking — inbox already saved)
+    if (response.text) {
+      try {
+        await sendBotResponse(msg.from, response);
+      } catch (sendErr) {
+        console.error("sendBotResponse failed (message saved to inbox):", sendErr);
+      }
+    }
 
     // Notify admin for new conversations or high-priority messages
     const { notifyAdminNewMessage } = await import("@/lib/bot/admin-notify");

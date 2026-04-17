@@ -1,4 +1,3 @@
-
 // =====================================================
 // ClalMobile — Twilio Webhook (SMS/Verify Status Callbacks)
 // POST /api/webhook/twilio
@@ -8,13 +7,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTwilioSignature } from "@/lib/webhook-verify";
 import { apiError, apiSuccess } from "@/lib/api-response";
+import { getPublicSiteUrl } from "@/lib/public-site-url";
 
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
-
-    // Parse form data first (needed for signature verification)
     const contentType = req.headers.get("content-type") || "";
+
+    // Parse form data first (needed for Twilio signature verification)
     let data: Record<string, string> = {};
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       data = JSON.parse(rawBody);
     }
 
-    // Twilio signature verification: HMAC-SHA1 over (URL + sorted params), base64
+    // Twilio signature verification (URL + sorted POST params + base64 HMAC-SHA1)
     const twilioSignature = req.headers.get("x-twilio-signature");
     const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
 
@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
         console.error("Twilio webhook: missing signature header — rejecting");
         return apiError("Missing webhook signature", 401);
       }
-      const requestUrl = req.url;
-      const valid = await verifyTwilioSignature(requestUrl, data, twilioSignature, twilioAuthToken);
+      const webhookUrl = `${getPublicSiteUrl()}/api/webhook/twilio`;
+      const valid = await verifyTwilioSignature(webhookUrl, data, twilioSignature, twilioAuthToken);
       if (!valid) {
         console.error("Twilio webhook: invalid signature");
         return apiError("Invalid webhook signature", 401);

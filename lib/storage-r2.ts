@@ -116,7 +116,7 @@ export async function uploadToR2(
   }
 
   // Fallback: Supabase Storage
-  console.log("[R2] Not configured, falling back to Supabase Storage");
+  console.warn("[R2] Not configured, falling back to Supabase Storage");
   const buffer = data instanceof Uint8Array ? data : new Uint8Array(data);
   return uploadImage(buffer, filename, contentType);
 }

@@ -42,6 +42,8 @@ export const ORDER_SOURCE = {
   external: { label: "متجر خارجي", labelHe: "חנות חיצונית", color: "#f97316", icon: "🏪" },
   whatsapp: { label: "واتساب", labelHe: "וואטסאפ", color: "#25d366", icon: "💬" },
   webchat: { label: "شات الموقع", labelHe: "צ'אט", color: "#a855f7", icon: "🌐" },
+  pipeline: { label: "فايبلاين", labelHe: "פייפליין", color: "#0ea5e9", icon: "🎯" },
+  phone: { label: "هاتف", labelHe: "טלפון", color: "#14b8a6", icon: "📞" },
   manual: { label: "يدوي", labelHe: "ידני", color: "#71717a", icon: "✍️" },
 } as const;
 
@@ -60,8 +62,8 @@ export type UserRole = keyof typeof USER_ROLE;
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   super_admin: ["*"],
-  admin: ["products", "orders", "customers", "tasks", "pipeline", "coupons", "heroes", "lines", "emails", "settings"],
-  sales: ["orders", "customers", "tasks", "pipeline"],
+  admin: ["products", "orders", "orders.create", "orders.edit", "customers", "tasks", "pipeline", "coupons", "heroes", "lines", "emails", "settings"],
+  sales: ["orders", "orders.create", "orders.edit", "customers", "tasks", "pipeline"],
   support: ["orders", "customers", "tasks"],
   content: ["products", "heroes", "emails"],
   viewer: ["orders.read", "customers.read"],
@@ -110,20 +112,14 @@ export const BANKS = [
 ] as const;
 
 export const INTEGRATION_TYPES = {
-  whatsapp: { label: "WhatsApp", icon: "💬", providers: ["yCloud", "Meta API", "Twilio"] as readonly string[] },
+  whatsapp: { label: "WhatsApp", icon: "💬", providers: ["yCloud"] as readonly string[] },
   sms: { label: "SMS / OTP", icon: "📱", providers: ["Twilio SMS"] as readonly string[] },
-  payment: { label: "الدفع — إسرائيل", icon: "💳", providers: ["רווחית (Rivhit)", "Tranzila", "PayPlus", "Stripe"] as readonly string[] },
+  payment: { label: "الدفع — إسرائيل", icon: "💳", providers: ["רווחית (Rivhit)"] as readonly string[] },
   payment_upay: { label: "الدفع — فلسطين والعالم", icon: "💳", providers: ["UPay"] as readonly string[] },
   email: { label: "Email", icon: "📧", providers: ["Resend", "SendGrid"] as readonly string[] },
-  ai_chat: { label: "ذكاء اصطناعي (بوت + بحث)", icon: "🤖", providers: ["Anthropic Claude", "Google Gemini"] as readonly string[] },
-  ai_admin: { label: "ذكاء اصطناعي (أدمن)", icon: "🧠", providers: ["OpenAI"] as readonly string[] },
+  ai_chat: { label: "ذكاء اصطناعي (بوت + بحث)", icon: "🤖", providers: ["Anthropic Claude"] as readonly string[] },
   storage: { label: "تخزين الصور", icon: "☁️", providers: ["Cloudflare R2"] as readonly string[] },
-  image_processing: { label: "معالجة الصور", icon: "🖼️", providers: ["RemoveBG"] as readonly string[] },
-  device_specs: { label: "مواصفات الأجهزة", icon: "📋", providers: ["MobileAPI"] as readonly string[] },
-  image_search: { label: "بحث صور المنتجات", icon: "🔍", providers: ["Pexels"] as readonly string[] },
   push_notifications: { label: "إشعارات Push", icon: "🔔", providers: ["Web Push (VAPID)"] as readonly string[] },
-  analytics: { label: "Analytics", icon: "📊", providers: ["Google Analytics", "Mixpanel"] as readonly string[] },
-  crm_external: { label: "CRM خارجي", icon: "🔄", providers: ["HubSpot", "Salesforce"] as readonly string[] },
 } as const;
 
 export const PRODUCT_TYPES = {

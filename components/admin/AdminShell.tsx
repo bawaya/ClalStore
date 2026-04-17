@@ -6,6 +6,7 @@ import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
 
 const NAV_ITEMS = [
+  { key: "orders", href: "/admin/orders", icon: "🧾", label: "הזמנות" },
   { key: "dashboard", href: "/admin", icon: "📊", label: "داشبورد" },
   { key: "products", href: "/admin/products", icon: "📱", label: "المنتجات" },
   { key: "coupons", href: "/admin/coupons", icon: "🏷️", label: "كوبونات" },

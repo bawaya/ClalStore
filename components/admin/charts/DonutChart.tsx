@@ -27,18 +27,19 @@ export function DonutChart({ data, size = 200, formatValue, showLegend = true }:
   const gapAngle = data.length > 1 ? 0.02 : 0;
 
   const segments = useMemo(() => {
-    let startAngle = -Math.PI / 2;
-    return data.map((d, i) => {
-      const sweep = (d.value / total) * Math.PI * 2 - gapAngle;
-      const seg = {
-        startAngle: startAngle + gapAngle / 2,
-        endAngle: startAngle + sweep + gapAngle / 2,
-        color: d.color,
+    let angle = -Math.PI / 2;
+    const result: { startAngle: number; endAngle: number; color: string; index: number }[] = [];
+    for (let i = 0; i < data.length; i++) {
+      const sweep = (data[i].value / total) * Math.PI * 2 - gapAngle;
+      result.push({
+        startAngle: angle + gapAngle / 2,
+        endAngle: angle + sweep + gapAngle / 2,
+        color: data[i].color,
         index: i,
-      };
-      startAngle += sweep + gapAngle;
-      return seg;
-    });
+      });
+      angle += sweep + gapAngle;
+    }
+    return result;
   }, [data, total, gapAngle]);
 
   if (total === 0 || data.length === 0) {

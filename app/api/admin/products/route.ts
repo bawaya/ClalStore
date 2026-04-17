@@ -82,7 +82,8 @@ export async function GET(req: NextRequest) {
       limit > 0 ? { limit, offset, total, totalPages: Math.ceil(total / limit) } : undefined,
     );
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Products GET error:", err);
+    return apiError("فشل في جلب المنتجات", 500);
   }
 }
 
@@ -93,12 +94,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const v = validateBody(body, productSchema);
     if (v.error) return apiError(v.error, 400);
-    const data = normalizePricingPayload(v.data!);
-    const product = await createProduct(data as Omit<Product, "id" | "created_at" | "updated_at">);
+    const data = normalizePricingPayload(v.data! as any);
+    const product = await createProduct(data as any);
     await logAction("مدير", `إضافة منتج: ${data.name_ar}`, "product", product.id);
     return apiSuccess(product);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Products POST error:", err);
+    return apiError("فشل في إضافة المنتج", 500);
   }
 }
 
@@ -111,12 +113,13 @@ export async function PUT(req: NextRequest) {
     if (!id) return apiError("Missing id", 400);
     const v = validateBody(updates, productUpdateSchema);
     if (v.error) return apiError(v.error, 400);
-    const data = normalizePricingPayload(v.data!);
-    const product = await updateProduct(id, data as Partial<Omit<Product, "id">>);
+    const data = normalizePricingPayload(v.data! as any);
+    const product = await updateProduct(id, data as any);
     await logAction("مدير", `تعديل منتج: ${data.name_ar || id}`, "product", id);
     return apiSuccess(product);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Products PUT error:", err);
+    return apiError("فشل في تحديث المنتج", 500);
   }
 }
 
@@ -150,6 +153,7 @@ export async function DELETE(req: NextRequest) {
     await logAction("مدير", `حذف منتج: ${id}`, "product", id);
     return apiSuccess(null);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Products DELETE error:", err);
+    return apiError("فشل في حذف المنتج", 500);
   }
 }

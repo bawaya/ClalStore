@@ -1,4 +1,10 @@
 {
+  "files.associations": {
+    "**/supabase/migrations/*.sql": "sql",
+    "**/.claude/worktrees/*/supabase/migrations/*.sql": "sql"
+  },
+  "mssql.intelliSense.enableErrorChecking": false
+}
   "css.customData": [],
   "css.validate": true,
   "css.lint.unknownAtRules": "ignore",

@@ -8,9 +8,10 @@
 
 import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { generateOrderId, validatePhone, validateIsraeliID } from "@/lib/validators";
+import { generateCustomerCode, generateOrderId, validatePhone, validateIsraeliID } from "@/lib/validators";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { orderSchema, validateBody } from "@/lib/admin/validators";
 import type { Product } from "@/types/database";
 import type { EmailProvider } from "@/lib/integrations/hub";
 
@@ -45,13 +46,13 @@ interface OrderRequestBody {
 
 export async function POST(req: NextRequest) {
   try {
-    const body: OrderRequestBody = await req.json();
-    const { customer, items, payment, couponCode, discountAmount: _discountAmount, source } = body;
-
-    // === Validation ===
-    if (!customer?.name || !customer?.phone || !customer?.city || !customer?.address) {
+    const raw = await req.json();
+    const validation = validateBody(raw, orderSchema);
+    if (validation.error) {
       return apiError("بيانات ناقصة", 400);
     }
+    const body: OrderRequestBody = validation.data! as OrderRequestBody;
+    const { customer, items, payment, couponCode, discountAmount: _discountAmount, source } = body;
 
     if (!validatePhone(customer.phone)) {
       return apiError("رقم هاتف غير صالح", 400);
@@ -71,6 +72,12 @@ export async function POST(req: NextRequest) {
       return apiError("السلة فارغة", 400);
     }
 
+    // 5.3.2: Reject items without product_id to prevent price tampering
+    const invalidItems = items.filter((i: CartItem) => !i.productId);
+    if (invalidItems.length > 0) {
+      return apiError("عناصر غير صالحة — يجب أن يحتوي كل منتج على معرّف", 400);
+    }
+
     const hasDevice = items.some((i: CartItem) => i.type === "device");
     if (hasDevice && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
       return apiError("رقم هوية غير صالح", 400);
@@ -88,49 +95,113 @@ export async function POST(req: NextRequest) {
 
     const { data: existingCustomer } = await supabase
       .from("customers")
-      .select("id")
+      .select("id, customer_code")
       .eq("phone", cleanPhone)
-      .single();
+      .maybeSingle();
 
     let customerId: string;
+    let customerCode: string | null = existingCustomer?.customer_code || null;
+    let isNewCustomer = false;
+
+    const upsertCustomerDetails = {
+      name: customer.name,
+      email: customer.email || undefined,
+      city: customer.city,
+      address: customer.address,
+      id_number: customer.idNumber || undefined,
+    };
+
+    const assignMissingCustomerCode = async (targetCustomerId: string) => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const candidate = generateCustomerCode();
+        const { error } = await supabase
+          .from("customers")
+          .update({ customer_code: candidate })
+          .eq("id", targetCustomerId)
+          .is("customer_code", null);
+
+        if (!error) {
+          return candidate;
+        }
+
+        if ((error as { code?: string }).code !== "23505") {
+          console.error("Customer code assignment error:", error);
+          break;
+        }
+      }
+
+      return null;
+    };
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
       // Update customer info
       await supabase
         .from("customers")
-        .update({
-          name: customer.name,
-          email: customer.email || undefined,
-          city: customer.city,
-          address: customer.address,
-          id_number: customer.idNumber || undefined,
-        })
+        .update(upsertCustomerDetails)
         .eq("id", customerId);
-    } else {
-      const { data: newCustomer, error: custErr } = await supabase
-        .from("customers")
-        .insert({
-          name: customer.name,
-          phone: cleanPhone,
-          email: customer.email || undefined,
-          city: customer.city,
-          address: customer.address,
-          id_number: customer.idNumber || undefined,
-          segment: "new",
-        } as Record<string, unknown>)
-        .select("id")
-        .single();
 
-      if (custErr || !newCustomer) {
+      if (!customerCode) {
+        customerCode = await assignMissingCustomerCode(customerId);
+      }
+    } else {
+      isNewCustomer = true;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const candidate = generateCustomerCode();
+        const { data: newCustomer, error: custErr } = await supabase
+          .from("customers")
+          .insert({
+            ...upsertCustomerDetails,
+            phone: cleanPhone,
+            segment: "new",
+            customer_code: candidate,
+          } as Record<string, unknown>)
+          .select("id, customer_code")
+          .single();
+
+        if (!custErr && newCustomer) {
+          customerId = newCustomer.id;
+          customerCode = newCustomer.customer_code || candidate;
+          break;
+        }
+
+        if ((custErr as { code?: string }).code === "23505") {
+          const { data: raceCustomer } = await supabase
+            .from("customers")
+            .select("id, customer_code")
+            .eq("phone", cleanPhone)
+            .maybeSingle();
+
+          if (raceCustomer) {
+            customerId = raceCustomer.id;
+            customerCode = raceCustomer.customer_code || null;
+            isNewCustomer = false;
+            await supabase
+              .from("customers")
+              .update(upsertCustomerDetails)
+              .eq("id", customerId);
+
+            if (!customerCode) {
+              customerCode = await assignMissingCustomerCode(customerId);
+            }
+            break;
+          }
+
+          continue;
+        }
+
         console.error("Customer creation error:", custErr);
         return apiError("خطأ في تسجيل الزبون", 500);
       }
-      customerId = newCustomer.id;
+
+      if (!customerId!) {
+        return apiError("خطأ في تسجيل الزبون", 500);
+      }
     }
 
     // === 2. Verify prices from DB ===
-    const orderId = generateOrderId();
+    let orderId = generateOrderId();
     const productIds = items.map((i: CartItem) => i.productId).filter(Boolean);
     let priceMap: Record<string, number> = {};
     if (productIds.length > 0) {
@@ -193,24 +264,32 @@ export async function POST(req: NextRequest) {
       storage: i.storage || null,
     }));
 
-    const { data: rpcResult, error: rpcErr } = await (supabase.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>)("create_order_atomic", {
-      p_order_id: orderId,
-      p_customer_id: customerId,
-      p_source: source || "store",
-      p_items_total: itemsTotal,
-      p_discount_amount: discount,
-      p_total: total,
-      p_coupon_code: couponCode || "",
-      p_payment_method: hasDevice ? "bank" : "credit",
-      p_payment_details: {
-        ...(payment || {}),
-        payment_status: hasDevice ? "pending" : "awaiting_redirect",
-      },
-      p_shipping_city: customer.city,
-      p_shipping_address: customer.address,
-      p_customer_notes: customer.notes || "",
-      p_items: orderItems,
-    });
+    let rpcResult: unknown = null;
+    let rpcErr: { message: string } | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) orderId = generateOrderId();
+      const res = await (supabase.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>)("create_order_atomic", {
+        p_order_id: orderId,
+        p_customer_id: customerId,
+        p_source: source || "store",
+        p_items_total: itemsTotal,
+        p_discount_amount: discount,
+        p_total: total,
+        p_coupon_code: couponCode || "",
+        p_payment_method: hasDevice ? "bank" : "credit",
+        p_payment_details: {
+          ...(payment || {}),
+          payment_status: hasDevice ? "pending" : "awaiting_redirect",
+        },
+        p_shipping_city: customer.city,
+        p_shipping_address: customer.address,
+        p_customer_notes: customer.notes || "",
+        p_items: orderItems,
+      });
+      rpcResult = res.data;
+      rpcErr = res.error;
+      if (!rpcErr || !rpcErr.message?.includes("duplicate key")) break;
+    }
 
     if (rpcErr) {
       console.error("Order atomic creation error:", rpcErr);
@@ -218,6 +297,12 @@ export async function POST(req: NextRequest) {
       // Surface stock/coupon errors clearly to the user
       if (msg.includes("المخزون غير كافٍ")) return apiError(msg, 409);
       if (msg.includes("الكوبون غير صالح")) return apiError(msg, 409);
+      if (msg.includes("المنتج غير موجود")) {
+        return apiError(
+          "منتج في السلة لم يعد متوفراً — أعد تحديث السلة وأزل العناصر القديمة",
+          409,
+        );
+      }
       return apiError("خطأ في إنشاء الطلب", 500);
     }
 
@@ -281,6 +366,8 @@ export async function POST(req: NextRequest) {
       status: hasDevice ? "new" : "pending_payment",
       // Only accessories get Rivhit payment redirect
       needsPayment: !hasDevice,
+      customerCode: customerCode || undefined,
+      isNewCustomer,
       message: hasDevice
         ? "تم استلام الطلب — الفريق سيتواصل معك"
         : "جاري تحويلك لصفحة الدفع الآمنة...",

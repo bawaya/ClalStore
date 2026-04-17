@@ -111,6 +111,7 @@ export function ContactPanel({
         <button
           onClick={onClose}
           className="text-muted hover:text-white text-lg"
+          aria-label="إغلاق"
         >
           ✕
         </button>
@@ -210,9 +211,10 @@ export function ContactPanel({
                   className="group px-2 py-0.5 rounded-full text-[10px] text-white flex items-center gap-1 transition-colors hover:opacity-80"
                   style={{ backgroundColor: l.color + "30", borderColor: l.color, borderWidth: 1 }}
                   title="اضغط لإزالة"
+                  aria-label={`إزالة تصنيف ${l.name}`}
                 >
                   {l.name}
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity">✕</span>
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">✕</span>
                 </button>
               ))}
             </div>

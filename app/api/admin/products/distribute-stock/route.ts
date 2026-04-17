@@ -50,19 +50,18 @@ export async function POST(req: NextRequest) {
     }
 
     let updated = 0;
-    for (const p of products) {
+    const updates = products.map((p: any) => {
       const newStock = weightedRandom(mode);
       const variants = (p.variants as any[] || []).map((v: any) => ({
         ...v,
         stock: weightedRandom(mode),
       }));
+      return s.from("products").update({ stock: newStock, variants }).eq("id", p.id);
+    });
 
-      const { error: uErr } = await s
-        .from("products")
-        .update({ stock: newStock, variants })
-        .eq("id", p.id);
-
-      if (!uErr) updated++;
+    const results = await Promise.all(updates);
+    for (const r of results) {
+      if (!r.error) updated++;
     }
 
     const modeLabels: Record<Mode, string> = {
@@ -72,6 +71,7 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ updated, mode });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Distribute stock error:", err);
+    return apiError("فشل في توزيع المخزون", 500);
   }
 }

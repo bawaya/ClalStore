@@ -154,7 +154,7 @@ export function exportToPDF(
           <h1>ClalMobile — ${options.title}</h1>
           ${options.subtitle ? `<div class="pdf-subtitle">${options.subtitle}</div>` : ""}
         </div>
-        <div class="date">${new Date().toLocaleDateString("ar-IL", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+        <div class="date">${new Date().toLocaleDateString("ar-IL", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Jerusalem" })}</div>
       </div>
       
       <div class="pdf-content">
@@ -162,7 +162,7 @@ export function exportToPDF(
       </div>
 
       <div class="pdf-footer">
-        تم التصدير من نظام ClalMobile — ${new Date().toLocaleString("ar-IL")}
+        تم التصدير من نظام ClalMobile — ${new Date().toLocaleString("ar-IL", { timeZone: "Asia/Jerusalem" })}
       </div>
 
       <script>

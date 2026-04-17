@@ -13,7 +13,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-
     const { id } = await params;
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB error", 500);
@@ -59,7 +58,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       has_more = (count || 0) > 0;
     }
 
-    // Fetch customer from customers table
+    // Fetch customer from customers table (batch phone variants)
     let customer = null;
     if (conversation.customer_phone) {
       const phone = (conversation.customer_phone as string).replace(/[-\s+]/g, "");
@@ -67,14 +66,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (phone.startsWith("972")) phoneVariants.push("0" + phone.slice(3));
       if (phone.startsWith("0")) phoneVariants.push("972" + phone.slice(1));
 
-      for (const pv of phoneVariants) {
-        const { data: cust } = await supabase
-          .from("customers")
-          .select("id, name, phone, email, city, address, total_orders, total_spent, segment, tags, created_at")
-          .eq("phone", pv)
-          .single();
-        if (cust) { customer = cust; break; }
-      }
+      const { data: custResults } = await supabase
+        .from("customers")
+        .select("id, name, phone, email, city, address, total_orders, total_spent, segment, tags, created_at")
+        .in("phone", phoneVariants)
+        .limit(1);
+      if (custResults?.length) customer = custResults[0];
     }
 
     // Fetch labels

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import type { Hero } from "@/types/database";
@@ -45,10 +46,11 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
       }}
     >
       {h.image_url && (
-        <img
+        <Image
           src={h.image_url}
-          alt={h.title_ar || h.title_he || "عرض ترويجي"}
-          className="absolute inset-0 w-full h-full object-cover opacity-20 rounded-[inherit]"
+          alt={title}
+          fill
+          className="object-cover opacity-20 rounded-[inherit]"
         />
       )}
       <div className="relative z-10">
@@ -82,13 +84,19 @@ export function HeroCarousel({ heroes }: { heroes?: Hero[] }) {
             <button
               key={i}
               onClick={() => setIdx(i)}
-              className="rounded-full transition-all"
-              style={{
-                width: idx === i ? 20 : 6,
-                height: 6,
-                background: idx === i ? "#c41040" : "#3f3f46",
-              }}
-            />
+              aria-label={`Slide ${i + 1}`}
+              className="relative flex items-center justify-center transition-all"
+              style={{ width: 44, height: 44 }}
+            >
+              <span
+                className="rounded-full block transition-all"
+                style={{
+                  width: idx === i ? 20 : 6,
+                  height: 6,
+                  background: idx === i ? "#c41040" : "#3f3f46",
+                }}
+              />
+            </button>
           ))}
         </div>
       )}

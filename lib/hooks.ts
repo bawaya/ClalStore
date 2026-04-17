@@ -93,7 +93,6 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       if (item) setValue(JSON.parse(item));
     } catch {}
     setHasHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   // Persist changes after hydration

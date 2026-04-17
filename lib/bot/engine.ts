@@ -33,19 +33,6 @@ export { logBotInteraction } from "./analytics";
 
 const BASE_URL = "https://clalmobile.com";
 
-// ===== Qualification JSONB shape (stored in bot_conversations.qualification) =====
-interface QualificationJsonb extends Record<string, unknown> {
-  step: number;
-  answers?: Record<string, string>;
-  budget?: string;
-  priority?: string;
-  brand?: string;
-  payment?: string;
-  _muhammadStep?: number;
-  _muhammadData?: { name?: string; phone?: string; message?: string } | null;
-  _greetingCount?: number;
-}
-
 // ===== Bot Response =====
 export interface BotResponse {
   text: string;
@@ -84,21 +71,23 @@ async function getSession(visitorId: string, channel: "webchat" | "whatsapp"): P
   const cached = sessionCache.get(visitorId);
   if (cached) return cached;
 
-  // 2. Look for active conversation in DB
+  // 2. Look for active conversation in DB (within 24h)
   try {
     const s = createAdminSupabase();
+    const ttlCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data } = await s
       .from("bot_conversations")
       .select("*")
       .eq("visitor_id", visitorId)
       .eq("channel", channel)
       .eq("status", "active")
+      .gte("updated_at", ttlCutoff)
       .order("updated_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (data) {
-      const qual = (data.qualification as QualificationJsonb) || {} as QualificationJsonb;
+      const qual = (data.qualification as any) || {};
       const session: SessionState = {
         conversationId: data.id,
         visitorId,
@@ -130,7 +119,7 @@ async function setSession(state: SessionState): Promise<void> {
   // Persist session state to DB — include Muhammad handoff + greeting count in qualification JSONB
   try {
     const s = createAdminSupabase();
-    const qualData: QualificationJsonb = {
+    const qualData = {
       ...state.qualification,
       _muhammadStep: state.muhammadStep || 0,
       _muhammadData: state.muhammadData || null,
@@ -140,13 +129,13 @@ async function setSession(state: SessionState): Promise<void> {
       .from("bot_conversations")
       .update({
         language: state.language,
-        qualification: qualData satisfies Record<string, unknown>,
+        qualification: qualData as any,
         message_count: state.messageCount,
         products_discussed: state.lastProductIds,
         customer_phone: state.customerPhone || null,
         customer_name: state.customerName || null,
         customer_id: state.customerId || null,
-      })
+      } as any)
       .eq("id", state.conversationId);
   } catch (err) {
     console.error("Session persist error:", err);
@@ -257,7 +246,7 @@ export async function processMessage(
       if (normalizedPhone) {
         await sb
           .from("inbox_conversations")
-          .update({ sentiment: "angry" } as Record<string, unknown>)
+          .update({ sentiment: "angry" } as any)
           .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.+${normalizedPhone}`)
           .neq("status", "archived");
       }
@@ -627,7 +616,22 @@ async function handlePriceInquiry(session: SessionState, detected: DetectedInten
 async function handleCompare(session: SessionState, detected: DetectedIntent): Promise<BotResponse> {
   const isAr = session.language !== "he";
   const brands = (String(detected.params.brands || "")).split(",").filter(Boolean);
+  const models = (String(detected.params.models || "")).split(",").filter(Boolean);
 
+  // Try model-based comparison first (more precise)
+  if (models.length >= 2) {
+    const prodsA = await searchByModel(models[0]);
+    const prodsB = await searchByModel(models[1]);
+    if (prodsA.length > 0 && prodsB.length > 0) {
+      const comparison = formatComparison(prodsA[0], prodsB[0], BASE_URL);
+      return {
+        text: comparison,
+        quickReplies: isAr ? ["🛒 أبغى أطلب", "💰 كم القسط؟", "👤 كلم موظف"] : ["🛒 לרכוש", "👤 נציג"],
+      };
+    }
+  }
+
+  // Fallback to brand-based comparison
   if (brands.length >= 2) {
     const [prodA] = await searchProducts({ brand: brands[0], limit: 1 });
     const [prodB] = await searchProducts({ brand: brands[1], limit: 1 });
@@ -652,7 +656,6 @@ async function handleInstallments(session: SessionState, _detected: DetectedInte
 
   // If we have last discussed products
   if (session.lastProductIds.length > 0) {
-    const { createAdminSupabase } = await import("@/lib/supabase");
     const { data } = await createAdminSupabase()
       .from("products").select("*").in("id", session.lastProductIds).limit(1);
 
@@ -739,18 +742,22 @@ async function handleOrderTracking(session: SessionState, detected: DetectedInte
   if (!orderId) {
     // Try looking up by phone
     if (session.customerPhone) {
-      const order = await lookupOrder(undefined, session.customerPhone);
-      if (order) {
-        const status = isAr
-          ? (ORDER_STATUS_AR[order.status] || order.status)
-          : (ORDER_STATUS_HE[order.status] || order.status);
-        const items = (order.order_items || []).map((i: { product_name: string }) => i.product_name).join(", ");
-        return {
-          text: isAr
-            ? `📦 *طلبك ${order.id}:*\nالحالة: ${status}\nالمنتجات: ${items || "—"}\nالتاريخ: ${new Date(order.created_at).toLocaleDateString("ar-EG")}`
-            : `📦 *הזמנה ${order.id}:*\nסטטוס: ${status}`,
-          quickReplies: isAr ? ["👤 كلم موظف", "📱 المنتجات"] : ["👤 נציג", "📱 מוצרים"],
-        };
+      try {
+        const order = await lookupOrder(undefined, session.customerPhone);
+        if (order) {
+          const status = isAr
+            ? (ORDER_STATUS_AR[order.status] || order.status)
+            : (ORDER_STATUS_HE[order.status] || order.status);
+          const items = (order.order_items || []).map((i: { product_name: string }) => i.product_name).join(", ");
+          return {
+            text: isAr
+              ? `📦 *طلبك ${order.id}:*\nالحالة: ${status}\nالمنتجات: ${items || "—"}\nالتاريخ: ${new Date(order.created_at).toLocaleDateString("ar-EG")}`
+              : `📦 *הזמנה ${order.id}:*\nסטטוס: ${status}`,
+            quickReplies: isAr ? ["👤 كلم موظف", "📱 المنتجات"] : ["👤 נציג", "📱 מוצרים"],
+          };
+        }
+      } catch (err) {
+        console.error("Order lookup by phone error:", err);
       }
     }
 
@@ -759,7 +766,15 @@ async function handleOrderTracking(session: SessionState, detected: DetectedInte
     };
   }
 
-  const order = await lookupOrder(orderId);
+  let order: any;
+  try {
+    order = await lookupOrder(orderId);
+  } catch (err) {
+    console.error("Order lookup error:", err);
+    return {
+      text: isAr ? "عذراً، حدث خطأ أثناء البحث. حاول مرة ثانية 🙏" : "מצטערים, שגיאה בחיפוש. נסה שוב 🙏",
+    };
+  }
   if (!order) {
     return {
       text: isAr
@@ -835,7 +850,7 @@ async function handleEscalation(session: SessionState, reason: string, lang: "ar
       if (normalizedPhone) {
         await sb
           .from("inbox_conversations")
-          .update({ status: "waiting", priority: "high" } as Record<string, unknown>)
+          .update({ status: "waiting", priority: "high" } as any)
           .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.+${normalizedPhone}`)
           .neq("status", "archived");
       }
@@ -846,6 +861,10 @@ async function handleEscalation(session: SessionState, reason: string, lang: "ar
   const text = isAr
     ? "أفهم تماماً وأعتذر عن أي إزعاج 🙏\n\nسأوصل طلبك فوراً لفريقنا وسيتواصل معك أحد الموظفين بأسرع وقت.\n\nهل هناك شيء آخر أقدر أساعدك فيه الآن؟"
     : "אני מבין לגמרי ומתנצל על אי הנוחות 🙏\n\nאעביר את הפנייה שלך לצוות ונציג יחזור אליך בהקדם.\n\nיש משהו נוסף שאפשר לעזור?";
+
+  // Mark session as escalated to prevent re-processing by bot
+  session.csatAsked = true; // prevent further CSAT prompts after escalation
+
   return { text, escalate: true };
 }
 
@@ -934,7 +953,7 @@ async function handleMuhammadCollect(
       const nameIntent = detectIntentRaw(nameText);
       const looksLikeRequest = nameIntent.intent !== "unknown" && nameIntent.intent !== "greeting" 
         && nameIntent.confidence >= 0.6;
-      const tooLong = nameText.split(/\s+/).length > 5; // names are usually ≤ 4 words
+      const tooLong = nameText.split(/\s+/).length > 8; // Arabic names can be long
       const hasDigitsOrLinks = /\d{4,}|http|www\.|\.com/i.test(nameText);
       
       if (looksLikeRequest || tooLong || hasDigitsOrLinks) {

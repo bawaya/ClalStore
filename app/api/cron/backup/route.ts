@@ -45,7 +45,5 @@ export async function POST(req: NextRequest) {
     note: "Lightweight snapshot. Full backups are managed via Supabase automatic daily backups.",
   };
 
-  console.log("[Backup] Snapshot:", JSON.stringify(snapshot));
-
   return apiSuccess(snapshot);
 }

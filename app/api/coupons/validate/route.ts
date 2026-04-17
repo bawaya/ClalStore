@@ -7,6 +7,7 @@
 import { NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { couponValidateSchema, validateBody } from "@/lib/admin/validators";
 
 const couponAttempts = new Map<string, number[]>();
 const COUPON_RATE_LIMIT = 5;
@@ -30,15 +31,12 @@ export async function POST(req: NextRequest) {
       return apiError("كثرة محاولات — حاول بعد دقيقة", 429);
     }
 
-    const { code, total } = await req.json();
-
-    if (!code || typeof total !== "number") {
+    const raw = await req.json();
+    const validation = validateBody(raw, couponValidateSchema);
+    if (validation.error) {
       return apiSuccess({ valid: false, discount: 0, message: "بيانات ناقصة" });
     }
-
-    if (typeof code !== "string" || code.length > 50) {
-      return apiSuccess({ valid: false, discount: 0, message: "كوبون غير صالح" });
-    }
+    const { code, total } = validation.data!;
 
     const supabase = createServerSupabase();
 

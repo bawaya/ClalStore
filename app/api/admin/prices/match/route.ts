@@ -53,7 +53,8 @@ export async function POST(req: NextRequest) {
     const supabase = createAdminSupabase();
     const { data: products, error: dbErr } = await supabase.from('products').select('*').eq('type', 'device');
     if (dbErr) {
-      return apiError('DB: ' + dbErr.message, 500);
+      console.error("Price match DB error:", dbErr.message);
+      return apiError("فشل في جلب المنتجات", 500);
     }
     if (!products?.length) {
       return apiError('No products in DB', 404);
@@ -295,7 +296,8 @@ export async function POST(req: NextRequest) {
     steps.push('done');
     return apiSuccess({ rows: results, summary, tokens, steps, provider: 'openai' });
   } catch (err: unknown) {
-    return apiError(errMsg(err, String(err)));
+    console.error("Price match error:", err);
+    return apiError("فشل في مطابقة الأسعار", 500);
   }
 }
 

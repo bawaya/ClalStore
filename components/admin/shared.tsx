@@ -21,7 +21,7 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between shrink-0" style={{ padding: scr.mobile ? "12px 16px" : "16px 24px" }}>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-sm">✕</button>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-sm" aria-label="إغلاق">✕</button>
           <h2 className="font-black" style={{ fontSize: scr.mobile ? 14 : 18 }}>{title}</h2>
         </div>
         <div className="overflow-y-auto flex-1 min-h-0" style={{ padding: scr.mobile ? "0 16px 16px" : "0 24px 24px" }}>
@@ -188,7 +188,7 @@ export function ErrorBanner({ message, onDismiss }: { message: string; onDismiss
   return (
     <div className="bg-state-error/10 border border-state-error/30 rounded-xl px-4 py-2 mb-3 flex items-center justify-between">
       <span className="text-state-error text-xs font-bold">⚠️ {message}</span>
-      {onDismiss && <button onClick={onDismiss} className="text-state-error text-sm cursor-pointer bg-transparent border-0">✕</button>}
+      {onDismiss && <button onClick={onDismiss} aria-label="إغلاق رسالة الخطأ" className="text-state-error text-sm cursor-pointer bg-transparent border-0">✕</button>}
     </div>
   );
 }

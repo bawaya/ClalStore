@@ -22,9 +22,18 @@ export async function authenticateCustomer(req: NextRequest) {
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, name, phone, email, city, address")
+    .select("id, name, phone, email, city, address, customer_code, auth_token_expires_at")
     .eq("auth_token", hashedToken)
     .single();
 
-  return customer;
+  if (!customer) return null;
+
+  // Check token expiry (4.3.3)
+  if (customer.auth_token_expires_at) {
+    const expiresAt = new Date(customer.auth_token_expires_at).getTime();
+    if (Date.now() > expiresAt) return null;
+  }
+
+  const { auth_token_expires_at: _, ...safeCustomer } = customer;
+  return safeCustomer;
 }

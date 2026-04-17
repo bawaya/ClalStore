@@ -10,7 +10,8 @@ export type AIFeature =
   | "smart_reply"
   | "summary"
   | "sentiment"
-  | "smart_search";
+  | "smart_search"
+  | "auto_label";
 
 interface UsageData {
   feature: AIFeature;

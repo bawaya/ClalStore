@@ -12,7 +12,8 @@ export async function GET(req: NextRequest) {
     const coupons = await getAdminCoupons();
     return apiSuccess(coupons);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Coupons GET error:", err);
+    return apiError("فشل في جلب الكوبونات", 500);
   }
 }
 
@@ -24,11 +25,12 @@ export async function POST(req: NextRequest) {
     const v = validateBody(body, couponSchema);
     if (v.error) return apiError(v.error, 400);
     const data = v.data!;
-    const coupon = await createCoupon(data);
+    const coupon = await createCoupon(data as any);
     await logAction("مدير", `إضافة كوبون: ${data.code}`, "coupon", coupon.id);
     return apiSuccess(coupon);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Coupons POST error:", err);
+    return apiError("فشل في إنشاء الكوبون", 500);
   }
 }
 
@@ -41,11 +43,12 @@ export async function PUT(req: NextRequest) {
     if (!id) return apiError("Missing id", 400);
     const v = validateBody(updates, couponUpdateSchema);
     if (v.error) return apiError(v.error, 400);
-    const coupon = await updateCoupon(id, v.data!);
+    const coupon = await updateCoupon(id, v.data! as any);
     await logAction("مدير", `تعديل كوبون: ${id}`, "coupon", id);
     return apiSuccess(coupon);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Coupons PUT error:", err);
+    return apiError("فشل في تحديث الكوبون", 500);
   }
 }
 
@@ -60,6 +63,7 @@ export async function DELETE(req: NextRequest) {
     await logAction("مدير", `حذف كوبون: ${id}`, "coupon", id);
     return apiSuccess(null);
   } catch (err: unknown) {
-    return apiError(errMsg(err, "Unknown error"));
+    console.error("Coupons DELETE error:", err);
+    return apiError("فشل في حذف الكوبون", 500);
   }
 }

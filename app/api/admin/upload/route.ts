@@ -62,6 +62,6 @@ export async function POST(req: NextRequest) {
     return apiSuccess({ urls: results.map((r) => r.url), results });
   } catch (err: unknown) {
     console.error("Upload error:", err);
-    return apiError(errMsg(err, "Unknown error"));
+    return apiError("فشل في رفع الملف", 500);
   }
 }

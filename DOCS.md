@@ -1,1208 +1,1092 @@
 # ClalMobile — Technical Documentation
 
-> Full-stack e-commerce ecosystem & CRM platform for HOT Mobile authorized dealer (وكيل رسمي)
-> Domain: clalmobile.com
+> Full-stack bilingual (Arabic + Hebrew, RTL) e-commerce ecosystem for HOT Mobile authorized dealer.
 
 ---
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Tech Stack](#tech-stack)
-3. [Project Structure](#project-structure)
-4. [Database Schema](#database-schema)
-5. [API Reference](#api-reference)
-6. [Authentication & Authorization](#authentication--authorization)
-7. [Core Modules](#core-modules)
-8. [Commission Calculator Module](#commission-calculator-module)
-9. [Integrations](#integrations)
-10. [Environment Variables](#environment-variables)
-11. [Deployment](#deployment)
-12. [Scripts & Commands](#scripts--commands)
-13. [Design System](#design-system)
-14. [Testing](#testing)
-15. [Security Audit](#security-audit)
+1. [Architecture Overview](#1-architecture-overview)
+2. [Tech Stack](#2-tech-stack)
+3. [Project Structure](#3-project-structure)
+4. [Database Schema](#4-database-schema)
+5. [API Reference](#5-api-reference)
+6. [Authentication & Authorization](#6-authentication--authorization)
+7. [Middleware & Security](#7-middleware--security)
+8. [Core Modules](#8-core-modules)
+9. [Commission System](#9-commission-system)
+10. [Bot Engine](#10-bot-engine)
+11. [Integrations](#11-integrations)
+12. [Internationalization](#12-internationalization)
+13. [Design System](#13-design-system)
+14. [Environment Variables](#14-environment-variables)
+15. [Deployment](#15-deployment)
+16. [Testing](#16-testing)
 
 ---
 
-## Architecture Overview
+## 1. Architecture Overview
 
-ClalMobile is a monolithic Next.js 14 application using the App Router pattern, deployed on Cloudflare Pages (edge runtime). It combines three main subsystems:
-
-```
-┌─────────────────────────────────────────────────────┐
-│                    ClalMobile                        │
-│                                                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │  Store    │  │  Admin   │  │      CRM         │  │
-│  │ (Public)  │  │ (Panel)  │  │ (Sales/Support)  │  │
-│  └────┬─────┘  └────┬─────┘  └────────┬─────────┘  │
-│       │              │                  │            │
-│       └──────────────┼──────────────────┘            │
-│                      │                               │
-│              ┌───────┴────────┐                      │
-│              │  API Routes    │                      │
-│              │  (99 endpoints)│                      │
-│              └───────┬────────┘                      │
-│                      │                               │
-│  ┌───────────────────┼───────────────────────────┐  │
-│  │           lib/ (Business Logic)                     │  │
-│  │  bot/ │ admin/ │ crm/ │ store/ │ commissions/ │ ... │  │
-│  └───────────────────┬───────────────────────────┘  │
-│                      │                               │
-│  ┌───────────────────┼───────────────────────────┐  │
-│  │           External Services                    │  │
-│  │  Supabase │ yCloud │ Twilio │ Rivhit │ Claude  │  │
-│  └────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-```
-
-**Data flow:** Browser → Next.js Middleware (auth/rate-limit/CSP) → API Route → lib/ logic → Supabase/External APIs → Response
-
----
-
-## Tech Stack
-
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Framework | Next.js (App Router) | 14.2 |
-| Language | TypeScript | 5.5 |
-| UI | React | 18.3 |
-| Styling | Tailwind CSS | 3.4 |
-| State | Zustand | 4.5 |
-| Database | Supabase (PostgreSQL) | latest |
-| Auth | Supabase Auth | SSR 0.5 |
-| Storage | Supabase Storage + Cloudflare R2 | — |
-| Hosting | Cloudflare Pages | — |
-| AI | Anthropic Claude + OpenAI | — |
-| Messaging | yCloud (WhatsApp) + Twilio (SMS) | — |
-| Payment | Rivhit / iCredit / UPay | — |
-| Email | Resend + SendGrid | — |
-| Validation | Zod | 4.3 |
-| Charts | Recharts | — |
-| PDF | pdf-lib + pdfjs-dist | — |
-| Analytics | Mixpanel | — |
-| Icons | Lucide React | — |
-| Testing | Vitest | 4.0 |
-
----
-
-## Project Structure
+ClalMobile is a monolithic Next.js 15 application using the App Router, deployed on Cloudflare Pages edge network. It combines five subsystems:
 
 ```
-clalmobile/
-├── app/                            # Next.js 14 App Router
-│   ├── layout.tsx                  # Root layout + providers
-│   ├── page.tsx                    # Homepage (landing)
-│   ├── loading.tsx                 # Global loading spinner
-│   ├── not-found.tsx               # 404 page
-│   ├── error.tsx                   # Error boundary
-│   ├── global-error.tsx            # Global error boundary
-│   ├── sitemap.ts                  # Dynamic sitemap
-│   ├── robots.ts                   # Robots.txt
-│   ├── icon.tsx                    # Dynamic favicon
-│   ├── apple-icon.tsx              # Apple touch icon
-│   │
-│   ├── (auth)/login/               # Team login page
-│   ├── (public)/                   # Public pages (about, FAQ, legal, contact, deals)
-│   │
-│   ├── store/                      # E-commerce storefront
-│   │   ├── page.tsx                # Product catalog
-│   │   ├── product/[id]/           # Product detail
-│   │   ├── cart/                   # Shopping cart
-│   │   ├── checkout/               # Checkout flow
-│   │   ├── account/                # Customer account
-│   │   ├── auth/                   # Customer auth
-│   │   ├── compare/                # Product comparison
-│   │   ├── wishlist/               # Wishlist
-│   │   ├── track/                  # Order tracking (public)
-│   │   └── contact/                # Contact form
-│   │
-│   ├── admin/                      # Admin dashboard (protected)
-│   │   ├── page.tsx                # Dashboard overview
-│   │   ├── layout.tsx              # Admin layout (sidebar)
-│   │   ├── products/               # Product CRUD
-│   │   ├── categories/             # Category management
-│   │   ├── order/                  # Order management
-│   │   ├── analytics/              # Sales analytics
-│   │   ├── prices/                 # Pricing management
-│   │   ├── heroes/                 # Hero banners
-│   │   ├── coupons/                # Discount codes
-│   │   ├── deals/                  # Flash deals
-│   │   ├── lines/                  # Prepaid plans
-│   │   ├── reviews/                # Review management
-│   │   ├── push/                   # Push notifications
-│   │   ├── bot/                    # Bot management
-│   │   ├── commissions/            # Commission Calculator module
-│   │   │   ├── page.tsx            # Commission dashboard (overview + pace)
-│   │   │   ├── calculator/         # Calculator (5 tabs: line, device, loyalty, target, summary)
-│   │   │   ├── sanctions/          # Sanctions management
-│   │   │   ├── history/            # Sales history with filters
-│   │   │   ├── import/             # Order sync + CSV import
-│   │   │   └── analytics/          # Multi-month analytics charts
-│   │   ├── settings/               # Store settings
-│   │   ├── features/               # Feature flags
-│   │   ├── homepage/               # Homepage CMS
-│   │   └── website/                # Website content CMS
-│   │
-│   ├── crm/                        # CRM system (protected)
-│   │   ├── page.tsx                # CRM dashboard
-│   │   ├── layout.tsx              # CRM layout
-│   │   ├── orders/                 # Order pipeline
-│   │   ├── customers/              # Customer database
-│   │   ├── inbox/                  # WhatsApp inbox
-│   │   ├── chats/                  # Bot chat monitoring
-│   │   ├── pipeline/               # Sales pipeline (kanban)
-│   │   ├── reports/                # CRM reports
-│   │   └── users/                  # Team management
-│   │
-│   └── api/                        # 99 API routes
-│       ├── admin/                  # Admin endpoints (protected)
-│       │   ├── commissions/        # 8 commission endpoints
-│       │   ├── categories/         # Category management
-│       │   ├── products/export/    # Product CSV export
-│       ├── crm/                    # CRM endpoints (protected)
-│       ├── store/                  # Public store APIs
-│       ├── orders/                 # Order creation
-│       ├── auth/                   # Customer auth
-│       ├── webhook/                # WhatsApp + Twilio webhooks
-│       ├── payment/                # Payment gateways
-│       ├── email/                  # Email sending
-│       ├── push/                   # Push notifications
-│       ├── notifications/          # Notification management
-│       ├── contact/                # Contact form
-│       ├── chat/                   # WebChat API
-│       ├── reviews/                # Review submission
-│       ├── coupons/                # Coupon validation
-│       ├── customer/               # Customer profile/loyalty
-│       ├── reports/                # Cron reports
-│       ├── cron/                   # Scheduled tasks
-│       ├── health/                 # Health check
-│       └── settings/               # Public settings
-│
-├── components/                     # React components
-│   ├── ui/                         # Base UI (Button, Card, Badge, Input, etc.)
-│   ├── shared/                     # Reusable shared components
-│   ├── store/                      # Store-specific components
-│   ├── admin/                      # Admin components
-│   │   └── charts/                 # Recharts visualizations
-│   ├── crm/                        # CRM components
-│   │   └── inbox/                  # Inbox UI
-│   ├── chat/                       # WebChat widget
-│   └── website/                    # Landing page sections
-│
-├── lib/                            # Business logic & utilities
-│   ├── supabase.ts                 # Supabase clients (browser/server/admin)
-│   ├── auth.ts                     # Auth utilities
-│   ├── constants.ts                # Business constants (statuses, roles, banks, cities)
-│   ├── validators.ts               # Israeli validators (ID, Luhn, phone)
-│   ├── utils.ts                    # Formatting & helpers
-│   ├── hooks.ts                    # React hooks (useScreen, useToast, useDebounce)
-│   ├── storage.ts                  # File storage
-│   ├── storage-r2.ts               # Cloudflare R2 storage
-│   ├── rate-limit.ts               # Rate limiting
-│   ├── payment-gateway.ts          # Payment routing
-│   ├── loyalty.ts                  # Loyalty points system
-│   ├── notifications.ts            # Push notifications
-│   ├── notify.ts                   # Admin WhatsApp notifications
-│   ├── email-templates.ts          # Email HTML templates
-│   ├── seo.ts                      # SEO utilities
-│   ├── analytics-events.ts         # Mixpanel events
-│   │
-│   ├── admin/                      # Admin-specific logic
-│   │   ├── queries.ts              # Admin CRUD operations
-│   │   ├── auth.ts                 # Admin auth checks
-│   │   ├── validators.ts           # Admin input validation
-│   │   ├── hooks.ts                # Admin React hooks
-│   │   ├── ai-tools.ts             # AI product enhancement
-│   │   ├── gsmarena.ts             # GSMArena device specs
-│   │   └── mobileapi.ts            # MobileAPI device database
-│   │
-│   ├── bot/                        # WhatsApp bot engine
-│   │   ├── engine.ts               # Main state machine
-│   │   ├── intents.ts              # Intent detection (NLU)
-│   │   ├── playbook.ts             # Conversation flows
-│   │   ├── policies.ts             # Policy responses
-│   │   ├── templates.ts            # Message templates
-│   │   ├── whatsapp.ts             # yCloud integration
-│   │   ├── webchat.ts              # WebChat integration
-│   │   ├── ai.ts                   # Claude/OpenAI fallback
-│   │   ├── guardrails.ts           # Safety & rate limiting
-│   │   ├── handoff.ts              # Human handoff
-│   │   ├── admin-notify.ts         # Admin notifications
-│   │   ├── analytics.ts            # Conversation analytics
-│   │   └── notifications.ts        # Escalation alerts
-│   │
-│   ├── crm/                        # CRM logic
-│   │   ├── queries.ts              # CRM data queries
-│   │   ├── inbox.ts                # Inbox operations
-│   │   ├── inbox-types.ts          # Type definitions
-│   │   └── sentiment.ts            # Sentiment analysis
-│   │
-│   ├── store/                      # Store logic
-│   │   ├── queries.ts              # Product/order queries
-│   │   ├── cart.ts                 # Cart management
-│   │   ├── wishlist.ts             # Wishlist
-│   │   └── compare.ts              # Product comparison
-│   │
-│   ├── integrations/               # External service providers
-│   │   ├── hub.ts                  # Provider registry
-│   │   ├── resend.ts               # Email (Resend)
-│   │   ├── sendgrid.ts             # Email (SendGrid)
-│   │   ├── rivhit.ts               # Payment gateway
-│   │   ├── upay.ts                 # Payment gateway
-│   │   ├── ycloud-wa.ts            # WhatsApp API
-│   │   ├── ycloud-templates.ts     # WhatsApp templates
-│   │   ├── twilio-sms.ts           # SMS/OTP
-│   │   └── removebg.ts             # Image background removal
-│   │
-│   ├── commissions/                # Commission Calculator engine
-│   │   ├── calculator.ts           # Formulas (line, device, loyalty, target, monthly)
-│   │   └── sync-orders.ts          # Auto-sync completed orders to commission_sales
-│   │
-│   ├── ai/                         # AI utilities
-│   │   ├── claude.ts               # Anthropic Claude client
-│   │   ├── product-context.ts      # Product AI context
-│   │   └── usage-tracker.ts        # Token usage tracking
-│   │
-│   └── reports/                    # Report generation
-│       └── service.ts              # PDF report service
-│
-├── types/
-│   └── database.ts                 # Full TypeScript types
-│
-├── styles/
-│   └── globals.css                 # Tailwind + design tokens
-│
-├── public/                         # Static assets
-│   ├── icons/                      # App icons
-│   ├── images/                     # Static images
-│   └── manifest.json               # PWA manifest
-│
-├── supabase/
-│   ├── migrations/                 # 26 SQL migration files
-│   └── seed/                       # Seed data scripts
-│
-├── tests/
-│   ├── setup.ts                    # Vitest setup
-│   └── unit/                       # Unit tests
-│
-├── middleware.ts                    # Auth + security + CORS + rate limiting
-├── next.config.js                   # Next.js configuration
-├── tailwind.config.ts               # Tailwind configuration
-├── tsconfig.json                    # TypeScript configuration
-├── vitest.config.ts                 # Test configuration
-├── wrangler.json                    # Cloudflare Pages config
-├── .eslintrc.json                   # ESLint rules
-├── .env.example                     # Environment template
-├── CLAUDE.md                        # AI assistant context
-├── README.md                        # Quick start guide
-├── LAUNCH.md                        # Deployment guide
-└── DOCS.md                          # This file
+┌───────────────────────────────────────────────────────────────┐
+│                         ClalMobile                            │
+│                                                               │
+│  ┌──────────┐  ┌──────────┐  ┌─────────┐  ┌──────────────┐  │
+│  │  Store    │  │  Admin   │  │   CRM   │  │  Sales PWA   │  │
+│  │ (Public)  │  │ (Panel)  │  │ (Inbox) │  │  (Mobile)    │  │
+│  └────┬─────┘  └────┬─────┘  └────┬────┘  └──────┬───────┘  │
+│       └──────────────┼─────────────┼──────────────┘          │
+│                      │                                        │
+│              ┌───────┴────────┐                               │
+│              │   API Routes   │                               │
+│              │ (100+ endpoints)│                               │
+│              └───────┬────────┘                               │
+│                      │                                        │
+│  ┌───────────────────┼────────────────────────────────────┐  │
+│  │              lib/ (Business Logic)                      │  │
+│  │  bot/ │ admin/ │ crm/ │ store/ │ commissions/ │ pwa/   │  │
+│  └───────────────────┬────────────────────────────────────┘  │
+│                      │                                        │
+│  ┌───────────────────┼────────────────────────────────────┐  │
+│  │              External Services                          │  │
+│  │  Supabase │ YCloud │ Twilio │ Rivhit │ UPay │ Claude   │  │
+│  └────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Request Flow:**
+```
+Browser → Cloudflare Edge → Next.js Middleware → API Route Handler → lib/ Business Logic → Supabase / External API → JSON Response
+                              (auth, CSRF, rate       (Zod validation,    (calculator, sync,
+                               limit, CORS,            requireAdmin,       queries, integrations)
+                               security headers)       apiSuccess/apiError)
 ```
 
 ---
 
-## Database Schema
+## 2. Tech Stack
 
-### Core Tables (30+)
-
-#### Users & Auth
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `users` | Team members | id, email, name, role, phone, active |
-| `customers` | Store shoppers | id, name, email, phone, segment, loyalty_points |
-
-#### Products & Catalog
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `products` | Device/accessory catalog | id, name_ar, brand, price, cost, stock, image_url, specs |
-| `product_variants` | Size/color options | id, product_id, color, storage, price, stock |
-| `categories` | Collections | id, name, type (manual/auto), filter_rules |
-| `product_reviews` | Customer reviews | id, product_id, customer_name, rating, comment |
-
-#### Orders & Commerce
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `orders` | Purchase orders | id, order_number (CLM-XXXXX), customer_*, status, total, source |
-| `order_items` | Line items | id, order_id, product_id, variant_id, quantity, price |
-| `order_notes` | Internal notes | id, order_id, user_id, note, type |
-| `coupons` | Discount codes | id, code, type (percentage/fixed), value, min_order, usage_limit |
-
-#### CRM & Communication
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `inbox_conversations` | Chat threads | id, customer_phone, channel, status, assigned_to, sentiment |
-| `inbox_messages` | Messages | id, conversation_id, direction, content, media_url |
-| `inbox_labels` | Tags | id, name, color |
-| `inbox_notes` | Internal notes | id, conversation_id, user_id, content |
-| `tasks` | Team tasks | id, title, assigned_to, status, due_date |
-| `pipeline_deals` | Sales pipeline | id, customer_id, stage, value, probability |
-
-#### Bot System
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `bot_conversations` | Bot sessions | id, phone, session_data, status |
-| `bot_messages` | Bot messages | id, conversation_id, role, content |
-| `bot_templates` | WhatsApp templates | id, name, language, components, status |
-| `bot_analytics` | Performance metrics | id, metric_type, value, date |
-
-#### Content & Settings
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `heroes` | Homepage banners | id, title, subtitle, image_url, link, active |
-| `deals` | Flash promotions | id, product_id, discount, starts_at, ends_at |
-| `line_plans` | Prepaid plans | id, name, data_gb, minutes, price, provider |
-| `website_content` | CMS pages | id, section, key, value_ar, value_he |
-| `settings` | Store config | id, key, value, category |
-| `integrations` | Service configs | id, provider, config, active |
-| `email_templates` | Email campaigns | id, name, subject, body, variables |
-
-#### Notifications & Analytics
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `push_subscriptions` | Web push | id, endpoint, keys, user_agent |
-| `push_notifications` | Notification queue | id, title, body, sent_at, clicks |
-| `loyalty_points` | Rewards | id, customer_id, points, tier |
-| `loyalty_transactions` | Points history | id, customer_id, amount, type, order_id |
-| `abandoned_carts` | Recovery | id, customer_id, items, recovered |
-| `audit_log` | Compliance | id, user_id, action, entity, entity_id, details |
-
-#### Commission Module (migrations 025-026)
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `commission_sales` | Sales records (manual + auto-synced) | id, sale_date, sale_type (line/device), source (manual/auto_sync/csv_import), order_id, customer_name, package_price, multiplier, has_valid_hk, loyalty_status, loyalty_start_date, device_name, device_sale_amount, commission_amount |
-| `commission_targets` | Monthly targets | id, month, target_lines_amount, target_devices_amount, target_total, target_lines_count, target_devices_count, is_locked, locked_at |
-| `commission_sanctions` | Penalties/sanctions | id, sanction_date, sanction_type, amount, has_sale_offset, description |
-| `commission_sync_log` | Order sync audit trail | id, sync_date, orders_synced, orders_skipped, total_amount, status, error_message |
-
-### Order Status Flow
-
-```
-جديد (new) → موافق (approved) → قيد الشحن (shipping) → تم التسليم (delivered)
-                ↘ مرفوض (rejected)
-                ↘ لا يوجد رد 1 → لا يوجد رد 2 → لا يوجد رد 3
-```
+| Layer | Technology | Version | Purpose |
+|-------|-----------|---------|---------|
+| **Framework** | Next.js (App Router) | 15 | SSR + API routes |
+| **Language** | TypeScript | 5.5 | Strict mode enabled |
+| **UI** | React | 18.3 | Component library |
+| **Styling** | Tailwind CSS | 3.4 | Utility-first CSS |
+| **State** | Zustand | 4.5 | Client-side state |
+| **Database** | Supabase (PostgreSQL) | latest | Data + Auth + Storage |
+| **Auth** | Supabase Auth SSR | 0.5 | Session management |
+| **Hosting** | Cloudflare Pages | — | Edge deployment |
+| **Adapter** | OpenNext Cloudflare | 1.18 | Next.js → CF Workers |
+| **Validation** | Zod | 4.3 | Input validation |
+| **AI** | Anthropic Claude | — | Bot + content enhancement |
+| **AI** | Google Gemini | — | Fallback + autofill |
+| **WhatsApp** | YCloud | — | Bot + inbox |
+| **SMS** | Twilio | — | Bot + notifications |
+| **Email** | SendGrid / Resend | — | Transactional emails |
+| **Payment** | Rivhit (iCredit) | — | Israeli payment gateway |
+| **Payment** | UPay | — | International gateway |
+| **Charts** | Recharts | 3.8 | Admin analytics |
+| **PDF** | pdf-lib + pdfjs-dist | — | Invoice/export |
+| **Excel** | xlsx (SheetJS) | 0.18 | Data export |
+| **Icons** | Lucide React | 0.400 | Icon library |
+| **Testing** | Vitest | 4.0 | Unit testing |
+| **Storage** | Cloudflare R2 | — | Static assets + cache |
 
 ---
 
-## API Reference
+## 3. Project Structure
 
-### Admin APIs (`/api/admin/*`) — Protected, role-based
+### Pages (`app/`)
+
+#### Public Store (`app/store/`)
+| Route | Page | Description |
+|-------|------|-------------|
+| `/store` | `page.tsx` | Product catalog with search, filters, categories |
+| `/store/product/[id]` | `page.tsx` | Product detail (gallery, specs, variants, reviews) |
+| `/store/cart` | `page.tsx` | Shopping cart with quantity management |
+| `/store/checkout` | `page.tsx` | Multi-step checkout + payment |
+| `/store/wishlist` | `page.tsx` | Saved wishlist |
+| `/store/compare` | `page.tsx` | Side-by-side product comparison |
+| `/store/account` | `page.tsx` | Customer profile & order history |
+| `/store/track` | `page.tsx` | Order tracking by ID |
+
+#### Admin Panel (`app/admin/`)
+| Route | Page | Description |
+|-------|------|-------------|
+| `/admin` | `page.tsx` | Dashboard home (stats, recent orders, alerts) |
+| `/admin/products` | `page.tsx` | Product CRUD (create, edit, delete, bulk ops) |
+| `/admin/categories` | `page.tsx` | Category management (auto/manual rules) |
+| `/admin/orders` | `page.tsx` | Order management + status pipeline |
+| `/admin/commissions` | `page.tsx` | Commission dashboard + pace tracking |
+| `/admin/commissions/analytics` | `page.tsx` | Multi-month commission analytics |
+| `/admin/commissions/team` | `page.tsx` | Team commission tracking |
+| `/admin/commissions/sanctions` | `page.tsx` | Sanctions & deduction management |
+| `/admin/commissions/history` | `page.tsx` | Sales history records |
+| `/admin/commissions/import` | `page.tsx` | Order sync / CSV bulk import |
+| `/admin/deals` | `page.tsx` | Flash deals & promotions |
+| `/admin/heroes` | `page.tsx` | Hero carousel CMS |
+| `/admin/homepage` | `page.tsx` | Homepage CMS editor (sections) |
+| `/admin/lines` | `page.tsx` | HOT Mobile line plans management |
+| `/admin/prices` | `page.tsx` | Price configuration |
+| `/admin/push` | `page.tsx` | Push notification management |
+| `/admin/reviews` | `page.tsx` | Review moderation (approve/reject) |
+| `/admin/bot` | `page.tsx` | Chatbot configuration |
+| `/admin/settings` | `page.tsx` | System settings |
+| `/admin/analytics` | `page.tsx` | Analytics dashboard |
+
+#### CRM (`app/crm/`)
+| Route | Page | Description |
+|-------|------|-------------|
+| `/crm` | `page.tsx` | CRM dashboard (conversations, tasks, pipeline) |
+| `/crm/inbox` | `page.tsx` | Unified inbox (WhatsApp, WebChat, SMS) |
+| `/crm/chats` | `page.tsx` | Chat history management |
+| `/crm/customers` | `page.tsx` | Customer database |
+| `/crm/customers/[id]` | `page.tsx` | Customer 360° profile |
+| `/crm/orders` | `page.tsx` | CRM orders view |
+| `/crm/pipeline` | `page.tsx` | Sales pipeline (lead → won/lost) |
+| `/crm/tasks` | `page.tsx` | Task management |
+| `/crm/users` | `page.tsx` | Team member management |
+| `/crm/reports` | `page.tsx` | CRM reports & analytics |
+
+#### Other Routes
+| Route | Description |
+|-------|-------------|
+| `/` | Homepage (landing, featured products, CMS) |
+| `/login` | Team staff login |
+| `/change-password` | Password change |
+| `/sales-pwa` | Sales team PWA |
+| `/deals` | Public deals page |
+| `/about`, `/faq`, `/contact` | Info pages |
+| `/legal`, `/privacy` | Legal pages |
+| `/command-center` | Admin command center |
+
+### Business Logic (`lib/`)
+
+| Module | Files | Description |
+|--------|-------|-------------|
+| `lib/admin/` | auth, validators, queries, hooks, ai-tools, device-data, gsmarena, mobileapi | Admin operations, auth (`requireAdmin()`), Zod validators |
+| `lib/ai/` | — | AI service abstraction (Claude + Gemini) |
+| `lib/bot/` | engine, ai, intents, playbook, guardrails, handoff, templates, policies, notifications, admin-notify, analytics, webchat, whatsapp | 14-module chatbot engine |
+| `lib/commissions/` | calculator, sync-orders, ledger, crm-bridge | Commission calculation + order sync |
+| `lib/crm/` | queries, inbox, inbox-types, pipeline, realtime, sentiment | CRM data layer + realtime |
+| `lib/integrations/` | hub, rivhit, upay, ycloud-wa, ycloud-templates, twilio-sms, sendgrid, resend, removebg | Provider registry pattern |
+| `lib/orders/` | admin | Order management operations |
+| `lib/pwa/` | — | PWA service utilities |
+| `lib/reports/` | — | Report generation |
+| `lib/store/` | cart, wishlist, compare, queries | Store state + queries |
+
+#### Key Root-Level Libraries
+
+| File | Purpose |
+|------|---------|
+| `lib/api-response.ts` | `apiSuccess(data)` / `apiError(msg, status)` — standardized API responses |
+| `lib/supabase.ts` | `createServerSupabase()`, `createBrowserSupabase()`, `createAdminSupabase()` |
+| `lib/auth.ts` | Session management, `getSession()`, `getUser()` |
+| `lib/csrf.ts` | Server-side CSRF token validation (double-submit cookie) |
+| `lib/csrf-client.ts` | Client-side CSRF token fetch |
+| `lib/rate-limit.ts` | In-memory rate limiting |
+| `lib/rate-limit-db.ts` | Database-backed rate limiting |
+| `lib/webhook-verify.ts` | HMAC SHA256 webhook verification (constant-time) |
+| `lib/payment-gateway.ts` | Payment routing — Israeli cities → Rivhit, else → UPay |
+| `lib/i18n.tsx` | Internationalization (Arabic + Hebrew) |
+| `lib/validators.ts` | Shared Zod schemas |
+| `lib/constants.ts` | Global constants |
+| `lib/hooks.ts` | React hooks (`useMediaQuery`, `useLocalStorage`, etc.) |
+| `lib/loyalty.ts` | Loyalty program logic (tiers, points) |
+| `lib/notifications.ts` | Notification system |
+| `lib/email-templates.ts` | Email template engine |
+| `lib/seo.ts` | SEO utilities & metadata |
+| `lib/pdf-export.ts` | PDF generation |
+| `lib/storage.ts` | Supabase Storage helpers |
+| `lib/storage-r2.ts` | Cloudflare R2 integration |
+| `lib/cities.ts` | Israeli cities list (for payment routing) |
+| `lib/crypto.ts` | Encryption utilities |
+| `lib/analytics-events.ts` | Analytics event tracking |
+
+### Components (`components/`)
+
+| Directory | Key Components | Description |
+|-----------|---------------|-------------|
+| `components/admin/` | AdminShell, ImageUpload, charts/ | Admin layout shell + admin-specific UI |
+| `components/store/` | ProductCard, ProductDetail, SearchFilters, SmartSearchBar, HeroCarousel, StoreHeader, StoreClient, LinePlans, LoyaltyWidget, ReviewsSection, StickyCartBar, FloatingActions, CompareBar, cart/ | Full storefront UI |
+| `components/crm/` | CRMShell, OrdersManagementPage, inbox/ (14+ components: InboxLayout, ChatPanel, MessageBubble, ConversationList, AssignAgent, QuickReplies, TemplateSelector...) | CRM layout + inbox system |
+| `components/chat/` | WebChatWidget | Embedded chat widget |
+| `components/pwa/` | — | PWA-specific components |
+| `components/shared/` | Analytics, CookieConsent, LangSwitcher, Logo, Providers, PWAInstallPrompt | Cross-cutting shared UI |
+| `components/ui/` | Toast | Base UI primitives |
+| `components/website/` | — | Landing page components |
+| `components/mobile/` | — | Mobile-optimized components |
+| `components/orders/` | — | Order display components |
+| `components/command-center/` | — | Command center UI |
+
+---
+
+## 4. Database Schema
+
+**Source of truth:** `types/database.ts` (40+ table types)
+**Migrations:** `supabase/migrations/` (39 sequential SQL files)
+
+### Core Tables
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `products` | Product catalog | `id`, `type` (device/accessory), `name_ar`, `name_he`, `price`, `stock`, `gallery`, `colors` (JSONB), `storage_options`, `variants`, `specs` (JSONB) |
+| `orders` | Customer orders | `id` (CLM-XXXXX), `customer_id`, `status`, `source`, `items_total`, `total`, `payment_method`, `shipping_city`, `assigned_to` |
+| `order_items` | Order line items | `order_id`, `product_id`, `product_name`, `price`, `quantity`, `color`, `storage` |
+| `order_notes` | Internal order notes | `order_id`, `user_id`, `text` |
+| `order_status_history` | Order audit trail | `order_id`, `old_status`, `new_status`, `changed_by_id` |
+| `customers` | Customer profiles | `name`, `phone`, `email`, `city`, `segment`, `loyalty_tier`, `tags` |
+| `customer_notes` | Customer notes | `customer_id`, `user_id`, `text` |
+| `users` | Staff accounts | `auth_id`, `name`, `email`, `role` (6 roles), `status`, `last_login_at` |
+| `categories` | Product categories | `name_ar`, `name_he`, `type` (auto/manual), `rule`/`product_ids`, `sort_order` |
+| `settings` | System settings | `key`, `value`, `type` (string/number/boolean/json) |
+| `integrations` | Integration configs | `type`, `provider`, `config` (JSONB), `status` |
+
+### E-Commerce Tables
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `line_plans` | HOT Mobile plans | `name_ar`, `name_he`, `data_amount`, `price`, `features_ar/he`, `popular` |
+| `coupons` | Discount coupons | `code`, `type` (percent/fixed), `value`, `min_order`, `max_uses`, `expires_at` |
+| `heroes` | Hero carousel | `title_ar`, `title_he`, `image_url`, `link_url`, `cta_text_ar/he` |
+| `deals` | Flash sales | `title_ar/he`, `product_id`, `deal_type`, `discount_percent`, `starts_at` |
+| `product_reviews` | Customer reviews | `product_id`, `customer_id`, `rating`, `title`, `body`, `verified_purchase` |
+| `abandoned_carts` | Cart recovery | `visitor_id`, `customer_phone`, `items` (JSONB), `total` |
+
+### Loyalty Tables
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `loyalty_points` | Customer balance | `customer_id`, `points`, `lifetime_points`, `tier` (bronze/silver/gold/platinum) |
+| `loyalty_transactions` | Points history | `customer_id`, `type` (earn/redeem/expire), `points`, `order_id` |
+
+### CRM Tables
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `inbox_conversations` | Unified inbox | `customer_phone/name`, `channel`, `status`, `assigned_to`, `priority` |
+| `inbox_messages` | Chat messages | `conversation_id`, `direction`, `message_type`, `content`, `media_url` |
+| `inbox_labels` | Conversation labels | `name`, `color`, `sort_order` |
+| `inbox_templates` | Quick reply templates | `name`, `category`, `content`, `variables` |
+| `pipeline_deals` | Sales pipeline | `customer_id/name`, `value`, `stage`, `assigned_to` |
+| `pipeline_stages` | Pipeline stages | `name`, `sort_order`, `color`, `is_won/is_lost` |
+| `tasks` | Task management | `title`, `customer_id`, `assigned_to`, `priority`, `status`, `due_date` |
+
+### Bot Tables
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `bot_conversations` | Bot sessions | `visitor_id`, `channel` (webchat/whatsapp/sms), `customer_id`, `status` |
+| `bot_messages` | Bot messages | `conversation_id`, `role` (user/bot/system), `content`, `intent` |
+| `bot_handoffs` | Escalation to human | `conversation_id`, `reason`, `summary`, `assigned_to` |
+| `bot_policies` | Bot policy docs | `type`, `title_ar/he`, `content_ar/he` |
+| `bot_templates` | Bot responses | `key`, `content_ar/he`, `channel`, `variables` |
+| `bot_analytics` | Bot usage stats | `date`, `channel`, `total_conversations`, `handoffs`, `top_intents` |
+
+### Commission Tables
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `commission_sales` | Sales records | `user_id/employee_id`, `sale_date`, `sale_type` (line/device), `customer_name`, `commission_amount` |
+| `commission_targets` | Monthly targets | `user_id`, `month`, `target_lines_amount`, `target_devices_amount` |
+| `commission_sanctions` | Deductions | `user_id/employee_id`, `sanction_date`, `sanction_type`, `amount` |
+| `commission_sync_log` | Sync audit | `sync_date`, `orders_synced`, `orders_skipped`, `status` |
+| `employee_commission_profiles` | Per-employee config | `user_id`, `line_multiplier`, `device_rate`, `device_milestone_bonus` |
+| `commission_employees` | Employee directory | `name`, `phone`, `token`, `role`, `active` |
+
+### PWA / Sales Docs Tables
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `sales_docs` | Sales documents | `doc_uuid`, `employee_user_id`, `sale_type`, `status`, `total_amount` |
+| `sales_doc_items` | Document items | `sales_doc_id`, `item_type`, `product_id`, `qty`, `unit_price` |
+| `sales_doc_attachments` | Document files | `sales_doc_id`, `file_path`, `file_name`, `mime_type` |
+| `sales_doc_events` | Document audit | `sales_doc_id`, `event_type`, `actor_user_id`, `payload` |
+| `sales_doc_sync_queue` | Sync queue | `sales_doc_id`, `sync_target`, `status` (pending/processing/done/failed) |
+
+### System Tables
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `audit_log` | Full audit trail | `user_id`, `action`, `entity_type`, `entity_id`, `details` |
+| `notifications` | User notifications | `user_id`, `type`, `title`, `body`, `link` |
+| `push_subscriptions` | Web push subs | `endpoint`, `keys` (JSONB), `visitor_id` |
+| `push_notifications` | Push messages sent | `title`, `body`, `target`, `target_filter` |
+| `customer_otps` | OTP verification | `phone`, `otp`, `expires_at`, `verified` |
+| `website_content` | CMS content | `section`, `title_ar/he`, `content` (JSONB) |
+| `email_templates` | Email templates | `slug`, `subject_ar/he`, `body_html_ar/he`, `variables` |
+
+### Enums & Constants
+
+| Enum | Values |
+|------|--------|
+| **Order Status** | `new` → `approved` → `processing` → `shipped` → `delivered` (or `cancelled` / `rejected`) |
+| **Order Source** | `store`, `facebook`, `external`, `whatsapp`, `webchat`, `manual` |
+| **User Role** | `super_admin` > `admin` > `sales` > `support` > `content` > `viewer` |
+| **Customer Segment** | `vip`, `loyal`, `active`, `new`, `cold`, `lost`, `inactive` |
+| **Loyalty Tier** | `bronze` → `silver` → `gold` → `platinum` |
+| **Bot Channel** | `webchat`, `whatsapp`, `sms` |
+| **Commission Sale Type** | `line`, `device` |
+| **Pipeline Stage** | `lead` → `negotiation` → `proposal` → `won` / `lost` |
+| **Sanction Types** | 9 predefined types (1,000–2,500 ILS each) |
+
+### Migration History
+
+39 sequential migrations in `supabase/migrations/`:
+
+| # | Migration | Purpose |
+|---|-----------|---------|
+| 001 | `initial_schema` | Core tables (products, orders, customers, users, settings) |
+| 002 | `functions` | PL/pgSQL functions |
+| 003 | `bot_tables` | Bot conversation engine |
+| 004 | `bot_fixes` | Bot schema fixes |
+| 005 | `features` | Reviews, deals, abandoned carts |
+| 006 | `customer_auth` | Customer OTP authentication |
+| 007 | `inbox` | Inbox conversations + messages |
+| 008 | `ai_enhancement` | AI enhancement fields |
+| 009 | `product_variants_and_cms` | Product variants, CMS tables |
+| 010 | `populate_product_variants` | Seed variant data |
+| 011 | `fix_product_colors` | Color schema fix |
+| 012 | `product_name_en` | English name field |
+| 013 | `reset_stocks` | Stock reset |
+| 014 | `sub_pages` | Sub-page content |
+| 015 | `template_usage_rpc` | Template usage RPC |
+| 016 | `whatsapp_templates` | WhatsApp template management |
+| 017 | `tighten_rls_policies` | Row-level security hardening |
+| 018 | `add_integration_types` | Integration type enum |
+| 019 | `user_management` | User roles & permissions |
+| 020 | `rate_limits` | Rate limit tables |
+| 021 | `atomic_order_and_rls_fix` | Atomic order creation + RLS fix |
+| 022 | `order_status_alignment` | Status standardization |
+| 023 | `stock_coupon_integrity` | Referential integrity constraints |
+| 024 | `performance_indexes` | Query optimization indexes |
+| 025 | `commissions` | Commission tables (sales, targets, sanctions) |
+| 026 | `commissions_lock_and_analytics` | Lock mechanisms + analytics |
+| 027 | `employee_commission_profiles` | Per-employee profiles |
+| 028 | `team_commissions` | Team-level commission tracking |
+| 029 | `commission_employees` | Employee directory |
+| 030 | `commission_soft_delete` | Soft delete support |
+| 031 | `loyalty` | Loyalty program (points, tiers, transactions) |
+| 032 | `notifications` | User notification system |
+| 033 | `employee_unification` | Employee user consolidation |
+| 034 | `rbac_permissions` | Role-based access control |
+| 035 | `order_management_pipeline` | Order pipeline enhancements |
+| 036 | `soft_delete` | Global soft delete patterns |
+| 037 | `payment_callback_rpc` | Payment callback RPC |
+| 038 | `customer_management_360` | Customer 360° view |
+| 039 | `sales_docs_pwa` | Sales documents for PWA |
+
+---
+
+## 5. API Reference
+
+### Admin APIs (`/api/admin/`)
 
 #### Products
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/api/admin/products` | List products (paginated, filterable) |
 | POST | `/api/admin/products` | Create product |
-| PUT | `/api/admin/products/:id` | Update product |
-| DELETE | `/api/admin/products/:id` | Delete product |
-| POST | `/api/admin/products/autofill` | AI auto-fill device specs |
-| POST | `/api/admin/products/color-image` | AI image background removal |
-| POST | `/api/admin/products/bulk-color-images` | Bulk image processing |
-| POST | `/api/admin/products/pexels` | Search Pexels for images |
-| POST | `/api/admin/products/distribute-stock` | Allocate stock across variants |
-
-#### Pricing
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/admin/prices/apply` | Apply bulk pricing rules |
-| POST | `/api/admin/prices/match` | Match competitor prices |
-
-#### Content Management
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/admin/heroes` | Manage homepage banners |
-| POST | `/api/admin/deals` | Create flash deals |
-| POST | `/api/admin/lines` | Manage prepaid plans |
-| POST | `/api/admin/coupons` | Manage discount codes |
-| POST | `/api/admin/reviews/generate` | Generate review cards |
-
-#### Analytics & AI
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/admin/analytics/dashboard` | Dashboard metrics |
-| POST | `/api/admin/analytics` | Custom reports |
-| POST | `/api/admin/ai-enhance` | AI product enhancement |
-| POST | `/api/admin/ai-usage` | Track AI token usage |
-| POST | `/api/admin/features/stats` | Feature analytics |
+| GET | `/api/admin/products/[id]` | Get product detail |
+| PUT | `/api/admin/products/[id]` | Update product |
+| DELETE | `/api/admin/products/[id]` | Delete product |
+| POST | `/api/admin/products/autofill` | AI-powered autofill from model name |
+| POST | `/api/admin/products/bulk-color-images` | Bulk upload color images |
+| POST | `/api/admin/products/color-image` | Upload single color image |
+| POST | `/api/admin/products/distribute-stock` | Distribute stock across variants |
+| GET | `/api/admin/products/export` | Export products |
+| POST | `/api/admin/products/import-image` | Import product image |
+| GET | `/api/admin/products/pexels` | Fetch images from Pexels |
 
 #### Categories
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/admin/categories` | List categories |
-| POST | `/api/admin/categories` | Create/update category |
-| DELETE | `/api/admin/categories` | Delete category |
+| POST | `/api/admin/categories` | Create category |
+| PUT | `/api/admin/categories/[id]` | Update category |
+| DELETE | `/api/admin/categories/[id]` | Delete category |
 
-#### Products Export
+#### Orders
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/admin/products/export` | Export products as CSV |
+| GET | `/api/admin/orders` | List orders |
+| POST | `/api/admin/orders/create` | Create order (admin) |
+| GET | `/api/admin/orders/[id]` | Get order detail |
+| GET | `/api/admin/order` | Legacy order endpoint |
 
-#### Commission Calculator
+#### Deals & Promotions
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/admin/commissions/dashboard` | Full dashboard with pace tracking (dual auth: session or bearer) |
-| GET | `/api/admin/commissions/summary` | Lightweight summary for local HTML app (bearer token only, CORS-enabled) |
-| GET | `/api/admin/commissions/sales` | List sales with filters (type, source, date range, pagination) |
-| POST | `/api/admin/commissions/sales` | Create/update a sale record |
-| POST | `/api/admin/commissions/calculate` | Calculate commission (line, device, loyalty, or target scenario) |
-| GET | `/api/admin/commissions/sanctions` | List sanctions with date filters |
-| POST | `/api/admin/commissions/sanctions` | Create a sanction record |
-| GET | `/api/admin/commissions/sync` | Get last sync info |
-| POST | `/api/admin/commissions/sync` | Sync completed orders to commission_sales |
-| GET | `/api/admin/commissions/targets` | Get monthly target |
-| POST | `/api/admin/commissions/targets` | Create/update monthly target (lock-aware) |
-| GET | `/api/admin/commissions/analytics` | Multi-month analytics (configurable range) |
-| GET | `/api/admin/commissions/export` | Export monthly data as CSV (sales + sanctions) |
+| GET/POST | `/api/admin/deals` | List/create deals |
+| PUT/DELETE | `/api/admin/deals/[id]` | Update/delete deal |
+| GET/POST | `/api/admin/coupons` | List/create coupons |
+| PUT/DELETE | `/api/admin/coupons/[id]` | Update/delete coupon |
 
-#### Files & Settings
+#### Content Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/admin/upload` | Upload file to R2 |
-| POST | `/api/admin/image-enhance` | AI image processing |
-| POST | `/api/admin/integrations/test` | Test integration setup |
-| GET/POST | `/api/admin/settings` | Store settings |
+| GET/POST | `/api/admin/heroes` | Hero carousel |
+| PUT/DELETE | `/api/admin/heroes/[id]` | Update/delete hero |
+| GET/PUT | `/api/admin/homepage` | Homepage CMS |
+| GET/PUT | `/api/admin/website` | Website content |
+| GET/POST | `/api/admin/sub-pages` | Sub-page management |
+| PUT/DELETE | `/api/admin/sub-pages/[id]` | Update/delete sub-page |
 
-### CRM APIs (`/api/crm/*`) — Protected
-
-#### Inbox
+#### Lines & Prices
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/crm/inbox` | List conversations |
-| GET | `/api/crm/inbox/:id` | Get conversation details |
-| POST | `/api/crm/inbox/:id/send` | Send WhatsApp message |
-| POST | `/api/crm/inbox/:id/status` | Change conversation status |
-| POST | `/api/crm/inbox/:id/assign` | Assign agent |
-| POST | `/api/crm/inbox/:id/notes` | Add internal note |
-| POST | `/api/crm/inbox/:id/sentiment` | Analyze sentiment |
-| POST | `/api/crm/inbox/:id/suggest` | AI response suggestions |
-| POST | `/api/crm/inbox/:id/summary` | AI conversation summary |
-| POST | `/api/crm/inbox/:id/auto-label` | Auto-tag conversation |
-| POST | `/api/crm/inbox/:id/recommend` | AI product recommendation |
-| GET | `/api/crm/inbox/labels` | Label management |
-| GET | `/api/crm/inbox/stats` | Inbox analytics |
-| POST | `/api/crm/inbox/upload` | Media upload |
+| GET/POST/PUT/DELETE | `/api/admin/lines` | HOT Mobile line plans |
+| GET/POST | `/api/admin/prices` | Price management |
+| PUT/DELETE | `/api/admin/prices/[id]` | Update/delete prices |
+| POST | `/api/admin/prices/apply` | Apply price changes |
+| POST | `/api/admin/prices/match-direct` | Direct price matching |
 
-#### Data
+#### Reviews & Push
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/crm/orders` | Order list |
-| GET | `/api/crm/customers` | Customer database |
-| POST | `/api/crm/pipeline` | Sales pipeline deals |
-| POST | `/api/crm/tasks` | Task management |
+| GET/POST | `/api/admin/reviews` | Review management |
+| PATCH | `/api/admin/reviews/[id]` | Update review status |
+| GET/POST | `/api/admin/push` | Push notifications |
+| DELETE | `/api/admin/push/[id]` | Delete notification |
+
+#### Settings & Integrations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/PUT | `/api/admin/settings` | System settings |
+| GET/POST | `/api/admin/integrations` | Integration management |
+| POST | `/api/admin/integrations/test` | Test integration |
+| PUT/DELETE | `/api/admin/integrations/[id]` | Update/delete integration |
+
+#### AI & Upload
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/admin/ai-enhance` | AI content enhancement |
+| POST | `/api/admin/image-enhance` | AI image enhancement |
+| GET | `/api/admin/ai-usage` | AI usage tracking |
+| POST | `/api/admin/upload` | File upload |
+| POST/DELETE | `/api/admin/upload-logo` | Logo management |
+
+#### Analytics & Other
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/analytics` | Analytics data |
+| GET | `/api/admin/analytics/dashboard` | Dashboard metrics |
+| GET | `/api/admin/features/stats` | Feature usage stats |
+| POST | `/api/admin/contact-notify` | Contact form notification |
+| POST | `/api/admin/supabase-management` | Supabase admin ops |
+| GET/POST/DELETE | `/api/admin/whatsapp-templates` | WhatsApp templates |
+| POST | `/api/admin/whatsapp-test` | Test WhatsApp template |
+
+### Commission APIs (`/api/admin/commissions/`)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/admin/commissions/summary` | Bearer token | Lightweight summary for external app |
+| GET | `/api/admin/commissions/dashboard` | Bearer/Session | Full dashboard + pace tracking |
+| GET | `/api/admin/commissions/analytics` | Session | Multi-month analytics |
+| GET/POST | `/api/admin/commissions/sales` | Session/Bearer | CRUD sales records |
+| PUT/DELETE | `/api/admin/commissions/sales/[id]` | Session | Update/delete sale |
+| GET/POST | `/api/admin/commissions/targets` | Session | Monthly targets |
+| PUT/DELETE | `/api/admin/commissions/targets/[id]` | Session | Update/delete target |
+| GET/POST | `/api/admin/commissions/sanctions` | Session | Sanctions management |
+| PUT/DELETE | `/api/admin/commissions/sanctions/[id]` | Session | Update/delete sanction |
+| GET/POST | `/api/admin/commissions/profiles` | Session | Employee commission profiles |
+| PUT | `/api/admin/commissions/profiles/[id]` | Session | Update profile |
+| GET | `/api/admin/commissions/export` | Session | CSV export |
+| GET | `/api/admin/commissions/bridge` | Session | CRM bridge data |
+| GET | `/api/admin/commissions/employees/list` | Bearer | Employee list |
+| POST | `/api/admin/commissions/sync` | Session | Sync orders → commissions |
+| POST | `/api/admin/commissions/calculate` | Session | Calculate commission amounts |
+
+> **Open CORS endpoints:** `summary`, `dashboard`, `sales` (GET), `employees/list` accept Bearer token auth via `COMMISSION_API_TOKEN` env var for external HTML app sync.
+
+### CRM APIs (`/api/crm/`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/crm/dashboard` | CRM dashboard overview |
+| GET | `/api/crm/customers` | List customers |
+| GET/PUT | `/api/crm/customers/[id]` | Customer detail + update |
+| GET | `/api/crm/customers/export` | Export customers |
+| POST | `/api/crm/customers/reconcile` | Reconcile customer data |
+| GET | `/api/crm/chats` | Chat history |
+| GET/PUT | `/api/crm/chats/[id]` | Chat detail + update |
+| GET/POST | `/api/crm/inbox` | Inbox conversations |
+| GET/PUT | `/api/crm/inbox/[id]` | Conversation detail + update |
+| GET | `/api/crm/orders` | CRM orders view |
+| GET/PUT | `/api/crm/orders/[id]` | Order detail + update |
+| GET/POST | `/api/crm/tasks` | Task list + create |
+| GET/PUT/DELETE | `/api/crm/tasks/[id]` | Task CRUD |
+| GET | `/api/crm/pipeline` | Sales pipeline data |
+| GET/PUT | `/api/crm/pipeline/[id]` | Deal detail + update |
 | GET | `/api/crm/reports` | CRM reports |
-| GET | `/api/crm/users` | Team members |
-| GET | `/api/crm/chats/:id` | Chat thread |
-| GET | `/api/crm/dashboard` | CRM dashboard |
+| GET/POST/PUT/DELETE | `/api/crm/users` | Team user management |
+| GET/PUT/DELETE | `/api/crm/users/[id]` | User CRUD |
 
-### Public APIs
+### Public Store APIs
 
-#### Store
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/store` | Product listing (with filters) |
-| GET | `/api/store/order-status` | Track order (public) |
-| GET | `/api/store/autocomplete` | Search suggestions |
-| POST | `/api/store/smart-search` | AI-powered search |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/orders` | Public | Create order |
+| GET | `/api/store/autocomplete` | Public | Search autocomplete |
+| GET | `/api/store/order-status` | Public | Track order status |
+| GET | `/api/store/smart-search` | Public | AI-powered search |
+| POST/DELETE | `/api/cart/abandoned` | Public | Abandoned cart recovery |
+| GET/PUT | `/api/customer/profile` | Customer | Customer profile |
+| GET | `/api/customer/orders` | Customer | Order history |
+| GET/POST | `/api/customer/loyalty` | Customer | Loyalty points |
+| POST | `/api/auth/customer` | Public | Customer login/registration |
+| POST | `/api/reviews` | Customer | Submit review |
+| POST | `/api/coupons/validate` | Public | Validate coupon |
 
-#### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/register` | Customer registration |
-| POST | `/api/auth/login` | Customer login |
-| POST | `/api/auth/customer` | Customer profile |
+### System APIs
 
-#### Payment
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/payment` | Create payment session |
-| GET | `/api/payment/callback` | Rivhit/iCredit callback |
-| POST | `/api/payment/upay/callback` | UPay callback |
-
-#### Webhooks
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/webhook/whatsapp` | yCloud WhatsApp messages |
-| POST | `/api/webhook/twilio` | Twilio SMS/OTP |
-
-#### Other Public
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/orders` | Create order |
-| POST | `/api/contact` | Contact form |
-| POST | `/api/chat` | WebChat messages |
-| POST | `/api/reviews` | Submit review |
-| POST | `/api/reviews/featured` | Featured reviews |
-| POST | `/api/coupons/validate` | Validate coupon |
-| POST | `/api/push/subscribe` | Register push subscription |
-| POST | `/api/push/send` | Send push notification |
-| POST | `/api/email` | Send email |
-| POST | `/api/email/campaign` | Email campaign |
-| POST | `/api/customer/profile` | Customer profile |
-| POST | `/api/customer/orders` | Customer orders |
-| POST | `/api/customer/loyalty` | Loyalty points |
-| GET | `/api/settings/public` | Public store settings |
-| GET | `/api/health` | System health check |
-| POST | `/api/reports/daily` | Daily cron report |
-| POST | `/api/reports/weekly` | Weekly cron report |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/chat` | Public | WebChat messages |
+| GET/POST | `/api/webhook/whatsapp` | HMAC | WhatsApp webhook |
+| GET/POST | `/api/webhook/twilio` | Provider | Twilio SMS webhook |
+| POST | `/api/payment/callback` | Provider | Payment callback |
+| POST/DELETE | `/api/push/subscribe` | Public | Push subscribe/unsubscribe |
+| GET | `/api/push/vapid` | Public | VAPID public key |
+| POST | `/api/email` | Internal | Send email |
+| GET | `/api/csrf` | Public | Get CSRF token |
+| GET | `/api/health` | Public | Health check |
+| POST | `/api/contact` | Public | Contact form |
+| GET/POST/PATCH | `/api/notifications` | Session | User notifications |
+| POST/GET | `/api/cron/reports` | Cron | Generate scheduled reports |
+| POST | `/api/cron/cleanup` | Cron | Data cleanup |
+| POST | `/api/auth/change-password` | Session | Change password |
+| GET | `/api/reports/[type]` | Session | Various report types |
 
 ---
 
-## Authentication & Authorization
+## 6. Authentication & Authorization
 
-### Auth Providers
-- **Team auth:** Supabase Auth (email/password)
-- **Customer auth:** Token-based with session storage
+### Authentication Methods
 
-### Role-Based Access Control
+| Method | Used By | Implementation |
+|--------|---------|---------------|
+| **Supabase Session** | Admin, CRM, Staff | Cookie-based session via `@supabase/ssr` |
+| **Customer OTP** | Store customers | Phone-based OTP via `customer_otps` table |
+| **Bearer Token** | Commission external API | `COMMISSION_API_TOKEN` env var |
+| **HMAC** | Webhooks | SHA256 signature verification |
+
+### Role-Based Access Control (6-Tier)
+
+```
+super_admin > admin > sales > support > content > viewer
+```
+
+| Role | Products | Orders | Customers | Settings | Commissions | CMS | Pipeline |
+|------|----------|--------|-----------|----------|-------------|-----|----------|
+| `super_admin` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `admin` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `sales` | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ |
+| `support` | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `content` | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| `viewer` | 👁 | 👁 | 👁 | ❌ | ❌ | ❌ | ❌ |
+
+*👁 = Read-only*
+
+### Permission Functions
 
 ```typescript
-type Role = 'super_admin' | 'admin' | 'sales' | 'support' | 'content' | 'viewer';
+// Check specific permission
+hasPermission(user, 'orders')    // boolean
+
+// Check page access
+canAccessPage(user, '/admin/products')  // boolean
+
+// Route protection
+requireAdmin(request)  // throws 401/403 if unauthorized
 ```
-
-| Role | Products | Orders | Customers | Settings | Pipeline | Bot |
-|------|----------|--------|-----------|----------|----------|-----|
-| super_admin | CRUD | CRUD | CRUD | CRUD | CRUD | CRUD |
-| admin | CRUD | CRUD | CRUD | CRUD | — | View |
-| sales | View | CRUD | CRUD | — | CRUD | — |
-| support | View | Edit | Edit | — | — | — |
-| content | CRUD | — | — | — | — | — |
-| viewer | View | View | View | — | — | — |
-
-### Middleware Protection
-
-```
-Protected routes:  /admin/*, /crm/*, /login
-Protected APIs:    /api/admin/*, /api/crm/*
-Public routes:     /store/*, /(public)/*, /
-Public APIs:       /api/store/*, /api/webhook/*, /api/health
-```
-
-### Rate Limiting
-- Login: 5 attempts/minute
-- Webhooks: 100 requests/minute
-- Contact form: 3 submissions/minute
-- Chat: 20 messages/minute
 
 ---
 
-## Core Modules
+## 7. Middleware & Security
 
-### 1. E-Commerce Store (`app/store/`, `lib/store/`)
-- Product catalog with filters (brand, category, price range)
-- Product variants (colors, storage sizes)
-- Shopping cart with Zustand state + localStorage persistence
-- Wishlist management
-- Product comparison (up to 4 products)
+**File:** `middleware.ts`
+
+### Security Layers (Applied in Order)
+
+1. **CORS** — Restricted to configured origins
+   - Open CORS for: `/api/admin/commissions/summary`, `/api/admin/commissions/dashboard`
+2. **Rate Limiting** — Per-route configurable:
+   - Login: limited attempts
+   - Contact/Email: 5 req / 5 min
+   - Payment: 30 req / min
+   - Chat: 30 req / min
+   - Webhooks: limited
+3. **CSRF Protection** — Double-submit cookie pattern
+   - **Exempt routes:** `/api/webhook/*`, `/api/cron/*`, `/api/payment/callback`, `/api/csrf`, `/api/orders`
+4. **Security Headers:**
+   - `X-Frame-Options: DENY`
+   - `X-Content-Type-Options: nosniff`
+   - `X-XSS-Protection: 1; mode=block`
+   - `Referrer-Policy: strict-origin-when-cross-origin`
+   - `Strict-Transport-Security: max-age=31536000`
+   - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+
+### Database Security
+- **Row-Level Security (RLS)** enabled on all tables
+- Service role for server operations
+- Anonymous role for public reads
+- Supabase clients:
+  - `createServerSupabase()` — Server components (session scoped)
+  - `createBrowserSupabase()` — Client components (session scoped)
+  - `createAdminSupabase()` — Service role (bypasses RLS)
+
+### Webhook Security
+- HMAC SHA256 signature verification via `lib/webhook-verify.ts`
+- Constant-time comparison to prevent timing attacks
+
+---
+
+## 8. Core Modules
+
+### 8.1 Store Module
+
+**Product System:**
+- Two types: `device` (phones/tablets) and `accessory`
+- Multi-storage variants with separate pricing (e.g., 128GB, 256GB, 512GB)
+- Color system: hex code + bilingual names (AR/HE)
+- Specifications stored as JSONB
+- AI-powered autofill from model name (GSMarena + Gemini)
+
+**Cart & Checkout:**
+- Client-side cart state (Zustand + localStorage)
+- Multi-step checkout flow
+- Automatic payment gateway routing (Rivhit for Israel, UPay for international)
 - Coupon validation at checkout
-- Multiple payment gateways (Rivhit, iCredit, UPay)
-- Public order tracking via order number
-- Customer reviews with ratings
 
-### 2. WhatsApp Bot (`lib/bot/`)
-Intent-based conversational engine with state machine:
+**Features:**
+- Product comparison (side-by-side)
+- Wishlist (persistent)
+- Smart search (AI-powered autocomplete)
+- Order tracking by ID
+- Customer reviews with moderation
+- Loyalty points program (earn on purchase, redeem as discount)
 
+### 8.2 Admin Panel
+
+**15+ Management Pages:**
+- Dashboard with real-time stats and alerts
+- CRUD for: products, categories, deals, coupons, heroes, line plans, prices
+- Homepage CMS editor (drag sections)
+- Push notification management
+- Review moderation
+- Bot configuration
+- System settings (site name, logo, contact info)
+- Analytics dashboard (sales, traffic, conversion)
+
+### 8.3 CRM Module
+
+**Unified Inbox:**
+- Multi-channel: WhatsApp, WebChat, SMS in one view
+- Real-time message streaming (Supabase Realtime)
+- Agent assignment & transfer
+- Quick reply templates
+- Conversation labels & priority
+- Contact info panel
+
+**Customer 360°:**
+- Full profile with order history
+- Segment classification (VIP, loyal, active, new, cold, lost, inactive)
+- Notes & internal comments
+- Loyalty tier & points balance
+- Communication history across channels
+
+**Sales Pipeline:**
+- Kanban-style stages: Lead → Negotiation → Proposal → Won / Lost
+- Deal value tracking
+- Agent assignment
+- Forecasting
+
+**Task Management:**
+- Create, assign, prioritize tasks
+- Due dates & status tracking
+- Link to customers & orders
+
+### 8.4 Order System
+
+**Order ID Format:** `CLM-XXXXX`
+
+**Status Flow:**
 ```
-User Message → Intent Detection → Playbook Router → Response
-                                       ↓
-                              [product_search, order_status,
-                               prepaid_plans, installment_calc,
-                               store_info, human_handoff]
-                                       ↓
-                              AI Fallback (Claude) if no match
+new → approved → processing → shipped → delivered
+         ↘ cancelled
+         ↘ rejected
 ```
 
-Features:
-- Product search & recommendations
-- Order status lookup
-- Prepaid plan information
-- Installment calculator
-- Human agent handoff
-- Sentiment analysis
-- Guardrails (rate limiting, blocked patterns, content safety)
-- Admin notifications for escalations
-- CSAT tracking
+**Sources:** store, facebook, external, whatsapp, webchat, manual
 
-### 3. Admin Dashboard (`app/admin/`, `lib/admin/`)
-- Product CRUD with AI-assisted spec filling (GSMArena, MobileAPI)
-- Bulk pricing tools (competitor matching, margin rules)
-- Automated image processing (RemoveBG, Pexels search)
-- Stock distribution across variants
-- Order management with status workflow
-- Customer analytics with Recharts
-- Hero banner management
-- Coupon & deal creation
-- Team settings & role management
-- Website CMS
-
-### 4. CRM System (`app/crm/`, `lib/crm/`)
-- WhatsApp inbox with real-time message management
-- Conversation assignment & status tracking
-- AI features: sentiment analysis, response suggestions, summaries, auto-labeling
-- Sales pipeline (kanban-style deal tracking)
-- Task management
-- Customer database with segmentation
-- PDF reports (daily/weekly) via cron
-
-### 5. Loyalty System (`lib/loyalty.ts`)
-- Points accumulation per purchase
-- Tier-based rewards
-- Point redemption at checkout
-- Transaction history
-
-### 6. Notifications (`lib/notifications.ts`, `lib/notify.ts`)
-- Web Push (VAPID)
-- WhatsApp notifications via yCloud
-- Email campaigns (Resend/SendGrid)
-- SMS/OTP (Twilio)
-- In-app toasts (Sonner)
+**Features:**
+- Admin order creation
+- Status pipeline with history audit
+- Internal notes
+- Agent assignment
+- Auto-sync to commission tracking
 
 ---
 
-## Commission Calculator Module
-
-The Commission Calculator is a complete commission tracking and calculation system for the HOT Mobile dealer contract. It lives in `lib/commissions/`, `app/admin/commissions/`, and `app/api/admin/commissions/`.
+## 9. Commission System
 
 ### Overview
-
-The module tracks three revenue streams for the dealer:
-
-1. **Line commissions** -- new mobile line activations
-2. **Device commissions** -- device/accessory sales
-3. **Loyalty bonuses** -- retention bonuses for lines that remain active
-
-Sanctions (penalties) are subtracted from the total. Monthly targets allow goal tracking with pace analysis.
-
-### Admin Pages (6 sub-pages)
-
-| Page | Path | Description |
-|------|------|-------------|
-| **Dashboard** | `/admin/commissions` | Monthly overview with KPI cards, pace tracking, daily chart, smart alerts, target progress |
-| **Calculator** | `/admin/commissions/calculator` | 5-tab calculator: Line, Device, Loyalty, Target Planner, Monthly Summary |
-| **Sanctions** | `/admin/commissions/sanctions` | Add/view sanctions with predefined types from the HOT contract |
-| **History** | `/admin/commissions/history` | Filterable sales history (by type, source, date range) with pagination |
-| **Import** | `/admin/commissions/import` | Auto-sync completed store orders + manual CSV import capability |
-| **Analytics** | `/admin/commissions/analytics` | Multi-month trend charts (up to 12 months) comparing lines, devices, sanctions, net |
-
-### Calculation Formulas
-
-All formulas are defined in `lib/commissions/calculator.ts` and match the HOT Mobile dealer contract.
-
-#### Line Commission
-
-```
-commission = package_price * 4 (multiplier)
-```
-
-- Minimum package price: 19.90 ILS (below this, commission = 0)
-- Requires valid HK (horadat kav / line transfer) document
-- Example: Package 29.90 ILS => commission = 29.90 * 4 = 119.60 ILS
-
-#### Device Commission
-
-```
-base = total_net_device_sales * 5%
-milestones = floor(total_net_device_sales / 50,000) * 2,500
-total = base + milestones
-```
-
-- 5% of net device sales amount
-- Milestone bonus: 2,500 ILS for every 50,000 ILS in cumulative sales
-- Example: 120,000 ILS in sales => 6,000 (5%) + 5,000 (2 milestones) = 11,000 ILS
-
-#### Loyalty Bonuses (per line)
-
-Bonuses are earned when a line remains active past certain month milestones within the 150-day loyalty period:
-
-| Months Active | Bonus Amount |
-|---------------|-------------|
-| 5 months | 80 ILS |
-| 9 months | 30 ILS |
-| 12 months | 20 ILS |
-| 15 months | 50 ILS |
-| **Total** | **180 ILS** |
-
-Loyalty period: 150 days from activation. After 150 days, no further bonuses accrue.
-
-#### Monthly Summary
-
-```
-gross_commission = lines_commission + devices_commission + loyalty_bonuses
-net_commission = gross_commission - total_sanctions
-target_progress = min(100, round(net_commission / target_total * 100))
-```
-
-#### Target / Reverse Calculator
-
-Given a target amount, calculates what is needed to reach it:
-
-- **Lines-only scenario:** How many lines per working day (avg package 25 ILS => 100 ILS commission/line)
-- **Devices-only scenario:** How much in device sales per working day
-- **Mixed scenario (60/40):** 60% from lines, 40% from devices
-
-Working days exclude Saturdays (Shabbat).
-
-### Sanctions (Penalties)
-
-9 predefined sanction types from the HOT Mobile contract:
-
-| Key | Description (Hebrew) | Amount | Has Offset |
-|-----|----------------------|--------|-----------|
-| `FAKE_PAYMENT` | אמצעי תשלום פיקטיבי / לא תקין | 2,500 ILS | Yes |
-| `FALSE_PROMISE` | הבטחת מוכר בניגוד לתנאי התוכניות | 2,500 ILS | Yes |
-| `NO_PROOF` | הכנסת מכירה ללא אסמכתא | 2,500 ILS | Yes |
-| `ILLEGAL_DIALER` | שימוש בחיוגי אשראי בניגוד לחוק | 2,500 ILS | Yes |
-| `DOUBLE_CONNECTION` | חיבור כפול | 2,500 ILS | Yes |
-| `UNAUTHORIZED_AD` | פרסום מטעם המשווק ללא אישור החברה | 2,500 ILS | No |
-| `HARASSMENT` | הטרדות – פניות חוזרות ונשנות | 1,000 ILS | No |
-| `NO_DNC_REMOVAL` | אי הסרת מספר מרשימות ההתקשרות | 1,000 ILS | No |
-| `UNAUTHORIZED_VISOR` | שימוש בויזר ללא הרשאה | 2,500 ILS | Yes |
-
-"Has Offset" means the sanction amount can be offset against future sales commissions.
-
-### Database Schema (4 tables)
-
-Created by migrations `025_commissions.sql` and `026_commissions_lock_and_analytics.sql`.
-
-**`commission_sales`** -- Individual sale records
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | BIGSERIAL | Primary key |
-| `sale_date` | TEXT | Date (YYYY-MM-DD) |
-| `sale_type` | TEXT | `line` or `device` |
-| `source` | TEXT | `manual`, `auto_sync`, or `csv_import` |
-| `order_id` | TEXT | Link to orders table (unique, for dedup) |
-| `customer_name` | TEXT | Customer name (lines) |
-| `customer_phone` | TEXT | Customer phone (lines) |
-| `package_price` | REAL | Monthly package price (lines) |
-| `multiplier` | INTEGER | Commission multiplier (default 4) |
-| `has_valid_hk` | BOOLEAN | Valid HK document (lines) |
-| `loyalty_status` | TEXT | `pending`, `active`, `churned`, `cancelled` |
-| `loyalty_start_date` | TEXT | Loyalty tracking start date |
-| `device_name` | TEXT | Device description (devices) |
-| `device_sale_amount` | REAL | Net sale amount (devices) |
-| `commission_amount` | REAL | Calculated commission |
-
-**`commission_targets`** -- Monthly targets
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | BIGSERIAL | Primary key |
-| `month` | TEXT | Month (YYYY-MM), unique per user |
-| `target_lines_amount` | REAL | Target commission from lines |
-| `target_devices_amount` | REAL | Target commission from devices |
-| `target_total` | REAL | Overall target amount |
-| `target_lines_count` | INTEGER | Target number of lines |
-| `target_devices_count` | INTEGER | Target number of devices |
-| `is_locked` | BOOLEAN | Lock flag (prevents edits) |
-| `locked_at` | TIMESTAMPTZ | When the target was locked |
-
-**`commission_sanctions`** -- Penalties
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | BIGSERIAL | Primary key |
-| `sanction_date` | TEXT | Date of sanction |
-| `sanction_type` | TEXT | One of 9 predefined types |
-| `amount` | REAL | Penalty amount (default 2,500) |
-| `has_sale_offset` | BOOLEAN | Can offset against commissions |
-| `description` | TEXT | Free-text details |
-
-**`commission_sync_log`** -- Order sync audit
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | BIGSERIAL | Primary key |
-| `sync_date` | TIMESTAMPTZ | When sync ran |
-| `orders_synced` | INTEGER | Orders successfully synced |
-| `orders_skipped` | INTEGER | Orders already in system |
-| `total_amount` | REAL | Total sales amount synced |
-| `status` | TEXT | `success` or `partial` |
-| `error_message` | TEXT | Error details if any |
-
-### API Endpoints (8 route files)
-
-All commission endpoints are under `/api/admin/commissions/`.
-
-#### Dashboard (dual auth)
-
-```
-GET /api/admin/commissions/dashboard?month=2026-04
-Authorization: Bearer <COMMISSION_API_TOKEN>  (or admin session cookie)
-```
-
-Returns: monthly summary, device milestone calc, daily breakdown chart data, pace tracking (lines/devices/overall with ahead/on_track/behind status), smart alerts, recent sales, target details, sync info.
-
-#### Summary (bearer token only, CORS-enabled)
-
-```
-GET /api/admin/commissions/summary?month=2026-04
-Authorization: Bearer <COMMISSION_API_TOKEN>
-```
-
-Designed for the local HTML app. Returns a lightweight JSON payload with: lines count/commission, device sales/commission/milestones, sanctions total, loyalty bonus, net commission, target progress, daily breakdown by day number, lock status.
-
-Rate limit: 60 requests/hour per token.
-
-CORS: `Access-Control-Allow-Origin: *` -- allows calls from `file://` and any origin.
-
-#### Sales CRUD
-
-```
-GET  /api/admin/commissions/sales?type=line&source=manual&from=2026-04-01&to=2026-04-30&page=1&limit=50
-POST /api/admin/commissions/sales
-```
-
-GET returns paginated sales with total count. POST creates a new sale record.
-
-#### Calculate
-
-```
-POST /api/admin/commissions/calculate
-Content-Type: application/json
-
-// Line calculation
-{ "type": "line", "packagePrice": 29.90, "hasValidHK": true, "count": 5 }
-
-// Device calculation
-{ "type": "device", "totalNetSales": 120000 }
-
-// Loyalty calculation
-{ "type": "loyalty", "loyaltyStartDate": "2025-10-01" }
-
-// Target/reverse calculation
-{ "type": "target", "targetAmount": 15000, "periodStart": "2026-04-01", "periodEnd": "2026-04-30" }
-```
-
-#### Sanctions
-
-```
-GET  /api/admin/commissions/sanctions?from=2026-04-01&to=2026-04-30
-POST /api/admin/commissions/sanctions
-     { "sanction_type": "FAKE_PAYMENT", "sanction_date": "2026-04-05", "amount": 2500, "has_sale_offset": true, "description": "..." }
-```
-
-#### Sync (order auto-import)
-
-```
-GET  /api/admin/commissions/sync          # Last sync info
-POST /api/admin/commissions/sync
-     { "startDate": "2026-04-01", "endDate": "2026-04-30" }
-```
-
-Syncs completed orders (status: delivered, shipped, approved) from the `orders` table into `commission_sales` as device-type entries with 5% commission. Deduplicates by `order_id`. Logs the sync in `commission_sync_log`.
-
-#### Targets
-
-```
-GET  /api/admin/commissions/targets?month=2026-04
-POST /api/admin/commissions/targets
-     { "month": "2026-04", "target_total": 15000, "target_lines_amount": 8000, "target_devices_amount": 7000, "target_lines_count": 80, "target_devices_count": 40 }
-```
-
-Targets can be locked (`is_locked: true`) to prevent modifications after the month ends.
-
-#### Analytics
-
-```
-GET /api/admin/commissions/analytics?months=12
-```
-
-Returns an array of monthly analytics objects with: target, lines/devices commission, loyalty bonus, gross/net commission, target progress, sales counts.
-
-#### Export
-
-```
-GET /api/admin/commissions/export?month=2026-04
-```
-
-Returns a CSV file with sales and sanctions for the given month (Hebrew column headers).
-
-### Local HTML App Integration
-
-The commission module supports a standalone local HTML application that can sync data via the bearer-token-authenticated endpoints:
-
-1. Set `COMMISSION_API_TOKEN` in environment variables
-2. The local app calls `GET /api/admin/commissions/summary` or `GET /api/admin/commissions/dashboard` with `Authorization: Bearer <token>`
-3. Both endpoints have CORS enabled (`Access-Control-Allow-Origin: *`) so they work from `file://` URLs
-4. The summary endpoint is also listed in `PUBLIC_API` in middleware.ts, so it bypasses session auth
-5. The dashboard endpoint uses dual auth -- accepts either bearer token or admin session
-
-### Pace Tracking
-
-The dashboard endpoint calculates real-time pace tracking:
-
-- **Working days:** Excludes Saturdays (Shabbat) from the count
-- **Lines pace:** Current lines/day vs. expected lines/day vs. required lines/day to hit target
-- **Devices pace:** Current devices/day vs. expected vs. required
-- **Overall pace:** Commission earned per working day vs. expected and required
-- **Status:** `ahead` (>110% of expected), `on_track`, or `behind`
-- **Smart alerts:** Auto-generated Hebrew alerts for target gaps, pace warnings, milestone proximity, loyalty expirations
+Contract-based commission tracking for HOT Mobile dealer operations.
+
+**Location:** `lib/commissions/` + `app/admin/commissions/` (6 sub-pages) + `app/api/admin/commissions/` (16 endpoints)
+
+### Three Revenue Streams
+
+#### 1. Line Commissions
+- **Formula:** Package price × 4 multiplier
+- **Min threshold:** 19.90 ILS
+- Per-employee multiplier configurable in profiles
+
+#### 2. Device Commissions
+- **Base rate:** 5% of net device sales
+- **Milestone bonuses:** 2,500 ILS per 50,000 ILS sales threshold
+- Per-employee rate configurable
+
+#### 3. Loyalty Bonuses
+- At **5 months:** 80 ILS per line
+- At **9 months:** 30 ILS per line
+- At **12 months:** 20 ILS per line
+- At **15 months:** 50 ILS per line
+- **Total:** 180 ILS per line over 15 months
+
+### Sanctions
+9 predefined penalty types (1,000–2,500 ILS each)
+
+### Auto-Sync
+- Completed orders from the store automatically sync to `commission_sales` table
+- Sync log tracked in `commission_sync_log`
+
+### External API
+- Bearer token authenticated endpoints for local HTML app
+- Endpoints: `summary`, `dashboard`, `sales`, `employees/list`
+- Auth via `COMMISSION_API_TOKEN` env var
+
+### Database Tables
+- `commission_sales` — Individual sale records
+- `commission_targets` — Monthly targets per employee
+- `commission_sanctions` — Sanctions & deductions
+- `commission_sync_log` — Sync audit trail
+- `employee_commission_profiles` — Per-employee configuration
+- `commission_employees` — Employee directory
 
 ---
 
-## Integrations
+## 10. Bot Engine
 
-| Service | Purpose | Config File | Key Env Vars |
-|---------|---------|-------------|-------------|
-| **Supabase** | Database, Auth, Storage | `lib/supabase.ts` | `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
-| **yCloud** | WhatsApp messaging | `lib/integrations/ycloud-wa.ts` | `YCLOUD_API_KEY`, `WHATSAPP_PHONE_ID` |
-| **Twilio** | SMS / OTP | `lib/integrations/twilio-sms.ts` | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` |
-| **Rivhit/iCredit** | Payment processing | `lib/integrations/rivhit.ts` | `ICREDIT_GROUP_PRIVATE_TOKEN` |
-| **UPay** | Alternative payment | `lib/integrations/upay.ts` | (configured in integration settings) |
-| **Resend** | Email delivery | `lib/integrations/resend.ts` | `RESEND_API_KEY` |
-| **SendGrid** | Email (fallback) | `lib/integrations/sendgrid.ts` | `SENDGRID_API_KEY` |
-| **Anthropic Claude** | AI bot, CRM AI | `lib/ai/claude.ts` | `ANTHROPIC_API_KEY`, `ANTHROPIC_API_KEY_BOT` |
-| **OpenAI** | Product descriptions | `lib/admin/ai-tools.ts` | `OPENAI_API_KEY` |
-| **Cloudflare R2** | Image storage | `lib/storage-r2.ts` | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` |
-| **Pexels** | Stock images | Admin AI tools | `PEXELS_API_KEY` |
-| **RemoveBG** | Image processing | `lib/integrations/removebg.ts` | `REMOVEBG_API_KEY` |
-| **GSMArena** | Device specs | `lib/admin/gsmarena.ts` | — (scraping) |
-| **MobileAPI** | Device database | `lib/admin/mobileapi.ts` | `MOBILEAPI_KEY` |
-| **Mixpanel** | Analytics | `lib/analytics-events.ts` | `NEXT_PUBLIC_MIXPANEL_TOKEN` |
+### Overview
+14-module AI-powered chatbot engine supporting multiple channels.
+
+**Location:** `lib/bot/` (14 files)
+
+### Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| **Engine** | `engine.ts` | Core message processing pipeline |
+| **AI** | `ai.ts` | Anthropic Claude conversation engine |
+| **Intents** | `intents.ts` | Intent detection & classification |
+| **Playbook** | `playbook.ts` | Conversation flow scripts |
+| **Guardrails** | `guardrails.ts` | Safety filters & content moderation |
+| **Handoff** | `handoff.ts` | Escalation to human agents |
+| **Templates** | `templates.ts` | Response template system |
+| **Policies** | `policies.ts` | Business policy knowledge base |
+| **WebChat** | `webchat.ts` | WebChat channel integration |
+| **WhatsApp** | `whatsapp.ts` | WhatsApp channel (YCloud API) |
+| **Analytics** | `analytics.ts` | Bot usage analytics |
+| **Notifications** | `notifications.ts` | Bot notification system |
+| **Admin Notify** | `admin-notify.ts` | Admin alerts for bot events |
+
+### Channels
+- **WebChat** — Embedded widget (`components/chat/WebChatWidget.tsx`)
+- **WhatsApp** — Via YCloud API (webhook at `/api/webhook/whatsapp`)
+- **SMS** — Via Twilio (webhook at `/api/webhook/twilio`)
+
+### Flow
+```
+User Message → Intent Detection → Playbook Match?
+  ├── Yes → Execute playbook response
+  └── No → AI (Claude) → Guardrails → Response
+              └── Unsafe? → Handoff to human agent
+```
 
 ---
 
-## Environment Variables
+## 11. Integrations
 
-### Critical (Required)
-```env
-NEXT_PUBLIC_SUPABASE_URL=         # Supabase project URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=    # Supabase anon/public key
-SUPABASE_SERVICE_ROLE_KEY=        # Supabase service role key (server-only)
-NEXT_PUBLIC_APP_URL=              # App URL (https://clalmobile.com)
-```
+### Provider Registry Pattern
 
-### Payment
-```env
-ICREDIT_GROUP_PRIVATE_TOKEN=      # iCredit payment token
-ICREDIT_TEST_MODE=                # "true" for sandbox
-```
+**File:** `lib/integrations/hub.ts`
 
-### WhatsApp (yCloud)
-```env
-YCLOUD_API_KEY=                   # yCloud API key
-WHATSAPP_PHONE_ID=                # WhatsApp business phone ID
-WEBHOOK_VERIFY_TOKEN=             # Webhook verification token
-```
+All integrations use a provider registry pattern. Configuration stored in `integrations` DB table.
 
-### SMS (Twilio)
-```env
-TWILIO_ACCOUNT_SID=               # Twilio account SID
-TWILIO_AUTH_TOKEN=                 # Twilio auth token
-TWILIO_VERIFY_SERVICE_SID=        # OTP verification service
-TWILIO_MESSAGING_SERVICE_SID=     # Messaging service
-TWILIO_FROM_NUMBER=               # Sender phone number
-```
+### Payment Gateways
+
+| Provider | File | Region | Features |
+|----------|------|--------|----------|
+| **Rivhit (iCredit)** | `rivhit.ts` | Israeli cities | Installment payments, ILS |
+| **UPay** | `upay.ts` | International | Multi-currency |
+
+**Auto-detection:** City-based routing via `lib/cities.ts` — Israeli cities → Rivhit, others → UPay.
+
+### Messaging
+
+| Provider | File | Channel | Purpose |
+|----------|------|---------|---------|
+| **YCloud** | `ycloud-wa.ts` | WhatsApp | Bot + inbox messaging |
+| **YCloud** | `ycloud-templates.ts` | WhatsApp | Template management |
+| **Twilio** | `twilio-sms.ts` | SMS | Bot + notifications |
 
 ### Email
-```env
-RESEND_API_KEY=                   # Resend API key
-RESEND_FROM=                      # Sender email
-SENDGRID_API_KEY=                 # SendGrid API key
-SENDGRID_FROM=                    # SendGrid sender email
-```
+
+| Provider | File | Purpose |
+|----------|------|---------|
+| **SendGrid** | `sendgrid.ts` | Transactional emails |
+| **Resend** | `resend.ts` | Alternative email provider |
 
 ### AI
-```env
-ANTHROPIC_API_KEY=                # Claude (general)
-ANTHROPIC_API_KEY_BOT=            # Claude (bot-specific)
-ANTHROPIC_API_KEY_ADMIN=          # Claude (admin features)
-ANTHROPIC_API_KEY_STORE=          # Claude (store search)
-OPENAI_API_KEY=                   # OpenAI (product descriptions)
-OPENAI_API_KEY_ADMIN=             # OpenAI (admin features)
-```
 
-### Storage (Cloudflare R2)
-```env
-R2_ACCOUNT_ID=                    # Cloudflare account ID
-R2_ACCESS_KEY_ID=                 # R2 access key
-R2_SECRET_ACCESS_KEY=             # R2 secret key
-R2_BUCKET_NAME=                   # R2 bucket name
-R2_PUBLIC_URL=                    # R2 public URL
-```
-
-### Push Notifications
-```env
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=     # VAPID public key
-VAPID_PRIVATE_KEY=                # VAPID private key
-```
-
-### Commission Module
-```env
-COMMISSION_API_TOKEN=             # Bearer token for external commission API access (summary + dashboard)
-```
+| Provider | Purpose |
+|----------|---------|
+| **Anthropic Claude** | Bot responses, content enhancement |
+| **Google Gemini** | Fallback AI, product autofill |
 
 ### Other
-```env
-REMOVEBG_API_KEY=                 # RemoveBG API key
-MOBILEAPI_KEY=                    # MobileAPI key
-PEXELS_API_KEY=                   # Pexels API key
-TEAM_WHATSAPP_NUMBERS=            # Admin notification phones (comma-separated)
-ADMIN_REPORT_PHONE=               # Report recipient phone
-ADMIN_PERSONAL_PHONE=             # Admin personal phone
-CRON_SECRET=                      # Cron job authentication
-NEXT_PUBLIC_MIXPANEL_TOKEN=       # Mixpanel analytics token
+
+| Provider | File | Purpose |
+|----------|------|---------|
+| **Remove.bg** | `removebg.ts` | Background removal from product images |
+
+---
+
+## 12. Internationalization
+
+### Languages
+- **Arabic** (primary) — `locales/ar.json`
+- **Hebrew** (secondary) — `locales/he.json`
+- Both RTL (right-to-left)
+
+### Implementation
+- **Static text:** JSON translation files with namespaced keys (`nav.*`, `store.*`, `admin.*`)
+- **Dynamic content:** Database columns use `*_ar` / `*_he` suffixes (e.g., `name_ar`, `name_he`)
+- **Language switcher:** `components/shared/LangSwitcher.tsx`
+- **i18n hook:** `lib/i18n.tsx`
+
+### Usage Pattern
+```typescript
+// Static text
+const t = useTranslation();
+<h1>{t('store.title')}</h1>
+
+// Dynamic content from DB
+<h2>{lang === 'ar' ? product.name_ar : product.name_he}</h2>
 ```
 
 ---
 
-## Deployment
+## 13. Design System
 
-### Cloudflare Pages
-
-**Build command:**
-```bash
-npx opennextjs-cloudflare build
-```
-
-**Output directory:**
-```
-.vercel/output/static
-```
-
-**Steps:**
-1. Connect repo to Cloudflare Pages
-2. Set build command and output directory
-3. Add all environment variables in Cloudflare Dashboard
-4. Connect domain: `clalmobile.com`
-5. Set up webhook URLs for yCloud and Twilio
-
-### Webhook URLs (Production)
-```
-WhatsApp: https://clalmobile.com/api/webhook/whatsapp
-Twilio:   https://clalmobile.com/api/webhook/twilio
-Payment:  https://clalmobile.com/api/payment/callback
-UPay:     https://clalmobile.com/api/payment/upay/callback
-```
-
----
-
-## Scripts & Commands
-
-### Development
-```bash
-npm run dev              # Start dev server (localhost:3000)
-npm run build            # Production build
-npm run start            # Start production server
-npm run lint             # ESLint check
-npm run format           # Prettier formatting
-```
-
-### Cloudflare
-```bash
-npm run build:cf         # Build for Cloudflare Pages
-npm run preview:cf       # Local Cloudflare preview
-npm run deploy:cf        # Deploy to Cloudflare Pages
-```
-
-### Database
-```bash
-npm run db:migrate       # Run Supabase migrations
-npm run db:seed          # Seed initial data
-npm run db:reset         # Reset database (dev only!)
-```
-
-### Testing
-```bash
-npm run test             # Run Vitest (watch mode)
-npm run test:run         # Single test run
-npm run test:coverage    # Coverage report (HTML)
-```
-
----
-
-## Design System
+**File:** `tailwind.config.ts`
 
 ### Colors
-```css
---brand:       #E11D48 (Rose/Red - primary)
---surface:     Dynamic light/dark backgrounds
---state-*:     Success (green), Warning (amber), Error (red), Info (blue)
-```
+| Token | Value | Usage |
+|-------|-------|-------|
+| `brand` | `#c41040` | Primary brand red |
+| `brand-light` | — | Lighter variant |
+| `brand-dark` | — | Darker variant |
+| `surface-bg` | `#09090b` | Page background |
+| `surface-card` | `#111114` | Card background |
+| `surface-elevated` | `#18181b` | Elevated elements |
+| `success` | Green | Success states |
+| `warning` | Yellow | Warning states |
+| `error` | Red | Error states |
+| `info` | Blue | Info states |
 
 ### Typography
-- **Arabic:** Tajawal (Google Fonts)
-- **Hebrew:** David Libre, Heebo (Google Fonts)
-- **English:** System fonts
+| Language | Font |
+|----------|------|
+| Arabic | Tajawal |
+| Hebrew | David Libre / Heebo |
 
-### RTL Support
-- Full RTL layout for Arabic and Hebrew
-- `dir="rtl"` on root layout
-- Tailwind RTL utilities
+### Spacing & Radius
+| Token | Value |
+|-------|-------|
+| `radius-card` | 14px |
+| `radius-button` | 10px |
+| `radius-chip` | 8px |
 
-### Responsive Breakpoints
-| Name | Width | Usage |
-|------|-------|-------|
-| mobile | < 640px | Phone layouts |
-| tablet | 640-1024px | Tablet layouts |
-| desktop | > 1024px | Full layouts |
+### Breakpoints
+| Name | Width |
+|------|-------|
+| Mobile | ≤ 767px |
+| Tablet | 768–1023px |
+| Desktop | ≥ 1024px |
 
 ---
 
-## Testing
-
-- **Framework:** Vitest 4.0
-- **Environment:** jsdom
-- **Location:** `tests/unit/`
-- **Setup:** `tests/setup.ts`
-- **Coverage:** HTML reporter
+## 14. Environment Variables
 
 ```bash
-npm run test           # Watch mode
-npm run test:run       # CI mode
-npm run test:coverage  # With coverage
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=        # Supabase project URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anon key (public)
+SUPABASE_SERVICE_ROLE_KEY=        # Supabase service role key (server only)
+
+# AI
+ANTHROPIC_API_KEY=                # Claude API key
+GEMINI_API_KEY=                   # Google Gemini API key
+
+# WhatsApp (YCloud)
+YCLOUD_API_KEY=                   # YCloud API key
+YCLOUD_WHATSAPP_NUMBER=           # WhatsApp business number
+YCLOUD_WEBHOOK_SECRET=            # Webhook signature secret
+
+# SMS (Twilio)
+TWILIO_ACCOUNT_SID=               # Twilio account SID
+TWILIO_AUTH_TOKEN=                 # Twilio auth token
+TWILIO_PHONE_NUMBER=              # Twilio phone number
+
+# Email
+SENDGRID_API_KEY=                 # SendGrid API key
+RESEND_API_KEY=                   # Resend API key
+
+# Payment
+RIVHIT_API_KEY=                   # Rivhit (iCredit) API key
+UPAY_API_KEY=                     # UPay API key
+UPAY_MERCHANT_ID=                 # UPay merchant ID
+
+# Commissions
+COMMISSION_API_TOKEN=             # Bearer token for external commission API
+
+# Cloudflare
+CLOUDFLARE_R2_ACCESS_KEY=        # R2 access key
+CLOUDFLARE_R2_SECRET_KEY=        # R2 secret key
+CLOUDFLARE_R2_BUCKET=            # R2 bucket name
+
+# Push Notifications
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=    # VAPID public key
+VAPID_PRIVATE_KEY=               # VAPID private key
+
+# Other
+NEXT_PUBLIC_SITE_URL=            # Public site URL
+REMOVE_BG_API_KEY=               # Remove.bg API key
 ```
 
 ---
 
-## Security Audit
+## 15. Deployment
 
-### Critical Issues Found
+### Platform
+Cloudflare Pages (edge) via OpenNext adapter.
 
-| # | Issue | Severity | Location | Recommendation |
-|---|-------|----------|----------|----------------|
-| 1 | Hardcoded fallback cron secret | HIGH | `api/cron/reports/route.ts:79` | Remove default value, require env var |
-| 2 | Hardcoded MobileAPI key fallback | HIGH | `lib/admin/mobileapi.ts:9` | Remove default value |
-| 3 | CSP allows `unsafe-inline` + `unsafe-eval` | MEDIUM | `middleware.ts:88-91` | Use nonces or hashes instead |
-| 4 | Timing-vulnerable token comparison | MEDIUM | `api/webhook/whatsapp/route.ts:20` | Use `crypto.timingSafeEqual()` |
-| 5 | Regex-based HTML sanitization | MEDIUM | `api/reviews/route.ts:88` | Use `sanitize-html` or `DOMPurify` |
-| 6 | Minimal customer token validation | LOW | `api/customer/orders/route.ts:11` | Add proper JWT/token type verification |
+### Build Steps
 
-### Code Quality Issues
+```bash
+# Full deployment (all 3 steps required):
+npm run build                      # 1. Next.js production build
+npx opennextjs-cloudflare build    # 2. OpenNext adapter (generates worker.js)
+npx wrangler deploy                # 3. Deploy to Cloudflare Pages
+```
 
-| # | Issue | Severity | Count | Recommendation |
-|---|-------|----------|-------|----------------|
-| 1 | `console.log` in production code | MEDIUM | 7+ files | Remove or replace with structured logging |
-| 2 | Excessive `any` type usage | MEDIUM | 10+ files | Enable `@typescript-eslint/no-explicit-any` |
-| 3 | ESLint rules disabled | LOW | `.eslintrc.json` | Re-enable `no-unused-vars`, `no-explicit-any` |
-| 4 | Missing `React.memo()` on components | LOW | Multiple | Add memoization for expensive components |
-| 5 | `@next/next/no-img-element` disabled | LOW | `.eslintrc.json` | Use Next.js `Image` component |
-| 6 | N+1 query pattern in webhook | LOW | `webhook/whatsapp/route.ts:48` | Use `.or()` filter instead of loop |
-| 7 | No centralized error tracking | LOW | Global | Add Sentry or similar service |
+> **Important:** Skipping step 2 means wrangler deploys a stale worker bundle.
 
-### Recommendations Priority
+### Cloudflare Configuration (`wrangler.json`)
+- **Main worker:** `.open-next/worker.js`
+- **Compatibility date:** 2026-04-01
+- **Flags:** `nodejs_compat`, `global_fetch_strictly_public`
+- **R2 Bucket:** `clalstore-opennext-cache` (static cache)
+- **Worker self-reference binding** for edge rendering
 
-**Immediate (before launch):**
-1. Remove all hardcoded secret fallbacks
-2. Remove `console.log` from production API routes
-3. Implement constant-time token comparison for webhooks
-
-**Short-term:**
-4. Replace regex HTML sanitization with proper library
-5. Tighten CSP headers (remove `unsafe-eval`)
-6. Add centralized error tracking (Sentry)
-7. Re-enable stricter ESLint rules
-
-**Long-term:**
-8. Eliminate `any` types across codebase
-9. Add comprehensive API request validation with Zod schemas
-10. Use Next.js `Image` component for optimization
-11. Add env var validation at startup
-12. Increase test coverage
+### Scripts
+```bash
+npm run build:cf    # Combined: next build + opennextjs-cloudflare build
+npm run deploy:cf   # Combined: build:cf + wrangler deploy
+```
 
 ---
 
-*Last updated: 2026-04-05*
-*Generated from comprehensive codebase analysis*
+## 16. Testing
+
+### Framework
+Vitest 4.0 with JSDOM environment.
+
+### Configuration
+**File:** `vitest.config.ts`
+
+### Test Structure
+```
+tests/
+├── setup.ts                    # Test setup & mocks
+└── unit/
+    ├── auth.test.ts            # Authentication logic
+    ├── analytics.test.ts       # Analytics events
+    ├── cart.test.ts            # Shopping cart logic
+    ├── commissions.test.ts     # Commission calculations
+    ├── constants.test.ts       # Constants validation
+    └── seo.test.ts             # SEO utilities
+```
+
+### Commands
+```bash
+npm run test                    # Watch mode
+npm run test:run                # Single run
+npm run test:coverage           # Coverage report
+npm run test:run -- tests/unit/auth.test.ts           # Single file
+npm run test:run -- tests/unit/auth.test.ts -t "name" # Single test
+```
+
+---
+
+## Code Conventions
+
+### Style
+- **Prettier:** 2 spaces, semicolons, double quotes, trailing commas, max width 100
+- **Import order:** Framework → External → `@/*` aliases → Relative
+- **Naming:** `PascalCase` components, `camelCase` functions/variables, `UPPER_SNAKE_CASE` constants
+
+### API Route Pattern
+```typescript
+// app/api/admin/example/route.ts
+import { NextRequest } from "next/server";
+import { requireAdmin } from "@/lib/admin/auth";
+import { apiSuccess, apiError } from "@/lib/api-response";
+import { validateBody } from "@/lib/admin/validators";
+
+export async function GET(request: NextRequest) {
+  const user = await requireAdmin(request);        // Auth check
+  // ... business logic
+  return apiSuccess(data);                         // Structured response
+}
+
+export async function POST(request: NextRequest) {
+  const user = await requireAdmin(request);
+  const body = await validateBody(request, schema); // Zod validation
+  // ... business logic
+  return apiSuccess(result, 201);
+}
+```
+
+### Supabase Client Usage
+```typescript
+// Server component
+const supabase = createServerSupabase();
+
+// Client component
+const supabase = createBrowserSupabase();
+
+// Service role (bypasses RLS)
+const supabase = createAdminSupabase();
+```
+
+### Error Handling
+- Never expose `err.message` in production responses
+- Use generic error messages via `apiError("Something went wrong", 500)`
+- Log detailed errors server-side only

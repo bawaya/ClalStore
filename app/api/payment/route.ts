@@ -11,17 +11,19 @@ import { NextRequest } from "next/server";
 import { getIntegrationConfig } from "@/lib/integrations/hub";
 import { detectPaymentGateway } from "@/lib/payment-gateway";
 import { apiSuccess, apiError } from "@/lib/api-response";
-import { paymentSchema, validateBody } from "@/lib/admin/validators";
 
 export async function POST(req: NextRequest) {
   try {
-    const v = validateBody(await req.json(), paymentSchema);
-    if (!v.success) return apiError(v.error, 400);
+    const body = await req.json();
     const {
       orderId, amount, customerName, customerPhone, customerEmail,
       customerCity, customerAddress, idNumber, items, maxInstallments,
       forceGateway,
-    } = v.data;
+    } = body;
+
+    if (!orderId || !amount || !customerName || !customerPhone) {
+      return apiError("بيانات ناقصة", 400);
+    }
 
     const gateway = forceGateway || detectPaymentGateway(customerCity || "");
     // Payment gateway selected

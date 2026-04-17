@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 // =====================================================
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
@@ -95,7 +96,7 @@ function DealCard({ deal, lang, mobile }: { deal: Deal; lang: string; mobile: bo
       {/* Image */}
       <div className="bg-surface-elevated flex items-center justify-center relative" style={{ height: mobile ? 160 : 220 }}>
         {deal.image_url ? (
-          <img src={deal.image_url} alt={title} className="max-h-[85%] max-w-[85%] object-contain" />
+          <Image src={deal.image_url} alt={title} fill className="object-contain p-[7.5%]" />
         ) : (
           <span style={{ fontSize: 48 }}>🔥</span>
         )}

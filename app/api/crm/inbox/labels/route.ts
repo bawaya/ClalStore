@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -19,7 +18,8 @@ export async function GET(req: NextRequest) {
 
     return apiSuccess({ labels: labels || [] });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Labels GET error:", err);
+    return apiError("فشل في جلب التصنيفات", 500);
   }
 }
 
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       .from("inbox_conversation_labels")
       .upsert({ conversation_id, label_id } as any, { onConflict: "conversation_id,label_id" });
 
-    if (error) return apiError(error.message, 500);
+    if (error) return apiError("فشل في ربط التصنيف", 500);
 
     await supabase.from("inbox_events").insert({
       conversation_id,
@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess(null);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Labels POST error:", err);
+    return apiError("فشل في ربط التصنيف", 500);
   }
 }
 
@@ -71,10 +72,11 @@ export async function PUT(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error) return apiError(error.message, 500);
+    if (error) return apiError("فشل في إنشاء التصنيف", 500);
     return apiSuccess({ label: data });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Labels PUT error:", err);
+    return apiError("فشل في إنشاء التصنيف", 500);
   }
 }
 
@@ -108,6 +110,7 @@ export async function DELETE(req: NextRequest) {
 
     return apiSuccess(null);
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Labels DELETE error:", err);
+    return apiError("فشل في إزالة التصنيف", 500);
   }
 }

@@ -15,13 +15,15 @@ export async function getOrCreateConversation(
 ): Promise<string> {
   const s = db();
 
-  // Look for active conversation
+  // Look for active conversation (within 24h)
+  const ttlCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: existing } = await s
     .from("bot_conversations")
     .select("id")
     .eq("visitor_id", visitorId)
     .eq("channel", channel)
     .eq("status", "active")
+    .gte("updated_at", ttlCutoff)
     .order("created_at", { ascending: false })
     .limit(1)
     .single();

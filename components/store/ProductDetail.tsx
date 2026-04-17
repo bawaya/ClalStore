@@ -208,7 +208,7 @@ export function ProductDetailClient({
                 <span className="text-[#a78bfa] font-bold">
                   ₪{(activeVariant?.monthly_price ?? Math.ceil(displayPrice / 36)).toLocaleString()} × 36
                 </span>
-                <span className="text-muted mr-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t("store2.monthlyInstallment")}</span>
+                <span className="text-muted me-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t("store2.monthlyInstallment")}</span>
               </div>
             )}
 
@@ -233,8 +233,11 @@ export function ProductDetailClient({
                 <div className="flex gap-1.5">
                   {colors.map((c, i) => (
                     <button
-                      key={c.hex}
+                      key={`${c.hex}-${i}`}
+                      type="button"
                       onClick={() => handleColorSelect(i)}
+                      aria-pressed={selColor === i}
+                      aria-label={`${t("detail.color")}: ${getColorName(c, lang)}`}
                       className="rounded-full cursor-pointer transition-all"
                       style={{
                         width: scr.mobile ? 28 : 36,
@@ -255,8 +258,11 @@ export function ProductDetailClient({
                 <div className="flex gap-1">
                   {storage.map((s, i) => (
                     <button
-                      key={s}
+                      key={`${s}-${i}`}
+                      type="button"
                       onClick={() => setSelStorage(i)}
+                      aria-pressed={selStorage === i}
+                      aria-label={`${t("detail.storage")}: ${s}`}
                       className={`chip ${selStorage === i ? "chip-active" : ""}`}
                     >
                       {s}

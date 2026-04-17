@@ -9,22 +9,29 @@ import { notifyAdmin, notifyTeam } from "./admin-notify";
 import { buildOrderNotification, buildStatusNotification } from "./engine";
 
 /** Send text to customer — fall back to template if 24h window expired */
-async function sendToCustomer(phone: string, text: string, templateName?: string, templateParams?: string[]): Promise<boolean> {
+async function sendToCustomer(
+  phone: string,
+  text: string,
+  templateName?: string,
+  templateParams?: string[]
+): Promise<{ success: boolean; error?: string }> {
   try {
     await sendWhatsAppText(phone, text);
-    return true;
+    return { success: true };
   } catch {
     // 24h window expired — try template
     if (templateName && templateParams) {
       try {
         await sendWhatsAppTemplate(phone, templateName, templateParams);
-        return true;
-      } catch {
+        return { success: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
         console.error(`[Notification] Template ${templateName} also failed for ${phone}`);
+        return { success: false, error: msg };
       }
     }
+    return { success: false, error: "Text send failed and no template fallback" };
   }
-  return false;
 }
 
 // ===== New Order: Notify Team =====
@@ -34,7 +41,7 @@ export async function notifyNewOrder(
   customerPhone: string,
   total: number,
   source: string
-): Promise<{ sent: boolean }> {
+) {
   try {
     // 1. Notify admin + team (from report phone)
     const teamMsg = buildOrderNotification(orderId, customerName, total, source);
@@ -43,31 +50,39 @@ export async function notifyNewOrder(
 
     // 2. Confirm to customer (with template fallback)
     const custMsg = `✅ *تم استلام طلبك!*\n\n📦 رقم الطلب: ${orderId}\n💰 المبلغ: ₪${total.toLocaleString()}\n\nالفريق سيتواصل معك قريباً.\nللاستفسار أرسل رقم طلبك في أي وقت.`;
-    const custSent = await sendToCustomer(customerPhone, custMsg, "clal_order_confirmation", [orderId, `₪${total.toLocaleString()}`]);
-    return { sent: custSent };
+    await sendToCustomer(customerPhone, custMsg, "clal_order_confirmation", [orderId, `₪${total.toLocaleString()}`]);
   } catch (err) {
     console.error("Notification error (new order):", err);
-    return { sent: false };
+    // Don't throw — notification failure shouldn't block order
   }
 }
 
 // ===== Order Status Change: Notify Customer =====
+const STATUS_AR: Record<string, string> = {
+  approved: "تمت الموافقة ✅",
+  processing: "قيد المعالجة ⚙️",
+  shipped: "تم الشحن 🚚",
+  delivered: "تم التوصيل 📦",
+  cancelled: "تم الإلغاء ❌",
+  rejected: "تم الرفض ⛔",
+  returned: "تم الإرجاع 🔄",
+};
+
 export async function notifyStatusChange(
   orderId: string,
   customerPhone: string,
   newStatus: string
-): Promise<{ sent: boolean }> {
-  // Only notify on meaningful status changes
-  const notifyStatuses = ["approved", "processing", "shipped", "delivered", "cancelled", "returned", "rejected"];
-  if (!notifyStatuses.includes(newStatus)) return { sent: false };
+) {
+  // Only notify on meaningful status changes (skip no_reply / new)
+  const notifyStatuses = ["approved", "processing", "shipped", "delivered", "cancelled", "rejected", "returned"];
+  if (!notifyStatuses.includes(newStatus)) return;
 
   try {
+    const statusLabel = STATUS_AR[newStatus] || newStatus;
     const msg = buildStatusNotification(orderId, newStatus);
-    const sent = await sendToCustomer(customerPhone, msg, "clal_order_status", [orderId, newStatus]);
-    return { sent };
+    await sendToCustomer(customerPhone, msg, "clal_order_status", [orderId, statusLabel]);
   } catch (err) {
     console.error("Notification error (status):", err);
-    return { sent: false };
   }
 }
 
@@ -76,7 +91,7 @@ export async function sendNoReplyReminder(
   orderId: string,
   customerPhone: string,
   attempt: number
-): Promise<{ sent: boolean }> {
+) {
   try {
     const msgs = [
       `📞 *${orderId}*\n\nحاولنا نتواصل معك بخصوص طلبك.\nالرجاء الرد هنا أو عبر فورم التواصل: clalmobile.com/contact 🙏`,
@@ -85,10 +100,8 @@ export async function sendNoReplyReminder(
     ];
 
     const msg = msgs[Math.min(attempt - 1, 2)];
-    const sent = await sendToCustomer(customerPhone, msg, "clal_reminder", [orderId]);
-    return { sent };
+    await sendToCustomer(customerPhone, msg, "clal_reminder", [orderId]);
   } catch (err) {
     console.error("Notification error (no reply):", err);
-    return { sent: false };
   }
 }

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { abandonedCartSchema, validateBody } from "@/lib/admin/validators";
 
 // POST — Save/update abandoned cart
 export async function POST(req: NextRequest) {
@@ -14,12 +15,12 @@ export async function POST(req: NextRequest) {
     const { data: setting } = await db.from("settings").select("value").eq("key", "feature_abandoned_cart").single();
     if (setting?.value !== "true") return apiSuccess(null);
 
-    const body = await req.json();
-    const { visitor_id, customer_phone, customer_name, items, total } = body;
-
-    if (!visitor_id || !items || items.length === 0) {
+    const raw = await req.json();
+    const validation = validateBody(raw, abandonedCartSchema);
+    if (validation.error) {
       return apiSuccess(null);
     }
+    const { visitor_id, customer_phone, customer_name, items, total } = validation.data!;
 
     // Upsert: check existing cart for this visitor
     const { data: existing } = await db.from("abandoned_carts")

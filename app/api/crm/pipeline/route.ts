@@ -1,41 +1,64 @@
+import { NextRequest } from "next/server";
+import { withPermission } from "@/lib/admin/auth";
+import { apiError, apiSuccess } from "@/lib/api-response";
+import { pipelineDealSchema, pipelineDealUpdateSchema, validateBody } from "@/lib/admin/validators";
+import {
+  createPipelineDealRecord,
+  deletePipelineDealRecord,
+  getPipelineSnapshot,
+  updatePipelineDealRecord,
+} from "@/lib/crm/pipeline";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { NextRequest, NextResponse } from "next/server";
-import { getPipelineDeals, createDeal, updateDeal, deleteDeal } from "@/lib/crm/queries";
-import { requireAdmin } from "@/lib/admin/auth";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+export const GET = withPermission(
+  "crm",
+  "view",
+  async (_req: NextRequest, db: SupabaseClient) => {
+    const data = await getPipelineSnapshot(db);
+    return apiSuccess(data);
+  },
+);
 
-export async function GET(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
-    return apiSuccess(await getPipelineDeals());
-  }
-  catch (err: unknown) { return apiError(errMsg(err), 500); }
-}
+export const POST = withPermission(
+  "crm",
+  "create",
+  async (req: NextRequest, db: SupabaseClient, user) => {
+    const body = await req.json();
+    const validation = validateBody(body, pipelineDealSchema);
+    if (validation.error) {
+      return apiError(validation.error, 400);
+    }
 
-export async function POST(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
-    return apiSuccess(await createDeal(await req.json()));
-  }
-  catch (err: unknown) { return apiError(errMsg(err), 500); }
-}
+    const deal = await createPipelineDealRecord(db, user, validation.data!);
+    return apiSuccess(deal, undefined, 201);
+  },
+);
 
-export async function PUT(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
-    const { id, ...u } = await req.json(); await updateDeal(id, u); return apiSuccess({ ok: true });
-  }
-  catch (err: unknown) { return apiError(errMsg(err), 500); }
-}
+export const PUT = withPermission(
+  "crm",
+  "edit",
+  async (req: NextRequest, db: SupabaseClient, user) => {
+    const body = await req.json();
+    const validation = validateBody(body, pipelineDealUpdateSchema);
+    if (validation.error) {
+      return apiError(validation.error, 400);
+    }
 
-export async function DELETE(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (auth instanceof NextResponse) return auth;
-    const id = new URL(req.url).searchParams.get("id"); if (!id) return apiError("Missing id", 400); await deleteDeal(id); return apiSuccess({ ok: true });
-  }
-  catch (err: unknown) { return apiError(errMsg(err), 500); }
-}
+    const deal = await updatePipelineDealRecord(db, user, validation.data!);
+    return apiSuccess(deal);
+  },
+);
+
+export const DELETE = withPermission(
+  "crm",
+  "delete",
+  async (req: NextRequest, db: SupabaseClient, user) => {
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) {
+      return apiError("Missing id", 400);
+    }
+
+    await deletePipelineDealRecord(db, user, id);
+    return apiSuccess({ ok: true });
+  },
+);

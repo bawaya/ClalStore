@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useScreen } from "@/lib/hooks";
 import { StoreHeader } from "@/components/store/StoreHeader";
 
@@ -11,6 +11,14 @@ function FailedContent() {
   const params = useSearchParams();
   const orderId = params.get("order") || "";
   const errorCode = params.get("error_code") || "";
+
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("clal_pending_order");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   return (
     <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">

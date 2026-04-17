@@ -48,7 +48,7 @@ export function ConversationItem({ conversation, isSelected, onClick }: Props) {
       className="w-full text-right px-3 py-2.5 transition-all hover:bg-surface-elevated border-b border-surface-border"
       style={{
         background: isSelected ? "rgba(196,16,64,0.08)" : undefined,
-        borderRight: isSelected ? "3px solid #c41040" : "3px solid transparent",
+        borderInlineStart: isSelected ? "3px solid #c41040" : "3px solid transparent",
       }}
     >
       <div className="flex items-start justify-between gap-2">

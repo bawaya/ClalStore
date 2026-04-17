@@ -58,7 +58,9 @@ export async function callGemini(req: ClaudeRequest): Promise<ClaudeResponse | n
       output: data.usageMetadata?.candidatesTokenCount || 0,
     };
 
-    console.log(`[AI] Gemini: ${tokens.input}+${tokens.output} tokens, ${duration}ms`);
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[AI] Gemini: ${tokens.input}+${tokens.output} tokens, ${duration}ms`);
+    }
 
     let json: Record<string, unknown> | undefined;
     if (req.jsonMode && text) {

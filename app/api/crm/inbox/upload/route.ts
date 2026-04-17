@@ -55,6 +55,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("Inbox upload error:", err);
-    return apiError(errMsg(err, "Unknown error"), 500);
+    return apiError("فشل في رفع الملف", 500);
   }
 }

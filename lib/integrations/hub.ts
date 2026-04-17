@@ -145,7 +145,7 @@ const providers: Record<ProviderType, any> = {
 let initialized = false;
 let initPromise: Promise<void> | null = null;
 
-export function registerProvider(type: ProviderType, provider: any) {
+export function registerProvider(type: ProviderType, provider: unknown) {
   providers[type] = provider;
 }
 

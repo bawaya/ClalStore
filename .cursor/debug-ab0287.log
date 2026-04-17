@@ -1,6 +1,0 @@
-{"sessionId":"ab0287","location":"queries.ts:getWebsiteContent","message":"supabase client created","data":{"hasClient":true},"timestamp":1773207397795,"hypothesisId":"H4"}
-{"sessionId":"ab0287","location":"queries.ts:getWebsiteContent","message":"DB query result","data":{"rowCount":0,"error":null,"sections":[]},"timestamp":1773207397867,"hypothesisId":"H1"}
-{"sessionId":"ab0287","location":"page.tsx:HomePage","message":"Homepage render with CMS","data":{"cmsSections":[],"hasCms":false,"heroTitle":"EMPTY","productCount":16,"planCount":4},"timestamp":1773207397870,"hypothesisId":"H1,H3"}
-{"sessionId":"ab0287","location":"page.tsx:HomePage","message":"Homepage render with CMS","data":{"cmsSections":[],"hasCms":false,"heroTitle":"EMPTY","productCount":16,"planCount":4},"timestamp":1773207471765,"hypothesisId":"H1,H3"}
-{"sessionId":"ab0287","location":"page.tsx:HomePage","message":"Homepage render with CMS","data":{"cmsSections":[],"hasCms":false,"heroTitle":"EMPTY","productCount":16,"planCount":4},"timestamp":1773207477441,"hypothesisId":"H1,H3"}
-{"sessionId":"ab0287","location":"page.tsx:HomePage","message":"Homepage render with CMS","data":{"cmsSections":[],"hasCms":false,"heroTitle":"EMPTY","productCount":16,"planCount":4},"timestamp":1773207482250,"hypothesisId":"H1,H3"}

@@ -292,6 +292,6 @@ ${reviewRequests}`;
     });
   } catch (err: unknown) {
     console.error("[Review Generator Error]", err);
-    return apiError(errMsg(err, "Generation failed"));
+    return apiError("فشل في توليد التقييمات", 500);
   }
 }

@@ -4,11 +4,11 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useRef } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { useAdminSettings } from "@/lib/admin/hooks";
 import { FormField, Toggle } from "@/components/admin/shared";
 import { INTEGRATION_TYPES } from "@/lib/constants";
 import { invalidateLogoCache } from "@/components/shared/Logo";
-import { csrfHeaders } from "@/lib/csrf-client";
 
 // ===== Provider Config Fields =====
 const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string; placeholder: string }[]> = {
@@ -56,13 +56,6 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
     { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
     { key: "admin_phone", label: "📱 رقم الأدمن", type: "text", placeholder: "05X-XXXXXXX — يستقبل إشعارات الطلبات" },
     { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },
-    { key: "completed_orders_email", label: "📧 إيميل الطلبات الجاهزة", type: "email", placeholder: "bawaya@icloud.com" },
-  ],
-  "Google Gemini": [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "AIzaSy..." },
-  ],
-  "Anthropic Claude": [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "sk-ant-..." },
   ],
   "Meta API": [
     { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
@@ -168,7 +161,7 @@ function IntegrationCard({
       }
       const res = await fetch("/api/admin/integrations/test", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...csrfHeaders() },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ type, config: configToTest }),
       });
       const data = await res.json();

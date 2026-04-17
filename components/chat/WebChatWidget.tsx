@@ -157,6 +157,7 @@ export function WebChatWidget() {
     return (
       <button
         onClick={() => setOpen(true)}
+        aria-label="فتح المحادثة"
         className="fixed z-[9999] rounded-full shadow-2xl flex items-center justify-center cursor-pointer border-0 transition-transform hover:scale-110"
         style={{
           bottom: scr.mobile ? 20 : 24,
@@ -205,6 +206,7 @@ export function WebChatWidget() {
         <button
           onClick={() => setOpen(false)}
           className="w-8 h-8 rounded-full bg-white/10 border-0 text-white cursor-pointer flex items-center justify-center text-sm"
+          aria-label="إغلاق المحادثة"
         >
           ✕
         </button>
@@ -248,9 +250,9 @@ export function WebChatWidget() {
             {/* Quick Replies */}
             {m.quickReplies && m.quickReplies.length > 0 && (
               <div className="flex gap-1 mt-1.5 flex-wrap justify-end">
-                {m.quickReplies.map((qr) => (
+                {m.quickReplies.map((qr, i) => (
                   <button
-                    key={qr}
+                    key={i}
                     onClick={() => send(qr)}
                     disabled={loading || escalated}
                     className="px-2.5 py-1.5 rounded-full border border-brand/40 text-brand text-[10px] font-bold cursor-pointer bg-brand/5 hover:bg-brand/15 transition-colors disabled:opacity-30"

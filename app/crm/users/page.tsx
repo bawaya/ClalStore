@@ -346,6 +346,7 @@ export default function UsersPage() {
                         onClick={() => handleDeleteUser(u)}
                         className="text-[9px] px-1.5 py-0.5 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
                         title="حذف المستخدم"
+                        aria-label="حذف المستخدم"
                       >
                         ✕
                       </button>

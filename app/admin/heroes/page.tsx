@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 export const dynamic = 'force-dynamic';
 
 import { useState } from "react";
@@ -58,7 +60,7 @@ export default function HeroesPage() {
               </div>
               {h.image_url && (
                 <div className="w-12 h-8 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 ml-2">
-                  <img src={h.image_url} alt="" className="w-full h-full object-cover" />
+                  <Image src={h.image_url} alt="" width={48} height={32} className="w-full h-full object-cover" />
                 </div>
               )}
             </div>

@@ -106,6 +106,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("AI usage API error:", err);
-    return apiError(errMsg(err), 500);
+    return apiError("فشل في جلب بيانات AI", 500);
   }
 }

@@ -25,13 +25,12 @@ export default function GlobalError({
             >
               {isHe ? "🔄 נסה שוב" : "🔄 حاول مرة ثانية"}
             </button>
-            <a
-              href="/"
-              className="px-6 py-3 rounded-xl font-bold text-[#a1a1aa] border border-[#27272a]"
-              style={{ textDecoration: "none" }}
+            <button
+              onClick={() => window.location.href = '/'}
+              className="px-6 py-3 rounded-xl font-bold text-[#a1a1aa] border border-[#27272a] bg-transparent cursor-pointer"
             >
               {isHe ? "🏠 דף הבית" : "🏠 الرئيسية"}
-            </a>
+            </button>
           </div>
           {error.digest && (
             <p className="text-[#52525b] text-[10px] mt-4">Error ID: {error.digest}</p>

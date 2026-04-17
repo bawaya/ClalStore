@@ -143,7 +143,7 @@ async function sendPushNotification(
 
   const enc = new TextEncoder();
 
-  // HKDF helper (RFC 5869: extract = HMAC-SHA256(salt, ikm), expand = HMAC-SHA256(prk, info||0x01))
+  // HKDF helper — RFC 5869: Extract uses salt as HMAC key, IKM as message
   async function hkdfSha256(ikm: Uint8Array, salt: Uint8Array, info: Uint8Array, length: number) {
     const saltKey = salt.length
       ? await crypto.subtle.importKey("raw", salt.buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
@@ -174,14 +174,11 @@ async function sendPushNotification(
   const authInfo = enc.encode("Content-Encoding: auth\0");
   const prk = await hkdfSha256(sharedBits, clientAuth, authInfo, 32);
 
-  // Generate salt once — used in both HKDF derivation and Encryption header
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-
   const keyInfo = buildInfo("aesgcm", clientPublicKey, ephemeralPubRaw);
   const nonceInfo = buildInfo("nonce", clientPublicKey, ephemeralPubRaw);
 
-  const contentKey = await hkdfSha256(prk, salt, keyInfo, 16);
-  const nonce = await hkdfSha256(prk, salt, nonceInfo, 12);
+  const contentKey = await hkdfSha256(prk, new Uint8Array(0), keyInfo, 16);
+  const nonce = await hkdfSha256(prk, new Uint8Array(0), nonceInfo, 12);
 
   // Add padding (2 bytes of padding length = 0)
   const payloadBytes = enc.encode(payloadStr);
@@ -202,7 +199,7 @@ async function sendPushNotification(
       Authorization: authorization,
       "Content-Encoding": "aesgcm",
       "Crypto-Key": `dh=${uint8ToUrlBase64(ephemeralPubRaw)}`,
-      Encryption: `salt=${uint8ToUrlBase64(salt)}`,
+      Encryption: `salt=${uint8ToUrlBase64(crypto.getRandomValues(new Uint8Array(16)))}`,
       "Content-Type": "application/octet-stream",
       TTL: "86400",
     },
@@ -218,8 +215,8 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    const supabase = createAdminSupabase();
-    if (!supabase) return apiError("DB unavailable", 500);
+    const db = createAdminSupabase();
+    if (!db) return apiError("DB unavailable", 500);
 
     const body = await req.json();
     const { title, body: notifBody, url, icon } = body;
@@ -237,7 +234,7 @@ export async function POST(req: NextRequest) {
     const vapidSubject = process.env.VAPID_SUBJECT || "mailto:info@clalmobile.com";
 
     // Get all active subscriptions
-    const { data: subs } = await supabase.from("push_subscriptions")
+    const { data: subs } = await db.from("push_subscriptions")
       .select("*")
       .eq("active", true);
 
@@ -278,13 +275,13 @@ export async function POST(req: NextRequest) {
 
     // Deactivate stale subscriptions
     if (staleIds.length > 0) {
-      await supabase.from("push_subscriptions")
+      await db.from("push_subscriptions")
         .update({ active: false })
         .in("id", staleIds);
     }
 
     // Save notification record
-    const { data: notif, error } = await supabase.from("push_notifications").insert({
+    const { data: notif, error } = await db.from("push_notifications").insert({
       title,
       body: notifBody,
       url: url || "https://clalmobile.com",
@@ -302,7 +299,8 @@ export async function POST(req: NextRequest) {
       message: `تم إرسال الإشعار إلى ${sent} مشترك`,
     });
   } catch (err: unknown) {
-    return apiError(errMsg(err), 500);
+    console.error("Push send error:", err);
+    return apiError("فشل في إرسال الإشعار", 500);
   }
 }
 
@@ -312,10 +310,10 @@ export async function GET(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    const supabase = createAdminSupabase();
-    if (!supabase) return apiSuccess({ notifications: [] });
+    const db = createAdminSupabase();
+    if (!db) return apiSuccess({ notifications: [] });
 
-    const { data } = await supabase.from("push_notifications")
+    const { data } = await db.from("push_notifications")
       .select("*")
       .order("sent_at", { ascending: false })
       .limit(50);

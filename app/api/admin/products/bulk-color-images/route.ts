@@ -228,6 +228,7 @@ export async function POST(req: NextRequest) {
       summary: { total: results.length, succeeded, failed },
     });
   } catch (err: unknown) {
-    return apiError(errMsg(err, "فشل في الجلب"), 500);
+    console.error("Bulk color images error:", err);
+    return apiError("فشل في الجلب", 500);
   }
 }

@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { ToastContainer } from "@/components/admin/shared";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -78,7 +78,7 @@ export default function BotAdminPage() {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null);
 
-  const sb = createBrowserSupabase();
+  const sb = useMemo(() => createBrowserSupabase(), []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -310,6 +310,7 @@ export default function BotAdminPage() {
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, content_ar: e.target.value })}
                       className="w-full bg-surface-elevated border border-surface-border rounded-xl p-2 text-white text-xs min-h-[80px] outline-none"
                       dir="rtl"
+                      placeholder="محتوى القالب بالعربية"
                     />
                   </div>
                   <div>
@@ -319,6 +320,7 @@ export default function BotAdminPage() {
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, content_he: e.target.value })}
                       className="w-full bg-surface-elevated border border-surface-border rounded-xl p-2 text-white text-xs min-h-[80px] outline-none"
                       dir="rtl"
+                      placeholder="תוכן התבנית בעברית"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -377,6 +379,7 @@ export default function BotAdminPage() {
                         value={editingPolicy.title_ar}
                         onChange={(e) => setEditingPolicy({ ...editingPolicy, title_ar: e.target.value })}
                         className="w-full bg-surface-elevated border border-surface-border rounded-xl p-2 text-white text-xs outline-none"
+                        placeholder="العنوان بالعربية"
                       />
                     </div>
                     <div>
@@ -385,6 +388,7 @@ export default function BotAdminPage() {
                         value={editingPolicy.title_he}
                         onChange={(e) => setEditingPolicy({ ...editingPolicy, title_he: e.target.value })}
                         className="w-full bg-surface-elevated border border-surface-border rounded-xl p-2 text-white text-xs outline-none"
+                        placeholder="הכותרת בעברית"
                       />
                     </div>
                   </div>
@@ -395,6 +399,7 @@ export default function BotAdminPage() {
                       onChange={(e) => setEditingPolicy({ ...editingPolicy, content_ar: e.target.value })}
                       className="w-full bg-surface-elevated border border-surface-border rounded-xl p-2 text-white text-xs min-h-[100px] outline-none"
                       dir="rtl"
+                      placeholder="محتوى السياسة بالعربية"
                     />
                   </div>
                   <div>
@@ -404,6 +409,7 @@ export default function BotAdminPage() {
                       onChange={(e) => setEditingPolicy({ ...editingPolicy, content_he: e.target.value })}
                       className="w-full bg-surface-elevated border border-surface-border rounded-xl p-2 text-white text-xs min-h-[100px] outline-none"
                       dir="rtl"
+                      placeholder="תוכן המדיניות בעברית"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -510,15 +516,15 @@ function BotBarChart({ data, valueKey, color }: {
   const max = Math.max(...data.map((d) => d[valueKey] || 0), 1);
   return (
     <div>
-      <div className="flex items-end gap-[2px]" style={{ height: 80 }}>
+      <div className="flex items-end gap-[2px] h-20">
         {data.map((d, i) => {
           const val = d[valueKey] || 0;
           const h = Math.max((val / max) * 100, 2);
           return (
             <div
               key={i}
-              className="flex-1 rounded-t-sm hover:opacity-80"
-              style={{ height: `${h}%`, background: color, minWidth: 3 }}
+              className="flex-1 rounded-t-sm hover:opacity-80 min-w-[3px]"
+              style={{ height: `${h}%`, background: color }}
               title={`${new Date(d.date).toLocaleDateString("ar-EG")}: ${val}`}
             />
           );

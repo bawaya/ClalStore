@@ -79,9 +79,10 @@ const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
 function getDateRange(key: RangeKey): { dateFrom?: string; dateTo?: string } {
   if (key === "all") return {};
   const now = new Date();
-  const to = now.toISOString().slice(0, 10);
+  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" });
+  const to = fmt.format(now);
   const days = key === "7d" ? 7 : key === "30d" ? 30 : 90;
-  const from = new Date(now.getTime() - days * 86400000).toISOString().slice(0, 10);
+  const from = fmt.format(new Date(now.getTime() - days * 86400000));
   return { dateFrom: from, dateTo: to };
 }
 

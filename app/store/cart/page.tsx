@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/validators";
 import { BANKS } from "@/lib/constants";
 import { CITY_SEARCH_MIN_LENGTH, searchCities, type City } from "@/lib/cities";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface CustomerInfo {
   name: string; phone: string; email: string;
@@ -30,6 +31,8 @@ interface OrderResult {
   city: string; address: string; customer: string; phone: string;
   notes: string; hasDevice: boolean; date: string;
   installments: number; monthlyAmount: number; bankName: string;
+  customerCode?: string;
+  isNewCustomer?: boolean;
 }
 
 const lbl = "block text-muted text-[10px] desktop:text-xs font-semibold mb-1";
@@ -42,10 +45,10 @@ interface ChoiceOption {
   searchText?: string;
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ label, error, children, htmlFor }: { label: string; error?: string; children: React.ReactNode; htmlFor?: string }) {
   return (
     <div className="mb-2.5">
-      <label className={lbl}>{label}</label>
+      <label className={lbl} htmlFor={htmlFor}>{label}</label>
       {children}
       {error && <div className={errS}>⚠️ {error}</div>}
     </div>
@@ -242,6 +245,8 @@ export default function CartPage() {
   const [order, setOrder] = useState<OrderResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [couponInput, setCouponInput] = useState("");
+  const [prefillLoading, setPrefillLoading] = useState(false);
+  const [accountCustomerCode, setAccountCustomerCode] = useState("");
   const bankOptions: ChoiceOption[] = BANKS.map((bank) => ({
     value: bank.id,
     label: bank.name_ar,
@@ -256,6 +261,72 @@ export default function CartPage() {
 
   // Styles
   const inp = "input";
+
+  const prefillFromSavedAccount = useCallback(async (showToast = true) => {
+    const token = localStorage.getItem("clal_customer_token");
+    if (!token) {
+      sessionStorage.setItem("clal_prefill_cart_after_auth", "1");
+      router.push("/store/auth?return=/store/cart");
+      return;
+    }
+
+    const hasManualInput = Boolean(
+      info.name.trim() ||
+      info.phone.trim() ||
+      info.email.trim() ||
+      info.city.trim() ||
+      info.address.trim() ||
+      info.idNumber.trim()
+    );
+
+    if (hasManualInput && showToast) {
+      const confirmed = window.confirm("سيتم استبدال البيانات الحالية ببيانات حسابك المحفوظة. هل تريد المتابعة؟");
+      if (!confirmed) return;
+    }
+
+    setPrefillLoading(true);
+    try {
+      const res = await fetch("/api/customer/profile", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const json = await res.json();
+      const data = json.data ?? json;
+
+      if (!json.success || !data.customer) {
+        throw new Error(json.error || data.error || "تعذر جلب بيانات الحساب");
+      }
+
+      const customer = data.customer;
+      localStorage.setItem("clal_customer", JSON.stringify(customer));
+      setAccountCustomerCode(customer.customer_code || "");
+      setInfo((prev) => ({
+        ...prev,
+        name: customer.name || "",
+        phone: customer.phone || prev.phone,
+        email: customer.email || "",
+        city: customer.city || "",
+        address: customer.address || "",
+      }));
+
+      if (showToast) {
+        show(`✅ تم استرجاع بياناتك${customer.customer_code ? ` — الكود: ${customer.customer_code}` : ""}`, "success");
+      }
+    } catch (err) {
+      show(`❌ ${err instanceof Error ? err.message : "تعذر استرجاع البيانات"}`, "error");
+    } finally {
+      setPrefillLoading(false);
+    }
+  }, [info.address, info.city, info.email, info.idNumber, info.name, info.phone, router, show]);
+
+  useEffect(() => {
+    const shouldPrefill = sessionStorage.getItem("clal_prefill_cart_after_auth") === "1";
+    if (!shouldPrefill) return;
+
+    sessionStorage.removeItem("clal_prefill_cart_after_auth");
+    void prefillFromSavedAccount(false);
+  }, [prefillFromSavedAccount]);
 
   // === Coupon ===
   const handleCoupon = async () => {
@@ -353,7 +424,7 @@ export default function CartPage() {
 
         const payRes = await fetch("/api/payment", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders(),
           body: JSON.stringify({
             orderId: data.orderId,
             amount: data.total,
@@ -376,9 +447,12 @@ export default function CartPage() {
         const payData = payJson.data ?? payJson;
 
         if (payJson.success && payData.paymentUrl) {
-          // Clear cart before redirect
-          cart.clearCart();
-          // Redirect to Rivhit's hosted payment page
+          try {
+            sessionStorage.setItem("clal_pending_order", String(data.orderId));
+          } catch {
+            /* ignore */
+          }
+          // Redirect to hosted payment — cart is cleared on /store/checkout/success only
           window.location.href = payData.paymentUrl;
           return;
         } else {
@@ -403,6 +477,8 @@ export default function CartPage() {
         installments: pay.installments,
         monthlyAmount: pay.installments > 1 ? Math.ceil(total / pay.installments) : total,
         bankName: selectedBank?.name_ar || pay.bank,
+        customerCode: data.customerCode,
+        isNewCustomer: !!data.isNewCustomer,
       });
       setStep(3);
       cart.clearCart();
@@ -505,22 +581,46 @@ export default function CartPage() {
     <div>
       <h2 className="font-black text-right mb-3" style={{ fontSize: scr.mobile ? 16 : 20 }}>📝 معلوماتك</h2>
       <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
-        <div style={{ display: scr.mobile ? "block" : "flex", gap: 10 }}>
-          <div className="flex-1"><Field label="الاسم الكامل *" error={errors.name}><input className={inp} value={info.name} onChange={(e) => setInfo({ ...info, name: e.target.value })} placeholder="محمد أحمد" /></Field></div>
-          <div className="flex-1"><Field label="رقم الهاتف * (05XXXXXXXX)" error={errors.phone}><input className={inp} value={info.phone} onChange={(e) => setInfo({ ...info, phone: e.target.value.replace(/[^\d-]/g, "") })} placeholder="0541234567" dir="ltr" /></Field></div>
+        <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 mb-3 text-right">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => void prefillFromSavedAccount()}
+              disabled={prefillLoading}
+              className="btn-outline flex-shrink-0 disabled:opacity-50"
+              style={{ fontSize: scr.mobile ? 10 : 12, padding: scr.mobile ? "8px 12px" : "10px 14px" }}
+            >
+              {prefillLoading ? "⏳ جاري الاسترجاع..." : "🔐 أنا زبون سابق"}
+            </button>
+            <div>
+              <div className="font-bold text-white text-xs desktop:text-sm">استرجاع بياناتك بعد OTP</div>
+              <div className="text-muted mt-0.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                لن نعرض أي بيانات إلا بعد التحقق الأمني برسالة OTP.
+              </div>
+              {accountCustomerCode && (
+                <div className="text-brand mt-1 font-bold" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                  كودك: {accountCustomerCode}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        <Field label="📧 البريد الإلكتروني" error={errors.email}><input className={inp} type="email" value={info.email} onChange={(e) => setInfo({ ...info, email: e.target.value })} placeholder="email@example.com" dir="ltr" /></Field>
+        <div style={{ display: scr.mobile ? "block" : "flex", gap: 10 }}>
+          <div className="flex-1"><Field label="الاسم الكامل *" error={errors.name} htmlFor="checkout-name"><input id="checkout-name" className={inp} value={info.name} onChange={(e) => setInfo({ ...info, name: e.target.value })} placeholder="محمد أحمد" /></Field></div>
+          <div className="flex-1"><Field label="رقم الهاتف * (05XXXXXXXX)" error={errors.phone} htmlFor="checkout-phone"><input id="checkout-phone" className={inp} value={info.phone} onChange={(e) => setInfo({ ...info, phone: e.target.value.replace(/[^\d-]/g, "") })} placeholder="0541234567" dir="ltr" /></Field></div>
+        </div>
+        <Field label="📧 البريد الإلكتروني" error={errors.email} htmlFor="checkout-email"><input id="checkout-email" className={inp} type="email" value={info.email} onChange={(e) => setInfo({ ...info, email: e.target.value })} placeholder="email@example.com" dir="ltr" /></Field>
         <div style={{ display: scr.mobile ? "block" : "flex", gap: 10 }}>
           <div className="flex-1"><CityCombobox value={info.city} onChange={(v) => setInfo({ ...info, city: v })} error={errors.city} /></div>
-          <div className="flex-1"><Field label="📍 العنوان بالتفصيل *" error={errors.address}><input className={inp} value={info.address} onChange={(e) => setInfo({ ...info, address: e.target.value })} placeholder="شارع + رقم بيت" /></Field></div>
+          <div className="flex-1"><Field label="📍 العنوان بالتفصيل *" error={errors.address} htmlFor="checkout-address"><input id="checkout-address" className={inp} value={info.address} onChange={(e) => setInfo({ ...info, address: e.target.value })} placeholder="شارع + رقم بيت" /></Field></div>
         </div>
         {hasDevices && (
-          <Field label="🪪 رقم الهوية * (תעודת זהות — 9 أرقام)" error={errors.idNumber}>
-            <input className={inp} value={info.idNumber} onChange={(e) => setInfo({ ...info, idNumber: e.target.value.replace(/\D/g, "").slice(0, 9) })} placeholder="XXXXXXXXX" maxLength={9} dir="ltr" />
+          <Field label="🪪 رقم الهوية * (תעודת זהות — 9 أرقام)" error={errors.idNumber} htmlFor="checkout-id">
+            <input id="checkout-id" className={inp} value={info.idNumber} onChange={(e) => setInfo({ ...info, idNumber: e.target.value.replace(/\D/g, "").slice(0, 9) })} placeholder="XXXXXXXXX" maxLength={9} dir="ltr" />
           </Field>
         )}
-        <Field label="📝 ملاحظات (اختياري)">
-          <textarea className={`${inp} min-h-[60px] resize-y`} value={info.notes} onChange={(e) => setInfo({ ...info, notes: e.target.value })} placeholder="ملاحظات خاصة..." />
+        <Field label="📝 ملاحظات (اختياري)" htmlFor="checkout-notes">
+          <textarea id="checkout-notes" className={`${inp} min-h-[60px] resize-y`} value={info.notes} onChange={(e) => setInfo({ ...info, notes: e.target.value })} placeholder="ملاحظات خاصة..." />
         </Field>
         <button onClick={() => validateInfo() && setStep(2)} className="btn-primary w-full mt-1">المتابعة للدفع →</button>
       </div>
@@ -556,8 +656,8 @@ export default function CartPage() {
               options={bankOptions}
             />
             <div className="flex gap-2.5">
-              <div className="flex-1"><Field label="رقم الفرع (3) *" error={errors.branch}><input className={inp} value={pay.branch} onChange={(e) => setPay({ ...pay, branch: e.target.value.replace(/\D/g, "").slice(0, 3) })} maxLength={3} dir="ltr" /></Field></div>
-              <div className="flex-1"><Field label="رقم الحساب (4-9) *" error={errors.account}><input className={inp} value={pay.account} onChange={(e) => setPay({ ...pay, account: e.target.value.replace(/\D/g, "").slice(0, 9) })} maxLength={9} dir="ltr" /></Field></div>
+              <div className="flex-1"><Field label="رقم الفرع (3) *" error={errors.branch} htmlFor="checkout-branch"><input id="checkout-branch" className={inp} value={pay.branch} onChange={(e) => setPay({ ...pay, branch: e.target.value.replace(/\D/g, "").slice(0, 3) })} maxLength={3} dir="ltr" /></Field></div>
+              <div className="flex-1"><Field label="رقم الحساب (4-9) *" error={errors.account} htmlFor="checkout-account"><input id="checkout-account" className={inp} value={pay.account} onChange={(e) => setPay({ ...pay, account: e.target.value.replace(/\D/g, "").slice(0, 9) })} maxLength={9} dir="ltr" /></Field></div>
             </div>
             {/* Installments */}
             <ChoiceCombobox
@@ -604,7 +704,7 @@ export default function CartPage() {
         <button
           onClick={() => validatePay() && submitOrder()}
           disabled={loading}
-          className="btn-primary w-full mt-2 disabled:opacity-50"
+          className={`btn-primary w-full mt-2 disabled:opacity-50 ${loading ? "animate-pulse cursor-not-allowed" : ""}`}
           style={{ fontSize: scr.mobile ? 14 : 16, padding: "14px 20px" }}
         >
           {loading ? "⏳ جاري المعالجة..." : hasDevices
@@ -622,6 +722,13 @@ export default function CartPage() {
         <div className="text-5xl mb-2">✅</div>
         <div className="font-black text-state-success mb-1" style={{ fontSize: scr.mobile ? 20 : 28 }}>تم إرسال الطلب!</div>
         <div className="font-black text-brand mb-2" style={{ fontSize: scr.mobile ? 28 : 40 }}>{order?.id}</div>
+        {order?.customerCode && (
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/10 px-4 py-2 text-brand font-bold" style={{ fontSize: scr.mobile ? 11 : 13 }}>
+            <span>🎖️</span>
+            <span>{order.customerCode}</span>
+            {order.isNewCustomer && <span className="text-white/70">كودك الجديد</span>}
+          </div>
+        )}
         <div className="text-muted" style={{ fontSize: scr.mobile ? 11 : 14 }}>
           {order?.hasDevice
             ? "📋 طلبك قيد المراجعة — الفريق سيتواصل معك خلال يوم عمل"

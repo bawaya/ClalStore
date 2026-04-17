@@ -261,7 +261,7 @@ async function doSearch(searchName: string, manufacturer?: string): Promise<Mobi
     });
 
     if (!res.ok) {
-      console.log(`[MobileAPI] Search failed with status ${res.status}`);
+      console.warn(`[MobileAPI] Search failed with status ${res.status}`);
       return null;
     }
 
@@ -301,10 +301,10 @@ async function doSearch(searchName: string, manufacturer?: string): Promise<Mobi
       }
     }
 
-    console.log(`[MobileAPI] Best match "${best.name}" (${best.match_certainty}) not confident enough for "${searchName}"`);
+    console.warn(`[MobileAPI] Best match not confident enough for "${searchName}"`);
     return null;
   } catch (e) {
-    console.log("[MobileAPI] Search error:", e);
+    console.warn("[MobileAPI] Search error");
     return null;
   }
 }

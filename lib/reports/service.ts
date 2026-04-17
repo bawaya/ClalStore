@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { createAdminSupabase } from "@/lib/supabase";
+import { getPublicSiteUrl } from "@/lib/public-site-url";
 
 type OrderRow = {
   id: string;
@@ -40,8 +41,6 @@ export type WeeklyReportData = {
   sourceCounts: Record<string, number>;
   topProducts: { name: string; qty: number; revenue: number }[];
 };
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://clalmobile.com";
 
 function toCurrency(n: number): string {
   return `₪${Number(n || 0).toLocaleString()}`;
@@ -179,7 +178,7 @@ export function buildDailyReportHtml(data: DailyReportData): string {
   </div>
   <div class="card"><h2>🏆 أفضل المنتجات</h2><table><thead><tr><th>#</th><th>المنتج</th><th>الكمية</th><th>الإيراد</th></tr></thead><tbody>${topRows || "<tr><td colspan='4'>لا توجد بيانات</td></tr>"}</tbody></table></div>
   <div class="card"><h2>📦 آخر الطلبات</h2><table><thead><tr><th>رقم الطلب</th><th>المنتجات</th><th>المبلغ</th><th>الحالة</th><th>المصدر</th></tr></thead><tbody>${rows || "<tr><td colspan='5'>لا توجد طلبات</td></tr>"}</tbody></table></div>
-  <div class="card"><small>لوحة الإدارة: ${SITE_URL}/admin</small></div>
+  <div class="card"><small>لوحة الإدارة: ${getPublicSiteUrl()}/admin</small></div>
   </div></body></html>`;
 }
 

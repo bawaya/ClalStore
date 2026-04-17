@@ -44,11 +44,11 @@ export async function GET(req: NextRequest) {
 
   // === Fetch Data ===
   const [ordersRes, prevOrdersRes, customersRes, conversationsRes, handoffsRes] = await Promise.all([
-    supabase.from("orders").select("*, order_items(*)").gte("created_at", startISO).lte("created_at", endISO).order("created_at", { ascending: false }),
-    supabase.from("orders").select("id, total, status").gte("created_at", prevWeekStart.toISOString()).lte("created_at", prevWeekEnd.toISOString()),
-    supabase.from("customers").select("*").gte("created_at", startISO).lte("created_at", endISO),
-    supabase.from("bot_conversations").select("*").gte("created_at", startISO).lte("created_at", endISO),
-    supabase.from("bot_handoffs").select("*").gte("created_at", startISO).lte("created_at", endISO),
+    supabase.from("orders").select("*, order_items(*)").gte("created_at", startISO).lte("created_at", endISO).order("created_at", { ascending: false }).limit(5000),
+    supabase.from("orders").select("id, total, status").gte("created_at", prevWeekStart.toISOString()).lte("created_at", prevWeekEnd.toISOString()).limit(5000),
+    supabase.from("customers").select("*").gte("created_at", startISO).lte("created_at", endISO).limit(5000),
+    supabase.from("bot_conversations").select("*").gte("created_at", startISO).lte("created_at", endISO).limit(5000),
+    supabase.from("bot_handoffs").select("*").gte("created_at", startISO).lte("created_at", endISO).limit(5000),
   ]);
 
   const orders = ordersRes.data || [];

@@ -15,15 +15,19 @@ export async function GET(req: NextRequest) {
   const { data: sales } = await db
     .from("commission_sales")
     .select("*")
+    .is("deleted_at", null)
     .gte("sale_date", `${month}-01`)
     .lte("sale_date", `${month}-31`)
-    .order("sale_date", { ascending: true });
+    .order("sale_date", { ascending: true })
+    .limit(5000);
 
   const { data: sanctions } = await db
     .from("commission_sanctions")
     .select("*")
+    .is("deleted_at", null)
     .gte("sanction_date", `${month}-01`)
-    .lte("sanction_date", `${month}-31`);
+    .lte("sanction_date", `${month}-31`)
+    .limit(5000);
 
   // Build CSV
   const headers = ["תאריך", "סוג", "מקור", "לקוח/מכשיר", "סכום", "עמלה", "הערות"];
@@ -48,7 +52,13 @@ export async function GET(req: NextRequest) {
 
   // Add BOM for Hebrew support
   const bom = "\uFEFF";
-  const csv = bom + [headers, ...rows].map((row) => row.map((cell: string | number) => `"${cell}"`).join(",")).join("\n");
+  const csv = bom + [headers, ...rows]
+    .map((row) =>
+      row
+        .map((cell: string | number) => `"${String(cell ?? "").replace(/"/g, "\"\"")}"`)
+        .join(","),
+    )
+    .join("\n");
 
   return new NextResponse(csv, {
     headers: {

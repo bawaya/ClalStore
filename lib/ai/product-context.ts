@@ -40,7 +40,8 @@ async function loadProducts(): Promise<ProductEntry[]> {
       .select("id, type, brand, name_ar, price, old_price, stock, sold, colors, storage_options, specs, featured")
       .eq("active", true)
       .order("featured", { ascending: false })
-      .order("sold", { ascending: false });
+      .order("sold", { ascending: false })
+      .limit(500);
 
     if (error || !data) return [];
 

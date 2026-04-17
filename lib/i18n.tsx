@@ -66,10 +66,8 @@ export function LangProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => {
-      setLangState(detectLang());
-      setMounted(true);
-    }, 0);
+    setLangState(detectLang());
+    setMounted(true);
   }, []);
 
   const setLang = useCallback((l: Lang) => {

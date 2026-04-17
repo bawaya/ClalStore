@@ -34,14 +34,20 @@ export const GET = withAdminAuth(async (_req: NextRequest, db: SupabaseClient) =
     .eq("status", "active")
     .order("name");
 
-  if (usersErr) return apiError(usersErr.message, 500);
+  if (usersErr) {
+    console.error("Profiles GET users error:", usersErr);
+    return apiError("فشل في جلب الموظفين", 500);
+  }
 
   // Get all profiles
   const { data: profiles, error: profErr } = await db
     .from("employee_commission_profiles")
     .select("*");
 
-  if (profErr) return apiError(profErr.message, 500);
+  if (profErr) {
+    console.error("Profiles GET profiles error:", profErr);
+    return apiError("فشل في جلب الملفات", 500);
+  }
 
   const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
 
@@ -56,9 +62,9 @@ export const GET = withAdminAuth(async (_req: NextRequest, db: SupabaseClient) =
 // POST — upsert profile
 export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) => {
   const v = validateBody(await req.json(), profileSchema);
-  if (!v.success) return apiError(v.error, 400);
+  if (v.error) return apiError(v.error, 400);
 
-  const { user_id, ...profileData } = v.data;
+  const { user_id, ...profileData } = v.data!;
 
   // Verify user exists
   const { data: user } = await db
@@ -79,7 +85,10 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =
     .select()
     .single();
 
-  if (error) return apiError(error.message, 500);
+  if (error) {
+    console.error("Profiles POST error:", error);
+    return apiError("فشل في حفظ الملف", 500);
+  }
   return apiSuccess(data);
 });
 
@@ -94,6 +103,9 @@ export const DELETE = withAdminAuth(async (req: NextRequest, db: SupabaseClient)
     .delete()
     .eq("user_id", userId);
 
-  if (error) return apiError(error.message, 500);
+  if (error) {
+    console.error("Profiles DELETE error:", error);
+    return apiError("فشل في حذف الملف", 500);
+  }
   return apiSuccess({ deleted: true });
 });

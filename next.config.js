@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Image optimization (unoptimized for Cloudflare Workers)
+  // Image optimization (unoptimized for Cloudflare Pages)
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -13,9 +13,6 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   reactStrictMode: true,
-
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
 
   // Redirects
   async redirects() {

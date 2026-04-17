@@ -176,10 +176,11 @@ export async function POST(req: NextRequest) {
         else {
           // SMS failed → fallback to WhatsApp
           const otpCode = generateOTP();
-          await supabase.from("customer_otps").insert({
+          const { error: otpErr } = await supabase.from("customer_otps").insert({
             phone: cleanPhone, otp: await hashSHA256(otpCode),
             expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
           } as any);
+          if (otpErr) console.error("OTP insert error:", otpErr.message);
           if (await sendViaWhatsApp(cleanPhone, otpCode)) sentVia = "whatsapp";
         }
       } else {
@@ -189,20 +190,22 @@ export async function POST(req: NextRequest) {
         else {
           // Fallback: direct WhatsApp text message with generated OTP
           const otpCode = generateOTP();
-          await supabase.from("customer_otps").insert({
+          const { error: otpErr } = await supabase.from("customer_otps").insert({
             phone: cleanPhone, otp: await hashSHA256(otpCode),
             expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
           } as any);
+          if (otpErr) console.error("OTP insert error:", otpErr.message);
           if (await sendViaWhatsApp(cleanPhone, otpCode)) sentVia = "whatsapp";
         }
       }
 
       // Store VERIFY marker if Twilio Verify was used
       if (usedVerify) {
-        await supabase.from("customer_otps").insert({
+        const { error: verifyErr } = await supabase.from("customer_otps").insert({
           phone: cleanPhone, otp: "VERIFY",
           expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
         } as any);
+        if (verifyErr) console.error("Verify marker insert error:", verifyErr.message);
       }
 
       if (sentVia === "none") {
@@ -275,7 +278,7 @@ export async function POST(req: NextRequest) {
         .from("customers")
         .select("*")
         .eq("phone", cleanPhone)
-        .single();
+        .maybeSingle();
 
       let customer;
 
@@ -288,7 +291,7 @@ export async function POST(req: NextRequest) {
             last_login: new Date().toISOString(),
           })
           .eq("id", existingCustomer.id)
-          .select("id, name, phone, email, city, address")
+          .select("id, name, phone, email, city, address, customer_code")
           .single();
         customer = updated || existingCustomer;
       } else {
@@ -302,7 +305,7 @@ export async function POST(req: NextRequest) {
             auth_token_expires_at: tokenExpiresAt,
             last_login: new Date().toISOString(),
           } as any)
-          .select("id, name, phone, email, city, address")
+          .select("id, name, phone, email, city, address, customer_code")
           .single();
         customer = newCust;
       }
@@ -316,6 +319,7 @@ export async function POST(req: NextRequest) {
           email: (customer as any)?.email || "",
           city: (customer as any)?.city || "",
           address: (customer as any)?.address || "",
+          customer_code: (customer as any)?.customer_code || "",
         },
       });
     }

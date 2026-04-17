@@ -23,7 +23,13 @@ export async function GET(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
     const { searchParams } = new URL(req.url);
-    const filters = { status: searchParams.get("status") || undefined, assignedTo: searchParams.get("assignedTo") || undefined };
+    const rawLimit = parseInt(searchParams.get("limit") || "200", 10);
+    const limit = Number.isFinite(rawLimit) ? rawLimit : 200;
+    const filters = {
+      status: searchParams.get("status") || undefined,
+      assignedTo: searchParams.get("assignedTo") || undefined,
+      limit,
+    };
     const data = await getCRMTasks(filters);
     return apiSuccess(data);
   } catch (err: unknown) { return apiError("Failed to load tasks"); }

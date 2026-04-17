@@ -1,4 +1,3 @@
-
 // =====================================================
 // ClalMobile — Cron Reports Trigger
 // POST /api/cron/reports — sends daily/weekly report links via WhatsApp
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
     return apiSuccess({ type: "daily", sent: true });
   } catch (err: unknown) {
     console.error("Cron report error:", err);
-    return apiError(errMsg(err), 500);
+    return apiError("فشل في إرسال التقرير", 500);
   }
 }
 
@@ -54,6 +53,6 @@ export async function GET(req: NextRequest) {
     return apiSuccess({ type, sent: true });
   } catch (err: unknown) {
     console.error("Cron report error:", err);
-    return apiError(errMsg(err), 500);
+    return apiError("فشل في إرسال التقرير", 500);
   }
 }
