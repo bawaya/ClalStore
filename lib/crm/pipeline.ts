@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logAudit } from "@/lib/admin/auth";
 import { createManualOrder, type AdminActor, type ManualOrderPayload } from "@/lib/orders/admin";
+import { registerSaleCommission } from "@/lib/commissions/register";
 
 type PipelineStage = {
   id: number;
@@ -45,6 +46,128 @@ type PipelineDealPayload = {
   notes?: string;
   lost_reason?: string;
 };
+
+/**
+ * When a deal lands in a `is_won` stage for the first time, auto-create a
+ * sales_doc + commission row. Idempotent: re-entering won stage won't produce
+ * duplicates because both sales_docs.idempotency_key and
+ * commission_sales.source_pipeline_deal_id have partial unique indexes.
+ *
+ * Returns the created sales_doc id (or null if already processed).
+ */
+async function autoRegisterWonDealCommission(
+  db: SupabaseClient,
+  deal: PipelineDealRow,
+  actorInfo: { appUserId: string | null; name: string },
+): Promise<{ salesDocId: number | null; commissionId: number | null }> {
+  const employeeId = deal.employee_id || actorInfo.appUserId;
+  if (!employeeId) {
+    console.warn(`[pipeline] deal ${deal.id} has no employee_id — skipping commission`);
+    return { salesDocId: null, commissionId: null };
+  }
+
+  const saleAmount = Number(deal.estimated_value ?? deal.value ?? 0);
+  if (!(saleAmount > 0)) {
+    console.warn(`[pipeline] deal ${deal.id} has non-positive value — skipping commission`);
+    return { salesDocId: null, commissionId: null };
+  }
+
+  // Default to device; product name heuristic can flip it to line
+  const name = (deal.product_name || "").toLowerCase();
+  const saleType: "line" | "device" =
+    /חבילה|باقة|package|line|خط|קו /i.test(name) ? "line" : "device";
+
+  // Check if sales_doc already exists for this deal (via idempotency_key)
+  const idempotencyKey = `pipeline_${deal.id}`;
+  const { data: existingDoc } = await db
+    .from("sales_docs")
+    .select("id")
+    .eq("idempotency_key", idempotencyKey)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existingDoc?.id) {
+    return { salesDocId: existingDoc.id as number, commissionId: null };
+  }
+
+  const saleDate = new Date().toISOString().slice(0, 10);
+
+  // Create sales_doc linked back to this deal
+  const { data: newDoc, error: docErr } = await db
+    .from("sales_docs")
+    .insert({
+      employee_user_id: employeeId,
+      employee_key: employeeId,
+      customer_id: deal.customer_id ?? null,
+      order_id: deal.order_id ?? null,
+      sale_type: saleType,
+      status: "synced_to_commissions",
+      sale_date: saleDate,
+      total_amount: saleAmount,
+      currency: "ILS",
+      source: "pipeline",
+      created_by: actorInfo.name,
+      submitted_at: new Date().toISOString(),
+      verified_at: new Date().toISOString(),
+      synced_at: new Date().toISOString(),
+      idempotency_key: idempotencyKey,
+      notes: `Auto-created from pipeline deal: ${deal.customer_name || deal.id}`,
+    })
+    .select("id")
+    .single();
+
+  if (docErr || !newDoc) {
+    // If unique violation (idempotency), treat as already processed
+    if (docErr?.message?.includes("duplicate") || docErr?.code === "23505") {
+      return { salesDocId: null, commissionId: null };
+    }
+    throw new Error(`autoRegisterWonDealCommission sales_doc: ${docErr?.message}`);
+  }
+
+  // Register the commission (idempotent via source_pipeline_deal_id unique index)
+  try {
+    const result = await registerSaleCommission(db, {
+      saleType,
+      amount: saleAmount,
+      employeeId,
+      saleDate,
+      source: "pipeline",
+      sourceSalesDocId: newDoc.id as number,
+      sourcePipelineDealId: deal.id,
+      orderId: deal.order_id ?? null,
+      customerId: deal.customer_id ?? null,
+      customerName: deal.customer_name ?? null,
+      customerPhone: deal.customer_phone ?? null,
+      packagePrice: saleType === "line" ? saleAmount : undefined,
+      deviceName: saleType === "device" ? deal.product_name ?? null : null,
+      notes: `Pipeline deal ${deal.id}`,
+    });
+
+    // Log the auto-registration event
+    await db.from("sales_doc_events").insert({
+      sales_doc_id: newDoc.id,
+      event_type: "auto_created_from_pipeline",
+      actor_user_id: actorInfo.appUserId ?? "system",
+      payload: {
+        deal_id: deal.id,
+        commission_id: result.id,
+        commission_amount: result.employeeCommission,
+      },
+    });
+
+    return { salesDocId: newDoc.id as number, commissionId: result.id };
+  } catch (err) {
+    // If commission insert failed but doc was created, record the failure
+    // so the admin can inspect. Doc stays as synced_to_commissions for idempotency.
+    await db.from("sales_doc_events").insert({
+      sales_doc_id: newDoc.id,
+      event_type: "auto_register_commission_failed",
+      actor_user_id: actorInfo.appUserId ?? "system",
+      payload: { deal_id: deal.id, error: (err as Error).message },
+    });
+    throw err;
+  }
+}
 
 async function resolveActor(db: SupabaseClient, actor: AdminActor) {
   if (actor.appUserId && actor.name) {
@@ -266,6 +389,15 @@ export async function updatePipelineDealRecord(
     throw new Error("lost_reason is required for lost deals");
   }
 
+  // Capture the pre-update state so we can detect a first-time transition
+  // into a won stage (decision 11).
+  const { data: before } = await db
+    .from("pipeline_deals")
+    .select("stage_id")
+    .eq("id", payload.id)
+    .maybeSingle();
+  const previousStageId = before?.stage_id as number | null;
+
   const actorInfo = await resolveActor(db, actor);
   const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -311,6 +443,17 @@ export async function updatePipelineDealRecord(
     entityId: payload.id,
     details: updates,
   });
+
+  // Decision 11: first-time transition into a won stage auto-creates
+  // sales_doc + commission. Idempotency guards against re-runs.
+  if (stage?.is_won && previousStageId !== stage.id) {
+    try {
+      await autoRegisterWonDealCommission(db, data as PipelineDealRow, actorInfo);
+    } catch (autoErr) {
+      console.error(`[pipeline] auto-commission failed for deal ${data.id}:`, autoErr);
+      // Do not throw — the stage update itself already succeeded.
+    }
+  }
 
   return data;
 }
@@ -424,6 +567,17 @@ export async function convertPipelineDealToOrder(
       stage_id: wonStage.id,
     },
   });
+
+  // Decision 11: converting a deal to an order lands it in won; register
+  // commission automatically. Idempotent via source_pipeline_deal_id.
+  try {
+    await autoRegisterWonDealCommission(db, updatedDeal as PipelineDealRow, actorInfo);
+  } catch (autoErr) {
+    console.error(
+      `[pipeline] auto-commission during convert failed for deal ${dealId}:`,
+      autoErr,
+    );
+  }
 
   return { order, deal: updatedDeal };
 }

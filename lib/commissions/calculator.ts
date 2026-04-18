@@ -64,7 +64,10 @@ export function calcEmployeeDeviceCommission(totalNetSales: number, profile: Emp
   return { basePct, milestoneCount, milestoneBonus, total: basePct + milestoneBonus };
 }
 
-// Calculate both contract and employee commission for a sale
+// Calculate both contract and employee commission for a single sale.
+// Important: device rows compute ONLY the base % here; milestone bonuses are
+// applied later by allocateDeviceCommissionRows (ledger) on a contract-wide
+// running total, per decision 4.
 export function calcDualCommission(
   saleType: 'line' | 'device',
   value: number,
@@ -72,16 +75,29 @@ export function calcDualCommission(
   profile: EmployeeProfile | null,
 ): { contractCommission: number; employeeCommission: number } {
   if (saleType === 'line') {
-    const contractCommission = calcLineCommission(value, hasValidHK);
+    // Absolute minimum package price — profile cannot go below contract floor
+    // (fixes audit issue 4.9: profile with lower min_package_price was producing
+    //  negative owner profit).
+    const effectiveMin = Math.max(
+      COMMISSION.MIN_PACKAGE_PRICE,
+      profile?.min_package_price ?? COMMISSION.MIN_PACKAGE_PRICE,
+    );
+
+    if (!hasValidHK || value < effectiveMin) {
+      return { contractCommission: 0, employeeCommission: 0 };
+    }
+
+    const contractCommission = value * COMMISSION.LINE_MULTIPLIER;
     const employeeCommission = profile
-      ? (value >= profile.min_package_price ? value * profile.line_multiplier : 0)
+      ? value * profile.line_multiplier
       : contractCommission;
     return { contractCommission, employeeCommission };
   }
-  // device
-  const contractCommission = calcDeviceCommission(value).total;
+
+  // device — base % only; milestone applied by ledger recalc
+  const contractCommission = value * COMMISSION.DEVICE_RATE;
   const employeeCommission = profile
-    ? calcEmployeeDeviceCommission(value, profile).total
+    ? value * profile.device_rate
     : contractCommission;
   return { contractCommission, employeeCommission };
 }

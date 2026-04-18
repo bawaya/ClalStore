@@ -25,6 +25,7 @@ export type DeviceCommissionAllocationRow = {
   sale_date: string;
   device_sale_amount: number;
   employee_id: string | null;
+  rate_snapshot?: EmployeeProfile | null;
 };
 
 export function sortBySaleDateAndId<T extends { sale_date: string; id: number | string }>(rows: T[]) {
@@ -263,6 +264,16 @@ export async function resolveLinkedAppUserId(
   return byAuth?.id || null;
 }
 
+/**
+ * Allocate device commissions across a month.
+ *
+ * Decision 4: milestone bonus (2500₪ / 50K contract) is counted on the
+ * WHOLE CONTRACT cumulative total (all employees combined), not per-employee.
+ * The bonus is attributed to whichever sale crossed the 50K threshold.
+ *
+ * Decision 7: if a row has rate_snapshot, it is used instead of the current
+ * profile — historical commissions stay frozen at their original rates.
+ */
 export function allocateDeviceCommissionRows(
   rows: DeviceCommissionAllocationRow[],
   profileMap = new Map<string, EmployeeProfile | null>(),
@@ -277,53 +288,44 @@ export function allocateDeviceCommissionRows(
   let contractRunningTotal = 0;
   for (const row of sortedRows) {
     const amount = Number(row.device_sale_amount || 0);
+
+    // Profile priority: snapshot (frozen) -> current profile -> default
+    const profile =
+      row.rate_snapshot ??
+      (row.employee_id ? profileMap.get(row.employee_id) : null) ??
+      DEFAULT_EMPLOYEE_PROFILE;
+
     const beforeMilestones = Math.floor(contractRunningTotal / COMMISSION.DEVICE_MILESTONE);
     const afterMilestones = Math.floor((contractRunningTotal + amount) / COMMISSION.DEVICE_MILESTONE);
     const milestoneDelta = afterMilestones - beforeMilestones;
+
+    // Employee base % uses their profile rate (decision 4 keeps rate per-employee)
+    const basePct = amount * profile.device_rate;
+    // Milestone bonus: contract-wide delta × contract bonus amount
+    const milestoneBonus = milestoneDelta * COMMISSION.DEVICE_MILESTONE_BONUS;
+    const employeeCommission = basePct + milestoneBonus;
+
+    // Contract commission (reference — always at contract base+bonus rates)
     const contractCommission =
       amount * COMMISSION.DEVICE_RATE + milestoneDelta * COMMISSION.DEVICE_MILESTONE_BONUS;
 
     allocations.set(row.id, {
       contract_commission: contractCommission,
-      commission_amount: contractCommission,
+      commission_amount: employeeCommission,
     });
 
     contractRunningTotal += amount;
   }
 
-  const byEmployee = new Map<string, DeviceCommissionAllocationRow[]>();
-  for (const row of sortedRows) {
-    if (!row.employee_id) continue;
-    const key = row.employee_id;
-    const bucket = byEmployee.get(key) || [];
-    bucket.push(row);
-    byEmployee.set(key, bucket);
-  }
-
-  for (const [employeeId, employeeRows] of byEmployee) {
-    const profile = profileMap.get(employeeId) || DEFAULT_EMPLOYEE_PROFILE;
-    const sortedEmployeeRows = sortBySaleDateAndId(employeeRows);
-    let employeeRunningTotal = 0;
-
-    for (const row of sortedEmployeeRows) {
-      const amount = Number(row.device_sale_amount || 0);
-      const beforeMilestones = Math.floor(employeeRunningTotal / COMMISSION.DEVICE_MILESTONE);
-      const afterMilestones = Math.floor((employeeRunningTotal + amount) / COMMISSION.DEVICE_MILESTONE);
-      const milestoneDelta = afterMilestones - beforeMilestones;
-      const employeeCommission =
-        amount * profile.device_rate + milestoneDelta * profile.device_milestone_bonus;
-
-      const previous = allocations.get(row.id);
-      allocations.set(row.id, {
-        contract_commission: previous?.contract_commission || 0,
-        commission_amount: employeeCommission,
-      });
-
-      employeeRunningTotal += amount;
-    }
-  }
-
   return allocations;
+}
+
+/** Last day of a YYYY-MM month as YYYY-MM-DD (issue 4.17 fix). */
+export function lastDayOfMonth(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  // new Date(year, monthIndex+1, 0) = last day of monthIndex
+  const d = new Date(Date.UTC(y, m, 0));
+  return d.toISOString().slice(0, 10);
 }
 
 export async function recalculateDeviceCommissionsForMonths(
@@ -336,16 +338,18 @@ export async function recalculateDeviceCommissionsForMonths(
   for (const month of uniqueMonths) {
     const { data: rows, error } = await db
       .from("commission_sales")
-      .select("id, sale_date, device_sale_amount, employee_id")
+      .select("id, sale_date, device_sale_amount, employee_id, rate_snapshot")
       .eq("sale_type", "device")
       .is("deleted_at", null)
       .gte("sale_date", `${month}-01`)
-      .lte("sale_date", `${month}-31`);
+      .lte("sale_date", lastDayOfMonth(month));
 
     if (error) throw error;
     if (!rows?.length) continue;
 
-    const employeeIds = [...new Set(rows.map((row) => row.employee_id).filter(Boolean))];
+    const employeeIds = [
+      ...new Set(rows.map((row) => row.employee_id).filter(Boolean) as string[]),
+    ];
     const profileMap = new Map<string, EmployeeProfile | null>();
 
     if (employeeIds.length > 0) {
@@ -364,9 +368,11 @@ export async function recalculateDeviceCommissionsForMonths(
     const allocations = allocateDeviceCommissionRows(
       rows.map((row) => ({
         id: row.id,
-        sale_date: row.sale_date,
+        sale_date:
+          typeof row.sale_date === "string" ? row.sale_date : String(row.sale_date),
         device_sale_amount: Number(row.device_sale_amount || 0),
         employee_id: row.employee_id || null,
+        rate_snapshot: (row.rate_snapshot as EmployeeProfile | null) || null,
       })),
       profileMap,
     );

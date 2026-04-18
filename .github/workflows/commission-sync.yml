@@ -1,0 +1,74 @@
+name: Commission Sync
+
+on:
+  schedule:
+    # Every hour at :30 (off the top-of-hour so we don't thrash on DST)
+    - cron: "30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: commission-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync orders → commissions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run commission sync
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/sync-commissions.ts
+
+      - name: Report failure to alert channel
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '[commission-sync] hourly sync failed';
+            const body = `Commission sync workflow failed.
+
+            - Run: ${context.runId}
+            - Workflow: ${context.workflow}
+            - See: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+            `;
+            // Reuse existing alert-dedup pattern — open issue if not already open
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'alert',
+              per_page: 50,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Still failing (run ${context.runId}).`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['alert', 'commission-sync'],
+              });
+            }
