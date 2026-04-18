@@ -1,0 +1,59 @@
+name: Mutation Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      files:
+        description: "Comma-separated files to mutate (leave empty for full run)"
+        required: false
+        default: ""
+  # Full run weekly — mutation testing is expensive
+  schedule:
+    - cron: "0 4 * * 0" # Sundays 04:00 UTC
+
+jobs:
+  mutation:
+    name: Stryker mutation testing
+    runs-on: ubuntu-latest
+    # Mutation runs are O(N×M): many mutants × test runs. Budget 45 min.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run Stryker (custom files)
+        if: github.event.inputs.files != ''
+        run: npx stryker run --mutate "${{ github.event.inputs.files }}"
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Run Stryker (full)
+        if: github.event.inputs.files == ''
+        run: npx stryker run
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 30
+
+      - name: Comment mutation score on PR
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          if [ -f reports/mutation/mutation.json ]; then
+            SCORE=$(node -e '
+              const r = require("./reports/mutation/mutation.json");
+              console.log(r.mutationScore?.toFixed?.(1) ?? "n/a");
+            ')
+            echo "Mutation Score: $SCORE%" >> $GITHUB_STEP_SUMMARY
+          fi

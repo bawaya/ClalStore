@@ -1,0 +1,60 @@
+version: 2
+updates:
+  # npm / Node ecosystem
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "Asia/Jerusalem"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    groups:
+      # Bundle related dev-deps together so we don't get 15 PRs
+      playwright:
+        patterns:
+          - "@playwright/*"
+          - "playwright*"
+      testing:
+        patterns:
+          - "@testing-library/*"
+          - "@vitest/*"
+          - "vitest"
+          - "@stryker-mutator/*"
+      types:
+        patterns:
+          - "@types/*"
+      eslint:
+        patterns:
+          - "eslint*"
+          - "@eslint/*"
+      supabase:
+        patterns:
+          - "@supabase/*"
+    ignore:
+      # Keep lighthouse pinned to ^12 — v13 requires Node >=22.19 which
+      # Cloudflare Workers runtime doesn't have
+      - dependency-name: "lighthouse"
+        versions: [">=13"]
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"

@@ -67,3 +67,7 @@ node_modules
 coverage/
 playwright-report/
 test-results/
+
+# Stryker mutation testing
+.stryker-tmp/
+reports/mutation/
