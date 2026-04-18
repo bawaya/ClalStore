@@ -117,7 +117,11 @@
       "Bash(curl -sS \"https://www.clalmobile.com/_next/static/chunks/app/\\(auth\\)/login/page-fcc968107878b4fe.js\")",
       "Bash(curl -sS \"https://www.clalmobile.com/_next/static/chunks/app/\\(auth\\)/login/page-fcc968107878b4fe.js\" -o /tmp/login-chunk.js)",
       "Bash(curl -sS -w \"\\\\n--- HTTP %{http_code}\\\\n\" -X POST \"https://nhvcfmhvrcsggpdjaejk.supabase.co/auth/v1/token?grant_type=password\" -H \"apikey: sb_publishable_780XRCqzJPv2vyxVWn2vrw_YRvPW2Ym\" -H \"Authorization: Bearer sb_publishable_780XRCqzJPv2vyxVWn2vrw_YRvPW2Ym\" -H \"Content-Type: application/json\" -d '{\"email\":\"doesnotexist@example.com\",\"password\":\"wrongpassword\"}')",
-      "Bash(npm info *)"
+      "Bash(npm info *)",
+      "Bash(curl -sS -o /dev/null -w \"login: %{http_code}\\\\n\" \"https://www.clalmobile.com/login\")",
+      "Bash(curl -sS -X POST \"https://nhvcfmhvrcsggpdjaejk.supabase.co/auth/v1/token?grant_type=password\" -H \"apikey: sb_publishable_780XRCqzJPv2vyxVWn2vrw_YRvPW2Ym\" -H \"Authorization: Bearer sb_publishable_780XRCqzJPv2vyxVWn2vrw_YRvPW2Ym\" -H \"Content-Type: application/json\" -d '{\"email\":\"x@y.z\",\"password\":\"x\"}' -w \"\\\\nsupabase auth: %{http_code}\\\\n\")",
+      "Bash(ls C:\\\\CLALSTORE\\\\clalmobile\\\\src\\\\app\\\\api\\\\pwa\\\\sales\\\\\\\\[id\\\\]\\\\\\\\attachments)",
+      "Bash(echo \"--- tsc exit code: $? ---\")"
     ]
   }
 }

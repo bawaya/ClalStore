@@ -58,6 +58,9 @@ describe("Commission Helpers", () => {
     expect(saleDate).toBe("2026-04-01");
   });
 
+  // Updated 2026-04-18: commission refactor — milestone bonus is contract-wide
+  // (decision 4). Employee base % uses profile rate (0.03), but milestone bonus
+  // uses contract's 2500, not profile's 1000.
   it("allocates device milestone bonuses per month for contract and employee profile", () => {
     const profileMap = new Map<string, EmployeeProfile | null>([
       [
@@ -80,13 +83,15 @@ describe("Commission Helpers", () => {
       profileMap,
     );
 
+    // Row 1: 40000 * 0.03 = 1200, no milestone crossed
     expect(allocations.get(1)).toEqual({
       contract_commission: 2000,
       commission_amount: 1200,
     });
+    // Row 2: 15000 * 0.03 = 450 + contract-wide milestone 2500 (55000 > 50000) = 2950
     expect(allocations.get(2)).toEqual({
       contract_commission: 3250,
-      commission_amount: 1450,
+      commission_amount: 2950,
     });
   });
 

@@ -123,14 +123,17 @@ describe("salesDocItemSchema", () => {
 // ─── createSalesDocSchema ─────────────────────────────────────────
 
 describe("createSalesDocSchema", () => {
+  // Updated 2026-04-18: commission refactor — total_amount is now required
+  // and positive (audit 4.12 sanity cap). A 0 or absent amount rejects.
   it("accepts valid sales doc with minimal fields", () => {
     const result = createSalesDocSchema.safeParse({
       sale_type: "device",
+      total_amount: 3499,
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.currency).toBe("ILS");
-      expect(result.data.total_amount).toBe(0);
+      expect(result.data.total_amount).toBe(3499);
       expect(result.data.items).toEqual([]);
     }
   });
@@ -161,10 +164,11 @@ describe("createSalesDocSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  // Updated 2026-04-18: commission refactor — total_amount is required.
   it("accepts all valid sale_type values", () => {
-    expect(createSalesDocSchema.safeParse({ sale_type: "line" }).success).toBe(true);
-    expect(createSalesDocSchema.safeParse({ sale_type: "device" }).success).toBe(true);
-    expect(createSalesDocSchema.safeParse({ sale_type: "mixed" }).success).toBe(true);
+    expect(createSalesDocSchema.safeParse({ sale_type: "line", total_amount: 59 }).success).toBe(true);
+    expect(createSalesDocSchema.safeParse({ sale_type: "device", total_amount: 3499 }).success).toBe(true);
+    expect(createSalesDocSchema.safeParse({ sale_type: "mixed", total_amount: 3558 }).success).toBe(true);
   });
 
   it("rejects invalid doc_uuid format", () => {
@@ -175,9 +179,11 @@ describe("createSalesDocSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  // Updated 2026-04-18: commission refactor — total_amount is required.
   it("accepts null optional fields", () => {
     const result = createSalesDocSchema.safeParse({
       sale_type: "device",
+      total_amount: 3499,
       sale_date: null,
       customer_id: null,
       customer_phone: null,
@@ -197,9 +203,11 @@ describe("createSalesDocSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  // Updated 2026-04-18: commission refactor — total_amount is required.
   it("accepts idempotency_key", () => {
     const result = createSalesDocSchema.safeParse({
       sale_type: "device",
+      total_amount: 3499,
       idempotency_key: "unique-key-123",
     });
     expect(result.success).toBe(true);

@@ -198,11 +198,12 @@ describe("calcRequiredForTarget", () => {
     expect(result.scenarios.mixed.deviceSales).toBe(80000);
   });
 
-  it("counts working days excluding Saturdays", () => {
-    // April 2026: starts Wed, Saturdays are 4, 11, 18, 25
-    // Total 30 days, 4 Saturdays = 26 working days
+  it("counts working days excluding Friday and Saturday (Israeli week)", () => {
+    // April 2026: Fridays are 3, 10, 17, 24; Saturdays are 4, 11, 18, 25
+    // Total 30 days − 4 Fri − 4 Sat = 22 working days
+    // (updated 2026-04-18: countWorkingDays was fixed to exclude Friday too)
     const result = calcRequiredForTarget(1000, "2026-04-01", "2026-04-30");
-    expect(result.workingDays).toBe(26);
+    expect(result.workingDays).toBe(22);
   });
 });
 
@@ -313,16 +314,22 @@ describe("calcDualCommission", () => {
       expect(result.employeeCommission).toBe(150); // 50 * 3
     });
 
-    it("returns 0 contract commission when HK is invalid", () => {
+    // Updated 2026-04-18: commission refactor — if HK invalid, BOTH commissions
+    // are zero (previously only contract was zero; employee paid out regardless
+    // of HK, which caused negative owner profit per audit issue 4.9).
+    it("returns 0 for both when HK is invalid", () => {
       const result = calcDualCommission("line", 50, false, customProfile);
       expect(result.contractCommission).toBe(0);
-      expect(result.employeeCommission).toBe(150); // employee is independent of HK in dual
+      expect(result.employeeCommission).toBe(0);
     });
 
-    it("returns 0 employee commission when below employee min_package_price", () => {
+    // Updated 2026-04-18: commission refactor — profile cannot drop below the
+    // absolute contract floor (MIN_PACKAGE_PRICE=19.90). A higher profile min
+    // (29) still rejects below itself, so 20 < 29 → BOTH commissions 0.
+    it("returns 0 for both when below employee min_package_price", () => {
       const result = calcDualCommission("line", 20, true, customProfile);
-      expect(result.contractCommission).toBe(80); // 20 * 4
-      expect(result.employeeCommission).toBe(0); // 20 < 29
+      expect(result.contractCommission).toBe(0);
+      expect(result.employeeCommission).toBe(0);
     });
   });
 

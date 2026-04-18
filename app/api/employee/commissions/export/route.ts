@@ -22,8 +22,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { requireEmployee } from "@/lib/pwa/auth";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiError, safeError } from "@/lib/api-response";
@@ -54,13 +52,43 @@ function asciiSafe(value: string | null | undefined): string {
   return String(value).replace(/[^\x20-\x7E]/g, "?").trim();
 }
 
-/** Try to load the Cairo TTF bundled under public/fonts. Returns null if
- * the file is missing (e.g. a clean checkout without the font) — the PDF
- * will fall back to Helvetica + English-only text. */
-function loadCairoFontBytes(): Uint8Array | null {
+/** Try to load the Cairo TTF font bytes.
+ *
+ * Three strategies, in priority:
+ *   1. Same-origin HTTPS fetch against `/fonts/cairo-regular.ttf` — works on
+ *      Cloudflare Workers (where we serve the font from the assets binding).
+ *   2. Node fs readFileSync for local dev / Vitest (gracefully handled when
+ *      fs is absent — e.g. inside the CF Workers runtime `fs` throws).
+ *   3. null — the caller falls back to Helvetica (English-only PDF).
+ *
+ * Returns a Uint8Array that pdf-lib can consume directly. Node Buffers
+ * technically extend Uint8Array but pdf-lib's type check rejects them
+ * under some bundlers, so we always normalise to a fresh Uint8Array.
+ */
+async function loadCairoFontBytes(req: NextRequest): Promise<Uint8Array | null> {
+  // Strategy 1: runtime same-origin fetch (Cloudflare Workers)
   try {
-    const path = join(process.cwd(), "public", "fonts", "cairo-regular.ttf");
-    return readFileSync(path);
+    const fontUrl = new URL("/fonts/cairo-regular.ttf", req.url);
+    const res = await fetch(fontUrl);
+    if (res.ok) {
+      const ab = await res.arrayBuffer();
+      if (ab.byteLength > 0) return new Uint8Array(ab);
+    }
+  } catch {
+    // fetch failed — try fs fallback
+  }
+
+  // Strategy 2: Node fs (local dev / Vitest). Wrap in dynamic import so it
+  // doesn't blow up the Cloudflare Workers bundler.
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const filePath = path.join(process.cwd(), "public", "fonts", "cairo-regular.ttf");
+    const buf = fs.readFileSync(filePath);
+    // Re-wrap the Node Buffer into a plain Uint8Array — some pdf-lib
+    // versions reject Buffer with "font must be of type string or
+    // Uint8Array or ArrayBuffer" otherwise.
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
   } catch {
     return null;
   }
@@ -230,7 +258,7 @@ export async function GET(req: NextRequest) {
     // if the font file is missing (e.g. first-time deploy), we still
     // produce a usable English-only PDF.
     let arabicFont: PDFFont | null = null;
-    const cairoBytes = loadCairoFontBytes();
+    const cairoBytes = await loadCairoFontBytes(req);
     if (cairoBytes) {
       try {
         doc.registerFontkit(fontkit);
@@ -239,6 +267,8 @@ export async function GET(req: NextRequest) {
         console.warn("[pdf-export] Cairo font embed failed:", fontErr);
         arabicFont = null;
       }
+    } else {
+      console.warn("[pdf-export] Cairo font unavailable — using Helvetica fallback");
     }
 
     let ctx: PageCtx = {

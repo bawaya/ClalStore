@@ -248,6 +248,10 @@ describe("allocateDeviceCommissionRows", () => {
     expect(allocations.get(2)!.contract_commission).toBe(3250);
   });
 
+  // Updated 2026-04-18: commission refactor — milestone bonus is now
+  // contract-wide (decision 4), so the employee commission's milestone portion
+  // uses the CONTRACT bonus (2500), not the employee's profile bonus (1000).
+  // Rate snapshot still controls the per-row base % (0.03).
   it("applies employee profile for employee-specific rows", () => {
     const profileMap = new Map<string, EmployeeProfile | null>([
       [
@@ -270,10 +274,11 @@ describe("allocateDeviceCommissionRows", () => {
       profileMap
     );
 
-    // Employee row 1: 40000 * 0.03 = 1200, 0 milestones
+    // Employee row 1: 40000 * 0.03 = 1200, 0 milestones crossed
     expect(allocations.get(1)!.commission_amount).toBe(1200);
-    // Employee row 2: 15000 * 0.03 = 450 + 1 milestone (55000 > 50000) * 1000 = 1450
-    expect(allocations.get(2)!.commission_amount).toBe(1450);
+    // Employee row 2: 15000 * 0.03 = 450 + 1 contract-wide milestone
+    // (55000 > 50000) * 2500 (CONTRACT bonus, decision 4) = 2950
+    expect(allocations.get(2)!.commission_amount).toBe(2950);
     // Contract commission still uses standard rates
     expect(allocations.get(1)!.contract_commission).toBe(2000);
     expect(allocations.get(2)!.contract_commission).toBe(3250);
@@ -294,6 +299,9 @@ describe("allocateDeviceCommissionRows", () => {
     expect(allocations.size).toBe(0);
   });
 
+  // Updated 2026-04-18: commission refactor — milestone is contract-wide
+  // (decision 4). Row 2 sees the contract running total cross 50K (20000+30000),
+  // so the milestone bonus (2500) is applied to the employee row as well.
   it("handles mixed employee and non-employee rows", () => {
     const profileMap = new Map<string, EmployeeProfile | null>([
       [
@@ -321,8 +329,9 @@ describe("allocateDeviceCommissionRows", () => {
     // commission_amount should equal contract_commission for non-employee rows
     expect(allocations.get(1)!.commission_amount).toBe(1000);
 
-    // Row 2 employee: 30000 * 0.10 = 3000, 0 employee milestones (only 30000 for this employee)
-    expect(allocations.get(2)!.commission_amount).toBe(3000);
+    // Row 2 employee: 30000 * 0.10 = 3000 + contract-wide milestone (50K crossed)
+    // * CONTRACT bonus 2500 = 5500 (decision 4: milestone uses contract bonus)
+    expect(allocations.get(2)!.commission_amount).toBe(5500);
     // Row 2 contract: 30000 * 0.05 = 1500 + milestone bonus (50000 crossed) = 1500 + 2500 = 4000
     expect(allocations.get(2)!.contract_commission).toBe(4000);
   });

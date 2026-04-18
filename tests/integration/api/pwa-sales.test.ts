@@ -47,6 +47,10 @@ vi.mock("@/lib/pwa/customer-linking", () => ({
   buildCustomerPhoneCandidates: vi.fn().mockImplementation((phone: string) => [phone]),
 }));
 
+// Updated 2026-04-18: commission refactor — attachments route now imports
+// attachmentMetadataSchema and MAX_ATTACHMENT_SIZE_BYTES (MIME whitelist, size cap).
+// Mock needs to expose them so the route module can import without vitest throwing
+// "No X export is defined on the @/lib/pwa/validators mock".
 vi.mock("@/lib/pwa/validators", () => ({
   createSalesDocSchema: {
     _input: undefined,
@@ -56,6 +60,19 @@ vi.mock("@/lib/pwa/validators", () => ({
     _input: undefined,
     _output: undefined,
   },
+  attachmentMetadataSchema: {
+    _input: undefined,
+    _output: undefined,
+  },
+  MAX_ATTACHMENT_SIZE_BYTES: 10 * 1024 * 1024,
+  ALLOWED_ATTACHMENT_MIMES: [
+    "application/pdf",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+  ],
 }));
 
 vi.mock("@/lib/admin/validators", () => ({
@@ -63,6 +80,25 @@ vi.mock("@/lib/admin/validators", () => ({
     data: body,
     error: null,
   })),
+}));
+
+// Updated 2026-04-18: submit route now calls registerSaleCommission directly
+// (decision 1: no manager approval). We mock it out so these tests focus on
+// the route logic (auth / attachments / status transition) without having to
+// stub every commission_sales insert.
+vi.mock("@/lib/commissions/register", () => ({
+  registerSaleCommission: vi.fn().mockResolvedValue({
+    id: 100,
+    contractCommission: 175,
+    employeeCommission: 175,
+    rateSnapshot: {
+      line_multiplier: 4,
+      device_rate: 0.05,
+      device_milestone_bonus: 2500,
+      min_package_price: 19.9,
+      loyalty_bonuses: {},
+    },
+  }),
 }));
 
 // ── Imports ───────────────────────────────────────────
@@ -204,9 +240,18 @@ describe("PWA Sales [id] — PUT /api/pwa/sales/[id]", () => {
 describe("PWA Sales Submit — POST /api/pwa/sales/[id]/submit", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  // Updated 2026-04-18: submit route now uses .maybeSingle() (not .single())
+  // for the initial doc lookup (commission refactor — idempotent lookup).
+  // Tests mock maybeSingle to drive the doc for the current test only.
   it("submits a draft with all required attachments", async () => {
-    supabaseClient.from("sales_docs").single.mockResolvedValueOnce({
-      data: { ...doc, sale_type: "device" },
+    const submittingDoc = { ...doc, sale_type: "device", total_amount: 3499 };
+    supabaseClient.from("sales_docs").maybeSingle.mockResolvedValueOnce({
+      data: submittingDoc,
+      error: null,
+    });
+    // Atomic UPDATE guard chain ends with maybeSingle too
+    supabaseClient.from("sales_docs").maybeSingle.mockResolvedValueOnce({
+      data: { ...submittingDoc, status: "synced_to_commissions" },
       error: null,
     });
     // Device requires: invoice, device_serial_proof
@@ -227,8 +272,8 @@ describe("PWA Sales Submit — POST /api/pwa/sales/[id]/submit", () => {
   });
 
   it("returns 400 for missing attachments", async () => {
-    supabaseClient.from("sales_docs").single.mockResolvedValueOnce({
-      data: { ...doc, sale_type: "line" },
+    supabaseClient.from("sales_docs").maybeSingle.mockResolvedValueOnce({
+      data: { ...doc, sale_type: "line", total_amount: 59 },
       error: null,
     });
     // Line requires: contract_photo, signed_form — but we only have invoice
@@ -243,7 +288,8 @@ describe("PWA Sales Submit — POST /api/pwa/sales/[id]/submit", () => {
   });
 
   it("returns 404 for missing doc", async () => {
-    supabaseClient.from("sales_docs").single.mockResolvedValueOnce({ data: null, error: null });
+    // Submit route uses maybeSingle for the initial doc lookup (not single).
+    supabaseClient.from("sales_docs").maybeSingle.mockResolvedValueOnce({ data: null, error: null });
     const req = createMockRequest({ method: "POST", url: "/api/pwa/sales/999/submit" });
     const res = await submitSale(req, ctxOf("999"));
     expect(res.status).toBe(404);
@@ -253,9 +299,22 @@ describe("PWA Sales Submit — POST /api/pwa/sales/[id]/submit", () => {
 describe("PWA Attachments — POST /api/pwa/sales/[id]/attachments", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  // Updated 2026-04-18: attachments route now enforces the sales-docs/{id}/
+  // path prefix (audit 4.3) and verifies the file exists in Storage before
+  // recording metadata. Tests must use a conforming path + mock storage.list
+  // to return a matching file entry.
   it("adds an attachment to a draft", async () => {
     supabaseClient.from("sales_docs").single.mockResolvedValueOnce({
       data: { id: 1, employee_key: "emp1", status: "draft" },
+      error: null,
+    });
+    const filePath = "sales-docs/1/invoice.pdf";
+    supabaseClient.storage.__bucket.list.mockResolvedValueOnce({
+      data: [{ name: "invoice.pdf", metadata: { size: 12345 } }],
+      error: null,
+    });
+    supabaseClient.from("sales_doc_attachments").single.mockResolvedValueOnce({
+      data: { id: 123, sales_doc_id: 1, attachment_type: "invoice", file_path: filePath, file_name: "invoice.pdf", mime_type: "application/pdf", file_size: 12345 },
       error: null,
     });
     const req = createMockRequest({
@@ -263,7 +322,7 @@ describe("PWA Attachments — POST /api/pwa/sales/[id]/attachments", () => {
       url: "/api/pwa/sales/1/attachments",
       body: {
         attachment_type: "invoice",
-        file_path: "/docs/invoice.pdf",
+        file_path: filePath,
         file_name: "invoice.pdf",
         mime_type: "application/pdf",
         file_size: 12345,
@@ -285,7 +344,7 @@ describe("PWA Attachments — POST /api/pwa/sales/[id]/attachments", () => {
       url: "/api/pwa/sales/1/attachments",
       body: {
         attachment_type: "invoice",
-        file_path: "/docs/invoice.pdf",
+        file_path: "sales-docs/1/invoice.pdf",
         file_name: "invoice.pdf",
         mime_type: "application/pdf",
         file_size: 12345,
@@ -305,7 +364,7 @@ describe("PWA Attachments — POST /api/pwa/sales/[id]/attachments", () => {
       url: "/api/pwa/sales/1/attachments",
       body: {
         attachment_type: "invoice",
-        file_path: "/docs/invoice.pdf",
+        file_path: "sales-docs/1/invoice.pdf",
         file_name: "invoice.pdf",
         mime_type: "application/pdf",
         file_size: 12345,
