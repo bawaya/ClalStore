@@ -109,7 +109,15 @@
       "Bash(curl -fsSL -o \"C:/CLALSTORE/clalmobile/public/fonts/cairo-regular.ttf\" \"https://fonts.googleapis.com/css2?family=Cairo:wght@400&display=swap\")",
       "Bash(curl -fsSL \"https://fonts.googleapis.com/css2?family=Cairo:wght@400\" -H \"User-Agent: Mozilla/5.0\")",
       "Bash(curl -fsSL -o \"C:/CLALSTORE/clalmobile/public/fonts/cairo-regular.ttf\" \"https://fonts.gstatic.com/s/cairo/v31/SLXgc1nY6HkvangtZmpQdkhzfH5lkSs2SgRjCAGMQ1z0hOA-W1Q.ttf\")",
-      "Bash(curl -fsSL \"https://fonts.googleapis.com/css2?family=Cairo:wght@400&subset=arabic\" -H \"User-Agent: Mozilla/5.0\")"
+      "Bash(curl -fsSL \"https://fonts.googleapis.com/css2?family=Cairo:wght@400&subset=arabic\" -H \"User-Agent: Mozilla/5.0\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" \"https://www.clalmobile.com/api/admin/commissions/dashboard\")",
+      "Bash(curl -s -w \"\\\\n--- HTTP %{http_code} ---\\\\n\" \"https://www.clalmobile.com/api/health\")",
+      "Bash(curl -sS \"https://www.clalmobile.com/_next/static/chunks/9324-7abf77a45731ad37.js\" -o /tmp/chunk.js -w \"%{http_code}\")",
+      "Bash(curl -sS \"https://www.clalmobile.com/login\")",
+      "Bash(curl -sS \"https://www.clalmobile.com/_next/static/chunks/app/\\(auth\\)/login/page-fcc968107878b4fe.js\")",
+      "Bash(curl -sS \"https://www.clalmobile.com/_next/static/chunks/app/\\(auth\\)/login/page-fcc968107878b4fe.js\" -o /tmp/login-chunk.js)",
+      "Bash(curl -sS -w \"\\\\n--- HTTP %{http_code}\\\\n\" -X POST \"https://nhvcfmhvrcsggpdjaejk.supabase.co/auth/v1/token?grant_type=password\" -H \"apikey: sb_publishable_780XRCqzJPv2vyxVWn2vrw_YRvPW2Ym\" -H \"Authorization: Bearer sb_publishable_780XRCqzJPv2vyxVWn2vrw_YRvPW2Ym\" -H \"Content-Type: application/json\" -d '{\"email\":\"doesnotexist@example.com\",\"password\":\"wrongpassword\"}')",
+      "Bash(npm info *)"
     ]
   }
 }
