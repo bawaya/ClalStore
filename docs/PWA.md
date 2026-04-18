@@ -415,7 +415,10 @@ Every drained request is replayed server-side and its response is
   top-level banner.
 - [`components/pwa/ConnectionBanner.tsx`](../components/pwa/ConnectionBanner.tsx)
   — sticky yellow banner that appears when `!isOnline()` and shows the
-  queue size + "retry now" button.
+  queue size + "retry now" button. **Flicker-free on mount**: the
+  useEffect only calls `setOnline(navigator.onLine)` when it differs from
+  the store's current value, so the banner never flashes when the two
+  were already in sync (fix 2026-04-18).
 
 ### Idempotency with the queue
 

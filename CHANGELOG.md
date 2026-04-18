@@ -79,6 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multiple audit issues from the 2026-04-18 commission audit
 - Legacy Cloudflare Pages build no longer crashes — `scripts/prepare-pages.mjs` stubbed for back-compat
 - Status page deploy migrated to GitHub Pages native API (was publishing via an orphan branch)
+- **Weekly summary `DRY_RUN` parse** — typos like `"flase"` or `"False "` (with trailing space) used to silently stay in dry-run; now the raw value is trimmed + lowercased and a loud warning is emitted for any unexpected input. Still defaults to dry-run (safe), but the operator now sees the mismatch.
+- **Dead fallback branch in `SalesPwaShell`** employee-name unwrap — collapsed the dual-shape handler with a clarifying comment; no behaviour change, clarity improved.
+- **`ConnectionBanner` flicker on mount** — useEffect now only calls `setOnline(navigator.onLine)` when it actually differs from the Zustand store, so the banner no longer flashes when the two were already in sync.
 
 ### Changed
 

@@ -369,6 +369,8 @@ Runs `scripts/weekly-employee-summary.ts`. Generates a per-employee recap of the
 
 Variable (not a secret) because it's a boolean toggle with no sensitive value. Flip it in GitHub → Settings → Variables → Actions. Failures use the same alert-dedup pattern as `commission-sync.yml`.
 
+**Parse robustness (2026-04-18 fix):** the script trims + lowercases the raw env value and treats anything other than `"true"` or `"false"` as dry-run (safe default), but emits a loud `WARN` with the received value — so typos like `"flase"` or `"False "` (trailing whitespace) don't silently suppress delivery.
+
 ### `scheduled-reports.yml` — Monthly reports scheduler
 
 **Trigger:** cron `*/5 * * * *`, manual.
