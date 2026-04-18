@@ -5,26 +5,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { calcDeviceCommission, calcLoyaltyBonus } from "@/lib/commissions/calculator";
+import { calcDeviceCommission, calcLoyaltyBonus, calcMonthlySummary } from "@/lib/commissions/calculator";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   getCommissionTarget,
   resolveCommissionEmployeeFilter,
 } from "@/lib/commissions/ledger";
+import { corsHeaders } from "@/lib/commissions/cors";
+import { safeTokenEqual } from "@/lib/commissions/safe-compare";
 
 const RATE_LIMIT = { maxRequests: 60, windowMs: 3600_000 }; // 60/hour
-
-const ALLOWED_ORIGINS = (process.env.COMMISSION_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-
-function corsHeaders(origin?: string | null): Record<string, string> {
-  if (ALLOWED_ORIGINS.length === 0) return {};
-  const allowed = (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  };
-}
 
 // CORS preflight
 export async function OPTIONS(req: NextRequest) {
@@ -37,11 +27,11 @@ export async function GET(req: NextRequest) {
   const token = authHeader?.replace("Bearer ", "");
   const validToken = process.env.COMMISSION_API_TOKEN;
 
-  if (!validToken || !token || token !== validToken) {
+  if (!safeTokenEqual(token, validToken)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders() });
   }
 
-  // Rate limit by token
+  // Rate limit by token (safeTokenEqual narrows `token` to string via predicate).
   const rl = checkRateLimit(`comm-api:${token.slice(-8)}`, RATE_LIMIT);
   if (!rl.allowed) {
     return NextResponse.json(
@@ -93,7 +83,7 @@ export async function GET(req: NextRequest) {
     getCommissionTarget(db, month, scope.targetKeys),
   ]);
 
-  interface SaleRow { sale_type: string; sale_date: string; commission_amount: number; device_sale_amount: number; loyalty_start_date: string | null; loyalty_status: string | null; }
+  interface SaleRow { sale_type: string; sale_date: string; commission_amount: number; device_sale_amount: number; loyalty_start_date: string | null; loyalty_status: string | null; source: string; }
   interface SanctionRow { amount: number; }
   interface TargetRow { target_total: number; target_lines_amount: number; target_devices_amount: number; is_locked: boolean; }
 
@@ -106,12 +96,9 @@ export async function GET(req: NextRequest) {
   const devicesSales = sales.filter((s: SaleRow) => s.sale_type === "device");
 
   const linesCount = linesSales.length;
-  const linesCommission = linesSales.reduce((sum: number, s: SaleRow) => sum + (s.commission_amount || 0), 0);
 
   const totalDeviceSalesAmount = devicesSales.reduce((sum: number, s: SaleRow) => sum + (s.device_sale_amount || 0), 0);
   const deviceCalc = calcDeviceCommission(totalDeviceSalesAmount);
-
-  const sanctionsTotal = sanctions.reduce((sum: number, s: SanctionRow) => sum + (s.amount || 0), 0);
 
   // Loyalty bonuses
   const activeLines = linesSales.filter((s: SaleRow) => s.loyalty_start_date && s.loyalty_status === "active");
@@ -120,10 +107,21 @@ export async function GET(req: NextRequest) {
     return sum + lb.earnedSoFar;
   }, 0);
 
-  const devicesCommission = devicesSales.reduce((sum: number, s: SaleRow) => sum + (s.commission_amount || 0), 0);
-  const netCommission = linesCommission + devicesCommission + loyaltyBonus - sanctionsTotal;
+  // Delegate to authoritative helper (audit issue 4.29 — was duplicated here).
+  const summary = calcMonthlySummary(
+    sales,
+    sanctions,
+    loyaltyBonus,
+    target ? { target_total: target.target_total || 0 } : null,
+  );
+  const {
+    linesCommission,
+    devicesCommission,
+    totalSanctions: sanctionsTotal,
+    netCommission,
+    targetProgress,
+  } = summary;
   const targetTotal = target?.target_total || 0;
-  const targetProgress = targetTotal > 0 ? Math.min(100, Math.round((netCommission / targetTotal) * 100)) : 0;
 
   // Daily breakdown: { "01": { lines: 3, devices: 5000 }, ... }
   const salesByDay: Record<string, { lines: number; devices: number }> = {};

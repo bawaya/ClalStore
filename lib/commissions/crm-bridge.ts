@@ -4,7 +4,7 @@
 // =====================================================
 
 import { createAdminSupabase } from "@/lib/supabase";
-import { calcDeviceCommission, calcLoyaltyBonus } from "@/lib/commissions/calculator";
+import { calcDeviceCommission, calcLoyaltyBonus, calcMonthlySummary } from "@/lib/commissions/calculator";
 import { resolveLinkedAppUserId } from "@/lib/commissions/ledger";
 
 // ---------- Types ----------
@@ -252,14 +252,16 @@ export async function getBridgeDashboard(month?: string): Promise<BridgeDashboar
   const linesSales = sales.filter((s) => s.sale_type === "line");
   const devicesSales = sales.filter((s) => s.sale_type === "device");
   const linesCount = linesSales.length;
-  const linesCommission = linesSales.reduce((sum, s) => sum + (s.commission_amount || 0), 0);
   const totalDeviceAmount = devicesSales.reduce((sum, s) => sum + (s.device_sale_amount || 0), 0);
   const deviceCalc = calcDeviceCommission(totalDeviceAmount);
-  const devicesCommission = devicesSales.reduce((sum, s) => sum + (s.commission_amount || 0), 0);
-  const sanctionsTotal = sanctions.reduce((sum, s) => sum + (s.amount || 0), 0);
 
   const activeLines = linesSales.filter((s) => s.loyalty_start_date && s.loyalty_status === "active");
   const loyaltyBonus = activeLines.reduce((sum, s) => sum + calcLoyaltyBonus(s.loyalty_start_date!).earnedSoFar, 0);
+
+  // Delegate lines/devices/sanctions/net aggregation to the authoritative helper
+  // (audit issue 4.29 — was previously inlined here).
+  const summary = calcMonthlySummary(sales, sanctions, loyaltyBonus, null);
+  const { linesCommission, devicesCommission, totalSanctions: sanctionsTotal, netCommission } = summary;
 
   // CRM aggregation
   const COMPLETED = ["delivered", "shipped", "approved"];
@@ -294,7 +296,7 @@ export async function getBridgeDashboard(month?: string): Promise<BridgeDashboar
       milestones: deviceCalc.milestoneCount,
       sanctions_total: sanctionsTotal,
       loyalty_bonus: loyaltyBonus,
-      net_commission: linesCommission + devicesCommission + loyaltyBonus - sanctionsTotal,
+      net_commission: netCommission,
     },
     crm: {
       total_orders: orders.length,

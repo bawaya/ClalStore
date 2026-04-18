@@ -17,6 +17,7 @@ type PipelineStage = {
 type PipelineDealRow = {
   id: string;
   stage_id: number | null;
+  customer_id?: string | null;
   customer_name: string;
   customer_phone?: string | null;
   customer_email?: string | null;

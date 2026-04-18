@@ -15,6 +15,7 @@
 
 import { NextRequest } from "next/server";
 import { requireAdmin, hasPermission, logAudit } from "@/lib/admin/auth";
+import { actorId } from "@/lib/admin/actor";
 import { apiError, apiSuccess, safeError } from "@/lib/api-response";
 import { createAdminSupabase } from "@/lib/supabase";
 import { cancelCommissionsByDoc } from "@/lib/commissions/register";
@@ -67,8 +68,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       );
     }
 
-    const actorAppUserId =
-      (auth as { appUserId?: string }).appUserId || auth.id;
+    // Do NOT fall back to `auth.id` — that's the auth.users.id and would
+    // poison the public.users FK. Use the shared helper (audit issue 4.8).
+    const actorAppUserId = actorId(auth as { appUserId?: string });
     const now = new Date().toISOString();
 
     // Atomic cancel — only succeeds if still in a cancellable state

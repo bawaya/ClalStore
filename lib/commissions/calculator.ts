@@ -3,6 +3,8 @@
 // Contract-based commission calculations
 // =====================================================
 
+import { countWorkingDays } from "./date-utils";
+
 export const COMMISSION = {
   LINE_MULTIPLIER: 4,
   MIN_PACKAGE_PRICE: 19.90,
@@ -174,17 +176,6 @@ export function calcLoyaltyBonus(loyaltyStartDate: string, now?: string): {
   }
 
   return { monthsActive, earnedSoFar, nextBonus, isInLoyaltyPeriod, daysRemaining };
-}
-
-// Count working days (excluding Saturdays / Shabbat)
-function countWorkingDays(start: Date, end: Date): number {
-  let count = 0;
-  const d = new Date(start);
-  while (d <= end) {
-    if (d.getDay() !== 6) count++; // 6 = Saturday
-    d.setDate(d.getDate() + 1);
-  }
-  return count;
 }
 
 // Reverse calculator: given target, what do I need?

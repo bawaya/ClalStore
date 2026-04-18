@@ -8,18 +8,9 @@ import {
   getCommissionTarget,
   resolveCommissionEmployeeFilter,
 } from "@/lib/commissions/ledger";
-
-const ALLOWED_ORIGINS = (process.env.COMMISSION_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-
-function corsHeaders(origin?: string | null): Record<string, string> {
-  if (ALLOWED_ORIGINS.length === 0) return {};
-  const allowed = (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  };
-}
+import { corsHeaders } from "@/lib/commissions/cors";
+import { countWorkingDays } from "@/lib/commissions/date-utils";
+import { safeTokenEqual } from "@/lib/commissions/safe-compare";
 
 // OPTIONS preflight — handled by middleware OPEN_CORS_PATHS, but keep as fallback
 export async function OPTIONS(req: NextRequest) {
@@ -29,17 +20,6 @@ export async function OPTIONS(req: NextRequest) {
   });
 }
 
-// Count working days (excluding Saturdays / Shabbat)
-function countWorkingDays(start: Date, end: Date): number {
-  let count = 0;
-  const d = new Date(start);
-  while (d <= end) {
-    if (d.getDay() !== 6) count++; // 6 = Saturday
-    d.setDate(d.getDate() + 1);
-  }
-  return count;
-}
-
 export async function GET(req: NextRequest) {
   // Dual auth: bearer token (local app) OR admin session (admin panel)
   const authHeader = req.headers.get("authorization");
@@ -47,7 +27,7 @@ export async function GET(req: NextRequest) {
   const validToken = process.env.COMMISSION_API_TOKEN;
 
   let authed = false;
-  if (bearerToken && validToken && bearerToken === validToken) {
+  if (safeTokenEqual(bearerToken, validToken)) {
     authed = true;
   } else {
     const auth = await requireAdmin(req);

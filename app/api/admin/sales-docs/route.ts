@@ -8,6 +8,9 @@ export const GET = withPermission("commissions", "manage", async (req: NextReque
     const status = searchParams.get("status");
     const employeeKey = searchParams.get("employee_key");
     const month = searchParams.get("month"); // YYYY-MM
+    const from = searchParams.get("from"); // YYYY-MM-DD
+    const to = searchParams.get("to"); // YYYY-MM-DD
+    const source = searchParams.get("source");
     const search = searchParams.get("search")?.trim();
 
     let q = db
@@ -19,9 +22,12 @@ export const GET = withPermission("commissions", "manage", async (req: NextReque
 
     if (status) q = q.eq("status", status);
     if (employeeKey) q = q.eq("employee_key", employeeKey);
+    if (source) q = q.eq("source", source);
     if (month) {
       q = q.gte("sale_date", `${month}-01`).lte("sale_date", `${month}-31`);
     }
+    if (from) q = q.gte("sale_date", from);
+    if (to) q = q.lte("sale_date", to);
     if (search) {
       q = q.or(
         `notes.ilike.%${search}%,order_id.ilike.%${search}%,customer_id.ilike.%${search}%,employee_key.ilike.%${search}%`

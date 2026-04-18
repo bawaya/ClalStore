@@ -7,20 +7,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getBridgeDashboard, getUnifiedEmployees, getSyncGaps } from "@/lib/commissions/crm-bridge";
+import { corsHeaders as sharedCorsHeaders } from "@/lib/commissions/cors";
+import { safeTokenEqual } from "@/lib/commissions/safe-compare";
 
 const RATE_LIMIT = { maxRequests: 60, windowMs: 3600_000 };
 
-const ALLOWED_ORIGINS = (process.env.COMMISSION_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-
-function corsHeaders(origin?: string | null) {
-  const allowed = ALLOWED_ORIGINS.length === 0
-    ? "*"
-    : (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  };
+// Preserve this route's historical "wildcard when unset" behaviour.
+function corsHeaders(origin?: string | null): Record<string, string> {
+  return sharedCorsHeaders(origin, { wildcardWhenUnset: true });
 }
 
 export async function OPTIONS(req: NextRequest) {
@@ -33,7 +27,7 @@ async function authenticate(req: NextRequest): Promise<boolean> {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.replace("Bearer ", "");
   const validToken = process.env.COMMISSION_API_TOKEN;
-  if (validToken && token === validToken) return true;
+  if (safeTokenEqual(token, validToken)) return true;
 
   // 2. Admin session (cookie-based via Supabase SSR)
   const result = await requireAdmin(req);

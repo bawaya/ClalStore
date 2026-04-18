@@ -8,18 +8,15 @@ import {
   resolveCommissionEmployeeFilter,
   resolveLinkedAppUserId,
 } from "@/lib/commissions/ledger";
+import { corsHeaders as sharedCorsHeaders } from "@/lib/commissions/cors";
+import { safeTokenEqual } from "@/lib/commissions/safe-compare";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const ALLOWED_ORIGINS = (process.env.COMMISSION_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-
+// Local wrapper preserves the DELETE/PUT/POST methods list for this route.
 function corsHeaders(origin?: string | null): Record<string, string> {
-  if (ALLOWED_ORIGINS.length === 0) return {};
-  const allowed = (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  };
+  return sharedCorsHeaders(origin, {
+    methods: "GET, POST, PUT, DELETE, OPTIONS",
+  });
 }
 
 export async function OPTIONS(req: NextRequest) {
@@ -31,7 +28,7 @@ async function authenticate(req: NextRequest): Promise<boolean> {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const validToken = process.env.COMMISSION_API_TOKEN;
-  if (token && validToken && token === validToken) return true;
+  if (safeTokenEqual(token, validToken)) return true;
 
   const result = await requireAdmin(req);
   return !(result instanceof NextResponse);
@@ -90,8 +87,10 @@ export async function GET(req: NextRequest) {
   else if (employeeScope.employeeName) query = query.eq("employee_name", employeeScope.employeeName);
   if (search) {
     const normalizedSearch = search.replace(/,/g, " ");
+    // Escape ilike wildcards so user input can't inject patterns (audit issue 4.26).
+    const escaped = normalizedSearch.replace(/[%_\\]/g, "\\$&");
     query = query.or(
-      `customer_name.ilike.%${normalizedSearch}%,customer_phone.ilike.%${normalizedSearch}%,device_name.ilike.%${normalizedSearch}%,employee_name.ilike.%${normalizedSearch}%,order_id.ilike.%${normalizedSearch}%,store_customer_code_snapshot.ilike.%${normalizedSearch}%`,
+      `customer_name.ilike.%${escaped}%,customer_phone.ilike.%${escaped}%,device_name.ilike.%${escaped}%,employee_name.ilike.%${escaped}%,order_id.ilike.%${escaped}%,store_customer_code_snapshot.ilike.%${escaped}%`,
     );
   }
 

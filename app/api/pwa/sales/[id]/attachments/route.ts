@@ -68,7 +68,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     }
 
     const fileName = payload.file_path.split("/").pop();
-    const fileEntry = (listed || []).find((f) => f.name === fileName);
+    const fileEntry = (listed || []).find((f: { name: string }) => f.name === fileName);
     if (!fileEntry) {
       return apiError("الملف غير موجود في التخزين — ارفعه أولاً", 400);
     }

@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { COMMISSION, DEFAULT_EMPLOYEE_PROFILE, type EmployeeProfile } from "@/lib/commissions/calculator";
+import { lastDayOfMonth } from "@/lib/commissions/date-utils";
+
+// Re-export for back-compat — consumers previously imported this from ledger.ts.
+export { lastDayOfMonth };
 
 export const COMMISSIONABLE_STATUSES = ["approved", "shipped", "delivered"] as const;
 export const COMMISSION_CONTRACT_TARGET_KEY = "__contract__";
@@ -318,14 +322,6 @@ export function allocateDeviceCommissionRows(
   }
 
   return allocations;
-}
-
-/** Last day of a YYYY-MM month as YYYY-MM-DD (issue 4.17 fix). */
-export function lastDayOfMonth(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  // new Date(year, monthIndex+1, 0) = last day of monthIndex
-  const d = new Date(Date.UTC(y, m, 0));
-  return d.toISOString().slice(0, 10);
 }
 
 export async function recalculateDeviceCommissionsForMonths(

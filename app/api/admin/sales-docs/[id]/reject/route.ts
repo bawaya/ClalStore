@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, safeError } from "@/lib/api-response";
 import { hasPermission, requireAdmin } from "@/lib/admin/auth";
+import { actorId } from "@/lib/admin/actor";
 import { validateBody } from "@/lib/admin/validators";
 import { z } from "zod";
 
@@ -63,8 +64,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await db.from("sales_doc_events").insert({
       sales_doc_id: docId,
       event_type: "rejected",
-      actor_user_id: (auth as any).appUserId || (auth as any).id,
-      actor_role: (auth as any).role,
+      actor_user_id: actorId(auth as { appUserId?: string }),
+      actor_role: (auth as { role?: string }).role,
       payload: { status: "rejected", reason },
     });
 
