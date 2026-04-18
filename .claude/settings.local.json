@@ -126,7 +126,8 @@
       "Bash(curl -sS -o /dev/null -w \"reset: %{http_code}\\\\n\" \"https://www.clalmobile.com/reset-password\")",
       "Bash(npx opennextjs-cloudflare *)",
       "Bash(ls -la C:\\\\\\\\CLALSTORE\\\\\\\\clalmobile/)",
-      "Bash(echo \"--- exit: $? ---\")"
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(node -e \"const {timingSafeEqual} = require\\('crypto'\\); const a = Buffer.from\\(''\\); const b = Buffer.from\\(''\\); console.log\\('len', a.length, 'equal', timingSafeEqual\\(a,b\\)\\);\")"
     ]
   }
 }

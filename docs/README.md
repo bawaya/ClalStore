@@ -54,27 +54,27 @@ Don't open a GitHub issue — see [../SECURITY.md](../SECURITY.md) for private d
 
 | Document | Lines | What's inside |
 |----------|-------|---------------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | 561 | System topology, Mermaid diagrams, RBAC roles, integration hub, design decisions |
-| [DATABASE.md](./DATABASE.md) | 501 | ER diagram, 60+ tables, RLS summary, triggers, RPCs, migration order |
-| [API-REFERENCE.md](./API-REFERENCE.md) | 567 | 129+ routes grouped by module, auth guards, example requests |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | 644 | System topology, Mermaid diagrams, RBAC roles, integration hub, design decisions |
+| [DATABASE.md](./DATABASE.md) | 523 | ER diagram, 65+ tables, RLS summary, triggers, RPCs, migration order |
+| [API-REFERENCE.md](./API-REFERENCE.md) | 581 | ~145 routes grouped by module, auth guards, example requests |
 | [STORE.md](./STORE.md) | 407 | Customer journey, search, coupons, loyalty, checkout, payment providers |
-| [ADMIN.md](./ADMIN.md) | 525 | Products/orders/customers management, site CMS, Integration Hub, reports, RBAC matrix |
-| [CRM.md](./CRM.md) | 570 | Intercom-style Inbox, AI features, Pipeline with Mermaid states, handoff policy |
-| [COMMISSIONS.md](./COMMISSIONS.md) | 690 | Dual calculation model, three sources (Pipeline/PWA/Sync), cancel flow, month lock — _conceptual, rates in private docs_ |
-| [PWA.md](./PWA.md) | 554 | Sales PWA flow, customer linking, offline notes |
+| [ADMIN.md](./ADMIN.md) | 754 | Products/orders/customers management, sales-docs cancel, announcements, corrections, site CMS, RBAC matrix |
+| [CRM.md](./CRM.md) | 616 | Intercom-style Inbox, AI features, Pipeline (+ auto-commission on won), handoff policy |
+| [COMMISSIONS.md](./COMMISSIONS.md) | 835 | Unified register, three sources (Pipeline/PWA/Sync), cancel flow, month-lock trigger — _conceptual, rates in private docs_ |
+| [PWA.md](./PWA.md) | 711 | Unified employee PWA — dashboard, commissions, calculator, corrections, activity, announcements |
 | [BOT.md](./BOT.md) | 542 | WhatsApp bot engine, intent handling, safety rails, handoff, WebChat |
-| [TESTING.md](./TESTING.md) | 496 | Six-layer strategy (Vitest, CI, Staging, Smoke, Monitor, Synthetic), coverage targets |
+| [TESTING.md](./TESTING.md) | 519 | Six-layer strategy, coverage targets, 2889 tests / 175 files |
 | [SECURITY.md](./SECURITY.md) | 265 | Trust model, auth, RLS, CSRF, webhook signatures, rate limits, secrets rotation |
 | [OPERATIONS.md](./OPERATIONS.md) | 296 | Deployment flow, rollback, secret rotation, migration apply, monitoring dashboards |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | 495 | Cloudflare Workers + OpenNext build pipeline, env vars, 12+ GitHub workflows |
-| [MONITORING.md](./MONITORING.md) | 309 | Alert layers, hourly monitor, status page, alert channels |
-| [I18N.md](./I18N.md) | 349 | Arabic + Hebrew RTL, locale files, bilingual DB columns, date/currency formatting |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | 515 | Cloudflare Workers + OpenNext build pipeline, env vars, 14+ GitHub workflows |
+| [MONITORING.md](./MONITORING.md) | 318 | Alert layers, hourly monitor, status page, alert channels |
+| [I18N.md](./I18N.md) | 408 | Arabic + Hebrew RTL, locale files, bilingual DB columns, date/currency, PDF Cairo font |
 | [INCIDENT-RESPONSE.md](./INCIDENT-RESPONSE.md) | 156 | Severity ladder, first-5-minute checklist, common scenarios |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | 351 | Prerequisites, daily workflow, code style, commit messages, PR process |
 | [RUM-SETUP.md](./RUM-SETUP.md) | 124 | Cloudflare Web Analytics + Sentry plan |
 | [CHANGELOG.md](./CHANGELOG.md) | 32 | Pointer to root-level canonical changelog |
 
-_Total public docs: ~7,800 lines of structured documentation._
+_Total public docs: ~9,000 lines of structured documentation._
 
 ---
 

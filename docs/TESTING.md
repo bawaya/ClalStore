@@ -50,7 +50,7 @@ Four non-negotiables govern every test we write:
 
 ### Scope
 
-- **2889 tests** across **173 files** (up from 2722 / 166 before the 2026-04-18 employee-portal work; count steady after the 2026-04-18 attachments-system removal replaced deleted attachment tests with behaviour tests for the "no attachment check" submit path)
+- **2889 tests** across **175 files** (up from 2722 / 166 before the 2026-04-18 employee-portal work; file count held steady after the attachments-system removal because deleted attachment tests were replaced in-file with behaviour tests for the "no attachment check" submit path)
 - `tests/unit/` — pure functions (validators, calculators, formatters, state stores)
 - `tests/integration/api/` — Next.js route handlers with mocked Supabase
 - `tests/component/` — React components with `@testing-library/react`
