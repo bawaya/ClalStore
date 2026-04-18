@@ -1,0 +1,136 @@
+name: Publish Status Page
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # every 15 minutes
+  workflow_dispatch:
+
+permissions:
+  contents: write # push to status-page branch
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: status-page # the dedicated branch we publish from
+          fetch-depth: 1
+        continue-on-error: true # branch may not exist yet; we bootstrap it below
+
+      - name: Bootstrap status-page branch if missing
+        run: |
+          if [ ! -f status.json ]; then
+            echo "[bootstrap] creating orphan status-page branch"
+            git checkout --orphan status-page
+            git rm -rf . 2>/dev/null || true
+            cat > README.md <<'EOF'
+          # ClalMobile Status Page
+
+          This branch is auto-updated every 15 minutes by the
+          `publish-status.yml` workflow.
+
+          Static files served via GitHub Pages:
+            * `status.json` — latest snapshot
+            * `history.json` — last 168 snapshots (7 days × 24h)
+            * `index.html` — human-readable page
+          EOF
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Fetch the publish-status script from main; we want the latest logic
+      # even though we're committing to status-page.
+      - name: Fetch publish-status.js from main
+        run: |
+          mkdir -p tests/monitor
+          curl -fsSL \
+            "https://raw.githubusercontent.com/${{ github.repository }}/main/tests/monitor/publish-status.js" \
+            -o tests/monitor/publish-status.js
+
+      - name: Run status snapshot
+        env:
+          STATUS_BASE_URL: ${{ secrets.STATUS_BASE_URL || 'https://clalmobile.com' }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node tests/monitor/publish-status.js
+
+      - name: Write human-readable index.html
+        run: |
+          cat > index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <title>ClalMobile — Status</title>
+              <style>
+                :root { color-scheme: light dark; }
+                body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+                .pill { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-weight: 600; }
+                .up { background: #16a34a; color: white; }
+                .degraded { background: #d97706; color: white; }
+                .down { background: #dc2626; color: white; }
+                table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+                th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid rgba(128,128,128,0.3); }
+                .sparkline { display: flex; gap: 2px; align-items: end; height: 48px; }
+                .sparkline span { flex: 1; background: #16a34a; }
+                .sparkline span.degraded { background: #d97706; }
+                .sparkline span.down { background: #dc2626; }
+                small { color: #888; }
+              </style>
+            </head>
+            <body>
+              <h1>ClalMobile · Status</h1>
+              <p id="overall"></p>
+              <table>
+                <thead><tr><th>Service</th><th>Status</th><th>Response</th></tr></thead>
+                <tbody id="services"></tbody>
+              </table>
+              <h2>Last 7 days</h2>
+              <div id="sparkline" class="sparkline"></div>
+              <p><small id="lastcheck"></small></p>
+              <script>
+                (async () => {
+                  const [snap, hist] = await Promise.all([
+                    fetch('./status.json', { cache: 'no-store' }).then(r => r.json()),
+                    fetch('./history.json', { cache: 'no-store' }).then(r => r.json()).catch(() => []),
+                  ]);
+                  const pill = { up: 'up', operational: 'up', degraded: 'degraded', down: 'down' }[snap.status] || 'degraded';
+                  document.getElementById('overall').innerHTML =
+                    `<span class="pill ${pill}">${snap.status.toUpperCase()}</span>`;
+                  document.getElementById('services').innerHTML = Object.entries(snap.services)
+                    .map(([k, v]) => `<tr><td>${k}</td><td>${v.status}</td><td>${v.responseMs}ms</td></tr>`)
+                    .join('');
+                  const sl = document.getElementById('sparkline');
+                  sl.innerHTML = hist.map(h => {
+                    const cls = { operational: '', degraded: 'degraded', down: 'down' }[h.s] || '';
+                    return `<span class="${cls}" title="${h.t}"></span>`;
+                  }).join('');
+                  document.getElementById('lastcheck').textContent = `Last check: ${snap.lastCheck} · ${hist.length} samples`;
+                })().catch(e => document.body.insertAdjacentHTML('beforeend', '<p>Error loading status: ' + e.message + '</p>'));
+              </script>
+            </body>
+          </html>
+          EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add status.json history.json index.html README.md 2>/dev/null || true
+          # Keep the bootstrap script out of the published branch
+          git rm --cached tests/monitor/publish-status.js 2>/dev/null || true
+          rm -rf tests 2>/dev/null || true
+          if git diff --cached --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "[publish-status] no changes to commit"
+            exit 0
+          fi
+          git add -A
+          git commit -m "status: update snapshot at $(date -u +%FT%TZ)"
+          # Force-push to the orphan branch (it's append-only history of snapshots)
+          git push origin HEAD:status-page

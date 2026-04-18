@@ -1,32 +1,56 @@
-name: Hourly Monitor
+name: Synthetic user journeys
 
 on:
   schedule:
-    - cron: "0 * * * *" # every hour on the hour
+    - cron: "*/30 * * * *" # every 30 minutes
   workflow_dispatch:
 
 permissions:
   contents: read
-  issues: write # alert-dedup creates/closes alert issues
+  issues: write # for alert dedup via GitHub Issues
 
 jobs:
-  monitor:
+  synthetic:
+    name: Playwright user journeys on production
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Health check
-        id: health
+          cache: "npm"
+      - run: npm ci --legacy-peer-deps
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: pw-${{ runner.os }}-
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run synthetic user journeys
+        id: synthetic
         env:
-          MONITOR_URL: ${{ secrets.MONITOR_URL || 'https://clalmobile.com' }}
-        run: node tests/monitor/check.js
+          SYNTHETIC_BASE_URL: ${{ secrets.SYNTHETIC_BASE_URL || 'https://clalmobile.com' }}
+        run: npx playwright test --config=playwright.synthetic.config.ts
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-report
+          path: synthetic-report/
+          retention-days: 30
+
       - name: Deduped alert on failure
         if: failure()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ALERT_SOURCE: monitor
+          ALERT_SOURCE: synthetic
           YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
           WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
           ALERT_WHATSAPP: ${{ secrets.ADMIN_PERSONAL_PHONE }}
@@ -34,11 +58,12 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
         run: node tests/monitor/alert-dedup.js
-      - name: Auto-recover on success
+
+      - name: Auto-recover open alert on success
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ALERT_SOURCE: monitor
+          ALERT_SOURCE: synthetic
           YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
           WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
           ALERT_WHATSAPP: ${{ secrets.ADMIN_PERSONAL_PHONE }}

@@ -6,6 +6,10 @@ on:
   schedule:
     - cron: "0 6 * * *" # daily at 06:00 UTC
 
+permissions:
+  contents: read
+  issues: write # alert-dedup creates/closes alert issues
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -24,13 +28,27 @@ jobs:
         env:
           SMOKE_TEST_URL: ${{ secrets.SMOKE_TEST_URL || 'https://clalmobile.com' }}
         run: npx vitest run tests/smoke/ --config vitest.smoke.config.ts
-      - name: Alert on failure
+      - name: Deduped alert on failure
         if: failure()
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALERT_SOURCE: smoke
           YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
           WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
           ALERT_WHATSAPP: ${{ secrets.ADMIN_PERSONAL_PHONE }}
           ALERT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
-        run: node tests/smoke/alert.js
+        run: node tests/monitor/alert-dedup.js
+      - name: Auto-recover on success
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALERT_SOURCE: smoke
+          YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
+          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+          ALERT_WHATSAPP: ${{ secrets.ADMIN_PERSONAL_PHONE }}
+          ALERT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+        run: node tests/monitor/alert-dedup.js --recover
