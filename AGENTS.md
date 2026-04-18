@@ -1,20 +1,24 @@
 # Agent Guide — ClalMobile
 
+> Canonical conventions for any AI agent (Claude, Copilot, Cursor) and any human contributor touching this codebase. Read this top-to-bottom once, then use it as lookup.
+
 ## Stack
-Next.js 14 App Router · TypeScript (strict) · Tailwind CSS 3 · Supabase (Postgres + Auth + Storage) · Cloudflare Pages (edge) · Zod 4 validation · Zustand state · Vitest testing.
+Next.js 15 App Router · TypeScript (strict) · Tailwind CSS 3 · Supabase (Postgres + Auth + Storage) · Cloudflare Workers via OpenNext (edge) · Zod 4 validation · Zustand state · Vitest testing.
 
 ## Architecture
 
 | Area | Path | Purpose |
 |------|------|---------|
 | **Public Store** | `app/store/` | E-commerce storefront (products, cart, checkout, wishlist, compare, tracking) |
-| **Admin Panel** | `app/admin/` | Product/order/content management, analytics, bot config, push notifications |
+| **Admin Panel** | `app/admin/` | Product/order/content management, analytics, bot config, push notifications, sales-docs |
 | **CRM** | `app/crm/` | Inbox, customers, chats, orders, tasks, pipeline, reports, team users |
-| **API Routes** | `app/api/` | 99 route handlers — REST endpoints for all features |
-| **Business Logic** | `lib/` | Domain logic: `lib/store/`, `lib/admin/`, `lib/crm/`, `lib/bot/`, `lib/ai/`, `lib/commissions/`, `lib/integrations/` |
-| **Components** | `components/` | UI by domain: `store/`, `admin/`, `crm/`, `chat/`, `website/`, `shared/`, `ui/` |
-| **DB Types** | `types/database.ts` | 35+ table types — single source of truth for the Supabase schema |
-| **Migrations** | `supabase/migrations/` | 26 SQL migrations defining the full schema (001-026) |
+| **Sales PWA** | `app/sales-pwa/` | Field-sales mobile web app — documents → commissions |
+| **Employee portal** | `app/employee/` | Self-service commissions view (read-only) |
+| **API Routes** | `app/api/` | 129+ route handlers — see `docs/API-REFERENCE.md` |
+| **Business Logic** | `lib/` | Domain logic: `lib/store/`, `lib/admin/`, `lib/crm/`, `lib/bot/`, `lib/ai/`, `lib/commissions/`, `lib/integrations/`, `lib/pwa/` |
+| **Components** | `components/` | UI by domain: `store/`, `admin/`, `crm/`, `chat/`, `website/`, `shared/`, `ui/`, `pwa/` |
+| **DB Types** | `types/database.ts` | 60+ table types — single source of truth for the Supabase schema |
+| **Migrations** | `supabase/migrations/` | 50 SQL migrations — sequential, never edited in place |
 | **i18n** | `locales/` | Hebrew (`he.json`) + Arabic (`ar.json`) — RTL bilingual UI |
 | **Fonts** | `app/fonts.ts` | `next/font/google` (Heebo, Tajawal, David Libre) — applied on `<html>` in `app/layout.tsx` |
 | **Public URL helper** | `lib/public-site-url.ts` | `getPublicSiteUrl()` for redirects, webhooks, admin links (not for PDF print popups — those may still load Google Fonts) |
@@ -66,9 +70,10 @@ npm run db:reset         # Reset DB
 
 ### Database
 - All table types in `types/database.ts` — update this file when adding/modifying tables.
-- RLS policies enforced — service role for server operations, anon for public reads.
-- Migrations are sequential: `001_initial_schema.sql` through `026_commissions_lock_and_analytics.sql`.
+- RLS is the default; every table lives under a policy (see `docs/DATABASE.md`). Most user-facing tables are `service_role`-only; API routes use `createAdminSupabase()` as the single trusted path.
+- Migrations are sequential under `supabase/migrations/`; never edit an applied migration in place — add a new one. Current tip: `20260418000005_fix_onconflict_constraint.sql`.
 - Use `createServerSupabase()` for server components, `createBrowserSupabase()` for client, `createAdminSupabase()` for service-role ops.
+- **Month lock** is enforced by DB trigger `check_month_lock` on `commission_sales` + `commission_sanctions`. To modify locked-month data, unlock temporarily via `commission_targets.is_locked` then re-lock — see `docs/private/RUNBOOK.md`.
 
 ### Integrations (`lib/integrations/`)
 - Provider registry pattern: `hub.ts` manages providers by type (payment, email, sms, whatsapp).
@@ -93,5 +98,16 @@ npm run db:reset         # Reset DB
 - **Customers**: segments: vip/loyal/active/new/cold/lost/inactive; loyalty program with points tiers (bronze/silver/gold/platinum).
 - **Bot**: Multi-channel (webchat, WhatsApp, SMS); intent detection; AI-powered responses via Claude; handoff to human agents; 14 modules in `lib/bot/`.
 - **Pipeline**: Sales stages: lead → negotiation → proposal → won/lost.
-- **Commissions**: HOT Mobile dealer commission tracking in `lib/commissions/` + `app/admin/commissions/` (6 sub-pages) + `app/api/admin/commissions/` (8 endpoints). Three revenue streams: line commissions (package×4), device commissions (5% + milestone bonuses per 50K), loyalty bonuses (at 5/9/12/15 months). 9 sanction types. Auto-sync from orders table. External bearer-token API for local HTML app. 4 DB tables: `commission_sales`, `commission_targets`, `commission_sanctions`, `commission_sync_log`.
+- **Commissions**: HOT Mobile dealer commission tracking. Single entry point: `lib/commissions/register.ts::registerSaleCommission()` — used by Pipeline (deal → won stage), Sales PWA (direct submit), and hourly order sync. Details in `docs/COMMISSIONS.md` (conceptual) and `docs/private/COMMISSION_RATES.md` (actual rates). Sale types: `line` (package × configurable multiplier), `device` (configurable base % + contract-wide milestone bonus). Rate snapshot (`rate_snapshot JSONB`) pins rates at sale time for historical accuracy. Nine sanction types (see private docs for amounts). Month lock via DB trigger. 6 DB tables: `commission_sales`, `commission_targets`, `commission_sanctions`, `commission_employees`, `employee_commission_profiles`, `commission_sync_log`.
+- **Sales PWA**: Field agents document sales via `/sales-pwa/*`. Flow: create draft → upload attachments via signed URL (Storage bucket `sales-docs-private`) → submit → atomic transition → `registerSaleCommission()` fires immediately. No manager approval. Managers can cancel later via `/api/admin/sales-docs/[id]/cancel` — soft-deletes linked commissions and recalculates month. Details in `docs/PWA.md`.
+- **Pipeline → commissions**: When a deal lands in a `pipeline_stages.is_won=true` stage for the first time (drag OR `convertPipelineDealToOrder`), `autoRegisterWonDealCommission()` creates a `sales_doc` + fires `registerSaleCommission()` with `source='pipeline'`. Idempotent via `idempotency_key = 'pipeline_<dealId>'`.
 - **Categories**: Admin category management in `app/admin/categories/` + `app/api/admin/categories/`.
+
+## Docs hierarchy
+- Root `README.md` — overview, quick start, badges.
+- Root `AGENTS.md` (this file) — agent/contributor guide.
+- Root `PROJECT_MAP.md` — auto-generated directory inventory.
+- Root `CHANGELOG.md` — Keep-a-Changelog format.
+- `docs/` — canonical technical documentation (architecture, DB, API, commissions, PWA, bot, store, admin, CRM, testing, deployment, monitoring, i18n, security, contributing, incident-response, operations, RUM).
+- `docs/private/` — gitignored; rates, business rules, runbook, infrastructure, onboarding, audit history.
+- Before starting a new session, skim `PROJECT_MAP.md` for the current surface area.

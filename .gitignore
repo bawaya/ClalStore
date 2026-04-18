@@ -75,3 +75,10 @@ reports/mutation/
 # Synthetic test output
 synthetic-report/
 synthetic-results.json
+
+# Private documentation — never push to the public repo
+/docs/private/
+/docs/internal/
+PRIVATE_*.md
+*_SECRETS.md
+*_CREDENTIALS.md

@@ -4,15 +4,135 @@
 
 ## Table of Contents
 
+- [Products overview](#products-overview)
+- [Tech stack layers](#tech-stack-layers)
 - [High-level topology](#high-level-topology)
 - [Runtime stack](#runtime-stack)
 - [Application layout](#application-layout)
 - [Data model](#data-model)
 - [Integration Hub](#integration-hub)
+- [RBAC — roles & permissions](#rbac--roles--permissions)
 - [Rendering & caching](#rendering--caching)
 - [Bilingual + RTL](#bilingual--rtl)
 - [Responsiveness](#responsiveness)
 - [Key design decisions](#key-design-decisions)
+
+---
+
+## Products overview
+
+ClalMobile is a single Next.js 15 monolith that serves **six distinct products** out of the same codebase, database, and Cloudflare Worker. Every product shares the same auth layer, RLS-protected Postgres, and Integration Hub — only the URL prefix and the role gate differ.
+
+| # | Product | URL prefix | Audience | Purpose |
+|---|---------|------------|----------|---------|
+| 1 | **Website** | `/` (+ `/about`, `/faq`, `/legal`, `/contact`) | Public | Marketing surface + brand pages, CMS-managed via `website_content` + `sub_pages` |
+| 2 | **Store** | `/store` | Customer (anon / OTP) | E-commerce storefront — catalog, cart, wishlist, compare, checkout, track, account |
+| 3 | **Admin** | `/admin` | Staff (super_admin / admin) | Product/order/commission/CMS admin — reads and writes every table |
+| 4 | **CRM** | `/crm` | Staff (super_admin / admin / sales) | Unified inbox, customer 360, deal pipeline, tasks, daily reports |
+| 5 | **WhatsApp Bot** | `/api/webhook/whatsapp` | WhatsApp users (via yCloud) | Auto-reply engine with intent detection + handoff; logs into `bot_conversations` |
+| 6 | **WebChat Widget** | embedded on `/` + `/store` | Anon site visitors | Floating chat bubble that shares the same engine as the WhatsApp Bot |
+
+Additionally, a lightweight **Sales PWA** (`/sales-pwa`) runs as a seventh, internal-only installable app for field agents — offline-capable, syncing `sales_docs` to the backend when connectivity returns.
+
+### Product relationship
+
+```mermaid
+graph LR
+  Customer[Customer / visitor] --> Website
+  Customer --> Storefront
+  Storefront --> StoreAPI[Store API<br/>/api/store, /api/orders]
+  Website --> CMS[CMS tables<br/>website_content, sub_pages]
+
+  Agent[Field agent] --> SalesPWA[Sales PWA<br/>/sales-pwa]
+  SalesPWA --> PWAAPI[PWA API<br/>/api/pwa]
+  PWAAPI --> SalesDocs[(sales_docs)]
+
+  Manager[Manager / admin] --> AdminPanel[Admin<br/>/admin]
+  Manager --> CRM[CRM<br/>/crm]
+  CRM --> Inbox[Unified Inbox<br/>WhatsApp + WebChat]
+  CRM --> Pipeline[Deal Pipeline<br/>kanban]
+  CRM --> Customers[Customer 360]
+
+  WhatsappUser[WhatsApp user] --> yCloud
+  yCloud --> BotWebhook[/api/webhook/whatsapp]
+  BotWebhook --> BotEngine[lib/bot/engine]
+
+  Visitor[Anon visitor] --> WebChat[WebChat Widget]
+  WebChat --> BotEngine
+
+  BotEngine --> Inbox
+  BotEngine --> Claude[Claude API]
+
+  StoreAPI --> Supabase[(Supabase<br/>Postgres + RLS)]
+  PWAAPI --> Supabase
+  AdminPanel --> Supabase
+  CRM --> Supabase
+  BotEngine --> Supabase
+```
+
+---
+
+## Tech stack layers
+
+```mermaid
+graph TB
+  subgraph Client
+    Browser[Browser<br/>Storefront / Admin / CRM]
+    PWAClient[Sales PWA<br/>IndexedDB + Service Worker]
+    WAClient[WhatsApp client]
+  end
+
+  subgraph Edge["Cloudflare Worker (OpenNext)"]
+    MW[middleware.ts<br/>Auth · CSRF · RateLimit · CORS · CSP]
+    RSC[Server Components<br/>SSR / ISR]
+    API[API Routes<br/>100+ route handlers]
+  end
+
+  subgraph Libs["lib/ — shared business logic"]
+    AuthLib[lib/admin/auth.ts<br/>requireAdmin + RBAC]
+    Hub[lib/integrations/hub.ts<br/>Provider registry]
+    BotLib[lib/bot/engine.ts<br/>Intent + guardrails]
+    CommLib[lib/commissions/<br/>calculator + ledger]
+    CRMLib[lib/crm/<br/>inbox + pipeline]
+  end
+
+  subgraph Supabase["Supabase — PostgreSQL 17"]
+    Auth[Auth<br/>auth.users + JWT]
+    PG[(Postgres<br/>60+ tables<br/>RLS on every sensitive table)]
+    Storage[Storage<br/>products bucket]
+    Realtime[Realtime<br/>inbox channel]
+  end
+
+  subgraph Integrations["External providers (swappable)"]
+    yCloud[yCloud<br/>WhatsApp]
+    Twilio[Twilio<br/>SMS]
+    Rivhit[Rivhit / iCredit<br/>Payment]
+    UPay[UPay<br/>Payment alt]
+    Resend[Resend / SendGrid<br/>Email]
+    R2[Cloudflare R2<br/>Object storage]
+    Claude[Anthropic Claude]
+    Gemini[Google Gemini]
+  end
+
+  Browser --> MW
+  PWAClient --> MW
+  WAClient --> yCloud
+  MW --> RSC
+  MW --> API
+  RSC --> Libs
+  API --> Libs
+  Libs --> Auth
+  Libs --> PG
+  Libs --> Storage
+  Libs --> Realtime
+  Hub --> yCloud
+  Hub --> Twilio
+  Hub --> Rivhit
+  Hub --> UPay
+  Hub --> Resend
+  BotLib --> Claude
+  Libs --> R2
+```
 
 ---
 
@@ -195,24 +315,88 @@ See [SECURITY.md → RLS](./SECURITY.md#row-level-security-rls-on-supabase).
 
 ## Integration Hub
 
-`lib/integrations/hub.ts` implements a provider registry for 6 categories:
+`lib/integrations/hub.ts` implements a provider registry for 6 categories. Each category has a **TypeScript interface**; each active provider exports a class that satisfies it. The business logic never imports a provider directly — it always calls `getProvider(type)` and talks to the interface.
 
-| Category | Interface | Providers |
-|----------|-----------|-----------|
-| Payment | `PaymentProvider` | Rivhit (iCredit), UPay |
-| Email | `EmailProvider` | SendGrid, Resend |
-| SMS | `SMSProvider` | Twilio |
-| WhatsApp | `WhatsAppProvider` | yCloud |
-| Shipping | `ShippingProvider` | *(slot, not wired)* |
-| Storage | *(direct call, not HOF)* | Supabase Storage, Cloudflare R2 |
+| Category | Interface | Primary provider | Alternative | Switch signal |
+|----------|-----------|------------------|-------------|---------------|
+| Payment | `PaymentProvider` | Rivhit (iCredit) | UPay | `integrations.config.provider` or env `RIVHIT_API_KEY` / `UPAY_API_KEY` |
+| Email | `EmailProvider` | Resend | SendGrid | `RESEND_API_KEY` preferred; falls back to `SENDGRID_API_KEY` |
+| SMS | `SMSProvider` | Twilio | — | `TWILIO_ACCOUNT_SID` or `integrations.sms.config` |
+| WhatsApp | `WhatsAppProvider` | yCloud | *(Twilio WA reserved)* | `YCLOUD_API_KEY` or `integrations.whatsapp.config` |
+| Shipping | `ShippingProvider` | — | — | *(interface defined, no concrete provider yet)* |
+| Storage | *(direct module, not Hub-wrapped)* | Cloudflare R2 | Supabase Storage fallback | `lib/storage.ts` picks based on `R2_*` env |
 
-### Runtime behavior
+### Runtime flow
 
-1. On first use, `getProvider(type)` calls `initializeProviders()` which reads the `integrations` table
-2. For each active config, a provider class is instantiated (e.g., `new RivhitProvider()`)
-3. The provider is cached in-memory; `registerProvider()` allows hot-swap for tests
+```
+API route needs to send an email
+    │
+    ▼
+lib/notifications.ts → getProvider<EmailProvider>("email")
+    │
+    ▼
+hub.ts → ensureInitialized() → initializeProviders() (only once per worker)
+    │         │
+    │         ├─ Read `integrations` table for "email" row
+    │         ├─ If row.status='active' AND row.config.api_key → use that
+    │         └─ Else fall back to process.env.RESEND_API_KEY / SENDGRID_API_KEY
+    │
+    ▼
+Dynamic import the matching class (`./resend` → `new ResendProvider()`)
+    │
+    ▼
+Registered in in-memory `providers` map; returned to caller
+    │
+    ▼
+provider.send({ to, subject, html }) — caller never knows which vendor ran it
+```
 
-This means the admin can swap providers (e.g., SendGrid → Resend) via the `integrations` table without code changes.
+### Why this matters
+
+1. **Hot-swap in the admin UI.** An admin can flip the payment vendor from Rivhit to UPay by editing one `integrations` row — no deploy, no code change.
+2. **Cost/latency tuning.** Under load, Resend is faster for transactional email while SendGrid is better for bulk marketing — we can hint the hub per call type.
+3. **Testing.** `registerProvider("email", fakeProvider)` in a Vitest setup file swaps the real vendor for a mock.
+
+---
+
+## RBAC — roles & permissions
+
+The in-memory permission map in `lib/admin/auth.ts` mirrors the `permissions` + `role_permissions` seed in migration `20260406000002_rbac_permissions.sql`. Roles are persisted on `users.role` (values constrained by a `CHECK` constraint).
+
+### Role catalog
+
+| Role | Where it's assigned | Can access | Notable restrictions |
+|------|---------------------|------------|----------------------|
+| **super_admin** | Bootstrap (first user in empty `users` table); can promote others | Everything — wildcard `*` permission | None; only role allowed to `users.manage_roles` |
+| **admin** | Promoted by super_admin in `/admin/settings/users` | Full admin + CRM + commissions + reports | Cannot reassign roles of other users |
+| **sales** | Assigned to field / in-store sales staff | CRM (`view`, `create`, `edit`), commissions (`view`, `create`), orders (`view`, `create`, `edit`), products (view), store (view), admin (view only) | Cannot delete records, edit settings, or manage users |
+| **support** | Assigned to support desk | Configured per deploy (typically CRM-only) | No commissions, no settings |
+| **content** | Assigned to content/marketing | Store edit, website CMS, products (view) | No orders, no CRM, no commissions |
+| **viewer** | Read-only staff | Every module's `.view` action | No writes anywhere |
+| **customer** | Auto-created on first store checkout via OTP | Only `/store` + `/store/account` + `/store/track` | Blocked by `requireAdmin()` from any `/admin` or `/crm` route |
+| **guest** | No `users` row — just an IP | `/`, `/store`, FAQ, legal, contact, webchat | Cannot check out without providing phone + address |
+
+> `customer` and `guest` are not rows in `role_permissions` — they are excluded from the staff permission system and gated at the route level.
+
+### Permission model (simplified)
+
+```
+users.role  →  role_permissions  →  permissions (module.action pairs)
+
+Example chain:
+  users.role = 'sales'
+     └─► role_permissions rows for role='sales'
+            └─► permission "commissions.create" is in the set
+                  ⇒ /api/admin/commissions/sales/POST succeeds
+```
+
+All admin API routes wrap their handler in `withPermission(module, action, ...)`. The wrapper:
+
+1. Calls `requireAdmin(req)` — 401 if no session, 403 if `users.status != 'active'` or role is blocked (`customer`, `viewer`).
+2. Looks up the in-memory `ROLE_PERMISSIONS` map — 403 if missing.
+3. Passes a typed `{ user, db }` context to the handler.
+
+Bootstrapping note: if the `users` table is empty, the first authenticated Supabase user is auto-inserted as `super_admin` so the system is never left without an operator.
 
 ---
 
@@ -253,21 +437,42 @@ Patterns:
 
 ## Key design decisions
 
-### Why Cloudflare Workers, not Vercel?
+### Why one monolithic Next.js repo, not six separate services?
 
-Cost at scale + global edge for Israeli traffic routing. OpenNext adapter is mature enough to run Next.js 15 App Router seamlessly.
+Each "product" (Website / Store / Admin / CRM / Bot / WebChat) shares ~80% of its code: the same `lib/` utilities, the same `types/database.ts`, the same auth layer, the same RLS rules, the same build pipeline. Splitting would mean duplicating all of that, plus adding an internal API contract we'd have to keep in sync. A single App Router tree lets us cross-reference types, rely on the same middleware, and ship every product from one deploy — with a route-level gate (`requireAdmin` / `requireEmployee` / anon) picking the audience at request time.
+
+### Why OpenNext on Cloudflare Workers, not Vercel?
+
+Cost at scale + global edge for Israeli traffic routing. OpenNext adapter is mature enough to run Next.js 15 App Router seamlessly, including server components, server actions, edge middleware, and ISR — the only concession is `images.unoptimized: true` (Cloudflare Workers can't ship `sharp`).
 
 ### Why Zustand, not Redux/Jotai/Context?
 
 Three stores total (`cart`, `wishlist`, `compare`) — Redux is overkill, context adds prop-drilling. Zustand's `persist` middleware ships localStorage out of the box.
 
+### Why `service_role` from API routes, not anon JWT + RLS-scoped queries?
+
+Two reasons:
+
+1. **RLS is a safety net, not the primary gate.** Our primary gate is `requireAdmin()` / `requireEmployee()` in `lib/admin/auth.ts` — those functions resolve the Supabase session, look up `users.role`, and reject on wrong role or suspended status before a query is ever run. RLS policies then add a defense-in-depth layer.
+2. **Some flows require cross-row writes.** Creating an order touches `orders`, `order_items`, `customers` (upsert), `coupons` (increment), `products` (stock decrement), `audit_log`, and `commission_sales` — all in one transaction via the `create_order_atomic()` RPC. An anon or customer JWT can't legally touch most of those tables, and `SECURITY DEFINER` RPCs would still need elevated grants. Using `service_role` from the API route is the simplest correct design.
+
+Anon client code does exist (`lib/supabase.ts → createServerSupabase()`) for read-only public queries that go through PostgREST with the `public_read` policies.
+
+### Why no client-side Supabase SDK for writes?
+
+Every write path in the app goes through a Next.js route handler that calls `createAdminSupabase()` (service_role) after auth. We deliberately avoid `createBrowserSupabase()` for writes because:
+
+- The browser client would need the anon key and rely purely on RLS policies for authorization. One buggy policy and a user could exfiltrate any row that passes `auth.uid() IS NOT NULL`.
+- CSRF, rate-limiting, audit logging, and server-side schema validation (Zod) all happen in the API route layer. Bypassing that for "direct writes" removes half our safety mechanisms.
+- We still use `createBrowserSupabase()` for realtime subscriptions on the CRM inbox (read-only channel).
+
+### Why RLS `FORCE` on only 2 tables instead of all?
+
+`FORCE` applies even to `BYPASSRLS` roles, which breaks Postgres's internal FK validation on tables that are FK targets (when the FK check needs to SELECT the referenced row). We keep `FORCE` on `sub_pages` and `audit_log` (no FK-inbound writes) and rely on standard `ENABLE RLS` + service-role-only policies elsewhere. See migration `20260418000002_harden_rls_followup.sql` for the full reasoning.
+
 ### Why mock Supabase in CI instead of using Supabase CLI locally?
 
 CLI requires Docker and 2 min of bootstrap per test run. A 100-line mock HTTP server (`tests/ci/mock-supabase.mjs`) answers enough of the PostgREST shape that Server Components render empty-state UI. Real Supabase behavior is tested in Layer 3 (staging) where it matters.
-
-### Why FORCE RLS on only 2 tables instead of all?
-
-FORCE applies even to `BYPASSRLS` roles, which breaks Postgres's internal FK validation on tables that are FK targets (when the FK check needs to SELECT the referenced row). We keep FORCE on `sub_pages` and `audit_log` (no FK-inbound writes) and rely on standard `ENABLE RLS` + service-role-only policies elsewhere.
 
 ### Why `sb_secret_` keys, not JWT `service_role`?
 

@@ -1,4 +1,4 @@
-# cleanup-cf-pages.ps1 — PowerShell counterpart to cleanup-cf-pages.mjs.
+# cleanup-cf-pages.ps1 - PowerShell counterpart to cleanup-cf-pages.mjs.
 # Uses your active `wrangler login` session (no API token needed).
 #
 # Run from the repo root:
@@ -14,59 +14,80 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "[cleanup] project=$Project dry-run=$(-not $Execute)" -ForegroundColor Cyan
 
-# Probe: list deployments via wrangler (JSON output)
-Write-Host "[cleanup] fetching deployments..." -ForegroundColor Gray
-$raw = npx --yes wrangler@latest pages deployment list --project-name=$Project 2>&1 | Out-String
-
-# Parse the Id column — every row starts with a UUID
-$deploymentIds = [regex]::Matches($raw, '([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})') |
-    ForEach-Object { $_.Groups[1].Value } |
-    Select-Object -Unique
-
-$total = $deploymentIds.Count
-Write-Host "[cleanup] found $total deployments" -ForegroundColor Cyan
-
-if ($total -eq 0) {
-    Write-Host "[cleanup] nothing to delete — trying project delete" -ForegroundColor Yellow
-    if ($Execute) {
-        npx --yes wrangler@latest pages project delete $Project --yes
-    } else {
-        Write-Host "[dry] would: wrangler pages project delete $Project --yes"
+function Get-DeploymentIds {
+    param([string]$ProjectName)
+    $raw = npx --yes wrangler@latest pages deployment list --project-name=$ProjectName 2>&1 | Out-String
+    $ms = [regex]::Matches($raw, '([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})')
+    $ids = @()
+    foreach ($m in $ms) {
+        $uuid = $m.Groups[1].Value
+        if ($ids -notcontains $uuid) { $ids += $uuid }
     }
-    exit 0
+    return ,$ids
 }
 
-$deleted = 0
-$failed = 0
+$totalDeleted = 0
+$totalFailed  = 0
+$round        = 0
 
-foreach ($id in $deploymentIds) {
-    if (-not $Execute) {
-        Write-Host "  [dry] would delete $id"
-        continue
+while ($true) {
+    $round++
+    Write-Host "[cleanup] round $round - fetching deployments..." -ForegroundColor Gray
+    $deploymentIds = Get-DeploymentIds -ProjectName $Project
+    $batch = $deploymentIds.Count
+    Write-Host "[cleanup] round $round - found $batch deployments" -ForegroundColor Cyan
+
+    if ($batch -eq 0) { break }
+
+    foreach ($id in $deploymentIds) {
+        if (-not $Execute) {
+            Write-Host "  [dry] would delete $id"
+            continue
+        }
+        try {
+            npx --yes wrangler@latest pages deployment delete $id --project-name=$Project --force 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "wrangler exited with $LASTEXITCODE" }
+            $totalDeleted++
+            Write-Host "  [OK]   $id" -ForegroundColor Green
+        } catch {
+            $totalFailed++
+            Write-Host "  [FAIL] ${id}: $_" -ForegroundColor Red
+        }
     }
-    try {
-        npx --yes wrangler@latest pages deployment delete $id --project-name=$Project --yes 2>&1 | Out-Null
-        $deleted++
-        Write-Host "." -NoNewline -ForegroundColor Green
-    } catch {
-        $failed++
-        Write-Host "`n  ✗ $id`: $_" -ForegroundColor Red
+
+    # Dry-run exits after one round (no deletions = list would never shrink)
+    if (-not $Execute) { break }
+
+    # Safety: bail if all 25 errored (otherwise infinite loop)
+    if ($totalFailed -ge ($round * $batch)) {
+        Write-Host "[cleanup] all deletions failing - bailing out" -ForegroundColor Red
+        exit 1
+    }
+
+    if ($round -ge 200) {
+        Write-Host "[cleanup] too many rounds - something is wrong" -ForegroundColor Red
+        exit 1
     }
 }
+
 Write-Host ""
-
-Write-Host "[cleanup] deleted=$deleted failed=$failed" -ForegroundColor Cyan
+Write-Host "[cleanup] totalDeleted=$totalDeleted totalFailed=$totalFailed" -ForegroundColor Cyan
 
 if (-not $Execute) {
-    Write-Host "[cleanup] dry-run; re-run with -Execute to actually delete" -ForegroundColor Yellow
+    Write-Host "[cleanup] dry-run complete. Re-run with -Execute to actually delete." -ForegroundColor Yellow
     exit 0
 }
 
-if ($failed -gt 0) {
-    Write-Host "[cleanup] some deployments failed — not deleting project yet" -ForegroundColor Red
+if ($totalFailed -gt 0) {
+    Write-Host "[cleanup] some deletions failed - not deleting project yet" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "[cleanup] deleting project..." -ForegroundColor Cyan
 npx --yes wrangler@latest pages project delete $Project --yes
-Write-Host "[cleanup] ✓ project $Project deleted" -ForegroundColor Green
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "[cleanup] OK - project $Project deleted" -ForegroundColor Green
+} else {
+    Write-Host "[cleanup] project delete failed (exit $LASTEXITCODE)" -ForegroundColor Red
+    exit 1
+}

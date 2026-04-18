@@ -90,7 +90,17 @@
       "Bash(clip.exe)",
       "Bash(curl -s -o /tmp/probe.json -w 'HTTP %{http_code}\\\\n' -X GET https://api.supabase.com/v1/projects -H 'Authorization: Bearer __TRACKED_VAR__')",
       "Bash(curl -s -o /tmp/query-probe.json -w 'HTTP %{http_code}\\\\n' -X POST https://api.supabase.com/v1/projects/nhvcfmhvrcsggpdjaejk/database/query -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"query\":\"SELECT current_database\\(\\), version\\(\\)\"}')",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(git add *)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"C:\\\\CLALSTORE\\\\clalmobile\\\\scripts\\\\cleanup-cf-pages.ps1\")",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"C:\\\\CLALSTORE\\\\clalmobile\\\\scripts\\\\cleanup-cf-pages.ps1\" -Execute)",
+      "Bash(npx --yes wrangler@latest pages deployment delete --help)",
+      "Bash(npx --yes wrangler@latest pages project delete --help)",
+      "Bash(git stash *)",
+      "Bash(supabase db *)",
+      "Bash(npx --yes supabase db push)",
+      "Bash(npx --yes supabase migration repair --status applied 20260417000001 20260418000001 20260418000002)",
+      "Bash(npx --yes supabase migration list)"
     ]
   }
 }

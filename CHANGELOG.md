@@ -5,15 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] — 2026-04-18
 
-### Added
+### Added — Commission system refactor
+
+- **Unified `registerSaleCommission`** — single entry point for awarding commissions across Pipeline, PWA, and manual sale flows (replaces three divergent call sites)
+- **Admin sales-docs management** at `/admin/sales-docs` — attachment review, status transitions, signed-URL download
+- **Employee commission portal** at `/employee/commissions` — personal commission ledger, target progress, sanctions history
+- **Commission sync workflow** — `.github/workflows/commission-sync.yml` runs hourly at :30, pulls orders from the last cursor, awards commissions idempotently via `UNIQUE(order_id, sale_type)` + `ON CONFLICT DO NOTHING`
+- **75 new tests** covering the unified commission path — zero regression on admin/employee UIs
+
+### Added — Documentation
+
+- Public docs set — `docs/I18N.md`, `docs/DEPLOYMENT.md`, `docs/MONITORING.md`, `docs/CHANGELOG.md`
 - Enterprise documentation set under `docs/` — `TESTING.md`, `SECURITY.md`, `OPERATIONS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `INCIDENT-RESPONSE.md`, `RUM-SETUP.md`
 - `CHANGELOG.md` following the Keep a Changelog convention
 - `.github/PULL_REQUEST_TEMPLATE.md` and issue templates
 
+### Fixed
+
+- **Commission sync migration** — dropped partial unique index in favor of a plain `UNIQUE(order_id, sale_type)` so `ON CONFLICT` can target it cleanly
+- **`onConflict` clause** in `sync-orders.ts` now matches the real `UNIQUE(order_id, sale_type)` constraint (previously targeted a column tuple that didn't match any index)
+- **`commission_sales.employee_id` type** — migration corrected to treat the column as UUID, removed the stray `::text` cast that was breaking joins
+- Legacy Cloudflare Pages build no longer crashes — `scripts/prepare-pages.mjs` stubbed for back-compat
+- Status page deploy migrated to GitHub Pages native API (was publishing via an orphan branch)
+
 ### Changed
+
 - `README.md` updated to reflect the six-layer testing strategy and documentation hub
+- Commission award flow now emits a single unified event shape — downstream reports and exports only need to read one schema
 
 ---
 
