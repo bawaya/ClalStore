@@ -78,12 +78,16 @@ export function SalesPwaShell({ children }: { children: ReactNode }) {
         if (!res.ok) return;
         const json: unknown = await res.json().catch(() => ({}));
         if (cancelled) return;
-        // apiSuccess wraps payload in { success, data }
-        const data =
+
+        // apiSuccess wraps payload as { success: true, data: {...} }. The
+        // unwrap below supports both that shape and a bare `{ name, email }`
+        // payload (for future robustness), then falls back through name →
+        // email → nothing.
+        const wrapped =
           json && typeof json === "object" && "data" in json
             ? (json as { data?: { name?: string; email?: string } }).data
             : (json as { name?: string; email?: string } | undefined);
-        const display = data?.name || data?.email || "";
+        const display = wrapped?.name || wrapped?.email || "";
         if (display) setEmployeeName(display);
       } catch {
         /* ignore */

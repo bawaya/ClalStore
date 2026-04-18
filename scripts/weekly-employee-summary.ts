@@ -211,7 +211,16 @@ async function main() {
   const serviceKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
   const yCloudKey = process.env.YCLOUD_API_KEY || "";
   const fromPhone = process.env.WHATSAPP_PHONE_ID || "";
-  const dryRun = (process.env.WEEKLY_SUMMARY_DRY_RUN ?? "true").toLowerCase() !== "false";
+  // DRY_RUN parsing: only the exact string "false" (case-insensitive, trimmed)
+  // flips to live mode. Typos like "flase" or anything unexpected are surfaced
+  // via warning and fall back to dry-run (safe default).
+  const dryRunRaw = (process.env.WEEKLY_SUMMARY_DRY_RUN ?? "").trim().toLowerCase();
+  if (dryRunRaw && dryRunRaw !== "true" && dryRunRaw !== "false") {
+    console.warn(
+      `[weekly-summary] WARNING: WEEKLY_SUMMARY_DRY_RUN="${process.env.WEEKLY_SUMMARY_DRY_RUN}" is not "true" or "false" — defaulting to dry-run mode`,
+    );
+  }
+  const dryRun = dryRunRaw !== "false";
 
   if (!dryRun && (!yCloudKey || !fromPhone)) {
     console.error("[weekly-summary] dry-run=false but YCLOUD_API_KEY or WHATSAPP_PHONE_ID missing — aborting");

@@ -11,8 +11,13 @@ export function ConnectionBanner() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Initial sync in case the flag drifted while store was initializing
-    setOnline(navigator.onLine);
+    // Sync with navigator.onLine only if it actually differs from the store,
+    // to avoid a pointless re-render (and visible banner flicker) when the
+    // Zustand store was already initialised correctly.
+    const navOnline = navigator.onLine;
+    if (online !== navOnline) {
+      setOnline(navOnline);
+    }
     const onUp = () => setOnline(true);
     const onDown = () => setOnline(false);
     window.addEventListener("online", onUp);
@@ -21,7 +26,10 @@ export function ConnectionBanner() {
       window.removeEventListener("online", onUp);
       window.removeEventListener("offline", onDown);
     };
-  }, [setOnline]);
+    // Intentionally run only once on mount — subsequent online/offline flips
+    // come through the window event listeners, not from reacting to `online`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (online) return null;
 
