@@ -457,8 +457,6 @@ and pipeline auto-registrations go straight into
   - Doc header (id, status, sale type, amount, source, created/submitted
     timestamps).
   - Items list (`sales_doc_items` — covered in `docs/COMMISSIONS.md`).
-  - Attachments list with signed-URL thumbnails for images and a
-    download link for PDFs.
   - Event trail (`sales_doc_events`) — every lifecycle event in
     chronological order.
   - Linked commissions — the `commission_sales` rows this doc produced,

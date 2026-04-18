@@ -3,7 +3,7 @@
 > Every HTTP route in the ClalMobile app, grouped by module. Auth column uses
 > shorthand: `admin`, `employee`, `customer`, `public`, `service`, `cron`.
 >
-> **Route count: ~147** (was 129 before the 2026-04-18 employee-portal expansion).
+> **Route count: ~145** (was 129 before the 2026-04-18 employee-portal expansion; count reduced from ~147 when the two sales-doc attachment endpoints were removed on 2026-04-18).
 
 This document is generated from source. For conceptual descriptions see
 [`DOCS.md`](../DOCS.md). For auth implementation details see
@@ -98,7 +98,7 @@ messages.
 | `/api/admin/orders/create` | POST | admin (permission) | Create an order on behalf of a customer. |
 | `/api/admin/orders/[id]/history` | GET | admin (permission) | Audit trail for a given order. |
 | `/api/admin/sales-docs` | GET | admin (`commissions:manage`) | List sales documents (filter by status, employee, date). |
-| `/api/admin/sales-docs/[id]/detail` | GET | admin (`commissions:manage`) | Full sales doc with items, attachments, events. |
+| `/api/admin/sales-docs/[id]/detail` | GET | admin (`commissions:manage`) | Full sales doc with items and events. |
 | `/api/admin/sales-docs/[id]/verify` | POST | admin (`commissions:manage`) | Mark a submitted doc as verified (legacy two-step flow). |
 | `/api/admin/sales-docs/[id]/reject` | POST | admin (`commissions:manage`) | Reject a submitted doc with reason. |
 | `/api/admin/sales-docs/[id]/cancel` | POST | admin (`commissions:manage`) | Cancel a synced sale + its commission. |
@@ -271,8 +271,6 @@ Used by the installable sales-agent PWA. All require `requireEmployee`
 | `/api/pwa/customers` | POST | employee | Quick-create a customer from the field with phone-dedup — returns the existing row on match instead of creating a duplicate. |
 | `/api/pwa/sales` | GET, POST | employee | List my sales docs / create a new draft. |
 | `/api/pwa/sales/[id]` | GET, PUT | employee | Read / edit one of my drafts. |
-| `/api/pwa/sales/[id]/attachments` | POST | employee | Record attachment metadata. |
-| `/api/pwa/sales/[id]/attachments/sign` | POST | employee | Mint a short-lived Signed Upload URL into the private `sales-docs-private` Supabase Storage bucket. The client uploads the file directly to Supabase, then calls `POST /api/pwa/sales/[id]/attachments` to register metadata. Service-role key never reaches the browser. |
 | `/api/pwa/sales/[id]/submit` | POST | employee | Submit a draft → commission_sales (atomic). |
 
 ---
@@ -479,7 +477,6 @@ Successful response:
 ```
 
 Failure cases:
-- `400` missing required attachments for the sale type.
 - `403` the doc does not belong to the signed-in employee.
 - `409` already submitted (atomic transition guard).
 - `500` commission registration failed — the doc is rolled back to `rejected`

@@ -140,7 +140,7 @@ clalmobile/
 │       │   ├── me/               #      Authed profile
 │       │   ├── corrections/      #      Submit correction request
 │       │   └── commissions/      #      Personal ledger, pacing, export
-│       ├── pwa/                  #    PWA submit + attachments + customers
+│       ├── pwa/                  #    PWA sales submit + customers
 │       ├── crm/                  #    CRM APIs
 │       ├── store/                #    Store APIs (search, autocomplete)
 │       ├── orders/               #    Public order creation
@@ -231,7 +231,7 @@ HOT Mobile dealer commission engine with three revenue streams (all multipliers,
 - Auto-sync via `.github/workflows/commission-sync.yml` (hourly) + external bearer-token API
 
 ### 📱 Unified Sales PWA
-Installable field-team PWA at `/sales-pwa` — single app for dashboard (daily target pacing), commissions ledger + chart, interactive calculator, correction requests, activity feed, announcements, and documentation. Mobile bottom nav, desktop sidebar. Offline-capable via Service Worker + IndexedDB queue for `/api/pwa/*` writes. Signed-URL uploads to `sales-docs-private` Supabase bucket.
+Installable field-team PWA at `/sales-pwa` — single app for dashboard (daily target pacing), commissions ledger + chart, interactive calculator, correction requests, activity feed, announcements, and documentation. Mobile bottom nav, desktop sidebar. Offline-capable via Service Worker + IndexedDB queue for `/api/pwa/*` writes. Sales docs submit with header data only — no file uploads.
 
 ## Roles & Permissions (6-Tier RBAC)
 

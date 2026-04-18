@@ -85,7 +85,6 @@ erDiagram
   commission_employees }o--|| users : "links-to"
 
   sales_docs ||--|{ sales_doc_items : "line-items"
-  sales_docs ||--o{ sales_doc_attachments : "proofs"
   sales_docs ||--o{ sales_doc_events : "timeline"
   sales_docs ||--o{ sales_doc_sync_queue : "async-sync"
   sales_docs ||--o{ commission_sales : "registers-as"
@@ -308,7 +307,7 @@ erDiagram
 | `employee_commission_profiles` | Per-employee override of the default rate structure (`line_multiplier`, `device_rate`, `loyalty_bonuses` JSONB, `min_package_price`). Values are configurable per employee. |
 | `sales_docs` | Sales-documentation headers created by the PWA (offline-capable via `doc_uuid`); flow: `draft → submitted → verified → synced_to_commissions`. New `cancelled` status + `cancelled_at` / `cancelled_by` / `cancellation_reason` audit columns for admin-driven cancellations. |
 | `sales_doc_items` | Per-item breakdown of a sales doc (line / device / accessory) with qty + unit price |
-| `sales_doc_attachments` | Uploaded proof files (photos of contracts, receipts) with sha256 + file size; stored in the private `sales-docs-private` bucket and fetched via Signed Upload URL |
+| `sales_doc_attachments` | **Legacy / orphaned as of 2026-04-18.** Previously held uploaded proof files for sales docs. No longer read or written by application code after the attachments system was removed; table retained for legacy audit rows only. Not dropped. |
 | `sales_doc_events` | Append-only audit trail of actions taken on a sales doc (submitted, verified, rejected, cancelled) |
 | `sales_doc_sync_queue` | Async queue of docs awaiting sync to `commission_sales` with retry/backoff |
 
@@ -383,7 +382,7 @@ Every sensitive table has RLS enabled. The gist per table (not a full policy tra
 | `commission_sales` | `service_role` full; authenticated can SELECT own rows (via `users.auth_id = auth.uid()`); month-lock enforced by TRIGGER |
 | `commission_sanctions`, `commission_targets` | same as `commission_sales` — service + employee-read-own |
 | `commission_sync_log`, `commission_employees`, `employee_commission_profiles` | `service_role` only |
-| `sales_docs`, `sales_doc_items`, `sales_doc_attachments`, `sales_doc_events`, `sales_doc_sync_queue` | `service_role` full + authenticated read-own by `employee_key = auth.uid()::text` |
+| `sales_docs`, `sales_doc_items`, `sales_doc_events`, `sales_doc_sync_queue` | `service_role` full + authenticated read-own by `employee_key = auth.uid()::text` (legacy `sales_doc_attachments` still RLS-protected but no longer referenced by app code) |
 | `commission_correction_requests` | `service_role` full; authenticated SELECT/INSERT own (`employee_id = auth.uid()`), UPDATE only via admin API |
 | `admin_announcements` | `service_role` full; authenticated SELECT active-non-expired rows where `target IN ('all','employees')` |
 | `admin_announcement_reads` | `service_role` full; authenticated SELECT own, INSERT/UPSERT own (`user_id = auth.uid()`) |
@@ -499,7 +498,7 @@ Migrations are stored in `supabase/migrations/` and applied in lexicographic ord
 36. `20260407000002_soft_delete.sql` — `orders.deleted_at` + partial indexes
 37. `20260407000003_payment_callback_rpc.sql` — `process_payment_callback` RPC
 38. `20260408000001_customer_management_360.sql` — `customers.source`, `assigned_to`, `created_by_id`, `gender`, `preferred_language`, `notes` + `customer_notes` table
-39. `20260410000001_sales_docs_pwa.sql` — 5-table sales-docs family (`sales_docs`, `sales_doc_items`, `sales_doc_attachments`, `sales_doc_events`, `sales_doc_sync_queue`)
+39. `20260410000001_sales_docs_pwa.sql` — 5-table sales-docs family (`sales_docs`, `sales_doc_items`, `sales_doc_attachments` [now orphaned — see table docs], `sales_doc_events`, `sales_doc_sync_queue`)
 40. `20260411000001_customer_identity.sql` — `customers.customer_code` + `customer_hot_accounts` table
 41. `20260411000002_commission_customer_link.sql` — `commission_sales.customer_id` FK
 42. `20260411000003_sales_docs_customer_fk_and_commission_backfill.sql` — convert `sales_docs.customer_id` to UUID FK + backfill `commission_sales.customer_id` from order

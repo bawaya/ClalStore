@@ -18,10 +18,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     const docId = Number(id);
     if (!docId || Number.isNaN(docId)) return apiError("Invalid id", 400);
 
-    const [docRes, itemsRes, attachmentsRes, eventsRes] = await Promise.all([
+    const [docRes, itemsRes, eventsRes] = await Promise.all([
       db.from("sales_docs").select("*").eq("id", docId).is("deleted_at", null).single(),
       db.from("sales_doc_items").select("*").eq("sales_doc_id", docId).is("deleted_at", null).order("id", { ascending: true }),
-      db.from("sales_doc_attachments").select("*").eq("sales_doc_id", docId).is("deleted_at", null).order("id", { ascending: true }),
       db.from("sales_doc_events").select("*").eq("sales_doc_id", docId).order("created_at", { ascending: true }),
     ]);
 
@@ -43,7 +42,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     return apiSuccess({
       doc: enrichedDoc,
       items: itemsRes.data || [],
-      attachments: attachmentsRes.data || [],
       events: eventsRes.data || [],
     });
   } catch (err: unknown) {

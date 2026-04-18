@@ -5,7 +5,6 @@ import {
   createMockSupabaseClient,
   makeSalesDoc,
   makeSalesDocItem,
-  makeSalesDocAttachment,
   makeSalesDocEvent,
   makeCustomer,
 } from "@/tests/helpers";
@@ -13,7 +12,6 @@ import {
 // ── Fixtures ──────────────────────────────────────────
 const doc = makeSalesDoc({ id: 1, employee_key: "emp1", employee_user_id: "emp1", status: "draft", sale_type: "device" });
 const docItem = makeSalesDocItem({ sales_doc_id: 1 });
-const attachment = makeSalesDocAttachment({ sales_doc_id: 1, attachment_type: "invoice" });
 const event = makeSalesDocEvent({ sales_doc_id: 1 });
 const customer = makeCustomer({ id: "cust1", phone: "0501234567", customer_code: "CLAL-001" });
 
@@ -21,7 +19,6 @@ const customer = makeCustomer({ id: "cust1", phone: "0501234567", customer_code:
 const supabaseClient = createMockSupabaseClient({
   sales_docs: { data: [doc] },
   sales_doc_items: { data: [docItem] },
-  sales_doc_attachments: { data: [attachment] },
   sales_doc_events: { data: [event] },
   customers: { data: [customer] },
   orders: { data: [] },
@@ -47,32 +44,9 @@ vi.mock("@/lib/pwa/customer-linking", () => ({
   buildCustomerPhoneCandidates: vi.fn().mockImplementation((phone: string) => [phone]),
 }));
 
-// Updated 2026-04-18: commission refactor — attachments route now imports
-// attachmentMetadataSchema and MAX_ATTACHMENT_SIZE_BYTES (MIME whitelist, size cap).
-// Mock needs to expose them so the route module can import without vitest throwing
-// "No X export is defined on the @/lib/pwa/validators mock".
 vi.mock("@/lib/pwa/validators", () => ({
-  createSalesDocSchema: {
-    _input: undefined,
-    _output: undefined,
-  },
-  updateSalesDocSchema: {
-    _input: undefined,
-    _output: undefined,
-  },
-  attachmentMetadataSchema: {
-    _input: undefined,
-    _output: undefined,
-  },
-  MAX_ATTACHMENT_SIZE_BYTES: 10 * 1024 * 1024,
-  ALLOWED_ATTACHMENT_MIMES: [
-    "application/pdf",
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/webp",
-    "image/heic",
-  ],
+  createSalesDocSchema: { _input: undefined, _output: undefined },
+  updateSalesDocSchema: { _input: undefined, _output: undefined },
 }));
 
 vi.mock("@/lib/admin/validators", () => ({
@@ -82,10 +56,9 @@ vi.mock("@/lib/admin/validators", () => ({
   })),
 }));
 
-// Updated 2026-04-18: submit route now calls registerSaleCommission directly
-// (decision 1: no manager approval). We mock it out so these tests focus on
-// the route logic (auth / attachments / status transition) without having to
-// stub every commission_sales insert.
+// Submit route calls registerSaleCommission directly (no manager approval,
+// decision 1). Mocked so tests focus on route logic (auth / status
+// transition) without stubbing every commission_sales insert.
 vi.mock("@/lib/commissions/register", () => ({
   registerSaleCommission: vi.fn().mockResolvedValue({
     id: 100,
@@ -105,7 +78,6 @@ vi.mock("@/lib/commissions/register", () => ({
 import { GET as listSales, POST as createSale } from "@/app/api/pwa/sales/route";
 import { GET as getSale, PUT as updateSale } from "@/app/api/pwa/sales/[id]/route";
 import { POST as submitSale } from "@/app/api/pwa/sales/[id]/submit/route";
-import { POST as addAttachment } from "@/app/api/pwa/sales/[id]/attachments/route";
 import { GET as customerLookup } from "@/app/api/pwa/customer-lookup/route";
 
 // Helper for parameterised routes
@@ -163,7 +135,7 @@ describe("PWA Sales — POST /api/pwa/sales", () => {
 describe("PWA Sales [id] — GET /api/pwa/sales/[id]", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns sales doc with items and attachments", async () => {
+  it("returns sales doc with items and events", async () => {
     supabaseClient.from("sales_docs").single.mockResolvedValueOnce({ data: doc, error: null });
     const req = createMockRequest({ url: "/api/pwa/sales/1" });
     const res = await getSale(req, ctxOf("1"));
@@ -172,7 +144,7 @@ describe("PWA Sales [id] — GET /api/pwa/sales/[id]", () => {
     expect(body.success).toBe(true);
     expect(body.doc).toBeDefined();
     expect(body.items).toBeDefined();
-    expect(body.attachments).toBeDefined();
+    expect(body.events).toBeDefined();
   });
 
   it("returns 404 for missing doc", async () => {
@@ -240,25 +212,18 @@ describe("PWA Sales [id] — PUT /api/pwa/sales/[id]", () => {
 describe("PWA Sales Submit — POST /api/pwa/sales/[id]/submit", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  // Updated 2026-04-18: submit route now uses .maybeSingle() (not .single())
-  // for the initial doc lookup (commission refactor — idempotent lookup).
-  // Tests mock maybeSingle to drive the doc for the current test only.
-  it("submits a draft with all required attachments", async () => {
+  // 2026-04-18: attachments system removed — submit is data-only.
+  // Route uses .maybeSingle() for the initial doc lookup (idempotent).
+  it("submits a draft with no attachments required", async () => {
     const submittingDoc = { ...doc, sale_type: "device", total_amount: 3499 };
     supabaseClient.from("sales_docs").maybeSingle.mockResolvedValueOnce({
       data: submittingDoc,
       error: null,
     });
-    // Atomic UPDATE guard chain ends with maybeSingle too
     supabaseClient.from("sales_docs").maybeSingle.mockResolvedValueOnce({
       data: { ...submittingDoc, status: "synced_to_commissions" },
       error: null,
     });
-    // Device requires: invoice, device_serial_proof
-    supabaseClient.__queryBuilders.get("sales_doc_attachments")!.__setData([
-      { attachment_type: "invoice" },
-      { attachment_type: "device_serial_proof" },
-    ]);
     const req = createMockRequest({
       method: "POST",
       url: "/api/pwa/sales/1/submit",
@@ -267,28 +232,19 @@ describe("PWA Sales Submit — POST /api/pwa/sales/[id]/submit", () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    // restore
-    supabaseClient.__queryBuilders.get("sales_doc_attachments")!.__setData([attachment]);
   });
 
-  it("returns 400 for missing attachments", async () => {
+  it("returns 400 when total_amount is 0", async () => {
     supabaseClient.from("sales_docs").maybeSingle.mockResolvedValueOnce({
-      data: { ...doc, sale_type: "line", total_amount: 59 },
+      data: { ...doc, sale_type: "line", total_amount: 0 },
       error: null,
     });
-    // Line requires: contract_photo, signed_form — but we only have invoice
-    supabaseClient.__queryBuilders.get("sales_doc_attachments")!.__setData([
-      { attachment_type: "invoice" },
-    ]);
     const req = createMockRequest({ method: "POST", url: "/api/pwa/sales/1/submit" });
     const res = await submitSale(req, ctxOf("1"));
     expect(res.status).toBe(400);
-    // restore
-    supabaseClient.__queryBuilders.get("sales_doc_attachments")!.__setData([attachment]);
   });
 
   it("returns 404 for missing doc", async () => {
-    // Submit route uses maybeSingle for the initial doc lookup (not single).
     supabaseClient.from("sales_docs").maybeSingle.mockResolvedValueOnce({ data: null, error: null });
     const req = createMockRequest({ method: "POST", url: "/api/pwa/sales/999/submit" });
     const res = await submitSale(req, ctxOf("999"));
@@ -296,84 +252,7 @@ describe("PWA Sales Submit — POST /api/pwa/sales/[id]/submit", () => {
   });
 });
 
-describe("PWA Attachments — POST /api/pwa/sales/[id]/attachments", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  // Updated 2026-04-18: attachments route now enforces the sales-docs/{id}/
-  // path prefix (audit 4.3) and verifies the file exists in Storage before
-  // recording metadata. Tests must use a conforming path + mock storage.list
-  // to return a matching file entry.
-  it("adds an attachment to a draft", async () => {
-    supabaseClient.from("sales_docs").single.mockResolvedValueOnce({
-      data: { id: 1, employee_key: "emp1", status: "draft" },
-      error: null,
-    });
-    const filePath = "sales-docs/1/invoice.pdf";
-    supabaseClient.storage.__bucket.list.mockResolvedValueOnce({
-      data: [{ name: "invoice.pdf", metadata: { size: 12345 } }],
-      error: null,
-    });
-    supabaseClient.from("sales_doc_attachments").single.mockResolvedValueOnce({
-      data: { id: 123, sales_doc_id: 1, attachment_type: "invoice", file_path: filePath, file_name: "invoice.pdf", mime_type: "application/pdf", file_size: 12345 },
-      error: null,
-    });
-    const req = createMockRequest({
-      method: "POST",
-      url: "/api/pwa/sales/1/attachments",
-      body: {
-        attachment_type: "invoice",
-        file_path: filePath,
-        file_name: "invoice.pdf",
-        mime_type: "application/pdf",
-        file_size: 12345,
-      },
-    });
-    const res = await addAttachment(req, ctxOf("1"));
-    const body = await res.json();
-    expect(res.status).toBe(201);
-    expect(body.success).toBe(true);
-  });
-
-  it("returns 403 for wrong employee", async () => {
-    supabaseClient.from("sales_docs").single.mockResolvedValueOnce({
-      data: { id: 1, employee_key: "other-emp", status: "draft" },
-      error: null,
-    });
-    const req = createMockRequest({
-      method: "POST",
-      url: "/api/pwa/sales/1/attachments",
-      body: {
-        attachment_type: "invoice",
-        file_path: "sales-docs/1/invoice.pdf",
-        file_name: "invoice.pdf",
-        mime_type: "application/pdf",
-        file_size: 12345,
-      },
-    });
-    const res = await addAttachment(req, ctxOf("1"));
-    expect(res.status).toBe(403);
-  });
-
-  it("returns 400 for non-editable status", async () => {
-    supabaseClient.from("sales_docs").single.mockResolvedValueOnce({
-      data: { id: 1, employee_key: "emp1", status: "submitted" },
-      error: null,
-    });
-    const req = createMockRequest({
-      method: "POST",
-      url: "/api/pwa/sales/1/attachments",
-      body: {
-        attachment_type: "invoice",
-        file_path: "sales-docs/1/invoice.pdf",
-        file_name: "invoice.pdf",
-        mime_type: "application/pdf",
-        file_size: 12345,
-      },
-    });
-    const res = await addAttachment(req, ctxOf("1"));
-    expect(res.status).toBe(400);
-  });
-});
+// PWA Attachments describe removed 2026-04-18: attachments endpoints deleted.
 
 describe("PWA Customer Lookup — GET /api/pwa/customer-lookup", () => {
   beforeEach(() => vi.clearAllMocks());

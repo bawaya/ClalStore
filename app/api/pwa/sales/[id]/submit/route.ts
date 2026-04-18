@@ -2,11 +2,12 @@
  * POST /api/pwa/sales/[id]/submit
  *
  * Direct commission registration (decision 1 — no manager approval):
- *   - Validates doc has required attachments (now real files, see audit 4.3)
  *   - Atomically transitions status from draft|rejected → synced_to_commissions
  *     (atomic UPDATE WHERE status IN (...) prevents double-submit, audit 4.2)
  *   - Calls registerSaleCommission so the sale enters commission_sales
  *     immediately. Manager can cancel later via /api/admin/sales-docs/[id]/cancel.
+ *
+ * No file-upload / attachment requirement — docs submit with data only.
  */
 
 import { NextRequest } from "next/server";
@@ -14,15 +15,6 @@ import { apiError, apiSuccess, safeError } from "@/lib/api-response";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireEmployee } from "@/lib/pwa/auth";
 import { registerSaleCommission } from "@/lib/commissions/register";
-
-function requiredAttachmentsForSaleType(saleType: string): string[] {
-  if (saleType === "line") return ["contract_photo", "signed_form"];
-  if (saleType === "device") return ["invoice", "device_serial_proof"];
-  if (saleType === "mixed") {
-    return ["contract_photo", "signed_form", "invoice", "device_serial_proof"];
-  }
-  return [];
-}
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -51,29 +43,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       return apiError("هذه الوثيقة تم إرسالها مسبقاً", 409);
     }
 
-    // Validate total_amount one more time on submit — new sanity cap
+    // Validate total_amount one more time on submit — sanity cap
     const amount = Number(doc.total_amount || 0);
     if (!(amount > 0)) {
       return apiError("مبلغ البيع يجب أن يكون أكبر من صفر", 400);
-    }
-
-    // Validate required attachments exist
-    const required = requiredAttachmentsForSaleType(doc.sale_type);
-    if (required.length > 0) {
-      const { data: attachments } = await db
-        .from("sales_doc_attachments")
-        .select("attachment_type")
-        .eq("sales_doc_id", docId)
-        .is("deleted_at", null);
-
-      const existingTypes = new Set(
-        (attachments || []).map((a: { attachment_type: string }) => a.attachment_type),
-      );
-      const missing = required.filter((t) => !existingTypes.has(t));
-
-      if (missing.length > 0) {
-        return apiError(`مرفقات ناقصة: ${missing.join(", ")}`, 400);
-      }
     }
 
     const now = new Date().toISOString();

@@ -22,7 +22,7 @@ The Sales PWA is a progressive web app (installable to the home screen,
 mobile-first UI, service worker for offline support) that is **one app
 for everything a non-admin employee does**:
 
-- **Document sales** — create, attach, submit. Submission registers the
+- **Document sales** — create and submit. Submission registers the
   commission immediately.
 - **View commissions** — daily dashboard, month detail, 12-month chart,
   PDF export.
@@ -36,7 +36,7 @@ It's a thin client over the same Supabase backend the rest of the app
 uses — no separate identity, no separate DB. PWA-specific additions:
 
 - A service worker scoped to `/sales-pwa/` for offline shell caching +
-  API-GET network-first caching + a POST replay queue (see §10).
+  API-GET network-first caching + a POST replay queue (see §8).
 - A manifest so it installs cleanly to the home screen.
 - `/api/pwa/*` for sales documentation + customer creation.
 - `/api/employee/*` for commissions, corrections, activity, and
@@ -56,8 +56,8 @@ left sidebar at ≥ 768 px; bottom tab nav below that).
 | Route | Purpose |
 |---|---|
 | `/sales-pwa` | Daily dashboard — today's sales, month target progress, recent sales, unread announcements peek, last activities. |
-| `/sales-pwa/new` | Create a new sale (draft → attachments → submit). |
-| `/sales-pwa/docs/[id]` | Sale detail — items, attachments, events, status. |
+| `/sales-pwa/new` | Create a new sale (draft → submit). |
+| `/sales-pwa/docs/[id]` | Sale detail — items, events, status. |
 | `/sales-pwa/commissions` | Month picker + detailed breakdown + milestones + 12-month chart + PDF export. |
 | `/sales-pwa/calculator` | Live commission calculator (what-if, no ledger writes). |
 | `/sales-pwa/corrections` | Submit + track correction requests. |
@@ -154,13 +154,8 @@ flowchart TD
     C --> CU[(customers)]
 
     B --> D[Open doc detail page]
-    D -->|for each attachment| E1[POST /api/pwa/sales/&#91;id&#93;/attachments/sign]
-    E1 --> E2[PUT file → Supabase Storage signed URL]
-    E2 --> E3[POST /api/pwa/sales/&#91;id&#93;/attachments]
 
-    D -->|POST /api/pwa/sales/&#91;id&#93;/submit| F{required<br/>attachments<br/>present?}
-    F -->|no| X[400 — missing list]
-    F -->|yes| S[Atomic UPDATE<br/>status → synced_to_commissions<br/>WHERE status IN draft,rejected]
+    D -->|POST /api/pwa/sales/&#91;id&#93;/submit| S[Atomic UPDATE<br/>status → synced_to_commissions<br/>WHERE status IN draft,rejected]
     S -->|0 rows| Y[409 — already submitted]
     S -->|1 row| R[registerSaleCommission<br/>source = sales_doc]
     R --> CS[(commission_sales)]
@@ -172,9 +167,7 @@ The agent-facing steps:
 1. **Create draft** at `/sales-pwa/new` → `POST /api/pwa/sales`.
 2. **(Optional) Register customer** if phone lookup returns nothing →
    `POST /api/pwa/customers`.
-3. **Attach files** — one round trip per file: `/sign` → `PUT` →
-   `/attachments`.
-4. **Submit** → `POST /api/pwa/sales/[id]/submit`. On success the sale is
+3. **Submit** → `POST /api/pwa/sales/[id]/submit`. On success the sale is
    already in `commission_sales`. No manager approval queue.
 
 ---
@@ -216,66 +209,17 @@ prevents accidental double-inserts from retries.
 
 ### `GET /api/pwa/sales/[id]`
 
-Fetch a single doc (must belong to the authed employee) with its items,
-attachments, and event trail.
+Fetch a single doc (must belong to the authed employee) with its items
+and event trail.
 
 ### `PUT /api/pwa/sales/[id]`
 
 Update a doc **only while it's in `draft` or `rejected` state**. Rejects
 updates to submitted/verified/cancelled/synced docs with 400.
 
-### `POST /api/pwa/sales/[id]/attachments/sign`
-
-**First half of the upload flow.** Returns a signed Supabase Storage
-upload URL plus the server-chosen storage path.
-
-Request body:
-
-```json
-{
-  "attachment_type": "contract_photo | signed_form | invoice | device_serial_proof | id_photo | other",
-  "file_name": "contract.jpg",
-  "mime_type": "image/jpeg",
-  "file_size": 1048576
-}
-```
-
-Response:
-
-```json
-{
-  "storage_path": "sales-docs/<docId>/<type>/<uuid>.jpg",
-  "signed_url": "https://<supabase>/storage/...",
-  "token": "...",
-  "bucket": "sales-docs-private",
-  "expected": { "attachment_type", "mime_type", "file_size", "file_name", "original_name" }
-}
-```
-
-The path is **server-controlled** (contains a `randomUUID()`) so agents
-cannot forge file_path values. Signed URLs are short-lived (~5 min
-window to PUT).
-
-### `POST /api/pwa/sales/[id]/attachments`
-
-**Second half of the upload flow** — records the metadata after the
-client has actually uploaded to the signed URL.
-
-Before inserting, the server:
-
-1. Validates `file_path` starts with `sales-docs/<docId>/` (injection
-   guard).
-2. Calls `storage.from(BUCKET).list(...)` to **verify the file actually
-   exists** at that path. If missing → 400 "الملف غير موجود في التخزين".
-3. Compares reported `file_size` with the actual size from Storage. If
-   they disagree → 400.
-
-This is the fix for audit issue 4.3 (previously, arbitrary metadata was
-accepted without proof a file existed).
-
 ### `POST /api/pwa/sales/[id]/submit`
 
-See §6 — submit flow.
+See §5 — submit flow.
 
 ### `POST /api/pwa/customers`
 
@@ -295,31 +239,7 @@ match (id / name / phone / customer_code) or `null`.
 
 ---
 
-## 5. Required attachments by sale type
-
-Enforced at submit time (`POST /api/pwa/sales/[id]/submit`):
-
-| sale_type | Required attachments |
-|-----------|----------------------|
-| `line` | `contract_photo` + `signed_form` |
-| `device` | `invoice` + `device_serial_proof` |
-| `mixed` | `contract_photo` + `signed_form` + `invoice` + `device_serial_proof` |
-
-Attachment types (enum in the validator):
-
-- `contract_photo` — photo of the customer's signed contract paperwork
-- `signed_form` — photo of the agent-customer agreement form
-- `invoice` — invoice / receipt for the device
-- `device_serial_proof` — photo of the IMEI / serial sticker
-- `id_photo` — customer ID photo (optional — used for fraud-prone flows)
-- `other` — catch-all
-
-If any required attachment is missing at submit, the API returns
-`400 — مرفقات ناقصة: <list>` and the submit is aborted.
-
----
-
-## 6. Submit flow
+## 5. Submit flow
 
 `POST /api/pwa/sales/[id]/submit` is the linchpin. Sequence:
 
@@ -327,8 +247,7 @@ If any required attachment is missing at submit, the API returns
 2. **State check** — doc status must be `draft` or `rejected`. Anything
    else → 409 "هذه الوثيقة تم إرسالها مسبقاً".
 3. **Amount check** — `total_amount > 0`.
-4. **Required attachments check** — see §5.
-5. **Atomic transition:**
+4. **Atomic transition:**
 
     ```sql
     UPDATE sales_docs
@@ -344,7 +263,7 @@ If any required attachment is missing at submit, the API returns
    A concurrent second submit sees zero rows returned → 409. This is the
    fix for audit issue 4.2.
 
-6. **Register commission(s)** — one call per sale type:
+5. **Register commission(s)** — one call per sale type:
    - `line` → one call, `saleType='line'`, `amount = doc.total_amount`
    - `device` → one call, `saleType='device'`, `amount = doc.total_amount`
    - `mixed` → split into line + device using `sales_doc_items`
@@ -353,12 +272,12 @@ If any required attachment is missing at submit, the API returns
    Each call uses `source: 'sales_doc'` and
    `sourceSalesDocId: doc.id` so the commission row is linked back.
 
-7. **Rollback on failure** — if `registerSaleCommission` throws (e.g.
+6. **Rollback on failure** — if `registerSaleCommission` throws (e.g.
    month is locked → DB trigger), the doc is flipped back to `rejected`
    with the error as `rejection_reason`, an event is logged, and a 500
    is returned.
 
-8. **Audit event** — `sales_doc_events(event_type='submitted_and_synced')`
+7. **Audit event** — `sales_doc_events(event_type='submitted_and_synced')`
    with the commission ids and total employee commission attached.
 
 Return shape:
@@ -379,63 +298,7 @@ Source: [`app/api/pwa/sales/[id]/submit/route.ts`](../app/api/pwa/sales/%5Bid%5D
 
 ---
 
-## 7. File upload — signed URL flow
-
-The Supabase bucket `sales-docs-private` is **private** (no public
-reads). Upload and download both go through signed URLs.
-
-```mermaid
-sequenceDiagram
-    participant C as Agent (PWA)
-    participant S as /api/pwa/.../sign
-    participant Store as Supabase Storage
-    participant A as /api/pwa/.../attachments
-    C->>S: POST sign request<br/>(type, name, mime, size)
-    S->>Store: createSignedUploadUrl(stablePath)
-    Store-->>S: signedUrl + token
-    S-->>C: {storage_path, signed_url, bucket}
-    C->>Store: PUT file bytes → signed_url
-    Store-->>C: 200 OK
-    C->>A: POST metadata<br/>(type, path, name, mime, size, sha256?)
-    A->>Store: list(path) — verify exists
-    Store-->>A: entries
-    A->>A: compare size, check path prefix
-    A-->>C: {attachment row}
-```
-
-### MIME whitelist
-
-Defined in `lib/pwa/validators.ts`:
-
-```
-application/pdf
-image/jpeg
-image/jpg
-image/png
-image/webp
-image/heic
-```
-
-Anything else is rejected at the `/sign` step.
-
-### Size cap
-
-`MAX_ATTACHMENT_SIZE_BYTES = 10 MB`. Enforced both at `/sign` (rejects
-absurd requests up front) and at the metadata step (re-checks against
-the actual stored object).
-
-### Path structure
-
-`sales-docs/<docId>/<attachment_type>/<uuid>.<ext>`
-
-- `<docId>` scopes the object to a specific sales_doc.
-- `<attachment_type>` groups by semantic role.
-- `<uuid>` is server-generated — prevents collisions and makes paths
-  unguessable.
-
----
-
-## 8. Customer linking
+## 6. Customer linking
 
 Finding/creating a customer from phone input is one of the most
 commonly-hit paths. Normalisation lives in
@@ -472,7 +335,7 @@ finance cross-reference with HOT Mobile records.
 
 ---
 
-## 9. Idempotency
+## 7. Idempotency
 
 Two layers protect against duplicate rows under retries.
 
@@ -502,7 +365,7 @@ duplicate docs.
 
 ---
 
-## 10. Offline support
+## 8. Offline support
 
 As of 2026-04-18, the PWA has **real offline support** for reads and
 writes. The service worker at `public/sales-pwa/sw.js` owns the
@@ -521,11 +384,9 @@ caching + queueing; `lib/pwa/offline-client.ts` and
 
 ### Writes — IndexedDB POST queue
 
-All `POST` / `PUT` to `/api/pwa/*` (except the attachment endpoints —
-those need a synchronous response for the upload handshake) are wrapped
-by the service worker. When offline, the request body is serialised
-into IndexedDB and a placeholder 202 is returned so the UI keeps
-moving.
+All `POST` / `PUT` to `/api/pwa/*` are wrapped by the service worker.
+When offline, the request body is serialised into IndexedDB and a
+placeholder 202 is returned so the UI keeps moving.
 
 Queue schema:
 
@@ -558,14 +419,14 @@ Every drained request is replayed server-side and its response is
 
 ### Idempotency with the queue
 
-The `doc_uuid` + `idempotency_key` scheme (§9) is exactly what makes
+The `doc_uuid` + `idempotency_key` scheme (§7) is exactly what makes
 queued replay safe. A create replayed twice (flaky connection + manual
 retry) lands on the partial unique index and the second insert is a
 no-op.
 
 ---
 
-## 11. Commission details (`/sales-pwa/commissions`)
+## 9. Commission details (`/sales-pwa/commissions`)
 
 Replaces the old `/employee/commissions` page.
 
@@ -573,7 +434,7 @@ Replaces the old `/employee/commissions` page.
 
 - **Month picker** — dropdown of the last 12 months; default = current
   Asia/Jerusalem month. URL-synced.
-- **Export PDF** — download link (see §14).
+- **Export PDF** — download link (see §12).
 
 ### Summary card
 
@@ -613,7 +474,7 @@ values. Data from `GET /api/employee/chart`.
 
 ---
 
-## 12. Calculator (`/sales-pwa/calculator`)
+## 10. Calculator (`/sales-pwa/calculator`)
 
 What-if commission preview. **Does not write anything to the ledger.**
 
@@ -636,7 +497,7 @@ Source: [`app/sales-pwa/calculator/page.tsx`](../app/sales-pwa/calculator/page.t
 
 ---
 
-## 13. Corrections (`/sales-pwa/corrections`)
+## 11. Corrections (`/sales-pwa/corrections`)
 
 Employee-filed dispute workflow. See `docs/COMMISSIONS.md` §16 for the
 data model and endpoints.
@@ -655,7 +516,7 @@ Admin responds from `/admin/commissions/corrections` — see
 
 ---
 
-## 14. PDF export
+## 12. PDF export
 
 `/api/employee/commissions/pdf?month=YYYY-MM` returns a PDF of the
 month's commission breakdown.
@@ -677,7 +538,7 @@ produces an empty PDF; it degrades to English.
 
 ---
 
-## 15. Activity timeline (`/sales-pwa/activity`)
+## 13. Activity timeline (`/sales-pwa/activity`)
 
 Infinite-scroll timeline of the employee's activity log. One row per
 event; newest first.
@@ -703,7 +564,7 @@ See `docs/COMMISSIONS.md` §18 for the write path.
 
 ---
 
-## 16. Announcements (`/sales-pwa/announcements`)
+## 14. Announcements (`/sales-pwa/announcements`)
 
 Broadcast messages published by admin via `/admin/announcements`.
 
@@ -722,7 +583,7 @@ Data model: `admin_announcements` + `admin_announcement_reads`
 
 ---
 
-## 17. Customer creation (details)
+## 15. Customer creation (details)
 
 `POST /api/pwa/customers` — covered in §4 above. A quick reminder of
 the dedup rules:
@@ -739,7 +600,7 @@ Returns `{ customer, existed: boolean }`.
 
 ---
 
-## 18. Row-level security (RLS)
+## 16. Row-level security (RLS)
 
 Enabled on the whole `sales_docs` family in migration
 `20260418000003_commission_refactor.sql`:
@@ -747,7 +608,6 @@ Enabled on the whole `sales_docs` family in migration
 ```sql
 ALTER TABLE sales_docs             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_doc_items        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sales_doc_attachments  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_doc_events       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_doc_sync_queue   ENABLE ROW LEVEL SECURITY;
 ```
@@ -780,7 +640,7 @@ permission checks today, but RLS is the defence-in-depth layer.
 
 ---
 
-## 19. Pipeline PWA integration
+## 17. Pipeline PWA integration
 
 Sales docs aren't only created by field agents. CRM staff working the
 **pipeline** also generate them — see `COMMISSIONS.md` §5.1. Those docs
@@ -801,25 +661,23 @@ the same `/admin/sales-docs` cancel flow.
 
 ---
 
-## 20. File & route reference
+## 18. File & route reference
 
 | Path | Role |
 |------|------|
 | `app/sales-pwa/layout.tsx` | Shell + SalesPwaInit (service worker registration). |
 | `app/sales-pwa/page.tsx` | List page — uses `/api/pwa/sales`. |
 | `app/sales-pwa/new/page.tsx` | Create-draft form. |
-| `app/sales-pwa/docs/[id]/page.tsx` | Doc detail + attachment upload UI + submit button. |
+| `app/sales-pwa/docs/[id]/page.tsx` | Doc detail + submit button. |
 | `components/pwa/SalesPwaInit.tsx` | Client-side service worker registration. |
 | `public/sales-pwa/sw.js` | Service worker (static cache, nav fallback). |
 | `public/sales-pwa/manifest.json` | PWA manifest (installability). |
 | `lib/pwa/auth.ts` | `requireEmployee(req)` — Supabase SSR auth gate. |
 | `lib/pwa/customer-linking.ts` | `buildCustomerPhoneCandidates`, `attachCustomersToSalesDocs`. |
-| `lib/pwa/validators.ts` | Zod schemas + MIME/size caps. |
+| `lib/pwa/validators.ts` | Zod schemas for sales-doc creation / update. |
 | `app/api/pwa/sales/route.ts` | List / create draft. |
 | `app/api/pwa/sales/[id]/route.ts` | Detail / update (draft+rejected only). |
 | `app/api/pwa/sales/[id]/submit/route.ts` | **Submit** → commission. |
-| `app/api/pwa/sales/[id]/attachments/sign/route.ts` | Signed upload URL. |
-| `app/api/pwa/sales/[id]/attachments/route.ts` | Metadata record + existence check. |
 | `app/api/pwa/customers/route.ts` | Create customer with dedup. |
 | `app/api/pwa/customer-lookup/route.ts` | Phone / code lookup. |
 | `supabase/migrations/20260410000001_sales_docs_pwa.sql` | Tables. |
@@ -827,7 +685,7 @@ the same `/admin/sales-docs` cancel flow.
 
 ---
 
-## 21. Related docs
+## 19. Related docs
 
 - `docs/COMMISSIONS.md` — what happens after submit.
 - `docs/BOT.md` — WhatsApp bot (separate channel; creates pipeline
@@ -835,7 +693,7 @@ the same `/admin/sales-docs` cancel flow.
 
 ---
 
-## 22. Data model
+## 20. Data model
 
 The unified PWA is backed by four additional tables (migration
 `20260418000006_unified_employee_pwa.sql`):
@@ -843,7 +701,7 @@ The unified PWA is backed by four additional tables (migration
 - `commission_correction_requests` — employee-filed disputes (see
   `docs/COMMISSIONS.md` §16).
 - `admin_announcements` + `admin_announcement_reads` — broadcast
-  messages with per-user read state (see §16 above, and
+  messages with per-user read state (see §14 above, and
   `docs/ADMIN.md`).
 - `employee_activity_log` — personal audit timeline (see
   `docs/COMMISSIONS.md` §18).

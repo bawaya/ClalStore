@@ -61,7 +61,7 @@ Don't open a GitHub issue — see [../SECURITY.md](../SECURITY.md) for private d
 | [ADMIN.md](./ADMIN.md) | 525 | Products/orders/customers management, site CMS, Integration Hub, reports, RBAC matrix |
 | [CRM.md](./CRM.md) | 570 | Intercom-style Inbox, AI features, Pipeline with Mermaid states, handoff policy |
 | [COMMISSIONS.md](./COMMISSIONS.md) | 690 | Dual calculation model, three sources (Pipeline/PWA/Sync), cancel flow, month lock — _conceptual, rates in private docs_ |
-| [PWA.md](./PWA.md) | 554 | Sales PWA flow, signed URL uploads, customer linking, offline notes |
+| [PWA.md](./PWA.md) | 554 | Sales PWA flow, customer linking, offline notes |
 | [BOT.md](./BOT.md) | 542 | WhatsApp bot engine, intent handling, safety rails, handoff, WebChat |
 | [TESTING.md](./TESTING.md) | 496 | Six-layer strategy (Vitest, CI, Staging, Smoke, Monitor, Synthetic), coverage targets |
 | [SECURITY.md](./SECURITY.md) | 265 | Trust model, auth, RLS, CSRF, webhook signatures, rate limits, secrets rotation |

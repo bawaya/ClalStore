@@ -2,7 +2,7 @@
  * GET /api/admin/sales-docs/[id]/detail
  *
  * Returns the full picture for the admin drawer:
- *   { doc, items, attachments, events, commission_ids, customer }
+ *   { doc, items, events, commission_ids, commissions, customer }
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -28,16 +28,10 @@ export const GET = withPermission(
       if (docErr) return apiError("فشل في جلب الوثيقة", 500);
       if (!doc) return apiError("Not found", 404);
 
-      const [itemsRes, attachRes, eventsRes, commRes, custRes] = await Promise.all([
+      const [itemsRes, eventsRes, commRes, custRes] = await Promise.all([
         db
           .from("sales_doc_items")
           .select("id, item_type, product_id, product_name, qty, unit_price, line_total, metadata")
-          .eq("sales_doc_id", id)
-          .is("deleted_at", null)
-          .order("id", { ascending: true }),
-        db
-          .from("sales_doc_attachments")
-          .select("id, attachment_type, file_path, file_name, mime_type, file_size, uploaded_by, created_at")
           .eq("sales_doc_id", id)
           .is("deleted_at", null)
           .order("id", { ascending: true }),
@@ -63,9 +57,8 @@ export const GET = withPermission(
       return apiSuccess({
         doc,
         items: itemsRes.data || [],
-        attachments: attachRes.data || [],
         events: eventsRes.data || [],
-        commission_ids: (commRes.data || []).map((c: any) => c.id),
+        commission_ids: (commRes.data || []).map((c: { id: number }) => c.id),
         commissions: commRes.data || [],
         customer: custRes.data || null,
       });

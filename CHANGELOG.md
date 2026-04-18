@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added — Commission system refactor
 
 - **Unified `registerSaleCommission`** — single entry point for awarding commissions across Pipeline, PWA, and manual sale flows (replaces three divergent call sites)
-- **Admin sales-docs management** at `/admin/sales-docs` — attachment review, status transitions, signed-URL download
+- **Admin sales-docs management** at `/admin/sales-docs` — status transitions
 - **Employee commission portal** at `/employee/commissions` — personal commission ledger, target progress, sanctions history
 - **Commission sync workflow** — `.github/workflows/commission-sync.yml` runs hourly at :30, pulls orders from the last cursor, awards commissions idempotently via `UNIQUE(order_id, sale_type)` + `ON CONFLICT DO NOTHING`
 - **75 new tests** covering the unified commission path — zero regression on admin/employee UIs
@@ -41,9 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Admin announcements broadcast** at `/admin/announcements` — priority, target audience, optional expiry, per-recipient read tracking
 - **Automatic activity log** on every commission event (registered, cancelled, sanction, target change, milestone, correction) — surfaced in `/sales-pwa/activity`
 - **Recharts 6-month comparison** (sales + commissions + targets) on `/sales-pwa/commissions`
-- **Offline support** via Service Worker — network-first API GET cache, IndexedDB POST queue for `/api/pwa/*` (except attachments), drains on `online` event
+- **Offline support** via Service Worker — network-first API GET cache, IndexedDB POST queue for `/api/pwa/*`, drains on `online` event
 - **Pipeline → commission auto-registration** — deal landing in `is_won` stage fires `autoRegisterWonDealCommission()`
-- **Real file uploads** via Supabase Signed URLs (`sales-docs-private` bucket, MIME whitelist, per-file size cap)
 - **`POST /api/pwa/customers`** — create customer from the PWA with phone / national-id dedup
 - **`GET /api/employee/me`** — authed profile for shell header
 - **Hourly commission sync workflow** (`.github/workflows/commission-sync.yml`)
@@ -52,6 +51,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New tables**: `commission_correction_requests`, `admin_announcements`, `admin_announcement_reads`, `employee_activity_log`, `employee_favorite_products`
 - Additional API endpoints + new test coverage (numbers tracked privately)
 - **Forgot / reset password flow** — `/forgot-password`, `/reset-password`. Single Supabase auth covers admin, CRM, and Sales PWA. Password strength rules mirror `/change-password`.
+
+### Removed
+
+- Attachments system removed entirely — sales docs now register with data
+  only, no file uploads. Deleted the two `/api/pwa/sales/[id]/attachments*`
+  endpoints, stripped attachment UI from the Sales PWA and admin drawer,
+  removed MIME/size validators. The `sales_doc_attachments` DB table is
+  orphaned (not dropped) for legacy audit; no app code references it. The
+  `sales-docs-private` Storage bucket is retained but no longer written to.
 
 ### Fixed
 

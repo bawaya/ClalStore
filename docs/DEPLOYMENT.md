@@ -455,7 +455,7 @@ Two primary storage stacks:
 Product images and public assets live in Supabase Storage. Bucket names used today:
 
 - `product-images` — public read, service-role write
-- `sales-docs-private` — **private**, signed-URL access only, used for sales attachments like ID scans, contracts, invoices
+- `sales-docs-private` — **private**, legacy bucket retained for historical objects only. **Not written to by any application code as of 2026-04-18** (the sales-doc attachments feature was removed on that date). Left in place to preserve existing audit artefacts.
 
 To create a new bucket:
 
@@ -467,7 +467,7 @@ VALUES ('my-bucket', 'my-bucket', false);
 -- Then add the access policies — see docs/SECURITY.md for the template
 ```
 
-Signed-URL generation happens in `lib/storage.ts` and the `/api/pwa/sales/[id]/attachments/sign` route. Never expose a service-role key to the browser for uploads — always mint a short-lived signed URL server-side.
+When a future feature needs browser-side upload into a private bucket, use the Signed Upload URL pattern: mint a short-lived URL server-side via `lib/storage.ts` and never expose the service-role key to the browser.
 
 ### Cloudflare R2
 

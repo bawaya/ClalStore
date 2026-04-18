@@ -50,7 +50,7 @@ aggregates with milestone bonuses and loyalty payouts, applies sanctions
 | Audience | What they do | Surface |
 |----------|--------------|---------|
 | **Sales agents** | Document sales, view their own monthly data, track progress to target | Sales PWA + `/employee/commissions` |
-| **Field agents (PWA)** | Capture sales in person with attachments | `/sales-pwa` |
+| **Field agents (PWA)** | Capture sales in person | `/sales-pwa` |
 | **CRM agents (pipeline)** | Move deals through stages; commission created automatically on "won" | `/admin/pipeline` |
 | **Managers / finance** | Configure employee profiles, targets, sanctions, cancel sales, lock months | `/admin/commissions/*`, `/admin/sales-docs` |
 | **Super admins** | Unlock locked months, audit override | `/admin/commissions` + private runbook |
@@ -304,17 +304,14 @@ Source: [`lib/crm/pipeline.ts`](../lib/crm/pipeline.ts) →
 
 ### 5.2 Sales PWA → commission
 
-Field agents create a `sales_docs` row via `POST /api/pwa/sales`, upload
-required attachments, then hit `POST /api/pwa/sales/[id]/submit`.
+Field agents create a `sales_docs` row via `POST /api/pwa/sales`, then
+hit `POST /api/pwa/sales/[id]/submit` — no file upload involved.
 
 ```mermaid
 flowchart TD
     A[Agent creates doc<br/>POST /api/pwa/sales] --> B[(sales_docs<br/>status = draft)]
-    B --> C[Upload attachments<br/>sign → PUT → register metadata]
-    C --> D[POST /api/pwa/sales/&#91;id&#93;/submit]
-    D --> V{Required<br/>attachments<br/>present?}
-    V -->|no| X[400 — missing attachments]
-    V -->|yes| T[Atomic UPDATE<br/>status draft→synced_to_commissions<br/>WHERE status IN &#40;draft,rejected&#41;]
+    B --> D[POST /api/pwa/sales/&#91;id&#93;/submit]
+    D --> T[Atomic UPDATE<br/>status draft→synced_to_commissions<br/>WHERE status IN &#40;draft,rejected&#41;]
     T -->|0 rows| Y[409 — already submitted]
     T -->|1 row| R[registerSaleCommission<br/>source = sales_doc<br/>sourceSalesDocId = doc.id]
     R -->|error| Z[rollback doc → rejected<br/>with failure reason]
@@ -703,7 +700,7 @@ flowchart LR
 | `supabase/migrations/20260101000027_employee_commission_profiles.sql` | Per-employee profiles. |
 | `supabase/migrations/20260101000029_commission_employees.sql` | External agent directory. |
 | `supabase/migrations/20260101000030_commission_soft_delete.sql` | `deleted_at` across commission tables. |
-| `supabase/migrations/20260410000001_sales_docs_pwa.sql` | `sales_docs`, `sales_doc_items`, `sales_doc_attachments`, `sales_doc_events`, `sales_doc_sync_queue`. |
+| `supabase/migrations/20260410000001_sales_docs_pwa.sql` | `sales_docs`, `sales_doc_items`, `sales_doc_attachments` (legacy — orphaned since 2026-04-18), `sales_doc_events`, `sales_doc_sync_queue`. |
 | `supabase/migrations/20260412000001_commission_identity_enrichment.sql` | `match_*` identity columns. |
 | `supabase/migrations/20260418000003_commission_refactor.sql` | Unified registration, `rate_snapshot`, month-lock triggers, source columns, unique indexes. |
 

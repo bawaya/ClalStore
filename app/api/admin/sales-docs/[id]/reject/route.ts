@@ -8,7 +8,7 @@ import { z } from "zod";
 
 const rejectSchema = z.object({
   reason: z.string().min(1).max(2000),
-  category: z.enum(["missing_attachment", "data_mismatch", "duplicate", "policy_violation", "other"]).optional(),
+  category: z.enum(["data_mismatch", "duplicate", "policy_violation", "other"]).optional(),
 });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,19 +1,5 @@
 import { z } from "zod";
 
-/**
- * Allowed MIME types for sales_doc attachments. Whitelist — anything else
- * is rejected (audit issue 4.3: arbitrary MIME was accepted before).
- */
-export const ALLOWED_ATTACHMENT_MIMES = [
-  "application/pdf",
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-] as const;
-
-export const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB (audit 4.3)
 export const MAX_SALE_AMOUNT = 100000; // ILS sanity cap (audit 4.12)
 export const MAX_SALE_DAYS_BACK = 90; // can't back-date > 90d (audit 4.16)
 
@@ -65,46 +51,6 @@ export const updateSalesDocSchema = createSalesDocSchema.partial().extend({
 
 export const submitSalesDocSchema = z.object({
   id: z.number().int().positive(),
-});
-
-/** Attachment metadata — validated after the Storage upload completed. */
-export const attachmentMetadataSchema = z.object({
-  attachment_type: z.enum([
-    "contract_photo",
-    "signed_form",
-    "invoice",
-    "device_serial_proof",
-    "id_photo",
-    "other",
-  ]),
-  file_path: z.string().min(1).max(1000),
-  file_name: z.string().min(1).max(200),
-  mime_type: z.enum(ALLOWED_ATTACHMENT_MIMES),
-  file_size: z
-    .number()
-    .int()
-    .min(1, "الملف فارغ")
-    .max(MAX_ATTACHMENT_SIZE_BYTES, "حجم الملف يتجاوز 10MB"),
-  sha256: z.string().max(128).optional().nullable(),
-});
-
-/** Request body for the sign endpoint — ask for a Signed Upload URL. */
-export const attachmentSignRequestSchema = z.object({
-  attachment_type: z.enum([
-    "contract_photo",
-    "signed_form",
-    "invoice",
-    "device_serial_proof",
-    "id_photo",
-    "other",
-  ]),
-  file_name: z.string().min(1).max(200),
-  mime_type: z.enum(ALLOWED_ATTACHMENT_MIMES),
-  file_size: z
-    .number()
-    .int()
-    .min(1)
-    .max(MAX_ATTACHMENT_SIZE_BYTES),
 });
 
 /** Customer creation from PWA (decision 5). */

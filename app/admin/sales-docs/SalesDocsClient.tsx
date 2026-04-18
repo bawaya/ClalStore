@@ -48,15 +48,6 @@ interface DetailData {
     unit_price: number;
     line_total: number;
   }>;
-  attachments: Array<{
-    id: number;
-    attachment_type: string;
-    file_path: string;
-    file_name: string;
-    mime_type: string;
-    file_size: number;
-    created_at: string;
-  }>;
   events: Array<{
     id: number;
     event_type: string;
@@ -651,33 +642,6 @@ export default function SalesDocsClient({
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
-
-              {/* Attachments */}
-              <div>
-                <h4 className="font-bold text-[12px] mb-1">📎 المرفقات ({detail.attachments.length})</h4>
-                {detail.attachments.length === 0 ? (
-                  <div className="text-dim text-[10px]">لا توجد مرفقات</div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {detail.attachments.map((a) => (
-                      <div
-                        key={a.id}
-                        className="flex items-center justify-between rounded-lg border border-surface-border px-2 py-1 text-[11px]"
-                      >
-                        <div>
-                          <div className="font-bold">{a.file_name}</div>
-                          <div className="text-muted text-[9px]">
-                            {a.attachment_type} · {Math.round(a.file_size / 1024)} KB
-                          </div>
-                        </div>
-                        <div className="text-[9px] text-muted font-mono break-all max-w-[60%] text-left">
-                          {a.file_path}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 )}
               </div>
 

@@ -146,20 +146,21 @@ describe("POST /api/pwa/sales/[id]/submit", () => {
     expect(res.status).toBe(409);
   });
 
-  it("rejects with 400 when attachments missing", async () => {
+  // 2026-04-18: attachments system removed — submit no longer checks for them.
+  // This test used to assert the "missing attachments → 400" branch; that
+  // branch is gone, so the scenario now succeeds (200).
+  it("accepts submit without attachments (attachments system removed)", async () => {
     mockDocReadAndTransition(
       { ...draftDoc, sale_type: "line" },
       { ...draftDoc, sale_type: "line", status: "synced_to_commissions" },
-      [], // no attachments
+      [], // no attachments — no longer required
     );
     const req = createMockRequest({
       method: "POST",
       url: "/api/pwa/sales/1/submit",
     });
     const res = await submitSale(req, ctxOf("1"));
-    const body = await res.json();
-    expect(res.status).toBe(400);
-    expect(body.error).toMatch(/مرفقات ناقصة/);
+    expect(res.status).toBe(200);
   });
 
   it("rejects with 400 when total_amount = 0", async () => {

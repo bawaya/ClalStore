@@ -36,7 +36,7 @@ ClalMobile is a single Next.js 15 monolith that serves **six distinct products**
 
 Additionally, a **unified Sales PWA** (`/sales-pwa` + `/employee/*`) runs as a seventh, first-class installable app for field agents and in-store employees. It combines two responsibilities that used to be separate apps:
 
-1. **Sales documentation** — offline-capable draft/submit flow for `sales_docs` (line / device / mixed), with attachment upload to the private `sales-docs-private` bucket.
+1. **Sales documentation** — offline-capable draft/submit flow for `sales_docs` (line / device / mixed); agents enter header data and submit without any file upload.
 2. **Employee commission portal** — self-service dashboard: today + month commissions, milestones, pacing colour, per-sale breakdown, correction requests, broadcast announcements, activity timeline, and bilingual PDF export (Arabic via Cairo font).
 
 Both halves share the same employee session (bearer-token authed via `requireEmployee`) and the same RLS-backed `read-own` rows on `commission_sales` / `commission_sanctions` / `commission_targets`.
@@ -309,7 +309,7 @@ tests/                          # Six-layer test suite — see TESTING.md
 | **Engagement** | `push_subscriptions`, `push_notifications`, `notifications`, `loyalty_points`, `loyalty_transactions` |
 | **Integrations** | `integrations` (key-value config per provider) |
 | **Content** | `sub_pages`, `website_content`, `email_templates`, `settings` |
-| **Sales docs (PWA)** | `sales_docs`, `sales_doc_items`, `sales_doc_attachments`, `sales_doc_events`, `sales_doc_sync_queue` |
+| **Sales docs (PWA)** | `sales_docs`, `sales_doc_items`, `sales_doc_events`, `sales_doc_sync_queue` (plus legacy `sales_doc_attachments` — orphaned, no longer referenced by app code as of 2026-04-18) |
 
 Every table has a corresponding `Row` / `Insert` / `Update` type in `types/database.ts`. This file is the **single source of truth** — adding a column means updating it here first.
 
