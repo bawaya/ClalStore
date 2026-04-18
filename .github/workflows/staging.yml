@@ -19,9 +19,6 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Temporary skip while the RLS hardening migration is deployed.
-          # Remove this line once 20260418000001_harden_rls_global.sql is in production.
-          SKIP_RLS_CONTRACT: "1"
           YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
           WHATSAPP_TEST_NUMBER: ${{ secrets.WHATSAPP_TEST_NUMBER }}
           EMAIL_TEST_ADDRESS: ${{ secrets.EMAIL_TEST_ADDRESS }}

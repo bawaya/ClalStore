@@ -84,7 +84,13 @@
       "Bash(npm view *)",
       "Bash(AUDIT_JSON=/tmp/audit.json ALLOWLIST=.github/audit-allowlist.json node .github/audit-check.js)",
       "Bash(node -e 'const p = require\\(\"./package-lock.json\"\\); console.log\\(\"root react:\", p.packages[\"\"].dependencies?.react\\); console.log\\(\"root react-dom:\", p.packages[\"\"].dependencies?.[\"react-dom\"]\\); console.log\\(\"next version:\", p.packages[\"node_modules/next\"]?.version\\); console.log\\(\"react-dom installed:\", p.packages[\"node_modules/react-dom\"]?.version\\);')",
-      "Bash(node -e 'const p = require\\(\"./package-lock.json\"\\); for \\(const [k,v] of Object.entries\\(p.packages\\)\\) { if \\(k.startsWith\\(\"node_modules/react\"\\) && !k.includes\\(\"/\"\\)\\) continue; if \\(k.match\\(/^node_modules\\\\/react\\(-dom\\)?$/\\)\\) console.log\\(k, \"=\", v.version\\); }')"
+      "Bash(node -e 'const p = require\\(\"./package-lock.json\"\\); for \\(const [k,v] of Object.entries\\(p.packages\\)\\) { if \\(k.startsWith\\(\"node_modules/react\"\\) && !k.includes\\(\"/\"\\)\\) continue; if \\(k.match\\(/^node_modules\\\\/react\\(-dom\\)?$/\\)\\) console.log\\(k, \"=\", v.version\\); }')",
+      "Bash(supabase --version)",
+      "Bash(npx --yes supabase@latest --version)",
+      "Bash(clip.exe)",
+      "Bash(curl -s -o /tmp/probe.json -w 'HTTP %{http_code}\\\\n' -X GET https://api.supabase.com/v1/projects -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(curl -s -o /tmp/query-probe.json -w 'HTTP %{http_code}\\\\n' -X POST https://api.supabase.com/v1/projects/nhvcfmhvrcsggpdjaejk/database/query -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"query\":\"SELECT current_database\\(\\), version\\(\\)\"}')",
+      "Bash(node -e ' *)"
     ]
   }
 }
