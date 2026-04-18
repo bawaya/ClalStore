@@ -10,6 +10,15 @@
       ],
       "reason": "xlsx/SheetJS has no upstream patch. Used only for admin-side CSV/XLSX exports — not exposed to untrusted user input. Tracked for replacement with exceljs in follow-up.",
       "expires": "2026-10-01"
+    },
+    {
+      "package": "next",
+      "severity": "high",
+      "advisories": [
+        "GHSA-q4gf-8mx6-v5v3"
+      ],
+      "reason": "Next 15.5.15 patch introduces a ReactCurrentDispatcher issue in CI (Linux chromium prerender) with react-dom 18.3.1. Sticking with 15.5.14 until we can coordinate a react 18→19 + next 15→16 migration. Our rate-limit middleware already blunts the DoS impact. Short expiry forces revisit.",
+      "expires": "2026-06-01"
     }
   ]
 }
