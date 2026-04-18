@@ -1,25 +1,25 @@
 {
-  "lastCheck": "2026-04-18T09:46:44.298Z",
+  "lastCheck": "2026-04-18T10:15:56.588Z",
   "status": "operational",
   "services": {
     "website": {
       "status": "up",
-      "responseMs": 454,
+      "responseMs": 856,
       "httpStatus": 200
     },
     "api": {
       "status": "gated",
-      "responseMs": 732,
+      "responseMs": 581,
       "httpStatus": 401
     },
     "store": {
       "status": "up",
-      "responseMs": 692,
+      "responseMs": 1048,
       "httpStatus": 200
     },
     "public-settings": {
       "status": "up",
-      "responseMs": 659,
+      "responseMs": 1274,
       "httpStatus": 200
     }
   },
@@ -27,6 +27,6 @@
     "valid": true,
     "daysRemaining": 77
   },
-  "commit": "943d7e312220eb3c5024e9689779b4d667a5c834",
-  "runUrl": "https://github.com/bawaya/ClalStore/actions/runs/24602050958"
+  "commit": "db7d2f37b9154226516774ab6542d2726a4a9361",
+  "runUrl": "https://github.com/bawaya/ClalStore/actions/runs/24602519970"
 }
