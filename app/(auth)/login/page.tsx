@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Logo } from "@/components/shared/Logo";
 
 export default function LoginPage() {
@@ -8,6 +9,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  // Flash: "?reset=success" after the reset-password flow redirects here
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reset") === "success") {
+      setResetSuccess(true);
+      // Clean the URL so a refresh doesn't show the flash again
+      const cleaned = new URL(window.location.href);
+      cleaned.searchParams.delete("reset");
+      window.history.replaceState({}, "", cleaned.toString());
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,9 +97,17 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-[#71717a] text-xs font-semibold mb-1">
-              كلمة المرور
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[#71717a] text-xs font-semibold">
+                كلمة المرور
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-[#71717a] text-[10px] hover:text-[#a1a1aa] underline underline-offset-2"
+              >
+                نسيت كلمة المرور؟
+              </Link>
+            </div>
             <input
               type="password"
               value={password}
@@ -95,6 +118,12 @@ export default function LoginPage() {
               dir="ltr"
             />
           </div>
+
+          {resetSuccess && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-green-400 text-xs text-center">
+              تم تغيير كلمة المرور بنجاح — سجّل دخولك بالكلمة الجديدة
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-red-400 text-xs text-center">
