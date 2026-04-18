@@ -24,6 +24,7 @@
     "db:reset": "npx supabase db reset"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "@supabase/ssr": "^0.5.0",
     "@supabase/supabase-js": "^2.100.1",
     "clsx": "^2.1.0",

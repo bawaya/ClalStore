@@ -21,6 +21,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { requireEmployee } from "@/lib/pwa/auth";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiError, safeError } from "@/lib/api-response";
@@ -31,12 +34,36 @@ import {
   COMMISSION,
 } from "@/lib/commissions/calculator";
 
-// Strip any non-WinAnsi chars (Helvetica encoding) so we never hit
-// "WinAnsi cannot encode" errors on Arabic/Hebrew customer names.
+/** Test whether a string contains any Arabic or Hebrew code points. */
+function containsRTL(s: string): boolean {
+  // Arabic: 0600-06FF, Hebrew: 0590-05FF
+  return /[\u0590-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(s);
+}
+
+/** pdf-lib has no RTL layout. For short labels/names we visually reverse
+ * Arabic/Hebrew runs so they display right-to-left when drawn left-to-right. */
+function rtlFriendly(s: string): string {
+  if (!containsRTL(s)) return s;
+  return s.split("").reverse().join("");
+}
+
+/** Legacy ASCII fallback — used only when Cairo font isn't available. */
 function asciiSafe(value: string | null | undefined): string {
   if (!value) return "";
   // eslint-disable-next-line no-control-regex
   return String(value).replace(/[^\x20-\x7E]/g, "?").trim();
+}
+
+/** Try to load the Cairo TTF bundled under public/fonts. Returns null if
+ * the file is missing (e.g. a clean checkout without the font) — the PDF
+ * will fall back to Helvetica + English-only text. */
+function loadCairoFontBytes(): Uint8Array | null {
+  try {
+    const path = join(process.cwd(), "public", "fonts", "cairo-regular.ttf");
+    return readFileSync(path);
+  } catch {
+    return null;
+  }
 }
 
 function fmtMoney(n: number): string {
@@ -68,6 +95,9 @@ interface PageCtx {
   doc: PDFDocument;
   font: PDFFont;
   fontBold: PDFFont;
+  /** Optional Arabic/Hebrew-capable font; if present, we draw RTL strings
+   * with it. When missing, we fall back to ASCII-only via `asciiSafe`. */
+  arabicFont: PDFFont | null;
   page: ReturnType<PDFDocument["addPage"]>;
   y: number;
 }
@@ -90,11 +120,21 @@ function drawText(
   const size = opts.size ?? 10;
   const x = opts.x ?? 50;
   const color = opts.color ?? [0, 0, 0];
-  ctx.page.drawText(asciiSafe(text), {
+  const hasRTL = containsRTL(text);
+  // If the string contains RTL chars AND we loaded a proper Arabic-capable font,
+  // use that font + visually-reverse the run. Otherwise, fall back to ASCII.
+  const useArabic = hasRTL && ctx.arabicFont !== null;
+  const body = useArabic ? rtlFriendly(text) : asciiSafe(text);
+  const font = useArabic
+    ? (ctx.arabicFont as PDFFont)
+    : opts.bold
+      ? ctx.fontBold
+      : ctx.font;
+  ctx.page.drawText(body, {
     x,
     y: ctx.y,
     size,
-    font: opts.bold ? ctx.fontBold : ctx.font,
+    font,
     color: rgb(color[0], color[1], color[2]),
   });
   return ctx;
@@ -185,19 +225,40 @@ export async function GET(req: NextRequest) {
     const doc = await PDFDocument.create();
     const font = await doc.embedFont(StandardFonts.Helvetica);
     const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+    // Try to load the Cairo TTF for Arabic/Hebrew text. Graceful fallback:
+    // if the font file is missing (e.g. first-time deploy), we still
+    // produce a usable English-only PDF.
+    let arabicFont: PDFFont | null = null;
+    const cairoBytes = loadCairoFontBytes();
+    if (cairoBytes) {
+      try {
+        doc.registerFontkit(fontkit);
+        arabicFont = await doc.embedFont(cairoBytes, { subset: true });
+      } catch (fontErr) {
+        console.warn("[pdf-export] Cairo font embed failed:", fontErr);
+        arabicFont = null;
+      }
+    }
+
     let ctx: PageCtx = {
       doc,
       font,
       fontBold,
+      arabicFont,
       page: doc.addPage([595.28, 841.89]),
       y: 800,
     };
 
     const genDate = new Date().toISOString().slice(0, 10);
 
-    // Header
+    // Header — English + Arabic (when Cairo font loaded)
     drawText(ctx, "Commission Statement - ClalMobile", { size: 18, bold: true });
-    ctx.y -= 24;
+    ctx.y -= 22;
+    if (ctx.arabicFont) {
+      drawText(ctx, "كشف عمولات", { size: 14, x: 420 });
+    }
+    ctx.y -= 14;
     drawText(ctx, `Month: ${month}`, { size: 11 });
     ctx.y -= 14;
     drawText(ctx, `Employee: ${authed.name}`, { size: 11 });
@@ -207,11 +268,14 @@ export async function GET(req: NextRequest) {
     drawLine(ctx);
     ctx.y -= 18;
 
-    // Note: Arabic version
-    drawText(ctx, "Arabic/Hebrew version: use Excel export (under development).", {
-      size: 9,
-      color: [0.45, 0.45, 0.45],
-    });
+    if (!ctx.arabicFont) {
+      // Only show the note when the font is unavailable
+      drawText(ctx, "Arabic/Hebrew text rendered as ASCII (font not loaded).", {
+        size: 9,
+        color: [0.45, 0.45, 0.45],
+      });
+      ctx.y -= 14;
+    }
     ctx.y -= 20;
 
     // Summary

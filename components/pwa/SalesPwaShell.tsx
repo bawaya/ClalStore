@@ -74,15 +74,17 @@ export function SalesPwaShell({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/employee/commissions/dashboard", { credentials: "same-origin" });
+        const res = await fetch("/api/employee/me", { credentials: "same-origin" });
         if (!res.ok) return;
         const json: unknown = await res.json().catch(() => ({}));
         if (cancelled) return;
-        // dashboard doesn't return a name — we fall back to a generic "موظف"
-        // in the header unless a future endpoint provides one.
-        if (json && typeof json === "object" && "data" in json) {
-          // no-op for now; placeholder for future employee profile endpoint
-        }
+        // apiSuccess wraps payload in { success, data }
+        const data =
+          json && typeof json === "object" && "data" in json
+            ? (json as { data?: { name?: string; email?: string } }).data
+            : (json as { name?: string; email?: string } | undefined);
+        const display = data?.name || data?.email || "";
+        if (display) setEmployeeName(display);
       } catch {
         /* ignore */
       }

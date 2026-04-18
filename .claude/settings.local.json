@@ -102,7 +102,14 @@
       "Bash(npx --yes supabase migration repair --status applied 20260417000001 20260418000001 20260418000002)",
       "Bash(npx --yes supabase migration list)",
       "Bash(python3)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(gh variable *)",
+      "Bash(curl -fsSL -o \"C:/CLALSTORE/clalmobile/public/fonts/cairo-regular.ttf\" \"https://github.com/googlefonts/cairo/raw/main/fonts/ttf/Cairo-Regular.ttf\")",
+      "Bash(curl -fsSL -o \"C:/CLALSTORE/clalmobile/public/fonts/cairo-regular.ttf\" \"https://raw.githubusercontent.com/googlefonts/cairo/main/fonts/ttf/Cairo-Regular.ttf\")",
+      "Bash(curl -fsSL -o \"C:/CLALSTORE/clalmobile/public/fonts/cairo-regular.ttf\" \"https://fonts.googleapis.com/css2?family=Cairo:wght@400&display=swap\")",
+      "Bash(curl -fsSL \"https://fonts.googleapis.com/css2?family=Cairo:wght@400\" -H \"User-Agent: Mozilla/5.0\")",
+      "Bash(curl -fsSL -o \"C:/CLALSTORE/clalmobile/public/fonts/cairo-regular.ttf\" \"https://fonts.gstatic.com/s/cairo/v31/SLXgc1nY6HkvangtZmpQdkhzfH5lkSs2SgRjCAGMQ1z0hOA-W1Q.ttf\")",
+      "Bash(curl -fsSL \"https://fonts.googleapis.com/css2?family=Cairo:wght@400&subset=arabic\" -H \"User-Agent: Mozilla/5.0\")"
     ]
   }
 }
