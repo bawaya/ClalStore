@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError, apiSuccess, safeError } from "@/lib/api-response";
 import { withPermission } from "@/lib/admin/auth";
+import { lastDayOfMonth } from "@/lib/commissions/date-utils";
 
 export const GET = withPermission("commissions", "manage", async (req: NextRequest, db) => {
   try {
@@ -24,7 +25,7 @@ export const GET = withPermission("commissions", "manage", async (req: NextReque
     if (employeeKey) q = q.eq("employee_key", employeeKey);
     if (source) q = q.eq("source", source);
     if (month) {
-      q = q.gte("sale_date", `${month}-01`).lte("sale_date", `${month}-31`);
+      q = q.gte("sale_date", `${month}-01`).lte("sale_date", lastDayOfMonth(month));
     }
     if (from) q = q.gte("sale_date", from);
     if (to) q = q.lte("sale_date", to);

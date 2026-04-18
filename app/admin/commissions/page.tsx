@@ -7,6 +7,7 @@ import { useScreen, useToast } from "@/lib/hooks";
 import { StatCard, Modal, FormField, ToastContainer, ConfirmDialog } from "@/components/admin/shared";
 import { formatCurrency } from "@/lib/utils";
 import { getCsrfToken } from "@/lib/csrf-client";
+import { lastDayOfMonth } from "@/lib/commissions/date-utils";
 
 interface PaceLines {
   target: number;
@@ -272,7 +273,7 @@ export default function CommissionsDashboard() {
     setSyncing(true);
     try {
       const startDate = `${month}-01`;
-      const endDate = `${month}-31`;
+      const endDate = lastDayOfMonth(month);
       const res = await fetch("/api/admin/commissions/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },

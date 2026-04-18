@@ -13,6 +13,7 @@ import {
 } from "@/lib/commissions/ledger";
 import { corsHeaders } from "@/lib/commissions/cors";
 import { safeTokenEqual } from "@/lib/commissions/safe-compare";
+import { lastDayOfMonth } from "@/lib/commissions/date-utils";
 
 const RATE_LIMIT = { maxRequests: 60, windowMs: 3600_000 }; // 60/hour
 
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
     targetKey: req.nextUrl.searchParams.get("target_key"),
   });
   const monthStart = `${month}-01`;
-  const monthEnd = `${month}-31`;
+  const monthEnd = lastDayOfMonth(month);
 
   if (scope.notFound && req.nextUrl.searchParams.get("employee_token")) {
     return NextResponse.json({ error: "Invalid employee token" }, { status: 403, headers: corsHeaders() });

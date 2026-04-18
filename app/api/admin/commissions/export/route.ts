@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase";
+import { lastDayOfMonth } from "@/lib/commissions/date-utils";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
     .select("*")
     .is("deleted_at", null)
     .gte("sale_date", `${month}-01`)
-    .lte("sale_date", `${month}-31`)
+    .lte("sale_date", lastDayOfMonth(month))
     .order("sale_date", { ascending: true })
     .limit(5000);
 
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
     .select("*")
     .is("deleted_at", null)
     .gte("sanction_date", `${month}-01`)
-    .lte("sanction_date", `${month}-31`)
+    .lte("sanction_date", lastDayOfMonth(month))
     .limit(5000);
 
   // Build CSV

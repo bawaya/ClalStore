@@ -6,6 +6,7 @@ import {
   COMMISSION_CONTRACT_TARGET_KEY,
   getCommissionTarget,
 } from "@/lib/commissions/ledger";
+import { lastDayOfMonth } from "@/lib/commissions/date-utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface MonthlyAnalytics {
@@ -38,7 +39,7 @@ export const GET = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =>
   const startMonth = months[0];
   const endMonth = months[months.length - 1];
   const startDate = `${startMonth}-01`;
-  const endDate = `${endMonth}-31`;
+  const endDate = lastDayOfMonth(endMonth);
 
   // Fetch all data across the range
   const [salesRes, sanctionsRes, targetsRes] = await Promise.all([
@@ -75,7 +76,7 @@ export const GET = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =>
   // Build monthly analytics
   const monthlyData: MonthlyAnalytics[] = months.map((month) => {
     const monthStart = `${month}-01`;
-    const monthEnd = `${month}-31`;
+    const monthEnd = lastDayOfMonth(month);
 
     const sales = allSales.filter((s) => s.sale_date >= monthStart && s.sale_date <= monthEnd);
     const sanctions = allSanctions.filter((s) => s.sanction_date >= monthStart && s.sanction_date <= monthEnd);

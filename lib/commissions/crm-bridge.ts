@@ -6,6 +6,7 @@
 import { createAdminSupabase } from "@/lib/supabase";
 import { calcDeviceCommission, calcLoyaltyBonus, calcMonthlySummary } from "@/lib/commissions/calculator";
 import { resolveLinkedAppUserId } from "@/lib/commissions/ledger";
+import { lastDayOfMonth } from "@/lib/commissions/date-utils";
 
 // ---------- Types ----------
 
@@ -235,9 +236,9 @@ export async function getBridgeDashboard(month?: string): Promise<BridgeDashboar
   // Parallel queries
   const todayStr = new Date().toISOString().slice(0, 10);
   const [salesRes, sanctionsRes, ordersRes, employees, gaps, todaySalesRes] = await Promise.all([
-    db.from("commission_sales").select("*").is("deleted_at", null).gte("sale_date", `${m}-01`).lte("sale_date", `${m}-31`),
-    db.from("commission_sanctions").select("amount").is("deleted_at", null).gte("sanction_date", `${m}-01`).lte("sanction_date", `${m}-31`),
-    db.from("orders").select("id, status, total, commission_synced").is("deleted_at", null).gte("created_at", `${m}-01`).lte("created_at", `${m}-31T23:59:59.999Z`),
+    db.from("commission_sales").select("*").is("deleted_at", null).gte("sale_date", `${m}-01`).lte("sale_date", lastDayOfMonth(m)),
+    db.from("commission_sanctions").select("amount").is("deleted_at", null).gte("sanction_date", `${m}-01`).lte("sanction_date", lastDayOfMonth(m)),
+    db.from("orders").select("id, status, total, commission_synced").is("deleted_at", null).gte("created_at", `${m}-01`).lte("created_at", `${lastDayOfMonth(m)}T23:59:59.999Z`),
     getUnifiedEmployees(),
     getSyncGaps(m),
     db.from("commission_sales").select("sale_type, commission_amount, device_sale_amount").is("deleted_at", null).eq("sale_date", todayStr),

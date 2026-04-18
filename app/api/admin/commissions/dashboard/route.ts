@@ -9,7 +9,7 @@ import {
   resolveCommissionEmployeeFilter,
 } from "@/lib/commissions/ledger";
 import { corsHeaders } from "@/lib/commissions/cors";
-import { countWorkingDays } from "@/lib/commissions/date-utils";
+import { countWorkingDays, lastDayOfMonth } from "@/lib/commissions/date-utils";
 import { safeTokenEqual } from "@/lib/commissions/safe-compare";
 
 // OPTIONS preflight — handled by middleware OPEN_CORS_PATHS, but keep as fallback
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
   const resolvedMonth = month || new Date().toISOString().slice(0, 7);
 
   const monthStart = `${resolvedMonth}-01`;
-  const monthEnd = `${resolvedMonth}-31`;
+  const monthEnd = lastDayOfMonth(resolvedMonth);
 
   // Build queries with optional employee filter
   let salesQuery = db.from("commission_sales")

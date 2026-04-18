@@ -7,6 +7,7 @@ import { FormField, ToastContainer, ConfirmDialog } from "@/components/admin/sha
 import { formatCurrency } from "@/lib/utils";
 import { COMMISSION, type SanctionKey } from "@/lib/commissions/calculator";
 import { getCsrfToken } from "@/lib/csrf-client";
+import { lastDayOfMonth } from "@/lib/commissions/date-utils";
 
 interface Sanction {
   id: number;
@@ -40,7 +41,7 @@ export default function SanctionsPage() {
   const fetchSanctions = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/commissions/sanctions?from=${currentMonth}-01&to=${currentMonth}-31`);
+      const res = await fetch(`/api/admin/commissions/sanctions?from=${currentMonth}-01&to=${lastDayOfMonth(currentMonth)}`);
       if (!res.ok) throw new Error();
       const json = await res.json();
       setSanctions(json.data || []);
