@@ -27,11 +27,15 @@ CREATE POLICY commission_targets_service ON commission_targets
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ─── Employee read-own (defense-in-depth) ───────────────────────────────────
+-- commission_sales.employee_id is UUID (added in employee_unification migration),
+-- so we match against users.id without casting. commission_sanctions.user_id and
+-- commission_targets.user_id are TEXT (legacy schema) — those keep the ::text cast.
+
 DROP POLICY IF EXISTS commission_sales_employee_read_own ON commission_sales;
 CREATE POLICY commission_sales_employee_read_own ON commission_sales
   FOR SELECT TO authenticated
   USING (
-    employee_id IN (SELECT id::text FROM users WHERE auth_id = auth.uid())
+    employee_id IN (SELECT id FROM users WHERE auth_id = auth.uid())
   );
 
 DROP POLICY IF EXISTS commission_sanctions_employee_read_own ON commission_sanctions;
