@@ -9,8 +9,18 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue?logo=typescript)](https://typescriptlang.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ecf8e?logo=supabase)](https://supabase.com/)
-[![Cloudflare](https://img.shields.io/badge/Cloudflare-Pages-f38020?logo=cloudflare)](https://pages.cloudflare.com/)
+[![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-f38020?logo=cloudflare)](https://workers.cloudflare.com/)
 [![Tailwind](https://img.shields.io/badge/Tailwind-3.4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
+
+[![CI](https://img.shields.io/github/actions/workflow/status/bawaya/ClalStore/test.yml?branch=main&label=CI&logo=github)](https://github.com/bawaya/ClalStore/actions/workflows/test.yml)
+[![Staging](https://img.shields.io/github/actions/workflow/status/bawaya/ClalStore/staging.yml?branch=main&label=Staging&logo=supabase)](https://github.com/bawaya/ClalStore/actions/workflows/staging.yml)
+[![Smoke](https://img.shields.io/github/actions/workflow/status/bawaya/ClalStore/smoke.yml?branch=main&label=Smoke&logo=checkmarx)](https://github.com/bawaya/ClalStore/actions/workflows/smoke.yml)
+[![Monitor](https://img.shields.io/github/actions/workflow/status/bawaya/ClalStore/monitor.yml?label=Monitor&logo=grafana)](https://github.com/bawaya/ClalStore/actions/workflows/monitor.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/bawaya/ClalStore/codeql.yml?branch=main&label=CodeQL&logo=github)](https://github.com/bawaya/ClalStore/actions/workflows/codeql.yml)
+[![Status](https://img.shields.io/badge/status-live-brightgreen?logo=githubpages)](https://bawaya.github.io/ClalStore/)
+[![License](https://img.shields.io/badge/license-proprietary-red)](#license)
+
+**[🔴 Live status](https://bawaya.github.io/ClalStore/)** · **[📖 Documentation](./docs/README.md)** · **[🏗 Architecture](./docs/ARCHITECTURE.md)** · **[🧪 Testing](./docs/TESTING.md)** · **[🔒 Security](./docs/SECURITY.md)**
 
 </div>
 
@@ -166,7 +176,7 @@ clalmobile/
 │   └── database.ts               # 40+ Supabase table types (single source of truth)
 │
 ├── supabase/
-│   └── migrations/               # 39 sequential SQL migrations
+│   └── migrations/               # 42+ sequential SQL migrations
 │
 ├── locales/
 │   ├── ar.json                   # Arabic translations
@@ -304,7 +314,7 @@ npx wrangler deploy      # 3. Deploy to Cloudflare Pages
 
 ## Database
 
-**39 sequential migrations** in `supabase/migrations/` covering:
+**42+ sequential migrations** in `supabase/migrations/` covering:
 - Core tables (products, orders, customers, users)
 - Bot engine tables (conversations, messages, handoffs, analytics)
 - CRM tables (inbox, pipeline, tasks)
@@ -323,13 +333,55 @@ Bilingual RTL support:
 - Database columns use `*_ar` / `*_he` suffixes
 - Language switcher component in header
 
+## Testing
+
+Six-layer strategy — every code change passes through at least three of these before production.
+
+| # | Layer | What it proves | Cadence |
+|---|-------|----------------|---------|
+| 1 | **Unit & Integration** (Vitest) | 2608 tests across 158 files, including coverage gates on critical files (`lib/admin/auth.ts` ≥ 98%, `lib/commissions/*` ≥ 95%) | Every commit |
+| 2 | **CI** ([`test.yml`](.github/workflows/test.yml)) | TypeScript + ESLint + unit + build + Playwright (88 E2E) | Every PR |
+| 3 | **Staging** ([`staging.yml`](.github/workflows/staging.yml)) | 37 tests against real Supabase with `TEST_` data · includes 17 RLS contract tests | Every push to main |
+| 4 | **Production smoke** ([`smoke.yml`](.github/workflows/smoke.yml)) | 33 checks against `clalmobile.com` | Post-deploy + daily |
+| 5 | **Hourly monitor** ([`monitor.yml`](.github/workflows/monitor.yml)) | 5 endpoints + SSL validity | Every hour |
+| 6 | **Synthetic journeys** ([`synthetic.yml`](.github/workflows/synthetic.yml)) | 17 real user flows on production | Every 30 min |
+
+Plus: CodeQL + gitleaks + `npm audit` (daily), Stryker mutation testing (weekly), visual regression + Lighthouse (PR-gated).
+
+Complete guide: **[docs/TESTING.md](./docs/TESTING.md)**
+
+## Security
+
+- **RLS enforced** on every sensitive table. Policies are role-scoped, audited by 17 `tests/staging/rls-contract.test.ts` assertions that run on every push to `main`
+- **Service-role-only writes** — all order / customer / commission mutations flow through `/api/*` routes; no direct writes from anon or authenticated clients
+- **HMAC-verified webhooks** (WhatsApp, payments, Twilio) with constant-time comparison
+- **CSRF** double-submit for every state-changing API
+- **Rate limiting** on every route (`middleware.ts`)
+- **CVE allowlist** with expiries — unknown HIGH/CRITICAL blocks CI
+
+Full model + disclosure policy: **[docs/SECURITY.md](./docs/SECURITY.md)** · private reports → `security@clalmobile.com`
+
+## Observability
+
+- **Alert deduplication** — WhatsApp + email alerts route through [`alert-dedup.js`](./tests/monitor/alert-dedup.js), which uses GitHub Issues as the state store. First failure fires; subsequent failures append comments with a 2-hour cooldown; recovery auto-closes and notifies
+- **Public status page** — [https://bawaya.github.io/ClalStore/](https://bawaya.github.io/ClalStore/) updated every 15 min
+- **Real User Monitoring** plan — [docs/RUM-SETUP.md](./docs/RUM-SETUP.md) (Cloudflare Web Analytics + Sentry)
+
 ## Documentation
 
-| File | Description |
-|------|-------------|
-| [DOCS.md](./DOCS.md) | Comprehensive technical documentation |
-| [AGENTS.md](./AGENTS.md) | AI agent coding guide & conventions |
+**[docs/README.md](./docs/README.md)** is the documentation hub.
+
+| Document | When to read it |
+|----------|-----------------|
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Onboarding · system design · request flow |
+| [docs/TESTING.md](./docs/TESTING.md) | Writing tests · running CI locally · debugging failures |
+| [docs/SECURITY.md](./docs/SECURITY.md) | RLS design · auth · payments · secrets |
+| [docs/OPERATIONS.md](./docs/OPERATIONS.md) | Deploying · rolling back · rotating secrets · applying migrations |
+| [docs/INCIDENT-RESPONSE.md](./docs/INCIDENT-RESPONSE.md) | When production breaks |
+| [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) | Dev setup · PR process · code style |
+| [CHANGELOG.md](./CHANGELOG.md) | What changed in each release |
+| [AGENTS.md](./AGENTS.md) | Conventions for AI-assisted coding (Claude, Copilot) |
 
 ## License
 
-Private — All rights reserved.
+Proprietary — All rights reserved.

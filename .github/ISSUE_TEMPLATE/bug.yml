@@ -1,0 +1,79 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Fill in as much as you can —
+        the more context we have, the faster we can fix it.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you see, what did you expect?
+      placeholder: |
+        1. I opened /store/cart
+        2. I clicked "Checkout"
+        3. Expected: payment gateway opened
+        4. Actual: blank page, console shows TypeError
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: URL or code path
+      placeholder: "https://clalmobile.com/store/cart OR lib/commissions/ledger.ts:142"
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Your best guess. Engineering will confirm.
+      options:
+        - "SEV-1 — site down, data loss, security leak"
+        - "SEV-2 — major flow broken"
+        - "SEV-3 — minor flow broken"
+        - "SEV-4 — cosmetic / non-blocking"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Step-by-step. If you can't reproduce reliably, describe frequency.
+      placeholder: |
+        1. Open X
+        2. Click Y
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser / OS / device / role (customer / admin / sales)
+      placeholder: |
+        - Browser: Chrome 128 on macOS 15
+        - User role: admin
+        - Language: Arabic
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots / console errors
+      description: Anything that helps us see what you saw. Screenshots are great for UI bugs.
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Security check
+      description: If this involves data disclosure, do not post secrets here.
+      options:
+        - label: I confirm this bug report does not include any secrets, tokens, or customer PII
+          required: true

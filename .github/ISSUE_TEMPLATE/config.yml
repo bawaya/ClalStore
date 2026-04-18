@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: mailto:security@clalmobile.com
+    about: Please email us privately — do not open a public issue for security bugs.
+  - name: Customer support
+    url: https://clalmobile.com/contact
+    about: For customer inquiries about orders, products, or account issues.
+  - name: Status page
+    url: https://bawaya.github.io/ClalStore/
+    about: Check the live production status before filing an "is the site down?" issue.

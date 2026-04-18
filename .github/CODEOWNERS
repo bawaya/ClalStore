@@ -1,0 +1,47 @@
+# GitHub CODEOWNERS
+#
+# Patterns are matched in order; last matching pattern wins. Everyone listed
+# becomes a required reviewer for PRs touching the matched paths.
+#
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+# ── Repository default owner ──
+*                                   @bawaya
+
+# ── Critical paths (security-sensitive) ──
+# Migrations, RLS, and admin auth get extra eyes
+supabase/migrations/**              @bawaya
+lib/admin/auth.ts                   @bawaya
+lib/webhook-verify.ts               @bawaya
+lib/csrf.ts                         @bawaya
+lib/csrf-client.ts                  @bawaya
+lib/rate-limit.ts                   @bawaya
+lib/rate-limit-db.ts                @bawaya
+middleware.ts                       @bawaya
+
+# ── Payment integration ──
+lib/integrations/rivhit.ts          @bawaya
+lib/integrations/upay.ts            @bawaya
+lib/payment-gateway.ts              @bawaya
+app/api/payment/**                  @bawaya
+
+# ── Commissions (financial) ──
+lib/commissions/**                  @bawaya
+app/api/admin/commissions/**        @bawaya
+
+# ── CI / workflows / secrets ──
+.github/workflows/**                @bawaya
+.github/dependabot.yml              @bawaya
+.github/audit-allowlist.json        @bawaya
+.github/audit-check.js              @bawaya
+
+# ── Tests (mandatory review so coverage doesn't drop) ──
+tests/staging/**                    @bawaya
+tests/smoke/**                      @bawaya
+tests/monitor/**                    @bawaya
+tests/synthetic/**                  @bawaya
+
+# ── Documentation ──
+docs/**                             @bawaya
+CHANGELOG.md                        @bawaya
+README.md                           @bawaya

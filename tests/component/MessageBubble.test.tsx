@@ -181,7 +181,9 @@ describe("MessageBubble", () => {
   });
 
   it("shows date separator when showDate is true", () => {
-    const msg = makeMessage({ created_at: "2026-04-17T10:00:00Z" });
+    // Use "right now" so this test is stable across days (was hardcoded to
+    // 2026-04-17 which started failing the following day).
+    const msg = makeMessage({ created_at: new Date().toISOString() });
     render(<MessageBubble message={msg} showDate />);
     expect(screen.getByText("اليوم")).toBeInTheDocument();
   });
