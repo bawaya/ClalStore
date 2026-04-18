@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ClalMobile — Status</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+      .pill { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-weight: 600; }
+      .up { background: #16a34a; color: white; }
+      .degraded { background: #d97706; color: white; }
+      .down { background: #dc2626; color: white; }
+      table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+      th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid rgba(128,128,128,0.3); }
+      .sparkline { display: flex; gap: 2px; align-items: end; height: 48px; }
+      .sparkline span { flex: 1; background: #16a34a; }
+      .sparkline span.degraded { background: #d97706; }
+      .sparkline span.down { background: #dc2626; }
+      small { color: #888; }
+    </style>
+  </head>
+  <body>
+    <h1>ClalMobile · Status</h1>
+    <p id="overall"></p>
+    <table>
+      <thead><tr><th>Service</th><th>Status</th><th>Response</th></tr></thead>
+      <tbody id="services"></tbody>
+    </table>
+    <h2>Last 7 days</h2>
+    <div id="sparkline" class="sparkline"></div>
+    <p><small id="lastcheck"></small></p>
+    <script>
+      (async () => {
+        const [snap, hist] = await Promise.all([
+          fetch('./status.json', { cache: 'no-store' }).then(r => r.json()),
+          fetch('./history.json', { cache: 'no-store' }).then(r => r.json()).catch(() => []),
+        ]);
+        const pill = { up: 'up', operational: 'up', degraded: 'degraded', down: 'down' }[snap.status] || 'degraded';
+        document.getElementById('overall').innerHTML =
+          `<span class="pill ${pill}">${snap.status.toUpperCase()}</span>`;
+        document.getElementById('services').innerHTML = Object.entries(snap.services)
+          .map(([k, v]) => `<tr><td>${k}</td><td>${v.status}</td><td>${v.responseMs}ms</td></tr>`)
+          .join('');
+        const sl = document.getElementById('sparkline');
+        sl.innerHTML = hist.map(h => {
+          const cls = { operational: '', degraded: 'degraded', down: 'down' }[h.s] || '';
+          return `<span class="${cls}" title="${h.t}"></span>`;
+        }).join('');
+        document.getElementById('lastcheck').textContent = `Last check: ${snap.lastCheck} · ${hist.length} samples`;
+      })().catch(e => document.body.insertAdjacentHTML('beforeend', '<p>Error loading status: ' + e.message + '</p>'));
+    </script>
+  </body>
+</html>
