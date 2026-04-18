@@ -1,0 +1,15 @@
+{
+  "comment": "HIGH/CRITICAL npm vulnerabilities we are knowingly accepting. Every entry MUST have a reason + expiry. CI will break if a listed entry expires or if an unlisted HIGH/CRITICAL vuln appears.",
+  "allowed": [
+    {
+      "package": "xlsx",
+      "severity": "high",
+      "advisories": [
+        "GHSA-4r6h-8v6p-xvw6",
+        "GHSA-5pgg-2g8v-p4x9"
+      ],
+      "reason": "xlsx/SheetJS has no upstream patch. Used only for admin-side CSV/XLSX exports — not exposed to untrusted user input. Tracked for replacement with exceljs in follow-up.",
+      "expires": "2026-10-01"
+    }
+  ]
+}
