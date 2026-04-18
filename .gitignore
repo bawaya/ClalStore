@@ -71,3 +71,7 @@ test-results/
 # Stryker mutation testing
 .stryker-tmp/
 reports/mutation/
+
+# Synthetic test output
+synthetic-report/
+synthetic-results.json
