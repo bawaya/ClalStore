@@ -21,24 +21,25 @@ import {
 } from "./setup";
 
 const skipReason = stagingSkipReason();
+const skipRls = skipReason || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// A publicly-readable anon client (no JWT).
+// A publicly-readable anon client (no JWT). Safe to call only when
+// NEXT_PUBLIC_SUPABASE_ANON_KEY is present — callers must check skip first.
 function getAnonClient(): SupabaseClient {
-  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)!;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  if (!url || !anonKey) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY required for RLS tests");
-  }
+  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) as string;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
   return createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 
-describe.skipIf(skipReason || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)(
+describe.skipIf(skipRls)(
   "Layer 3 · RLS contract",
   () => {
-    const svc = skipReason ? null : getTestSupabaseClient();
-    const anon = skipReason ? null : getAnonClient();
+    // Lazy client construction — only runs inside beforeAll so a missing
+    // anon key never crashes describe-block evaluation.
+    const svc = skipRls ? null : getTestSupabaseClient();
+    const anon = skipRls ? null : getAnonClient();
 
     let hiddenSubPageId: string | null = null;
     let visibleSubPageId: string | null = null;
