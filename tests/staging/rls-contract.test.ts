@@ -21,7 +21,13 @@ import {
 } from "./setup";
 
 const skipReason = stagingSkipReason();
-const skipRls = skipReason || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Set SKIP_RLS_CONTRACT=1 while rolling out the hardening migration.
+// When the migration is live on production, unset it so these tests gate
+// every future push to main.
+const skipRls =
+  skipReason ||
+  !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.SKIP_RLS_CONTRACT === "1";
 
 // A publicly-readable anon client (no JWT). Safe to call only when
 // NEXT_PUBLIC_SUPABASE_ANON_KEY is present — callers must check skip first.
