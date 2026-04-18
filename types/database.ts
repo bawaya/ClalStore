@@ -288,6 +288,36 @@ export type Database = {
         Update: Partial<Omit<SalesDocSyncQueue, "id">>;
         Relationships: [];
       };
+      commission_correction_requests: {
+        Row: CommissionCorrectionRequest;
+        Insert: Omit<CommissionCorrectionRequest, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<CommissionCorrectionRequest, "id">>;
+        Relationships: [];
+      };
+      admin_announcements: {
+        Row: AdminAnnouncement;
+        Insert: Omit<AdminAnnouncement, "id" | "created_at">;
+        Update: Partial<Omit<AdminAnnouncement, "id">>;
+        Relationships: [];
+      };
+      admin_announcement_reads: {
+        Row: AdminAnnouncementRead;
+        Insert: Omit<AdminAnnouncementRead, "read_at"> & { read_at?: string };
+        Update: Partial<AdminAnnouncementRead>;
+        Relationships: [];
+      };
+      employee_activity_log: {
+        Row: EmployeeActivityLog;
+        Insert: Omit<EmployeeActivityLog, "id" | "created_at">;
+        Update: Partial<Omit<EmployeeActivityLog, "id">>;
+        Relationships: [];
+      };
+      employee_favorite_products: {
+        Row: EmployeeFavoriteProduct;
+        Insert: Omit<EmployeeFavoriteProduct, "created_at"> & { created_at?: string };
+        Update: Partial<EmployeeFavoriteProduct>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -1128,4 +1158,84 @@ export type SalesDocSyncQueue = {
   next_retry_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ===== Unified Employee PWA (migration 20260418000006) =====
+
+export type CorrectionRequestType =
+  | "amount_error"
+  | "wrong_type"
+  | "wrong_date"
+  | "wrong_customer"
+  | "missing_sale"
+  | "other";
+
+export type CorrectionRequestStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "resolved";
+
+export type CommissionCorrectionRequest = {
+  id: number;
+  employee_id: string;
+  commission_sale_id: number | null;
+  sales_doc_id: number | null;
+  request_type: CorrectionRequestType;
+  description: string;
+  status: CorrectionRequestStatus;
+  admin_response: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AnnouncementPriority = "low" | "normal" | "high" | "urgent";
+export type AnnouncementTarget = "all" | "employees" | "admins";
+
+export type AdminAnnouncement = {
+  id: number;
+  title: string;
+  body: string;
+  priority: AnnouncementPriority;
+  target: AnnouncementTarget;
+  created_by: string;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export type AdminAnnouncementRead = {
+  announcement_id: number;
+  user_id: string;
+  read_at: string;
+}
+
+export type EmployeeActivityEventType =
+  | "sale_registered"
+  | "sale_cancelled"
+  | "sanction_added"
+  | "sanction_removed"
+  | "target_set"
+  | "target_updated"
+  | "month_locked"
+  | "correction_submitted"
+  | "correction_resolved"
+  | "profile_updated"
+  | "milestone_reached";
+
+export type EmployeeActivityLog = {
+  id: number;
+  employee_id: string;
+  event_type: EmployeeActivityEventType;
+  title: string;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export type EmployeeFavoriteProduct = {
+  employee_id: string;
+  product_id: string;
+  created_at: string;
 }

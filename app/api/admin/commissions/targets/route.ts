@@ -8,6 +8,7 @@ import {
   getCommissionTargetKey,
   resolveLinkedAppUserId,
 } from "@/lib/commissions/ledger";
+import { logEmployeeActivity } from "@/lib/employee/activity-log";
 
 async function resolveTargetKey(
   db: SupabaseClient,
@@ -104,8 +105,27 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =
 
   if (error) {
     console.error("Targets POST error:", error);
-    return apiError("ÙØ´Ù„ ÙÙŠ Ø­ÙØ¸ Ø§Ù„Ù‡Ø¯Ù", 500);
+    return apiError("فشل في حفظ الهدف", 500);
   }
+
+  // Activity log — only for employee-scoped targets, skip contract-level.
+  if (targetKey && targetKey !== COMMISSION_CONTRACT_TARGET_KEY) {
+    const amount = Number(target_total || 0);
+    void logEmployeeActivity(db, {
+      employeeId: targetKey,
+      eventType: existing ? "target_updated" : "target_set",
+      title: "هدف شهري",
+      description: `${amount.toLocaleString("he-IL")}₪ لشهر ${month}`,
+      metadata: {
+        target_id: (data as { id?: number | string } | null)?.id ?? null,
+        month,
+        target_total: amount,
+        target_lines_amount: Number(target_lines_amount || 0),
+        target_devices_amount: Number(target_devices_amount || 0),
+      },
+    });
+  }
+
   return apiSuccess(data);
 });
 
@@ -131,7 +151,7 @@ export const PATCH = withAdminAuth(async (req: NextRequest, db: SupabaseClient) 
     .eq("month", month)
     .maybeSingle();
 
-  if (!existing) return apiError("×œ× ×§×™×™× ×™×¢×“ ×œ×—×•×“×© ×–×”", 404);
+  if (!existing) return apiError("لا يوجد هدف لهذا الشهر", 404);
 
   const isLocking = action === "lock";
 
@@ -148,7 +168,27 @@ export const PATCH = withAdminAuth(async (req: NextRequest, db: SupabaseClient) 
 
   if (error) {
     console.error("Targets PATCH error:", error);
-    return apiError("ÙØ´Ù„ ÙÙŠ ØªØ­Ø¯ÙŠØ« Ø­Ø§Ù„Ø© Ø§Ù„Ù‡Ø¯Ù", 500);
+    return apiError("فشل في تحديث حالة الهدف", 500);
   }
+
+  // Activity log — only for employee-scoped targets, skip contract-level.
+  if (targetKey && targetKey !== COMMISSION_CONTRACT_TARGET_KEY) {
+    const amount = Number(
+      (data as { target_total?: number | null } | null)?.target_total || 0,
+    );
+    void logEmployeeActivity(db, {
+      employeeId: targetKey,
+      eventType: "target_updated",
+      title: "هدف شهري",
+      description: `${amount.toLocaleString("he-IL")}₪ لشهر ${month} (${isLocking ? "قفل" : "فتح"})`,
+      metadata: {
+        target_id: existing.id,
+        month,
+        action,
+        is_locked: isLocking,
+      },
+    });
+  }
+
   return apiSuccess(data);
 });

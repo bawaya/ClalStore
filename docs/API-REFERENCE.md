@@ -114,6 +114,9 @@ messages.
 | `/api/admin/commissions/profiles` | GET, POST, DELETE | admin | Per-employee commission profiles (rates, caps). |
 | `/api/admin/commissions/employees` | GET, POST, PATCH, DELETE | admin | Manage employees inside commissions module. |
 | `/api/admin/commissions/employees/list` | GET | service (Bearer) | Read-only employee list for external apps. |
+| `/api/admin/corrections` | GET | admin (`commissions:manage`) | Cross-employee list of correction requests (filter by status). |
+| `/api/admin/corrections/[id]` | PUT | admin (`commissions:manage`) | Respond to a pending request. Transitions `pending → {approved, rejected, resolved}`, adds an `employee_activity_log` row, emits `audit_log`. Already-resolved returns `409`. |
+| `/api/admin/announcements` | GET, POST | admin (POST: `settings:manage`) | List all broadcasts with readCount/totalRecipients, or publish a new one (priority + target + optional expiry). |
 | `/api/admin/commissions/bridge` | GET | admin | Bridge data (orders ↔ commissions). |
 | `/api/admin/commissions/calculate` | POST | admin | Recompute commission amounts for a period. |
 | `/api/admin/commissions/sync` | GET, POST | admin | Sync orders into `commission_sales`. |
@@ -285,6 +288,14 @@ Used by the installable sales-agent PWA. All require `requireEmployee`
 | Path | Methods | Auth | Purpose |
 |---|---|---|---|
 | `/api/employee/commissions` | GET | employee | Own commission dashboard (month scoped). |
+| `/api/employee/commissions/dashboard` | GET | employee | Merged today + month + milestones + pacing colour (used by the PWA home). |
+| `/api/employee/commissions/calculate` | POST | employee | Pure commission preview — returns `{ contractCommission, employeeCommission, ownerProfit }` for a hypothetical sale. No ledger writes. |
+| `/api/employee/commissions/chart` | GET | employee | Last N months (`?range=12months`, clamped to [1, 24]) of sales, commissions, and targets. |
+| `/api/employee/commissions/details` | GET | employee | Per-sale breakdown with rate snapshot, milestones touched, and sanctions. |
+| `/api/employee/corrections` | GET, POST | employee | List own dispute requests / submit a new one. Submission also writes to `employee_activity_log`. |
+| `/api/employee/announcements` | GET | employee | Active broadcasts (target ∈ {`all`,`employees`}, not expired) with per-user `read` flag + `unreadCount`. |
+| `/api/employee/announcements/[id]/read` | POST | employee | Idempotent upsert into `admin_announcement_reads`. |
+| `/api/employee/activity` | GET | employee | Paginated personal audit trail (every sale, sanction, target change, correction resolution). |
 
 ---
 

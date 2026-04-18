@@ -3,6 +3,7 @@ import { withAdminAuth } from "@/lib/admin/auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveLinkedAppUserId } from "@/lib/commissions/ledger";
+import { logEmployeeActivity } from "@/lib/employee/activity-log";
 
 export const GET = withAdminAuth(async (req: NextRequest, db: SupabaseClient) => {
   const { searchParams } = new URL(req.url);
@@ -46,6 +47,25 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient, u
     console.error("Sanctions POST error:", error);
     return apiError("فشل في إضافة العقوبة", 500);
   }
+
+  // Activity log (skip contract-level sanctions where no employee is tied)
+  if (resolvedEmployeeId) {
+    const sanctionAmount = Number(amount || 2500);
+    void logEmployeeActivity(db, {
+      employeeId: resolvedEmployeeId,
+      eventType: "sanction_added",
+      title: `عقوبة: ${sanction_type}`,
+      description: `${sanctionAmount.toLocaleString("he-IL")}₪${description ? ` — ${description}` : ""}`,
+      metadata: {
+        sanction_id: (data as { id?: number | string } | null)?.id ?? null,
+        sanction_type,
+        sanction_date,
+        amount: sanctionAmount,
+        has_sale_offset: has_sale_offset || false,
+      },
+    });
+  }
+
   return apiSuccess(data, undefined, 201);
 });
 
@@ -53,6 +73,13 @@ export const DELETE = withAdminAuth(async (req: NextRequest, db: SupabaseClient)
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return apiError("id required", 400);
+
+  // Snapshot row pre-delete so we can log on the right employee's timeline.
+  const { data: existing } = await db
+    .from("commission_sanctions")
+    .select("id, employee_id, sanction_type, amount, sanction_date")
+    .eq("id", id)
+    .maybeSingle();
 
   // Soft delete: set deleted_at instead of hard delete
   const { error } = await db.from("commission_sanctions")
@@ -62,5 +89,23 @@ export const DELETE = withAdminAuth(async (req: NextRequest, db: SupabaseClient)
     console.error("Sanctions DELETE error:", error);
     return apiError("فشل في حذف العقوبة", 500);
   }
+
+  const employeeId = (existing as { employee_id?: string | null } | null)?.employee_id;
+  if (existing && employeeId) {
+    const sanctionAmount = Number((existing as { amount?: number | null }).amount || 0);
+    const sanctionType = (existing as { sanction_type?: string }).sanction_type;
+    void logEmployeeActivity(db, {
+      employeeId,
+      eventType: "sanction_removed",
+      title: "إلغاء عقوبة",
+      description: `${sanctionType || ""} — ${sanctionAmount.toLocaleString("he-IL")}₪`,
+      metadata: {
+        sanction_id: (existing as { id?: number | string }).id ?? null,
+        sanction_type: sanctionType ?? null,
+        amount: sanctionAmount,
+      },
+    });
+  }
+
   return apiSuccess({ deleted: true });
 });

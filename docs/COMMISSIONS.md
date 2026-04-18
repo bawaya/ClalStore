@@ -688,3 +688,29 @@ flowchart LR
 - `docs/private/COMMISSIONS_RUNBOOK.md` — lock/unlock procedure,
   manual-correction steps, payroll snapshot flow.
 
+---
+
+## 17. Employee portal (2026-04-18)
+
+The commission portal was merged into the unified `/sales-pwa` PWA
+(see `docs/PWA.md` §15). Three self-service surfaces were added:
+
+- **Correction requests** — if an employee believes a commission is
+  wrong, they submit a typed dispute (`amount_error`, `wrong_type`,
+  `wrong_date`, `wrong_customer`, `missing_sale`, `other`). Admin
+  responds via `PUT /api/admin/corrections/[id]` with `approved`,
+  `rejected`, or `resolved` and a human-readable response. Every
+  resolution also fires a `correction_resolved` row into the employee's
+  activity log.
+- **Announcements** — broadcast messages (priority: `low` / `normal` /
+  `high` / `urgent`; target: `all` / `employees` / `admins`). Read
+  state is per-user via `admin_announcement_reads`; admin UI exposes
+  readCount / totalRecipients for each broadcast.
+- **Activity log** — rolling audit trail visible to the employee: every
+  sale_registered, sanction_added, target_set, month_locked,
+  correction_* and milestone_reached event ends up here. Write path is
+  `lib/employee/activity-log.ts` (non-throwing).
+
+All three tables ship with RLS — employees only see their own rows;
+service-role clients inside admin endpoints bypass the policies.
+

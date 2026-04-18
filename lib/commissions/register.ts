@@ -25,6 +25,7 @@ import {
   COMMISSION,
 } from "./calculator";
 import { recalculateDeviceCommissionsForMonths } from "./ledger";
+import { logEmployeeActivity } from "@/lib/employee/activity-log";
 
 export type CommissionSource =
   | "sales_doc"
@@ -174,6 +175,8 @@ export async function registerSaleCommission(
 
   // 5. For devices, recompute the whole month so the contract-wide milestone
   //    is applied correctly after this new sale.
+  let finalEmployeeCommission = employeeCommission;
+  let finalContractCommission = contractCommission;
   if (input.saleType === "device") {
     const month = input.saleDate.slice(0, 7);
     await recalculateDeviceCommissionsForMonths(db, [month]);
@@ -184,22 +187,32 @@ export async function registerSaleCommission(
       .select("commission_amount, contract_commission")
       .eq("id", data.id)
       .single();
-    return {
-      id: data.id as number,
-      contractCommission: Number(
-        updated?.contract_commission ?? contractCommission,
-      ),
-      employeeCommission: Number(
-        updated?.commission_amount ?? employeeCommission,
-      ),
-      rateSnapshot: profile,
-    };
+    if (updated) {
+      finalContractCommission = Number(updated.contract_commission ?? contractCommission);
+      finalEmployeeCommission = Number(updated.commission_amount ?? employeeCommission);
+    }
   }
+
+  // 6. Log activity for the employee's timeline (best-effort; never throws)
+  void logEmployeeActivity(db, {
+    employeeId: input.employeeId,
+    eventType: "sale_registered",
+    title: input.saleType === "device" ? "بيعة جهاز جديدة" : "بيعة خط جديدة",
+    description: `${input.amount.toLocaleString("he-IL")}₪ — عمولة ${finalEmployeeCommission.toLocaleString("he-IL")}₪`,
+    metadata: {
+      commission_sale_id: data.id,
+      source: input.source,
+      amount: input.amount,
+      sale_type: input.saleType,
+      source_sales_doc_id: input.sourceSalesDocId ?? null,
+      source_pipeline_deal_id: input.sourcePipelineDealId ?? null,
+    },
+  });
 
   return {
     id: data.id as number,
-    contractCommission,
-    employeeCommission,
+    contractCommission: finalContractCommission,
+    employeeCommission: finalEmployeeCommission,
     rateSnapshot: profile,
   };
 }
@@ -210,10 +223,11 @@ export async function registerSaleCommission(
 async function cancelCommissionsByFilter(
   db: SupabaseClient,
   filter: { source_sales_doc_id?: number; source_pipeline_deal_id?: string },
+  reason?: string,
 ): Promise<{ cancelledIds: number[]; affectedMonths: string[] }> {
   let query = db
     .from("commission_sales")
-    .select("id, sale_date, sale_type")
+    .select("id, sale_date, sale_type, employee_id, commission_amount")
     .is("deleted_at", null);
 
   if (filter.source_sales_doc_id !== undefined) {
@@ -249,15 +263,32 @@ async function cancelCommissionsByFilter(
     await recalculateDeviceCommissionsForMonths(db, affectedMonths);
   }
 
+  // Log a cancellation entry per row so each affected employee sees it
+  for (const row of rows) {
+    if (!row.employee_id) continue;
+    void logEmployeeActivity(db, {
+      employeeId: row.employee_id as string,
+      eventType: "sale_cancelled",
+      title: "بيعة ملغية",
+      description: reason || "ألغاها المدير",
+      metadata: {
+        commission_sale_id: row.id,
+        commission_amount: row.commission_amount,
+        sale_type: row.sale_type,
+        reason: reason ?? null,
+      },
+    });
+  }
+
   return { cancelledIds, affectedMonths };
 }
 
-export function cancelCommissionsByDoc(db: SupabaseClient, docId: number) {
-  return cancelCommissionsByFilter(db, { source_sales_doc_id: docId });
+export function cancelCommissionsByDoc(db: SupabaseClient, docId: number, reason?: string) {
+  return cancelCommissionsByFilter(db, { source_sales_doc_id: docId }, reason);
 }
 
-export function cancelCommissionsByDeal(db: SupabaseClient, dealId: string) {
-  return cancelCommissionsByFilter(db, { source_pipeline_deal_id: dealId });
+export function cancelCommissionsByDeal(db: SupabaseClient, dealId: string, reason?: string) {
+  return cancelCommissionsByFilter(db, { source_pipeline_deal_id: dealId }, reason);
 }
 
 export { MAX_SALE_AMOUNT, COMMISSION };

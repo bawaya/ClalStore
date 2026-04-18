@@ -100,7 +100,9 @@
       "Bash(supabase db *)",
       "Bash(npx --yes supabase db push)",
       "Bash(npx --yes supabase migration repair --status applied 20260417000001 20260418000001 20260418000002)",
-      "Bash(npx --yes supabase migration list)"
+      "Bash(npx --yes supabase migration list)",
+      "Bash(python3)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

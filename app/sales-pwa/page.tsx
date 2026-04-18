@@ -1,145 +1,365 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { csrfHeaders } from "@/lib/csrf-client";
+import {
+  Plus,
+  TrendingUp,
+  Target,
+  Trophy,
+  Bell,
+  ActivitySquare,
+  ArrowLeft,
+} from "lucide-react";
+import { formatCurrency, timeAgo } from "@/lib/utils";
 
-type Doc = {
-  id: number;
-  sale_type: string;
-  status: string;
-  sale_date: string | null;
-  total_amount: number;
-  order_id: string | null;
-  notes: string | null;
-  created_at: string;
-  customer?: { id: string; name: string; phone: string; customer_code?: string } | null;
+type DashboardData = {
+  today: { date: string; salesCount: number; totalAmount: number; commission: number };
+  month: {
+    month: string;
+    salesCount: number;
+    totalAmount: number;
+    totalCommission: number;
+    sanctions: number;
+    netCommission: number;
+    target: number;
+    targetProgress: number;
+    remainingAmount: number;
+    workingDaysLeft: number;
+    dailyRequired: number;
+    pacingColor: "green" | "yellow" | "red";
+  };
+  milestones: {
+    currentTotal: number;
+    nextMilestoneAt: number;
+    milestonesReached: number;
+    bonusEarned: number;
+  };
+  recentSales: Array<{
+    id: number;
+    sale_date: string;
+    sale_type: "line" | "device";
+    package_price: number | null;
+    device_sale_amount: number | null;
+    commission_amount: number;
+    source: string;
+  }>;
 };
 
-function pill(status: string) {
-  if (status === "draft") return "bg-slate-500/15 text-slate-200";
-  if (status === "submitted") return "bg-sky-500/15 text-sky-200";
-  if (status === "verified") return "bg-emerald-500/15 text-emerald-200";
-  if (status === "rejected") return "bg-rose-500/15 text-rose-200";
-  if (status === "synced_to_commissions") return "bg-violet-500/15 text-violet-200";
-  return "bg-white/10 text-slate-100";
+type Activity = {
+  id: number;
+  event_type: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+};
+
+function formatTodayDate(iso: string): string {
+  try {
+    const d = new Date(`${iso}T00:00:00`);
+    return d.toLocaleDateString("ar-EG", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
 }
 
-export default function SalesPwaHomePage() {
-  const [docs, setDocs] = useState<Doc[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState<string>("");
+function sourceBadge(source: string): { label: string; cls: string } {
+  switch (source) {
+    case "pipeline":
+      return { label: "Pipeline", cls: "bg-violet-500/15 text-violet-200" };
+    case "sales_doc":
+    case "pwa":
+      return { label: "PWA", cls: "bg-emerald-500/15 text-emerald-200" };
+    case "manual":
+      return { label: "يدوي", cls: "bg-slate-500/15 text-slate-200" };
+    case "auto_sync":
+      return { label: "Sync", cls: "bg-sky-500/15 text-sky-200" };
+    case "order":
+      return { label: "طلب", cls: "bg-amber-500/15 text-amber-200" };
+    default:
+      return { label: source, cls: "bg-white/10 text-slate-200" };
+  }
+}
 
-  const query = useMemo(() => {
-    const params = new URLSearchParams();
-    if (status) params.set("status", status);
-    return params.toString();
-  }, [status]);
+function pacingColors(color: "green" | "yellow" | "red"): {
+  bar: string;
+  text: string;
+} {
+  if (color === "green") return { bar: "bg-emerald-500", text: "text-emerald-300" };
+  if (color === "yellow") return { bar: "bg-amber-500", text: "text-amber-300" };
+  return { bar: "bg-rose-500", text: "text-rose-300" };
+}
+
+export default function SalesPwaDashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [unread, setUnread] = useState(0);
+  const [activity, setActivity] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/pwa/sales${query ? `?${query}` : ""}`, { headers: csrfHeaders() });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || json?.success === false) throw new Error(json?.error || "فشل في تحميل العمليات");
-        setDocs(json.data?.docs || json.docs || []);
-      } catch (e: any) {
-        setError(e?.message || "خطأ في التحميل");
+        const [dashRes, annRes, actRes] = await Promise.all([
+          fetch("/api/employee/commissions/dashboard", { credentials: "same-origin" }),
+          fetch("/api/employee/announcements", { credentials: "same-origin" }),
+          fetch("/api/employee/activity?limit=3&offset=0", { credentials: "same-origin" }),
+        ]);
+        if (cancelled) return;
+
+        const dashJson: unknown = await dashRes.json().catch(() => ({}));
+        if (!dashRes.ok) {
+          const msg =
+            (dashJson as { error?: string } | undefined)?.error || "فشل في تحميل اللوحة";
+          throw new Error(msg);
+        }
+        // apiSuccess spreads keys at top level
+        setData(dashJson as DashboardData);
+
+        const annJson: unknown = await annRes.json().catch(() => ({}));
+        if (annRes.ok && annJson && typeof annJson === "object" && "unreadCount" in annJson) {
+          const n = (annJson as { unreadCount?: number }).unreadCount;
+          if (typeof n === "number") setUnread(n);
+        }
+
+        const actJson: unknown = await actRes.json().catch(() => ({}));
+        if (actRes.ok && actJson && typeof actJson === "object" && "activities" in actJson) {
+          const list = (actJson as { activities?: Activity[] }).activities;
+          if (Array.isArray(list)) setActivity(list);
+        }
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "خطأ");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [query]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-32 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+        <div className="h-40 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+        <div className="h-32 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+        {error || "تعذر تحميل اللوحة"}
+      </div>
+    );
+  }
+
+  const pacing = pacingColors(data.month.pacingColor);
+  const pct = Math.min(100, data.month.targetProgress);
+  const msPct =
+    data.milestones.nextMilestoneAt > 0
+      ? Math.min(100, (data.milestones.currentTotal / data.milestones.nextMilestoneAt) * 100)
+      : 0;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-sm text-slate-400">لوحة الموظف</div>
-            <div className="text-xl font-black">عمليات التوثيق</div>
+      {/* Top card — today */}
+      <section className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-sky-500/5 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs text-slate-300">{formatTodayDate(data.today.date)}</div>
+            <div className="mt-1 flex items-baseline gap-3">
+              <div className="text-3xl font-black md:text-4xl">{data.today.salesCount}</div>
+              <div className="text-sm text-slate-300">مبيعات اليوم</div>
+            </div>
+            <div className="mt-1 text-sm text-slate-300">
+              إجمالي: <span className="font-bold text-white">{formatCurrency(data.today.totalAmount)}</span>
+            </div>
+            <div className="mt-1 text-sm text-emerald-300">
+              عمولة اليوم: <span className="font-black">{formatCurrency(data.today.commission)}</span>
+            </div>
           </div>
           <Link
             href="/sales-pwa/new"
-            className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 hover:bg-emerald-400"
+            className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-emerald-950 shadow-lg shadow-emerald-500/30 hover:bg-emerald-400"
           >
-            عملية جديدة
+            <Plus className="h-5 w-5" aria-hidden />
+            بيعة جديدة
           </Link>
         </div>
+      </section>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-sm text-slate-400">فلتر:</div>
-          <select
-            className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm"
-            title="فلتر حالة عمليات التوثيق"
-            aria-label="فلتر حالة عمليات التوثيق"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="">الكل</option>
-            <option value="draft">مسودة</option>
-            <option value="submitted">مُرسلة</option>
-            <option value="verified">معتمدة</option>
-            <option value="rejected">مرفوضة</option>
-            <option value="synced_to_commissions">تم ترحيلها للعمولات</option>
-          </select>
+      {/* Target card */}
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-sky-300" aria-hidden />
+            <div className="text-sm font-bold">الهدف الشهري · יעד חודשי</div>
+          </div>
+          <div className={`text-sm font-black ${pacing.text}`}>{pct}%</div>
         </div>
-      </div>
-
-      {loading && <div className="text-sm text-slate-400">جاري التحميل…</div>}
-      {error && <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>}
-
-      {!loading && !error && docs.length === 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-slate-300">
-          لا توجد عمليات بعد. ابدأ بإنشاء عملية جديدة.
+        <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className={`h-full ${pacing.bar} transition-all`}
+            style={{ width: `${pct}%` }}
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          />
         </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <div className="text-[10px] text-slate-400">المتبقي</div>
+            <div className="text-sm font-bold">{formatCurrency(data.month.remainingAmount)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400">أيام عمل باقية</div>
+            <div className="text-sm font-bold">{data.month.workingDaysLeft}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400">مطلوب يومياً</div>
+            <div className={`text-base font-black ${pacing.text}`}>
+              {formatCurrency(data.month.dailyRequired)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400">صافي الشهر</div>
+            <div className="text-sm font-bold text-emerald-300">
+              {formatCurrency(data.month.netCommission)}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Milestones card */}
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-amber-300" aria-hidden />
+            <div className="text-sm font-bold">المعالم · אבני דרך</div>
+          </div>
+          <div className="text-xs text-slate-400">{formatCurrency(data.milestones.currentTotal)}</div>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full bg-amber-400 transition-all"
+            style={{ width: `${msPct}%` }}
+            role="progressbar"
+            aria-valuenow={Math.round(msPct)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+          <span>
+            المعلم التالي: <span className="font-bold text-white">{formatCurrency(data.milestones.nextMilestoneAt)}</span>
+          </span>
+          <span>
+            هذا الشهر: <span className="font-bold text-amber-300">{data.milestones.milestonesReached} معالم</span>
+            <span className="mx-1 text-slate-500">·</span>
+            <span className="font-bold text-emerald-300">بونص {formatCurrency(data.milestones.bonusEarned)}</span>
+          </span>
+        </div>
+      </section>
+
+      {/* Recent sales */}
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-emerald-300" aria-hidden />
+            <div className="text-sm font-bold">آخر المبيعات</div>
+          </div>
+          <Link href="/sales-pwa/commissions" className="inline-flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200">
+            عرض الكل <ArrowLeft className="h-3 w-3" aria-hidden />
+          </Link>
+        </div>
+        {data.recentSales.length === 0 ? (
+          <div className="text-sm text-slate-400">لا توجد مبيعات حتى الآن هذا الشهر</div>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {data.recentSales.map((s) => {
+              const amount =
+                s.sale_type === "line"
+                  ? Number(s.package_price || 0)
+                  : Number(s.device_sale_amount || 0);
+              const badge = sourceBadge(s.source);
+              return (
+                <li key={s.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <span>{s.sale_date}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.cls}`}>
+                        {badge.label}
+                      </span>
+                      <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-300">
+                        {s.sale_type === "line" ? "خط" : "جهاز"}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-sm font-bold">{formatCurrency(amount)}</div>
+                  </div>
+                  <div className="text-sm font-black text-emerald-300">
+                    +{formatCurrency(s.commission_amount)}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Unread announcements */}
+      {unread > 0 && (
+        <Link
+          href="/sales-pwa/announcements"
+          className="flex items-center justify-between rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 hover:bg-rose-500/15"
+        >
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5 text-rose-300" aria-hidden />
+            <div>
+              <div className="text-sm font-bold">لديك {unread} إعلانات غير مقروءة</div>
+              <div className="text-[11px] text-slate-300">اضغط للعرض</div>
+            </div>
+          </div>
+          <ArrowLeft className="h-4 w-4 text-rose-200" aria-hidden />
+        </Link>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {docs.map((d) => (
-          <Link
-            key={d.id}
-            href={`/sales-pwa/docs/${d.id}`}
-            className="group rounded-2xl border border-white/10 bg-white/5 p-4 hover:border-white/20 hover:bg-white/7"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <div className="text-sm text-slate-400">#{d.id}</div>
-                <div className="text-base font-bold">
-                  {d.sale_type === "line" ? "خط" : d.sale_type === "device" ? "جهاز" : "مختلط"}
-                  {d.order_id ? <span className="text-slate-400"> • {d.order_id}</span> : null}
-                </div>
-                {d.customer && (
-                  <div className="flex items-center gap-1.5 text-xs text-emerald-300">
-                    <span>{d.customer.name}</span>
-                    {d.customer.customer_code && (
-                      <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px]">
-                        {d.customer.customer_code}
-                      </span>
-                    )}
-                  </div>
-                )}
-                <div className="text-xs text-slate-400">
-                  {d.sale_date ? d.sale_date : "بدون تاريخ"} • ₪{Number(d.total_amount || 0).toLocaleString("he-IL")}
-                </div>
-              </div>
-              <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${pill(d.status)}`}>
-                {d.status}
-              </span>
-            </div>
-            {d.notes ? (
-              <div className="mt-3 line-clamp-2 text-sm text-slate-300">{d.notes}</div>
-            ) : (
-              <div className="mt-3 text-sm text-slate-500">لا توجد ملاحظات</div>
-            )}
-            <div className="mt-3 text-xs text-slate-500">آخر تحديث: {new Date(d.created_at).toLocaleString("he-IL")}</div>
+      {/* Last 3 activity */}
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ActivitySquare className="h-4 w-4 text-violet-300" aria-hidden />
+            <div className="text-sm font-bold">النشاط الأخير</div>
+          </div>
+          <Link href="/sales-pwa/activity" className="inline-flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200">
+            كامل السجل <ArrowLeft className="h-3 w-3" aria-hidden />
           </Link>
-        ))}
-      </div>
+        </div>
+        {activity.length === 0 ? (
+          <div className="text-sm text-slate-400">لا يوجد نشاط</div>
+        ) : (
+          <ul className="space-y-2">
+            {activity.map((a) => (
+              <li key={a.id} className="rounded-xl border border-white/5 bg-white/5 p-3">
+                <div className="text-xs text-slate-400">{timeAgo(a.created_at)}</div>
+                <div className="text-sm font-bold">{a.title}</div>
+                {a.description && <div className="mt-0.5 text-xs text-slate-300">{a.description}</div>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
-

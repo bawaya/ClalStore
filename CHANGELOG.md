@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2026-04-18
 
+### Added — Unified Employee PWA (2026-04-18)
+
+- **Merged `/employee/commissions` + `/sales-pwa`** — one installable PWA with a single navigation, five surfaces: `/sales-pwa/commissions`, `/calculator`, `/corrections`, `/activity`, `/announcements`. `/employee/commissions` is now a server-side redirect to `/sales-pwa/commissions` — old bookmarks keep working.
+- **Correction request workflow** — employees submit typed disputes via `POST /api/employee/corrections`; admins respond via `PUT /api/admin/corrections/[id]` (approve / reject / resolve). Every admin resolution lands in the employee's activity log.
+- **Broadcast announcements** — new `admin_announcements` + `admin_announcement_reads` tables; admin page at `/admin/announcements` publishes prioritised messages (targeting: `all` / `employees` / `admins`) with optional expiry and per-recipient read tracking.
+- **Employee activity log** — rolling audit trail (`employee_activity_log`) covering sales, sanctions, target changes, correction lifecycle, and milestone hits. Writes are non-throwing via `lib/employee/activity-log.ts`.
+- **Migration `20260418000006_unified_employee_pwa.sql`** — four new tables with RLS: `commission_correction_requests`, `admin_announcements` + `admin_announcement_reads`, `employee_activity_log`, `employee_favorite_products` (schema-only placeholder).
+- **36 new integration tests** in `tests/integration/api/employee-pwa.test.ts` covering dashboard shapes, pacing-color logic, pure calculator with profile overrides, chart ranges, correction create/resolve transitions, announcement read idempotency, and admin-side RBAC.
+
 ### Added — Commission system refactor
 
 - **Unified `registerSaleCommission`** — single entry point for awarding commissions across Pipeline, PWA, and manual sale flows (replaces three divergent call sites)

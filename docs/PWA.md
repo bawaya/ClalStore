@@ -552,3 +552,37 @@ the same `/admin/sales-docs` cancel flow.
 - `docs/COMMISSIONS.md` — what happens after submit.
 - `docs/BOT.md` — WhatsApp bot (separate channel; creates pipeline
   leads, not sales_docs).
+
+---
+
+## 15. Unified Employee App (2026-04-18)
+
+The former standalone `/employee/commissions` screen and the document-only
+`/sales-pwa` have been merged into a single installable PWA under
+`/sales-pwa`. One session, one layout, one navigation — no more separate
+tabs for sales docs vs. commission tracking.
+
+### New routes (all under `/sales-pwa`)
+
+| Route | Purpose |
+|---|---|
+| `/sales-pwa/commissions` | Daily dashboard: today, month-to-date, pacing, milestones. Replaces `/employee/commissions`. |
+| `/sales-pwa/calculator` | Preview a commission for a hypothetical sale (line or device) without touching the ledger. |
+| `/sales-pwa/corrections` | Employee dispute workflow — submit a correction request, track status. |
+| `/sales-pwa/activity` | Personal audit timeline (sales registered, sanctions, target changes, corrections). |
+| `/sales-pwa/announcements` | Broadcast messages from admin, with per-user read state. |
+
+### Legacy compatibility
+
+`/employee/commissions` is now a server-side 308 redirect to
+`/sales-pwa/commissions`. Old emails, push links, and bookmarks keep
+working unchanged. Middleware does not gate `/employee/*` — the redirect
+short-circuits before any auth wall.
+
+### Data model
+
+Migration `20260418000006_unified_employee_pwa.sql` introduced four
+tables: `commission_correction_requests`, `admin_announcements` +
+`admin_announcement_reads`, `employee_activity_log`, and
+`employee_favorite_products`. RLS restricts reads/writes to the owning
+employee; service role bypasses for admin endpoints.
