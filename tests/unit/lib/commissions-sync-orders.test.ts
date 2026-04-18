@@ -459,7 +459,7 @@ describe("syncOrdersToCommissions", () => {
     hoistedAdminSupabase.mockReturnValue(db);
 
     await syncOrdersToCommissions("2026-04-01", "2026-04-30");
-    // The route always uses upsert with onConflict=order_id — verify that.
+    // The route always uses upsert with onConflict=(order_id, sale_type) — verify that.
     expect(db.__state.commission_sales?.upserts?.length).toBe(1);
     expect(db.__state.commission_sales?.inserts?.length ?? 0).toBe(0);
   });

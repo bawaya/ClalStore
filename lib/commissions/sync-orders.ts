@@ -291,7 +291,7 @@ async function syncOrdersByIds(
           notes: `Order-synced commission (${order.status})`,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "order_id" },
+        { onConflict: "order_id,sale_type" },
       );
 
     if (error) {
