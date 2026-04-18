@@ -50,7 +50,7 @@ Four non-negotiables govern every test we write:
 
 ### Scope
 
-- **2608 tests** across 158 files
+- **2888 tests** across **173 files** (up from 2722 / 166 before the 2026-04-18 employee-portal work)
 - `tests/unit/` — pure functions (validators, calculators, formatters, state stores)
 - `tests/integration/api/` — Next.js route handlers with mocked Supabase
 - `tests/component/` — React components with `@testing-library/react`
@@ -66,6 +66,29 @@ Four non-negotiables govern every test we write:
 - **Runner:** Vitest 4 with `jsdom` environment
 - **Pool:** `forks` with `maxForks: 4` (parallel), `execArgv: --max-old-space-size=2048`
 - **Coverage:** `@vitest/coverage-v8`
+
+### New suites — 2026-04-18
+
+Seven new test files (152 new tests) landed with the unified Sales PWA + employee-portal work:
+
+| File | Layer | Scope |
+|------|-------|-------|
+| `tests/pages/forgot-password.test.tsx` | Page | Forgot-password form — email validation, submit, success message, error states, no account-enumeration in response |
+| `tests/pages/reset-password.test.tsx` | Page | Reset-password form — token handling, password strength, mismatch error, redirect on success |
+| `tests/integration/pipeline-commission-flow.test.ts` | Integration | End-to-end: pipeline deal → `won` → `registerSaleCommission` writes a `commission_sales` row with `source='pipeline'` + `source_pipeline_deal_id` + snapshot |
+| `tests/integration/pwa-commission-flow.test.ts` | Integration | PWA sales-doc submit → commission row created with `source='sales_doc'`; rollback path when commission insert fails |
+| `tests/integration/commissions-full-flow.test.ts` | Integration | Multi-source commission correctness: manual + pipeline + PWA + order-sync all produce the right rows under `UNIQUE(order_id, sale_type)` |
+| `tests/integration/admin-cancel-flow.test.ts` | Integration | Admin cancel endpoint: soft-deletes commissions, records reason, respects the month-lock trigger (`423 Locked` on locked months) |
+| `tests/integration/admin-announcements-corrections.test.ts` | Integration | Admin publishes announcement; `read_count` increments via employee `POST /read`; correction lifecycle `pending → approved/rejected/resolved` with `employee_activity_log` and `audit_log` writes |
+| `tests/integration/employee-app-endpoints.test.ts` | Integration | Every `/api/employee/*` route: profile, dashboard, chart, details, calculator, export (PDF headers), corrections, announcements, activity, announcements-read |
+| `tests/unit/commission-date-utils.test.ts` | Unit | `lib/commissions/date-utils.ts` — `lastDayOfMonth`, `countWorkingDays`, timezone anchoring; covers the Israel work-week fix |
+
+### Bugs surfaced by tests
+
+Two code-level bugs were caught by the new suites and fixed in the same batch of commits:
+
+1. **`countWorkingDays` excluded only Saturday** — Israel's work-week is Sunday through Thursday (weekend = Friday + Saturday). The helper in `lib/commissions/date-utils.ts` was only excluding Saturday, inflating target-pace calculations every week. `tests/unit/commission-date-utils.test.ts` reproduced the drift and the fix extended the weekend skip to both days.
+2. **PDF export silently downgraded to Helvetica on Cloudflare Workers** — `app/api/employee/commissions/export/route.ts` was loading the Cairo font with `readFileSync`, which does not exist on the Workers runtime. The `try/catch` swallowed the error, so every production PDF was English-only without logging. The fix switched to a same-origin `fetch('/fonts/cairo-regular.ttf')` against Cloudflare's asset binding with an `fs.readFile` fallback for local Node dev. Helvetica is retained as a last-resort fallback only. Covered end-to-end by `tests/integration/employee-app-endpoints.test.ts`.
 
 ### Critical-file coverage gates
 

@@ -10,18 +10,31 @@ Next.js 15 App Router · TypeScript (strict) · Tailwind CSS 3 · Supabase (Post
 | Area | Path | Purpose |
 |------|------|---------|
 | **Public Store** | `app/store/` | E-commerce storefront (products, cart, checkout, wishlist, compare, tracking) |
-| **Admin Panel** | `app/admin/` | Product/order/content management, analytics, bot config, push notifications, sales-docs |
+| **Admin Panel** | `app/admin/` | Product/order/content management, analytics, bot config, push notifications, sales-docs, commission corrections, announcements |
 | **CRM** | `app/crm/` | Inbox, customers, chats, orders, tasks, pipeline, reports, team users |
-| **Sales PWA** | `app/sales-pwa/` | Field-sales mobile web app — documents → commissions |
-| **Employee portal** | `app/employee/` | Self-service commissions view (read-only) |
-| **API Routes** | `app/api/` | 129+ route handlers — see `docs/API-REFERENCE.md` |
-| **Business Logic** | `lib/` | Domain logic: `lib/store/`, `lib/admin/`, `lib/crm/`, `lib/bot/`, `lib/ai/`, `lib/commissions/`, `lib/integrations/`, `lib/pwa/` |
+| **Sales PWA** | `app/sales-pwa/` | Unified employee app — dashboard, commissions, calculator, corrections, activity, announcements, documentation. Replaces the former `/employee/commissions` (now a 308 redirect). |
+| **Auth pages** | `app/(auth)/` | `login/`, `forgot-password/`, `reset-password/` — single Supabase auth shared by admin, CRM, and Sales PWA |
+| **API Routes** | `app/api/` | Route handlers grouped by `admin/`, `employee/`, `pwa/`, `crm/`, `store/`, `webhook/`, `payment/`, `cron/`, `health/` — see `docs/API-REFERENCE.md` |
+| **Business Logic** | `lib/` | Domain logic: `lib/store/`, `lib/admin/`, `lib/crm/`, `lib/bot/`, `lib/ai/`, `lib/commissions/`, `lib/employee/`, `lib/integrations/`, `lib/pwa/` |
 | **Components** | `components/` | UI by domain: `store/`, `admin/`, `crm/`, `chat/`, `website/`, `shared/`, `ui/`, `pwa/` |
+| **Stores** | `stores/` | Zustand stores — e.g. `stores/offline-store.ts` for PWA offline state |
 | **DB Types** | `types/database.ts` | 60+ table types — single source of truth for the Supabase schema |
-| **Migrations** | `supabase/migrations/` | 50 SQL migrations — sequential, never edited in place |
+| **Migrations** | `supabase/migrations/` | Sequential SQL migrations — never edited in place |
 | **i18n** | `locales/` | Hebrew (`he.json`) + Arabic (`ar.json`) — RTL bilingual UI |
-| **Fonts** | `app/fonts.ts` | `next/font/google` (Heebo, Tajawal, David Libre) — applied on `<html>` in `app/layout.tsx` |
+| **Fonts** | `app/fonts.ts` + `public/fonts/` | `next/font/google` (Heebo, Tajawal, David Libre) applied on `<html>`; `public/fonts/cairo-regular.ttf` bundled for server-side Arabic PDF export |
 | **Public URL helper** | `lib/public-site-url.ts` | `getPublicSiteUrl()` for redirects, webhooks, admin links (not for PDF print popups — those may still load Google Fonts) |
+
+### New / notable modules (2026-04-18)
+
+| Module | What it does |
+|---|---|
+| `lib/commissions/register.ts` | **Single entry point** for commission creation. `registerSaleCommission(db, input)` — used by Pipeline, Sales PWA, and hourly sync. Persists `rate_snapshot` for historical accuracy and fires an activity-log entry. |
+| `lib/commissions/date-utils.ts` | `countWorkingDays(from, to)` (Sunday–Thursday only, excludes Fri+Sat), `lastDayOfMonth(month)`. **Always use these** — never hardcode `${month}-31` for month boundaries. |
+| `lib/employee/activity-log.ts` | `logEmployeeActivity(db, input)` — non-throwing fire-and-forget. Called from every commission-touching code path (register, cancel, sanction, target edit, milestone hit, correction lifecycle). Surfaces in `/sales-pwa/activity`. |
+| `components/pwa/SalesPwaShell.tsx` | Unified shell for `/sales-pwa/*` — bottom nav on mobile, sidebar on desktop. Header pulls the employee name from `/api/employee/me`. |
+| `components/pwa/ConnectionBanner.tsx` | Offline banner driven by the Zustand offline store. |
+| `stores/offline-store.ts` | Zustand offline state (online flag, queue size). |
+| `lib/pwa/offline-client.ts` | `isOnline`, `getQueueSize`, `syncQueue` — IndexedDB queue for `/api/pwa/*` POST replay on reconnect (attachments excluded). |
 
 ## Build & Test
 ```
@@ -59,9 +72,14 @@ npm run db:reset         # Reset DB
 - Never expose `err.message` in production responses — use generic errors.
 
 ### Auth & Security
-- Supabase Auth for sessions; `users` table for roles/permissions.
+- Supabase Auth for sessions; `users` table for roles/permissions. A single Supabase auth covers admin, CRM, and the Sales PWA.
 - 6 roles: `super_admin` > `admin` > `sales` > `support` > `content` > `viewer`.
 - Permission check: `hasPermission(user, 'orders')` / `canAccessPage(user, '/admin/products')`.
+- **Route guards**:
+  - `/api/admin/*` → `requireAdmin` from `lib/admin/auth.ts` + per-permission checks.
+  - `/api/employee/*` → `requireEmployee` from `lib/pwa/auth.ts` (any authenticated user with an `employee_commission_profiles` row).
+  - `/api/pwa/*` → session + CSRF + employee guard.
+- **Password recovery**: Supabase-driven. Request at `/forgot-password`, land on `/reset-password` from the recovery email. Applies to admin, CRM, and Sales PWA (single auth). Password strength rules mirror `/change-password`.
 - Middleware enforces: auth gating, CSRF (double-submit cookie), rate limiting, security headers, CORS.
 - CSRF exempt: `/api/webhook/*`, `/api/cron/*`, `/api/payment/callback`, `/api/csrf`, `/api/orders`.
 - Open CORS (no session required): `/api/admin/commissions/summary`, `/api/admin/commissions/dashboard` — these accept bearer token auth via `COMMISSION_API_TOKEN` env var.
@@ -98,9 +116,11 @@ npm run db:reset         # Reset DB
 - **Customers**: segments: vip/loyal/active/new/cold/lost/inactive; loyalty program with points tiers (bronze/silver/gold/platinum).
 - **Bot**: Multi-channel (webchat, WhatsApp, SMS); intent detection; AI-powered responses via Claude; handoff to human agents; 14 modules in `lib/bot/`.
 - **Pipeline**: Sales stages: lead → negotiation → proposal → won/lost.
-- **Commissions**: HOT Mobile dealer commission tracking. Single entry point: `lib/commissions/register.ts::registerSaleCommission()` — used by Pipeline (deal → won stage), Sales PWA (direct submit), and hourly order sync. Details in `docs/COMMISSIONS.md` (conceptual) and `docs/private/COMMISSION_RATES.md` (actual rates). Sale types: `line` (package × configurable multiplier), `device` (configurable base % + contract-wide milestone bonus). Rate snapshot (`rate_snapshot JSONB`) pins rates at sale time for historical accuracy. Nine sanction types (see private docs for amounts). Month lock via DB trigger. 6 DB tables: `commission_sales`, `commission_targets`, `commission_sanctions`, `commission_employees`, `employee_commission_profiles`, `commission_sync_log`.
-- **Sales PWA**: Field agents document sales via `/sales-pwa/*`. Flow: create draft → upload attachments via signed URL (Storage bucket `sales-docs-private`) → submit → atomic transition → `registerSaleCommission()` fires immediately. No manager approval. Managers can cancel later via `/api/admin/sales-docs/[id]/cancel` — soft-deletes linked commissions and recalculates month. Details in `docs/PWA.md`.
+- **Commissions**: HOT Mobile dealer commission tracking. **Three sources unified** through a single entry point: `lib/commissions/register.ts::registerSaleCommission()` — used by Pipeline (deal → won stage), Sales PWA (agent direct submit, no manager approval), and hourly order sync (`.github/workflows/commission-sync.yml`). Conceptual docs: `docs/COMMISSIONS.md`. Actual rates: `docs/private/COMMISSION_RATES.md`. Sale types: `line` (package × configurable multiplier) and `device` (configurable base rate + **contract-wide** cumulative milestone bonus — attributed to whichever employee's sale crosses the threshold). `rate_snapshot JSONB` is pinned on every commission row so past profile edits never rewrite history. Month lock enforced by DB trigger `check_month_lock` on `commission_sales` + `commission_sanctions`. DB tables: `commission_sales`, `commission_targets`, `commission_sanctions`, `commission_employees`, `employee_commission_profiles`, `commission_sync_log`, `commission_correction_requests`.
+- **Sales PWA (unified)**: Single employee app at `/sales-pwa/*` — dashboard with daily target pacing + daily-required amount (computed over Sun–Thu working days via `lib/commissions/date-utils.ts::countWorkingDays`), commissions ledger + Recharts 6-month chart, interactive calculator (no DB write), correction requests, activity log, broadcast announcements, documentation. Bottom nav on mobile, sidebar on desktop (`components/pwa/SalesPwaShell.tsx`). Offline via Service Worker + IndexedDB queue (`lib/pwa/offline-client.ts`). Signed-URL attachment uploads to `sales-docs-private` Supabase bucket (10 MB cap, MIME whitelist). Flow: create draft → upload → submit → atomic transition → `registerSaleCommission()` fires immediately (no manager approval). Managers cancel via `/api/admin/sales-docs/[id]/cancel` — soft-deletes linked commissions, triggers month recalc. Details in `docs/PWA.md`.
 - **Pipeline → commissions**: When a deal lands in a `pipeline_stages.is_won=true` stage for the first time (drag OR `convertPipelineDealToOrder`), `autoRegisterWonDealCommission()` creates a `sales_doc` + fires `registerSaleCommission()` with `source='pipeline'`. Idempotent via `idempotency_key = 'pipeline_<dealId>'`.
+- **Announcements**: Admin broadcasts via `/admin/announcements` (priority + target audience + optional `expires_at`). Stored in `admin_announcements`; per-user read receipts in `admin_announcement_reads`. Surfaced in `/sales-pwa/announcements`.
+- **Employee activity log**: Every commission event (registered, cancelled, sanction applied, target changed, milestone crossed, correction submitted/resolved) writes to `employee_activity_log` via `lib/employee/activity-log.ts`. Writes are non-throwing — activity logging never blocks a commission operation.
 - **Categories**: Admin category management in `app/admin/categories/` + `app/api/admin/categories/`.
 
 ## Docs hierarchy

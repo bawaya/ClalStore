@@ -2,6 +2,8 @@
 
 > Every HTTP route in the ClalMobile app, grouped by module. Auth column uses
 > shorthand: `admin`, `employee`, `customer`, `public`, `service`, `cron`.
+>
+> **Route count: ~147** (was 129 before the 2026-04-18 employee-portal expansion).
 
 This document is generated from source. For conceptual descriptions see
 [`DOCS.md`](../DOCS.md). For auth implementation details see
@@ -222,6 +224,8 @@ visibility).
 |---|---|---|---|
 | `/api/auth/customer` | POST | public | Customer login / registration (phone + OTP via WhatsApp). |
 | `/api/auth/change-password` | POST | admin or customer session | Change password for the current session user. |
+| `/api/auth/forgot-password` | POST | public (rate-limited) | Send a password-reset email link to the submitted address. Responds 200 regardless of whether the address exists (no account enumeration). Powered by Supabase Auth's reset flow after the `@supabase/ssr` 0.7 upgrade that supports the new publishable key format. |
+| `/api/auth/reset-password` | POST | public (token-gated) | Complete the reset — accepts the `code` from the Supabase email link + a new password. Validates password strength + rotates the session cookie. |
 | `/api/csrf` | GET | public | Issue a CSRF token (cookie + body). |
 
 > ClalMobile does not expose a dedicated `/api/otp/*` namespace. OTP flows are
@@ -264,11 +268,11 @@ Used by the installable sales-agent PWA. All require `requireEmployee`
 | Path | Methods | Auth | Purpose |
 |---|---|---|---|
 | `/api/pwa/customer-lookup` | GET | employee | Lookup a customer by phone / id. |
-| `/api/pwa/customers` | POST | employee | Quick-create a customer from the field. |
+| `/api/pwa/customers` | POST | employee | Quick-create a customer from the field with phone-dedup — returns the existing row on match instead of creating a duplicate. |
 | `/api/pwa/sales` | GET, POST | employee | List my sales docs / create a new draft. |
 | `/api/pwa/sales/[id]` | GET, PUT | employee | Read / edit one of my drafts. |
 | `/api/pwa/sales/[id]/attachments` | POST | employee | Record attachment metadata. |
-| `/api/pwa/sales/[id]/attachments/sign` | POST | employee | Get a signed upload URL. |
+| `/api/pwa/sales/[id]/attachments/sign` | POST | employee | Mint a short-lived Signed Upload URL into the private `sales-docs-private` Supabase Storage bucket. The client uploads the file directly to Supabase, then calls `POST /api/pwa/sales/[id]/attachments` to register metadata. Service-role key never reaches the browser. |
 | `/api/pwa/sales/[id]/submit` | POST | employee | Submit a draft → commission_sales (atomic). |
 
 ---
@@ -287,15 +291,17 @@ Used by the installable sales-agent PWA. All require `requireEmployee`
 
 | Path | Methods | Auth | Purpose |
 |---|---|---|---|
+| `/api/employee/me` | GET | employee | Authenticated profile (id, name, email, contract-defined rate snapshot, locale preference). Acts as the session bootstrap call for the unified Sales PWA. |
 | `/api/employee/commissions` | GET | employee | Own commission dashboard (month scoped). |
 | `/api/employee/commissions/dashboard` | GET | employee | Merged today + month + milestones + pacing colour (used by the PWA home). |
 | `/api/employee/commissions/calculate` | POST | employee | Pure commission preview — returns `{ contractCommission, employeeCommission, ownerProfit }` for a hypothetical sale. No ledger writes. |
 | `/api/employee/commissions/chart` | GET | employee | Last N months (`?range=12months`, clamped to [1, 24]) of sales, commissions, and targets. |
-| `/api/employee/commissions/details` | GET | employee | Per-sale breakdown with rate snapshot, milestones touched, and sanctions. |
+| `/api/employee/commissions/details` | GET | employee | Per-sale breakdown with rate snapshot, milestones touched, and sanctions (`?month=YYYY-MM`). |
+| `/api/employee/commissions/export` | GET | employee | Bilingual PDF export of a given month (`?month=YYYY-MM`). Uses `pdf-lib` + `@pdf-lib/fontkit` with the bundled Cairo font for Arabic/Hebrew glyph rendering. Falls back to Helvetica (Latin-only) if the font asset can't be loaded. See [`I18N.md` — PDF export](./I18N.md#pdf-export--bilingual-handling). |
 | `/api/employee/corrections` | GET, POST | employee | List own dispute requests / submit a new one. Submission also writes to `employee_activity_log`. |
 | `/api/employee/announcements` | GET | employee | Active broadcasts (target ∈ {`all`,`employees`}, not expired) with per-user `read` flag + `unreadCount`. |
 | `/api/employee/announcements/[id]/read` | POST | employee | Idempotent upsert into `admin_announcement_reads`. |
-| `/api/employee/activity` | GET | employee | Paginated personal audit trail (every sale, sanction, target change, correction resolution). |
+| `/api/employee/activity` | GET | employee | Paginated personal audit trail (`?limit=50&offset=0`) — every sale, sanction, target change, correction resolution. |
 
 ---
 

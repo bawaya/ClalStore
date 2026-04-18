@@ -31,11 +31,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CHANGELOG.md` following the Keep a Changelog convention
 - `.github/PULL_REQUEST_TEMPLATE.md` and issue templates
 
+### Added — Sales PWA (unified employee app)
+
+- **Unified employee app** — merged `/employee/commissions` into `/sales-pwa` (single mobile + desktop PWA with bottom nav / sidebar shell)
+- **Daily dashboard** with target progress pacing and a daily-required amount computed only across working days (Sunday–Thursday)
+- **Interactive commission calculator** — live preview, no DB write
+- **Monthly PDF export** in Arabic via the Cairo font (fetch-based on Cloudflare Workers, `fs` fallback locally)
+- **Correction request flow** — employees submit via `POST /api/employee/corrections`, admins respond via `/admin/commissions/corrections`
+- **Admin announcements broadcast** at `/admin/announcements` — priority, target audience, optional expiry, per-recipient read tracking
+- **Automatic activity log** on every commission event (registered, cancelled, sanction, target change, milestone, correction) — surfaced in `/sales-pwa/activity`
+- **Recharts 6-month comparison** (sales + commissions + targets) on `/sales-pwa/commissions`
+- **Offline support** via Service Worker — network-first API GET cache, IndexedDB POST queue for `/api/pwa/*` (except attachments), drains on `online` event
+- **Pipeline → commission auto-registration** — deal landing in `is_won` stage fires `autoRegisterWonDealCommission()`
+- **Real file uploads** via Supabase Signed URLs (`sales-docs-private` bucket, MIME whitelist, per-file size cap)
+- **`POST /api/pwa/customers`** — create customer from the PWA with phone / national-id dedup
+- **`GET /api/employee/me`** — authed profile for shell header
+- **Hourly commission sync workflow** (`.github/workflows/commission-sync.yml`)
+- **Weekly WhatsApp summary** — Sunday mornings (UTC) via yCloud; gated by the `WEEKLY_SUMMARY_DRY_RUN` GitHub variable
+- **DB-level month lock** via `check_month_lock` trigger on `commission_sales` + `commission_sanctions`
+- **New tables**: `commission_correction_requests`, `admin_announcements`, `admin_announcement_reads`, `employee_activity_log`, `employee_favorite_products`
+- Additional API endpoints + new test coverage (numbers tracked privately)
+- **Forgot / reset password flow** — `/forgot-password`, `/reset-password`. Single Supabase auth covers admin, CRM, and Sales PWA. Password strength rules mirror `/change-password`.
+
 ### Fixed
 
 - **Commission sync migration** — dropped partial unique index in favor of a plain `UNIQUE(order_id, sale_type)` so `ON CONFLICT` can target it cleanly
 - **`onConflict` clause** in `sync-orders.ts` now matches the real `UNIQUE(order_id, sale_type)` constraint (previously targeted a column tuple that didn't match any index)
 - **`commission_sales.employee_id` type** — migration corrected to treat the column as UUID, removed the stray `::text` cast that was breaking joins
+- **PWA ↔ Commissions gap** — agent PWA submissions now register commission immediately (no manager approval)
+- **`countWorkingDays` was counting Friday as a working day** — now excludes Fri + Sat (Israel work-week)
+- **PDF export silently failed on Cloudflare Workers** — `readFileSync` not supported there; switched to fetch-based font loading with `fs` fallback
+- **`sales_docs` status double-verify race** — atomic `UPDATE ... WHERE status IN (...) RETURNING ...`
+- **Partial unique index rejected by PostgREST `ON CONFLICT`** — replaced with plain non-partial unique
+- **UTC vs Israel timezone** in month boundary queries
+- **`sale_date TEXT → DATE`**; many `${month}-31` call sites replaced with `lastDayOfMonth(month)`
+- **`@supabase/ssr 0.5 → 0.7`** — older version silently rejected new `sb_publishable_*` keys in the browser, breaking login
+- **Dashboard 500 after `sale_date DATE` conversion** — invalid calendar dates (e.g. `2026-04-31`) were rejected by PG; now we always clamp to the real last day of the month
+- **Migration 04 type mismatch** — `commission_sales.employee_id` is UUID, not TEXT (RLS policy cast fixed)
+- Multiple audit issues from the 2026-04-18 commission audit
 - Legacy Cloudflare Pages build no longer crashes — `scripts/prepare-pages.mjs` stubbed for back-compat
 - Status page deploy migrated to GitHub Pages native API (was publishing via an orphan branch)
 
@@ -43,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `README.md` updated to reflect the six-layer testing strategy and documentation hub
 - Commission award flow now emits a single unified event shape — downstream reports and exports only need to read one schema
+- **No manager approval needed** for Sales PWA commissions — they register on agent submit; managers can cancel later with a required reason
+- **Milestone bonus** computed on **contract-wide cumulative total** (not per-employee) — decision 4 of the 2026-04-18 commission audit
+- **`rate_snapshot JSONB`** stored per commission row for historical accuracy — profile edits never rewrite past sales
+- **Sales PWA and Commissions merged** into one unified app at `/sales-pwa`
 
 ---
 
@@ -117,7 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `lib/admin/auth.ts` coverage raised from 14% → 98%
 - `lib/commissions/sync-orders.ts` coverage raised from 2.67% → 98.21%
-- `lib/commissions/ledger.ts` coverage raised from 43.75% → 95.62%
+- `lib/commissions/ledger.ts` coverage raised from ~44 percent → ~96 percent
 - `lib/supabase.ts` coverage raised from 3.84% → 100%
 
 ### Fixed

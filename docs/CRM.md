@@ -316,20 +316,66 @@ When a deal reaches an active negotiation, the agent can click "Convert to order
 3. `POST /api/crm/pipeline/[id]/convert` creates the order via the shared order API, stamps `deal.order_id`, and moves the deal to the **closing** stage.
 4. The order then follows the normal status pipeline (see `ADMIN.md` → Order management).
 
-### Won transition — commission auto-creation
+### Pipeline → Commission auto-registration
 
-Moving a deal to a `is_won: true` stage triggers `autoRegisterWonDealCommission()` in `lib/crm/pipeline.ts`:
+As of 2026-04-18, moving a deal to an `is_won = true` stage triggers
+**direct commission registration** (no manager approval, no separate
+review queue). The handler is `autoRegisterWonDealCommission()` in
+[`lib/crm/pipeline.ts`](../lib/crm/pipeline.ts).
 
-1. Resolve the employee who owns the deal (from `deal.employee_id` or the acting user).
-2. Classify the sale type (`line` or `device`) from the product name keywords.
-3. Check for an existing `sales_docs` row with idempotency key `pipeline_${deal.id}` — if found, skip.
-4. Insert a new `sales_docs` row linked to the deal.
-5. Call `registerSaleCommission()` which computes the commission amount using the configured formulas (see `COMMISSIONS.md` for details — this document intentionally does not repeat the formulas).
-6. Log a `sales_doc_events` entry tagged `auto_created_from_pipeline` with the commission ID.
+**Trigger points** — both paths call the same handler:
 
-The flow is **idempotent** — re-entering the won stage (or moving to `won` from `lost` and back) won't create duplicate docs or commissions, because `sales_docs.idempotency_key` and `commission_sales.source_pipeline_deal_id` both carry partial unique indexes.
+- Drag-to-column / stage change — `updatePipelineDealRecord` detects a
+  **first-time** transition into a won stage (`previousStageId !==
+  stage.id && stage.is_won`) and calls the handler at the end of the
+  update.
+- `convertPipelineDealToOrder` — the helper that mints a real order
+  from a deal. It ends with the deal in `won` and calls the handler to
+  register the commission.
 
-See `COMMISSIONS.md` for the commission calculation engine, bonus schedules, sanctions and payroll export.
+**Handler steps:**
+
+1. Resolve the employee — `deal.employee_id` first, else the actor who
+   moved the card. Skip with a warning if neither is available.
+2. Read `estimated_value ?? value` as the sale amount. Skip if
+   non-positive.
+3. **Sale type heuristic** — match `product_name` (lower-cased) against
+   `/חבילה|باقة|package|line|خط|קו /i`. Hit → `line`. Miss → `device`.
+4. **Idempotency check** — look up `sales_docs` by
+   `idempotency_key = 'pipeline_<dealId>'`. If found, return the
+   existing id as a no-op.
+5. **Create the sales doc** with `status = 'synced_to_commissions'`,
+   `source = 'pipeline'`, `submitted_at` / `verified_at` / `synced_at`
+   stamped to now, and the idempotency key set.
+6. **Register the commission** via `registerSaleCommission` with
+   `source = 'pipeline'` and `sourcePipelineDealId = deal.id`. This in
+   turn writes the `commission_sales` row with `rate_snapshot`,
+   triggers device-month recalculation if applicable, and fans out a
+   `sale_registered` row to the employee's activity log.
+7. **Log the event** — `sales_doc_events(event_type = 'auto_created_from_pipeline')`
+   with the deal id, resulting commission id, and amount.
+
+**On failure:** if the sales_doc INSERT succeeds but
+`registerSaleCommission` throws, the doc stays in
+`synced_to_commissions` (so the idempotency key is held) and a
+`sales_doc_events(event_type = 'auto_register_commission_failed')` row
+is inserted with the error message. Admin can inspect via
+`/admin/sales-docs`, cancel the failed doc, and re-trigger
+manually. The outer stage update succeeds either way — a commission
+failure never reverts the CRM card back from won.
+
+**Idempotency guarantees** — two layers:
+
+- `sales_docs.idempotency_key` has a partial unique index on
+  `(idempotency_key) WHERE deleted_at IS NULL`.
+- `commission_sales.source_pipeline_deal_id` has a partial unique
+  index via `uq_commission_sales_source_pipeline_deal`.
+
+Re-entering a won stage (or oscillating `lost → won → lost → won`)
+cannot create duplicates.
+
+See `COMMISSIONS.md` §5.1 for the commission-side details and
+`COMMISSIONS.md` §6 for `registerSaleCommission`.
 
 ```mermaid
 stateDiagram-v2

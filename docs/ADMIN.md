@@ -15,8 +15,9 @@ The admin panel is the operational cockpit for ClalMobile. It lives at `/admin`,
 7. [Integration hub](#7-integration-hub)
 8. [Reports](#8-reports)
 9. [Settings and users](#9-settings-and-users)
-10. [Audit log](#10-audit-log)
-11. [File map](#11-file-map)
+10. Sales-docs, announcements, corrections, forgot-password ([10a](#10a-sales-docs-management) · [10b](#10b-announcements) · [10c](#10c-correction-requests) · [10d](#10d-forgot-password-flow))
+11. [Audit log](#11-audit-log)
+12. [File map](#12-file-map)
 
 ---
 
@@ -428,7 +429,237 @@ The server enforces this matrix on every `requireAdmin()` call; the UI mirrors i
 
 ---
 
-## 10. Audit log
+## 10a. Sales-docs management
+
+`/admin/sales-docs` is the manager console for every sales document the
+system has ever produced — PWA submissions, pipeline auto-created
+docs, and manual entries. As of 2026-04-18, it's the cancellation
+surface for **direct-registered** commissions (see
+`COMMISSIONS.md` — there is no "verify" step any more; PWA submissions
+and pipeline auto-registrations go straight into
+`synced_to_commissions`).
+
+### List view
+
+- **Filters** — `status` (draft / submitted / verified / rejected /
+  synced_to_commissions / cancelled), `employee_id`, `from` / `to` date
+  range, `source` (pipeline / pwa / manual / auto_sync), free-text
+  `search` across notes, order id, customer id, employee key.
+- **Layout** —
+  - **Mobile (< 768 px)** — card list, one card per doc.
+  - **Desktop** — table with sortable columns.
+- **Stats strip** at the top — total docs, synced, cancelled, pending
+  (any non-terminal).
+
+### Per-row actions
+
+- **View** — opens a drawer with:
+  - Doc header (id, status, sale type, amount, source, created/submitted
+    timestamps).
+  - Items list (`sales_doc_items` — covered in `docs/COMMISSIONS.md`).
+  - Attachments list with signed-URL thumbnails for images and a
+    download link for PDFs.
+  - Event trail (`sales_doc_events`) — every lifecycle event in
+    chronological order.
+  - Linked commissions — the `commission_sales` rows this doc produced,
+    with their current amounts (live — reflects any month-lock recalc).
+- **Cancel** — only shown when the current status is cancellable
+  (`synced_to_commissions`, `verified`, or `submitted`).
+
+### Cancel modal
+
+Cancelling opens a modal with:
+
+1. **Reason** — required, minimum 3 characters, stored on the doc and
+   echoed into both the event trail and the audit log.
+2. **Linked commissions** — the rows that will be soft-deleted.
+3. **Month-lock warning** — if any linked commission falls in a locked
+   month, a prominent banner warns that cancellation will be rejected
+   by the DB trigger. The request still runs — the trigger returns
+   `423`, the server rolls the doc back, and the UI surfaces the error.
+
+### What the cancel does
+
+`POST /api/admin/sales-docs/[id]/cancel` — detailed in
+`docs/COMMISSIONS.md` §7. Summary:
+
+1. Atomic `UPDATE sales_docs SET status='cancelled' WHERE status IN
+   cancellable` — concurrent second cancel returns 409.
+2. `cancelCommissionsByDoc(docId)` soft-deletes linked
+   `commission_sales` rows (`deleted_at = now()`).
+3. Device-month recalc re-runs so the contract-wide milestone stays
+   consistent.
+4. DB trigger `check_month_lock` rejects any write inside a locked
+   month → 423 returned, doc rollback.
+5. `sales_doc_events(event_type='cancelled')` and `audit_log(action='cancel')`
+   entries are written.
+
+### No verify button
+
+The legacy "verify" flow is gone. Direct registration (decision 1 from
+the commission refactor) means agents' submissions land at
+`synced_to_commissions` in one atomic transaction. Docs still in
+`submitted` or `verified` are historical holdovers; once cancelled
+they stay cancelled.
+
+Requires `commissions:manage` permission for cancel; read requires
+`commissions:view`.
+
+---
+
+## 10b. Announcements
+
+`/admin/announcements` — broadcast messages from admin to employees (or
+to other admins).
+
+### List
+
+Each row shows title, body preview, priority pill (urgent / high /
+normal / low), target audience (all / employees / admins),
+`expires_at`, and a **read counter** (e.g. `12/25 read`). Read state
+lives in `admin_announcement_reads` (a per-user join table); the
+counter is computed as `COUNT(reads) / COUNT(target_recipients)`.
+
+### New-announcement modal
+
+- **Title** — short headline.
+- **Body** — longer content (plain text; newlines preserved).
+- **Priority** — one of `low`, `normal`, `high`, `urgent`. Drives the
+  colour in the employee UI (see `docs/PWA.md` §16).
+- **Target** — `all`, `employees`, or `admins`.
+- **Expires at** (optional) — datetime. Employees stop seeing
+  announcements past their expiry.
+
+Posting requires `settings:manage` permission. Employees see the
+broadcast at `/sales-pwa/announcements` as soon as it's published (no
+push notification today — the unread bell badge is updated on the next
+page load).
+
+---
+
+## 10c. Correction requests
+
+`/admin/commissions/corrections` — the admin-side queue for employee
+correction requests filed from `/sales-pwa/corrections`. See
+`docs/COMMISSIONS.md` §16 for the data model.
+
+### Tabbed queue
+
+- `pending` (default view — unresolved disputes).
+- `approved`, `rejected`, `resolved` — historical views, grouped by
+  status.
+- `all` — everything, for search and filtering.
+
+### Row
+
+Employee name · linked sale id (click-through to the commission row)
+· request type (`amount_error`, `wrong_type`, `wrong_date`,
+`wrong_customer`, `missing_sale`, `other`) · description excerpt ·
+status pill · actions.
+
+### Respond modal
+
+- **Admin response** — required free text, minimum 2 characters.
+- **Status choice** — `approved`, `rejected`, or `resolved`.
+
+Submission is an **atomic** `PUT /api/admin/corrections/[id]` with:
+
+```sql
+UPDATE commission_correction_requests
+   SET status = <new>, admin_response = ..., resolved_at = now(),
+       resolved_by = <appUserId>
+ WHERE id = <id>
+   AND status = 'pending'
+```
+
+A second concurrent resolve finds zero rows and the API returns 409.
+
+**Side effects:**
+
+- `audit_log(action='resolve_correction')` entry.
+- `correction_resolved` row in the filer's activity log.
+
+Requires `commissions:manage` permission.
+
+---
+
+## 10d. Forgot-password flow
+
+Since 2026-04-18 the `/login` page exposes a **"نسيت كلمة المرور؟"**
+link to `/forgot-password`. The flow applies to **every** user of the
+Supabase project — admin panel, CRM agents, and Sales PWA employees —
+because they all share one Supabase project.
+
+### Pages
+
+- [`app/(auth)/forgot-password/page.tsx`](../app/%28auth%29/forgot-password/page.tsx)
+  — enter email, submit, see confirmation. No UI state whatsoever
+  reveals whether the email is registered.
+- [`app/(auth)/reset-password/page.tsx`](../app/%28auth%29/reset-password/page.tsx)
+  — target of the recovery email link.
+
+### Sequence
+
+```mermaid
+flowchart LR
+  U[User clicks<br/>&quot;نسيت كلمة المرور؟&quot;<br/>on /login] --> F[/forgot-password/]
+  F -->|submit email| S1[supabase.auth<br/>.resetPasswordForEmail<br/>redirectTo=/reset-password]
+  S1 --> E[Supabase sends<br/>recovery email<br/>time-limited token]
+  E -->|user clicks link| R[/reset-password#access_token=...&amp;type=recovery/]
+  R --> P[Detect recovery session<br/>from URL hash]
+  P -->|ok| N[New password form<br/>strength checklist]
+  N -->|submit| S2[supabase.auth<br/>.updateUser password]
+  S2 --> L[/login?reset=success<br/>green flash/]
+  P -->|no session| X[Expired-link UI +<br/>link back to<br/>/forgot-password]
+```
+
+### Security properties
+
+- **No email enumeration** — `/forgot-password` shows the same success
+  message whether the email is registered or not. The server call's
+  error is only surfaced to the UI when it's a rate-limit error
+  (otherwise the user would be stuck in a silent-lockout state).
+- **Rate limit** — handled by Supabase Auth server-side. The client
+  detects rate-limit strings in the error and shows an explicit
+  "wait a minute and try again" message.
+- **Password strength** — mirrors `/change-password`:
+  - 8+ characters,
+  - at least one uppercase letter (A–Z),
+  - at least one number (0–9),
+  - confirm field matches.
+  The form shows a live checklist and disables submit until all four
+  rules pass.
+- **Expired / invalid token handling** — on
+  mount, `/reset-password` waits for the `PASSWORD_RECOVERY` auth event
+  or reads `supabase.auth.getSession()` after a short handshake. If no
+  session is installed (expired link, tampered hash), it shows an
+  error card with a link back to `/forgot-password` instead of an
+  empty form.
+
+### Supabase configuration required
+
+On the Supabase project:
+
+- `site_url = https://www.clalmobile.com` (for the production recovery
+  link domain).
+- `uri_allow_list` includes a pattern matching `/reset-password` so the
+  redirect is accepted. Without it, Supabase rejects the redirect as
+  an open-redirect risk.
+
+Both settings live in the Supabase dashboard → Authentication → URL
+Configuration. Staging uses its own Supabase project with the staging
+domain; the runbook (private) documents the exact values.
+
+### Applies to all user types
+
+Because admin, CRM, and Sales PWA all authenticate through the same
+Supabase project, one reset email covers every role. A user who's both
+a CRM agent and a Sales PWA employee has a single password — resetting
+updates it everywhere.
+
+---
+
+## 11. Audit log
 
 Every write operation in the admin surface writes an entry to `audit_log` via `logAudit()`. An entry carries:
 
@@ -449,7 +680,7 @@ Only super-admins can purge audit entries, and purging writes its own "purge" ev
 
 ---
 
-## 11. File map
+## 12. File map
 
 ```
 app/admin/

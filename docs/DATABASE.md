@@ -14,6 +14,7 @@
   - [CRM & Inbox](#crm--inbox)
   - [Bot (WhatsApp + WebChat)](#bot-whatsapp--webchat)
   - [Commissions & sales documents](#commissions--sales-documents)
+  - [Employee portal](#employee-portal)
   - [Site CMS & content](#site-cms--content)
   - [Loyalty & engagement](#loyalty--engagement)
   - [Integrations & system](#integrations--system)
@@ -29,9 +30,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tables | **60+** (public schema) |
-| Migrations applied | **50** sequential `.sql` files |
-| Triggers | **13** (6 on orders/commissions, 4 `updated_at` keepers, 3 audit/legacy-sync) |
+| Total tables | **65+** (public schema) |
+| Migrations applied | **54** sequential `.sql` files |
+| Triggers | **15** (6 on orders/commissions, 4 `updated_at` keepers, 3 audit/legacy-sync, **2 month-lock**) |
 | RPCs / stored functions | **15** |
 | Tables with RLS enabled | ~100% of sensitive tables; 2 with `FORCE ROW LEVEL SECURITY` |
 | Bilingual columns | `name_ar` / `name_he`, `title_ar` / `title_he`, `content_ar` / `content_he` across content tables |
@@ -176,8 +177,10 @@ erDiagram
     uuid employee_id FK
     uuid customer_id FK
     text sale_type "line|device"
-    date sale_date
+    date sale_date "was TEXT pre-2026-04-18"
     text source "manual|auto_sync|sales_doc|pipeline|order"
+    bigint source_sales_doc_id FK "nullable"
+    uuid source_pipeline_deal_id FK "nullable"
     numeric commission_amount
     jsonb rate_snapshot "frozen profile at time of sale"
     timestamptz deleted_at
@@ -297,17 +300,31 @@ erDiagram
 
 | Table | Purpose |
 |-------|---------|
-| `commission_sales` | One row per commissionable sale (line or device), linked to employee + optionally to an order / pipeline deal / sales doc. Snapshots commission rate at time of sale for historical accuracy. Soft-delete via `deleted_at`. |
-| `commission_targets` | Monthly target amounts per employee + per category (lines, devices); has `is_locked` flag that prevents downstream modifications via trigger |
-| `commission_sanctions` | Penalty rows (amount, reason, offset flag) applied against a specific employee month |
+| `commission_sales` | One row per commissionable sale (line or device), linked to employee + optionally to an order / pipeline deal / sales doc. Snapshots commission rate at time of sale in `rate_snapshot` JSONB for historical accuracy. `sale_date` is now `DATE` (was `TEXT`). New FK columns `source_sales_doc_id` and `source_pipeline_deal_id` identify the originating record; `source` CHECK widened to include both new paths. Uniqueness is now `UNIQUE(order_id, sale_type)`. Soft-delete via `deleted_at`. |
+| `commission_targets` | Monthly target amounts per employee + per category (lines, devices); has `is_locked` flag that prevents downstream modifications via `check_month_lock` trigger |
+| `commission_sanctions` | Penalty rows (amount, reason, offset flag) applied against a specific employee month; also guarded by month-lock trigger |
 | `commission_sync_log` | Rolling log of auto-sync runs (orders → commissions) with counts + errors |
-| `commission_employees` | Standalone lightweight employee registry (token-authed) for HOT Mobile sales team — can optionally link to a `users` row |
-| `employee_commission_profiles` | Per-employee override of the default rate structure (`line_multiplier`, `device_rate`, `loyalty_bonuses` JSONB, `min_package_price`) |
-| `sales_docs` | Sales-documentation headers created by the PWA (offline-capable via `doc_uuid`); flow: `draft → submitted → verified → synced_to_commissions` |
+| `commission_employees` | Standalone lightweight employee registry (token-authed) for HOT Mobile sales team — can optionally link to a `users` row. `deleted_at` column supports soft-delete / archival. |
+| `employee_commission_profiles` | Per-employee override of the default rate structure (`line_multiplier`, `device_rate`, `loyalty_bonuses` JSONB, `min_package_price`). Values are configurable per employee. |
+| `sales_docs` | Sales-documentation headers created by the PWA (offline-capable via `doc_uuid`); flow: `draft → submitted → verified → synced_to_commissions`. New `cancelled` status + `cancelled_at` / `cancelled_by` / `cancellation_reason` audit columns for admin-driven cancellations. |
 | `sales_doc_items` | Per-item breakdown of a sales doc (line / device / accessory) with qty + unit price |
-| `sales_doc_attachments` | Uploaded proof files (photos of contracts, receipts) with sha256 + file size |
+| `sales_doc_attachments` | Uploaded proof files (photos of contracts, receipts) with sha256 + file size; stored in the private `sales-docs-private` bucket and fetched via Signed Upload URL |
 | `sales_doc_events` | Append-only audit trail of actions taken on a sales doc (submitted, verified, rejected, cancelled) |
 | `sales_doc_sync_queue` | Async queue of docs awaiting sync to `commission_sales` with retry/backoff |
+
+`orders` gained a related column: **`excluded_from_sync BOOLEAN`** — when `true`, the hourly `commission-sync.yml` job skips the order (used for refunded / test / edge-case orders that an admin explicitly suppressed).
+
+### Employee portal
+
+New tables that back the unified Sales PWA's employee-facing features (`/employee/*`). All enforce `service_role` full access + `authenticated` read-own.
+
+| Table | Purpose |
+|-------|---------|
+| `commission_correction_requests` | Employee-raised disputes against a specific `commission_sales` row (wrong amount, wrong employee, should be cancelled). Flow: `pending → {approved, rejected, resolved}`. Each transition writes an `employee_activity_log` row + an `audit_log` row. |
+| `admin_announcements` | Broadcast messages published by admins (release notes, policy changes, monthly kickoff). Columns: `title`, `body`, `priority`, `target` (`all` / `employees`), optional `expires_at`, `published_by`. |
+| `admin_announcement_reads` | Per-user read receipts — UNIQUE `(announcement_id, user_id)`. Populated by `POST /api/employee/announcements/[id]/read` via idempotent upsert. |
+| `employee_activity_log` | Personal append-only timeline of commission-relevant events for an employee: sale created, sanction applied, target changed, correction submitted, correction resolved, announcement read. Paginated via `/api/employee/activity`. |
+| `employee_favorite_products` | Schema-only for a future "quick-sell" feature in the PWA — no routes read or write it yet. |
 
 ### Site CMS & content
 
@@ -367,6 +384,11 @@ Every sensitive table has RLS enabled. The gist per table (not a full policy tra
 | `commission_sanctions`, `commission_targets` | same as `commission_sales` — service + employee-read-own |
 | `commission_sync_log`, `commission_employees`, `employee_commission_profiles` | `service_role` only |
 | `sales_docs`, `sales_doc_items`, `sales_doc_attachments`, `sales_doc_events`, `sales_doc_sync_queue` | `service_role` full + authenticated read-own by `employee_key = auth.uid()::text` |
+| `commission_correction_requests` | `service_role` full; authenticated SELECT/INSERT own (`employee_id = auth.uid()`), UPDATE only via admin API |
+| `admin_announcements` | `service_role` full; authenticated SELECT active-non-expired rows where `target IN ('all','employees')` |
+| `admin_announcement_reads` | `service_role` full; authenticated SELECT own, INSERT/UPSERT own (`user_id = auth.uid()`) |
+| `employee_activity_log` | `service_role` full; authenticated SELECT own (`employee_id = auth.uid()`) |
+| `employee_favorite_products` | `service_role` only (routes not wired yet) |
 | `users`, `permissions`, `role_permissions` | authenticated read (for session bootstrapping) + `service_role` full access |
 | `tasks`, `pipeline_deals`, `pipeline_stages` | authenticated full (legacy) — primary gate is `requireAdmin()` at the route level |
 | `loyalty_points`, `loyalty_transactions` | `service_role` only |
@@ -485,9 +507,10 @@ Migrations are stored in `supabase/migrations/` and applied in lexicographic ord
 44. `20260417000001_fix_sub_pages_rls.sql` — explicit per-role SELECT policies on `sub_pages`; revoke INSERT/UPDATE/DELETE from anon + authenticated
 45. `20260418000001_harden_rls_global.sql` — globally enable RLS + `FORCE` on sensitive tables (sub_pages, audit_log, commission_*, customers, orders, inbox_*) + service_role-only policies + revoke direct grants
 46. `20260418000002_harden_rls_followup.sql` — drop `FORCE` on FK-target tables (products, customers, orders, order_items, inbox_*, commission_*) to restore service_role bypass for FK validation; close `orders_public_insert` / `customers_public_upsert` loopholes
-47. `20260418000003_commission_refactor.sql` — unified commission registration: `UNIQUE(order_id, sale_type)` replacing `UNIQUE(order_id)`, `rate_snapshot` JSONB, `source_sales_doc_id` + `source_pipeline_deal_id` FKs, month-lock triggers, RLS on sales_docs family, `sales_docs.cancelled` status, `orders.excluded_from_sync`, `match_confidence` CHECK, `sale_date` TEXT → DATE
+47. `20260418000003_commission_refactor.sql` — unified commission registration: `UNIQUE(order_id, sale_type)` replacing `UNIQUE(order_id)`, `rate_snapshot` JSONB, `source_sales_doc_id` + `source_pipeline_deal_id` FKs, month-lock triggers (`check_month_lock` on `commission_sales` + `commission_sanctions`), RLS on sales_docs family, `sales_docs.cancelled` status + audit columns, `orders.excluded_from_sync`, `match_confidence` CHECK, `sale_date` TEXT → DATE (with data migration), `commission_employees.deleted_at`
 48. `20260418000004_employee_portal_rls.sql` — defense-in-depth `read-own` policies on `commission_sales` / `commission_sanctions` / `commission_targets` for the `/employee/commissions` portal
 49. `20260418000005_fix_onconflict_constraint.sql` — drop partial unique index on `(order_id, sale_type)` and replace with plain unique index so PostgREST upsert works; keep partial indexes on `source_sales_doc_id` / `source_pipeline_deal_id` (plain INSERT path)
+50. `20260418000006_employee_portal_tables.sql` — create 5 new tables for the employee portal: `commission_correction_requests`, `admin_announcements`, `admin_announcement_reads`, `employee_activity_log`, `employee_favorite_products` (schema-only); seed RLS policies (service_role full + authenticated read-own) + appropriate indexes
 
 > Migration numbering is `YYYYMMDDHHMMSS_description.sql`. The `20260101*` prefix is the initial-schema batch applied on day 1; later migrations use real dates (`20260311*`, `20260406*`, etc.).
 

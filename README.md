@@ -28,7 +28,7 @@
 
 ## Overview
 
-ClalMobile is a full-stack bilingual (Arabic + Hebrew, RTL) e-commerce ecosystem built for a HOT Mobile authorized dealer. It combines a public storefront, admin panel, CRM, AI-powered chatbot, and dealer commission tracking into a single Next.js application deployed on Cloudflare Pages edge network.
+ClalMobile is a full-stack bilingual (Arabic + Hebrew, RTL) e-commerce ecosystem built for a HOT Mobile authorized dealer. It combines a public storefront, admin panel, CRM, AI-powered chatbot, a unified Sales PWA for the field team, and dealer commission tracking into a single Next.js application deployed on Cloudflare Pages edge network.
 
 ## Tech Stack
 
@@ -121,17 +121,27 @@ clalmobile/
 │   │   ├── users/                #    Team member management
 │   │   └── reports/              #    CRM reports
 │   │
-│   ├── sales-pwa/                # 📱 Sales team PWA
+│   ├── sales-pwa/                # 📱 Unified Sales PWA (dashboard, commissions,
+│   │                             #    calculator, corrections, activity, announcements, docs)
 │   ├── (auth)/login/             # 🔐 Team login
+│   ├── (auth)/forgot-password/   # 🔑 Password recovery request
+│   ├── (auth)/reset-password/    # 🔑 Password reset (Supabase recovery link)
 │   │
-│   └── api/                      # 🔌 100+ REST API routes
-│       ├── admin/                #    Admin APIs (~50 endpoints)
+│   └── api/                      # 🔌 REST API routes (configurable route set)
+│       ├── admin/                #    Admin APIs (role-gated)
 │       │   ├── products/         #      Product CRUD + bulk ops
-│       │   ├── commissions/      #      Commission APIs (10 endpoints)
+│       │   ├── commissions/      #      Commission admin + corrections + sync
+│       │   ├── announcements/    #      Broadcast announcements
+│       │   ├── sales-docs/       #      Sales PWA doc review + cancel
 │       │   ├── categories/       #      Category CRUD
 │       │   ├── orders/           #      Order management
 │       │   └── ...               #      Settings, deals, push, AI, upload
-│       ├── crm/                  #    CRM APIs (~20 endpoints)
+│       ├── employee/             #    Sales PWA APIs (requireEmployee guard)
+│       │   ├── me/               #      Authed profile
+│       │   ├── corrections/      #      Submit correction request
+│       │   └── commissions/      #      Personal ledger, pacing, export
+│       ├── pwa/                  #    PWA submit + attachments + customers
+│       ├── crm/                  #    CRM APIs
 │       ├── store/                #    Store APIs (search, autocomplete)
 │       ├── orders/               #    Public order creation
 │       ├── webhook/              #    WhatsApp + Twilio webhooks
@@ -211,15 +221,17 @@ Unified customer relationship management with multi-channel inbox (WhatsApp, Web
 14-module bot engine supporting WebChat, WhatsApp, and SMS channels. Features intent detection, AI-powered responses (Claude), conversation playbooks, safety guardrails, and human agent handoff.
 
 ### 💰 Commission Tracking
-HOT Mobile dealer commission calculator with three revenue streams:
-- **Line commissions** — Package price × 4 multiplier
-- **Device commissions** — 5% + milestone bonuses per 50K ILS
-- **Loyalty bonuses** — At 5, 9, 12, 15 months (80+30+20+50 = 180 ILS/line)
-- **9 sanction types** (1,000–2,500 ILS)
-- Auto-sync from orders table + external bearer-token API
+HOT Mobile dealer commission engine with three revenue streams (all multipliers, rates, and thresholds are **configurable** via `lib/commissions/calculator.ts::COMMISSION` and per-employee overrides in `employee_commission_profiles`):
+- **Line commissions** — Package price × configurable multiplier
+- **Device commissions** — Configurable base rate + contract-wide milestone bonus
+- **Loyalty bonuses** — Tiered by months-active
+- **Sanctions** — Multiple configurable deduction types
+- **Rate snapshot** — Every commission row pins the rate at sale time, so profile edits never rewrite past sales
+- **Three sources** unified through `lib/commissions/register.ts`: Pipeline (deal won), Sales PWA (agent submit), hourly order-sync
+- Auto-sync via `.github/workflows/commission-sync.yml` (hourly) + external bearer-token API
 
-### 📱 Sales PWA
-Progressive Web App for the sales team with offline-capable sales document management.
+### 📱 Unified Sales PWA
+Installable field-team PWA at `/sales-pwa` — single app for dashboard (daily target pacing), commissions ledger + chart, interactive calculator, correction requests, activity feed, announcements, and documentation. Mobile bottom nav, desktop sidebar. Offline-capable via Service Worker + IndexedDB queue for `/api/pwa/*` writes. Signed-URL uploads to `sales-docs-private` Supabase bucket.
 
 ## Roles & Permissions (6-Tier RBAC)
 
@@ -249,7 +261,10 @@ new → approved → processing → shipped → delivered
 
 | Layer | Implementation |
 |-------|---------------|
-| **Authentication** | Supabase Auth sessions |
+| **Authentication** | Supabase Auth sessions (single auth covers admin, CRM, Sales PWA) |
+| **Password recovery** | `/forgot-password` + `/reset-password` (Supabase recovery email); mirrors the `/change-password` strength rules |
+| **Employee guard** | `/api/employee/*` → `requireEmployee` (`lib/pwa/auth.ts`) |
+| **Admin guard** | `/api/admin/*` → `requireAdmin` + per-permission checks |
 | **Authorization** | 6-tier RBAC with permission checks |
 | **CSRF** | Double-submit cookie pattern |
 | **Rate Limiting** | Per-route configurable limits |
@@ -274,14 +289,17 @@ new → approved → processing → shipped → delivered
 
 ## API Overview
 
-| Category | Endpoints | Auth Method |
-|----------|-----------|------------|
-| Admin APIs | ~50 | Session (role-based) |
-| Commission APIs | 10 | Session or Bearer token |
-| CRM APIs | ~20 | Session |
-| Store/Public APIs | ~20 | Public / customer token |
-| Webhooks | 3 | HMAC / provider verification |
-| **Total** | **100+** | Mixed |
+| Category | Auth Method |
+|----------|------------|
+| Admin APIs | Session (role-based) + `requireAdmin` |
+| Employee / Sales PWA APIs | Session + `requireEmployee` |
+| PWA submit APIs | Session + CSRF |
+| Commission APIs | Session or Bearer token |
+| CRM APIs | Session |
+| Store/Public APIs | Public / customer token |
+| Webhooks | HMAC / provider verification |
+
+Full catalogue (auto-generated): [`docs/API-REFERENCE.md`](./docs/API-REFERENCE.md).
 
 ## Scripts
 
@@ -339,14 +357,14 @@ Six-layer strategy — every code change passes through at least three of these 
 
 | # | Layer | What it proves | Cadence |
 |---|-------|----------------|---------|
-| 1 | **Unit & Integration** (Vitest) | 2608 tests across 158 files, including coverage gates on critical files (`lib/admin/auth.ts` ≥ 98%, `lib/commissions/*` ≥ 95%) | Every commit |
-| 2 | **CI** ([`test.yml`](.github/workflows/test.yml)) | TypeScript + ESLint + unit + build + Playwright (88 E2E) | Every PR |
-| 3 | **Staging** ([`staging.yml`](.github/workflows/staging.yml)) | 37 tests against real Supabase with `TEST_` data · includes 17 RLS contract tests | Every push to main |
-| 4 | **Production smoke** ([`smoke.yml`](.github/workflows/smoke.yml)) | 33 checks against `clalmobile.com` | Post-deploy + daily |
-| 5 | **Hourly monitor** ([`monitor.yml`](.github/workflows/monitor.yml)) | 5 endpoints + SSL validity | Every hour |
-| 6 | **Synthetic journeys** ([`synthetic.yml`](.github/workflows/synthetic.yml)) | 17 real user flows on production | Every 30 min |
+| 1 | **Unit & Integration** (Vitest) | A large test suite spanning many files, with coverage gates on critical files (`lib/admin/auth.ts`, `lib/commissions/*`) | Every commit |
+| 2 | **CI** ([`test.yml`](.github/workflows/test.yml)) | TypeScript + ESLint + unit + build + Playwright E2E | Every PR |
+| 3 | **Staging** ([`staging.yml`](.github/workflows/staging.yml)) | Tests against real Supabase with `TEST_` data · includes RLS contract tests | Every push to main |
+| 4 | **Production smoke** ([`smoke.yml`](.github/workflows/smoke.yml)) | Smoke checks against `clalmobile.com` | Post-deploy + daily |
+| 5 | **Hourly monitor** ([`monitor.yml`](.github/workflows/monitor.yml)) | Endpoint + SSL validity checks | Every hour |
+| 6 | **Synthetic journeys** ([`synthetic.yml`](.github/workflows/synthetic.yml)) | Real user flows on production | Every 30 min |
 
-Plus: CodeQL + gitleaks + `npm audit` (daily), Stryker mutation testing (weekly), visual regression + Lighthouse (PR-gated).
+Plus: CodeQL + gitleaks + `npm audit` (daily), Stryker mutation testing (weekly), visual regression + Lighthouse (PR-gated), hourly commission sync ([`commission-sync.yml`](.github/workflows/commission-sync.yml)), weekly WhatsApp summary ([`weekly-summary.yml`](.github/workflows/weekly-summary.yml) — gated by the `WEEKLY_SUMMARY_DRY_RUN` variable).
 
 Complete guide: **[docs/TESTING.md](./docs/TESTING.md)**
 

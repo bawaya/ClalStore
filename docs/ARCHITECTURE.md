@@ -12,6 +12,8 @@
 - [Data model](#data-model)
 - [Integration Hub](#integration-hub)
 - [RBAC — roles & permissions](#rbac--roles--permissions)
+- [Commission registration paths](#commission-registration-paths)
+- [Background processing](#background-processing)
 - [Rendering & caching](#rendering--caching)
 - [Bilingual + RTL](#bilingual--rtl)
 - [Responsiveness](#responsiveness)
@@ -32,7 +34,12 @@ ClalMobile is a single Next.js 15 monolith that serves **six distinct products**
 | 5 | **WhatsApp Bot** | `/api/webhook/whatsapp` | WhatsApp users (via yCloud) | Auto-reply engine with intent detection + handoff; logs into `bot_conversations` |
 | 6 | **WebChat Widget** | embedded on `/` + `/store` | Anon site visitors | Floating chat bubble that shares the same engine as the WhatsApp Bot |
 
-Additionally, a lightweight **Sales PWA** (`/sales-pwa`) runs as a seventh, internal-only installable app for field agents — offline-capable, syncing `sales_docs` to the backend when connectivity returns.
+Additionally, a **unified Sales PWA** (`/sales-pwa` + `/employee/*`) runs as a seventh, first-class installable app for field agents and in-store employees. It combines two responsibilities that used to be separate apps:
+
+1. **Sales documentation** — offline-capable draft/submit flow for `sales_docs` (line / device / mixed), with attachment upload to the private `sales-docs-private` bucket.
+2. **Employee commission portal** — self-service dashboard: today + month commissions, milestones, pacing colour, per-sale breakdown, correction requests, broadcast announcements, activity timeline, and bilingual PDF export (Arabic via Cairo font).
+
+Both halves share the same employee session (bearer-token authed via `requireEmployee`) and the same RLS-backed `read-own` rows on `commission_sales` / `commission_sanctions` / `commission_targets`.
 
 ### Product relationship
 
@@ -43,9 +50,11 @@ graph LR
   Storefront --> StoreAPI[Store API<br/>/api/store, /api/orders]
   Website --> CMS[CMS tables<br/>website_content, sub_pages]
 
-  Agent[Field agent] --> SalesPWA[Sales PWA<br/>/sales-pwa]
+  Employee[Field agent /<br/>in-store employee] --> SalesPWA[Unified Sales PWA<br/>/sales-pwa + /employee]
   SalesPWA --> PWAAPI[PWA API<br/>/api/pwa]
+  SalesPWA --> EmpAPI[Employee API<br/>/api/employee]
   PWAAPI --> SalesDocs[(sales_docs)]
+  EmpAPI --> CommRows[(commission_sales<br/>activity_log<br/>corrections)]
 
   Manager[Manager / admin] --> AdminPanel[Admin<br/>/admin]
   Manager --> CRM[CRM<br/>/crm]
@@ -65,6 +74,7 @@ graph LR
 
   StoreAPI --> Supabase[(Supabase<br/>Postgres + RLS)]
   PWAAPI --> Supabase
+  EmpAPI --> Supabase
   AdminPanel --> Supabase
   CRM --> Supabase
   BotEngine --> Supabase
@@ -397,6 +407,79 @@ All admin API routes wrap their handler in `withPermission(module, action, ...)`
 3. Passes a typed `{ user, db }` context to the handler.
 
 Bootstrapping note: if the `users` table is empty, the first authenticated Supabase user is auto-inserted as `super_admin` so the system is never left without an operator.
+
+---
+
+## Commission registration paths
+
+A commission row (`commission_sales`) can now be registered from **four distinct sources**, all funneling through the unified `registerSaleCommission()` entrypoint in `lib/commissions/register.ts`. The unified path snapshots the employee's rate config into `rate_snapshot` JSONB at the moment of the sale, so historical rows are frozen even if the profile later changes.
+
+| Source | Trigger | Set on row |
+|--------|---------|------------|
+| **Manual** | Admin UI — `POST /api/admin/commissions/sales` | `source='manual'` |
+| **Pipeline** | Deal auto-converts to `won` in the pipeline | `source='pipeline'`, `source_pipeline_deal_id=<deal>` |
+| **PWA / Sales doc** | Employee submits a verified sales doc | `source='sales_doc'`, `source_sales_doc_id=<doc>` |
+| **Order auto-sync** | Hourly `commission-sync.yml` + order-creation hook | `source='auto_sync'`, `order_id=<id>`, `sale_type` |
+
+Uniqueness is now `UNIQUE(order_id, sale_type)` rather than `UNIQUE(order_id)` — an order can legitimately produce both a `line` and a `device` commission row. The PWA upsert uses that conflict key; a historic partial index was replaced by a plain unique index to make PostgREST's `onConflict` understand the target.
+
+### Pipeline → Commission flow
+
+```mermaid
+sequenceDiagram
+    participant Admin as Admin / CRM
+    participant API as /api/crm/pipeline
+    participant DB as Supabase
+    participant Reg as registerSaleCommission
+    participant CS as commission_sales
+
+    Admin->>API: PATCH deal.stage = won
+    API->>DB: update pipeline_deals
+    API->>Reg: registerSaleCommission({<br/>source: 'pipeline',<br/>dealId, employeeId,<br/>customerId, saleType})
+    Reg->>DB: read employee_commission_profiles
+    Reg->>DB: check commission_targets.is_locked
+    Note over Reg,DB: month-lock trigger would reject<br/>even if code missed the check
+    Reg->>CS: INSERT (rate_snapshot,<br/>source='pipeline',<br/>source_pipeline_deal_id)
+    CS-->>Admin: commission id returned
+```
+
+### PWA (sales-doc) → Commission flow
+
+```mermaid
+sequenceDiagram
+    participant Emp as Employee<br/>(PWA)
+    participant PWA as /api/pwa/sales/[id]/submit
+    participant DB as Supabase
+    participant Reg as registerSaleCommission
+    participant CS as commission_sales
+
+    Emp->>PWA: POST submit (doc_uuid)
+    PWA->>DB: advance sales_docs.status<br/>draft → submitted → verified
+    PWA->>Reg: registerSaleCommission({<br/>source: 'sales_doc',<br/>salesDocId, employeeId,<br/>customerId, saleType})
+    Reg->>DB: snapshot rate profile
+    Reg->>CS: INSERT (source='sales_doc',<br/>source_sales_doc_id, rate_snapshot)
+    alt commission INSERT fails
+        PWA->>DB: rollback sales_docs → rejected<br/>+ rejection_reason
+    else success
+        PWA->>DB: sales_docs.status = synced_to_commissions
+    end
+    CS-->>Emp: 200 { commissions: [...] }
+```
+
+---
+
+## Background processing
+
+Two scheduled jobs move data in the background, both gated through GitHub Actions cron with the same alert-dedup plumbing the health monitors use.
+
+| Job | Cadence | Script | Purpose |
+|-----|---------|--------|---------|
+| **Commission sync** | `30 * * * *` (hourly at :30) | `scripts/sync-commissions.ts` | Pulls orders from a 48-hour sliding window and funnels them through `registerSaleCommission` so any order missed by the realtime hook still gets a commission row. `concurrency: commission-sync` prevents overlapping runs. |
+| **Weekly WhatsApp summary** | `0 5 * * 0` (Sun 05:00 UTC = 08:00 Asia/Jerusalem) | `scripts/weekly-employee-summary.ts` | Generates a per-employee summary (lines/devices closed, commissions accrued, targets) and sends it to each employee's registered phone. Gated by `WEEKLY_SUMMARY_DRY_RUN` GH Variable for safe previewing. |
+
+### Alert-dedup via GitHub Issues
+
+Both cron jobs — plus the hourly `monitor.yml`, `smoke.yml`, and `synthetic.yml` — share one alert pattern: on failure, `alert-dedup.js` (or an inline `github-script@v7` equivalent) upserts a single `alert:active` GitHub Issue keyed by `(source, title)`. First failure opens + notifies. Subsequent failures append a comment. Recovery closes with a "still-green" comment. This prevents a multi-hour outage from generating dozens of notifications. See [`MONITORING.md`](./MONITORING.md#alert-dedup-and-auto-recovery) for the full decision table.
 
 ---
 

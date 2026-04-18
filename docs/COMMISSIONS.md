@@ -7,6 +7,27 @@ private operator runbook (`docs/private/COMMISSION_RATES.md`).
 
 ---
 
+> ## Direct registration — 2026-04-18
+>
+> As of 2026-04-18, **agent submissions fire commission registration
+> immediately — there is no manager approval queue.** When a field agent
+> submits a `sales_doc` from the PWA, the status transitions atomically
+> to `synced_to_commissions` and `registerSaleCommission` runs in the
+> same request. Same for pipeline: the moment a CRM deal enters an
+> `is_won = true` stage, a `sales_doc` is auto-created and the commission
+> is written.
+>
+> Managers still have full control **after the fact** — the cancel flow
+> (§7) soft-deletes the commission row, re-runs device milestone
+> allocation, and writes both an `audit_log` entry and a
+> `sales_doc_events` row. The month-lock trigger (§8) blocks cancellation
+> inside a locked month.
+>
+> See also: `docs/PWA.md` for the agent-side flow, `docs/ADMIN.md` for
+> the cancel / announcements / corrections admin surfaces.
+
+---
+
 ## 1. Overview
 
 ClalMobile sells HOT Mobile lines, devices (phones + accessories), and mixed
@@ -403,7 +424,16 @@ registerSaleCommission(db, {
 5. **Line rows do NOT trigger a recalc** (line commission is independent
    per-row, no running totals).
 
-Source: [`lib/commissions/register.ts`](../lib/commissions/register.ts).
+### Activity log fan-out
+
+Every successful `registerSaleCommission` call also writes a
+`sale_registered` row to `employee_activity_log` (best-effort — the write
+never throws). The log powers `/sales-pwa/activity` and gives each
+employee a timestamped audit trail of everything that touched their
+ledger. See §15 for the full list of activity event types.
+
+Source: [`lib/commissions/register.ts`](../lib/commissions/register.ts),
+[`lib/employee/activity-log.ts`](../lib/employee/activity-log.ts).
 
 ---
 
@@ -563,19 +593,20 @@ Source:
 
 ---
 
-## 12. Employee portal `/employee/commissions`
+## 12. Employee commissions view
 
-**Read-only** view of the authenticated employee's own data.
-
-Server-side auth gate in `app/employee/commissions/page.tsx` rejects
-`customer` role and inactive/suspended users.
+**Read-only** view of the authenticated employee's own data. Surfaced
+inside the unified Sales PWA at `/sales-pwa/commissions` (see
+`docs/PWA.md` §11). The legacy route `/employee/commissions` is now a
+308 redirect to the new location.
 
 The API (`GET /api/employee/commissions?month=YYYY-MM`) returns, for the
 current app user only:
 
 - Monthly `summary` (lines, devices, loyalty, sanctions, net, target
   progress)
-- List of `sales` (line + device rows)
+- List of `sales` (line + device rows) with per-row
+  `calculation` explanation strings derived from `rate_snapshot`.
 - List of `sanctions`
 - List of `sales_docs` (own only)
 - The monthly `target` (per-employee → contract fallback)
@@ -588,9 +619,7 @@ Scoping:
 
 Agents cannot see other agents' data. No write operations.
 
-Source:
-- [`app/employee/commissions/page.tsx`](../app/employee/commissions/page.tsx)
-- [`app/api/employee/commissions/route.ts`](../app/api/employee/commissions/route.ts)
+Source: [`app/api/employee/commissions/route.ts`](../app/api/employee/commissions/route.ts).
 
 ---
 
@@ -608,17 +637,20 @@ concurrency:
   cancel-in-progress: false
 ```
 
-Runs `npx tsx scripts/sync-commissions.ts` with the Supabase service-role
-key as an env var. The script invokes `syncOrdersToCommissions(start, end)`
-for the current rolling window.
+Runs `npx tsx scripts/sync-commissions.ts` which invokes
+`syncOrdersToCommissions(start, end)` for a rolling **48-hour** window —
+that's wide enough to re-pick up any recent status transition (e.g. an
+order moving `approved → shipped` right at the top of the hour). The
+sync upserts `commission_sales` rows with `onConflict: "order_id,sale_type"`
+so a second run with the same window is a safe no-op.
 
 ### Failure alert pattern
 
-On a failed run, a GitHub Actions job opens (or comments on) an issue
-labelled `alert` + `commission-sync` so on-call sees a durable signal in
-the GitHub issues list. Existing open issues are de-duped by title
-(`[commission-sync] hourly sync failed`) — subsequent failures append
-a comment instead of creating a new issue.
+On a failed run, a GitHub Actions script opens (or comments on) an
+issue labelled `alert` + `commission-sync` so on-call sees a durable
+signal in the GitHub issues list. Existing open issues are de-duped by
+title — subsequent failures append a comment instead of creating a new
+issue.
 
 This keeps alert noise low while still surfacing every failure. Resolve
 the issue once the next successful run clears.
@@ -677,7 +709,109 @@ flowchart LR
 
 ---
 
-## 16. Related docs
+## 16. Correction requests
+
+Since 2026-04-18, employees have a self-service channel for disputes.
+Instead of back-channel WhatsApp messages asking "my commission is
+wrong", they file a typed request from `/sales-pwa/corrections` and the
+admin team responds from `/admin/commissions/corrections`.
+
+### Table
+
+`commission_correction_requests` — one row per employee-filed dispute.
+
+| Column | Notes |
+|--------|-------|
+| `employee_id` | App-user id of the filer — RLS limits read/insert to the owner |
+| `commission_sale_id` / `sales_doc_id` | Optional — pin the dispute to a specific row or doc |
+| `request_type` | One of six enums (below) |
+| `description` | Free text from the employee |
+| `status` | `pending` → `approved` / `rejected` / `resolved` |
+| `admin_response` | Free text written when admin resolves |
+| `resolved_at`, `resolved_by` | Stamped on transition out of `pending` |
+
+### Six request types
+
+- `amount_error` — "the commission amount looks wrong"
+- `wrong_type` — "this was logged as a device but it was actually a line"
+- `wrong_date` — "the sale date is off"
+- `wrong_customer` — "wrong customer linked"
+- `missing_sale` — "a sale I made is not showing up"
+- `other` — catch-all
+
+### Endpoints
+
+- `POST /api/employee/corrections` — employee files a request (status starts `pending`).
+- `GET /api/employee/corrections` — employee lists their own requests.
+- `GET /api/admin/corrections` — admin queue, filterable by status.
+- `PUT /api/admin/corrections/[id]` — admin resolves. Requires
+  `commissions:manage`; transition is atomic (only rows in `pending`
+  move — a second concurrent resolve returns 409). Writes an
+  `audit_log` entry and fires `correction_resolved` into the employee's
+  activity log.
+
+---
+
+## 17. Weekly WhatsApp summary
+
+Every Sunday at **05:00 UTC** (≈ 08:00 Asia/Jerusalem local), a
+workflow sends each active employee a Hebrew WhatsApp summary with:
+
+- Their sales count + total amount for the past 7 days.
+- Month-to-date totals.
+- Progress against their target.
+- Pacing signal (on-track / behind / ahead).
+
+### Workflow
+
+File: [`.github/workflows/weekly-summary.yml`](../.github/workflows/weekly-summary.yml).
+
+- **Cron**: `0 5 * * 0`.
+- **Script**: `scripts/weekly-employee-summary.ts`.
+- **Dry-run gate**: controlled by the `WEEKLY_SUMMARY_DRY_RUN` GitHub
+  **Variable** (not secret). Default `true` so a fresh workflow won't
+  mass-send by accident; set to `false` in production.
+- **Skip rules**: employees with zero weekly **and** zero MTD activity
+  are skipped (no empty summaries). Employees without a stored phone
+  number are skipped.
+
+### Failure alert
+
+Mirrors the commission-sync pattern — failed runs open or comment on a
+`[weekly-summary]` issue labelled `alert` + `weekly-summary`.
+
+---
+
+## 18. Activity log
+
+Every commission-adjacent event is mirrored into `employee_activity_log`
+so each employee has a single timeline to scroll. Surfaced in
+`/sales-pwa/activity`.
+
+### Event types
+
+| `event_type` | Triggered by |
+|---|---|
+| `sale_registered` | `registerSaleCommission` (any source) |
+| `sale_cancelled` | `cancelCommissionsByDoc` / `cancelCommissionsByDeal` |
+| `sanction_added` / `sanction_removed` | Admin sanction CRUD |
+| `target_set` / `target_updated` | Admin target CRUD |
+| `correction_submitted` / `correction_resolved` | Correction request lifecycle |
+| `milestone_reached` | Device milestone crossing (attributed to the row that crossed the threshold) |
+
+### Write path
+
+`logEmployeeActivity` in `lib/employee/activity-log.ts`. The helper is
+**non-throwing** — an activity-log failure never takes down the
+commission write that triggered it. The log is additive (rows are
+immutable; "cancellation" is a new row, not a mutation of the original).
+
+RLS: employees only see their own rows. Admin endpoints (service role)
+can read any row for the manager-facing dashboards.
+
+---
+
+## 19. Related docs
 
 - `docs/PWA.md` — how field agents produce `sales_docs` that flow into this
   system.
@@ -685,32 +819,20 @@ flowchart LR
   creates pipeline leads that may eventually become won deals).
 - `docs/private/COMMISSION_RATES.md` — **the actual numbers** (rates,
   thresholds, bonuses, sanction amounts). Restricted.
-- `docs/private/COMMISSIONS_RUNBOOK.md` — lock/unlock procedure,
-  manual-correction steps, payroll snapshot flow.
+- `docs/private/RUNBOOK.md` — lock/unlock procedure, manual-correction
+  steps, payroll snapshot flow.
 
 ---
 
-## 17. Employee portal (2026-04-18)
+## 20. Employee portal (2026-04-18)
 
-The commission portal was merged into the unified `/sales-pwa` PWA
-(see `docs/PWA.md` §15). Three self-service surfaces were added:
+The former standalone `/employee/commissions` screen has been merged into
+the unified `/sales-pwa` PWA (see `docs/PWA.md`). The old route now
+serves a 308 redirect to `/sales-pwa/commissions` so bookmarks and email
+links keep working.
 
-- **Correction requests** — if an employee believes a commission is
-  wrong, they submit a typed dispute (`amount_error`, `wrong_type`,
-  `wrong_date`, `wrong_customer`, `missing_sale`, `other`). Admin
-  responds via `PUT /api/admin/corrections/[id]` with `approved`,
-  `rejected`, or `resolved` and a human-readable response. Every
-  resolution also fires a `correction_resolved` row into the employee's
-  activity log.
-- **Announcements** — broadcast messages (priority: `low` / `normal` /
-  `high` / `urgent`; target: `all` / `employees` / `admins`). Read
-  state is per-user via `admin_announcement_reads`; admin UI exposes
-  readCount / totalRecipients for each broadcast.
-- **Activity log** — rolling audit trail visible to the employee: every
-  sale_registered, sanction_added, target_set, month_locked,
-  correction_* and milestone_reached event ends up here. Write path is
-  `lib/employee/activity-log.ts` (non-throwing).
-
-All three tables ship with RLS — employees only see their own rows;
-service-role clients inside admin endpoints bypass the policies.
+The three self-service surfaces added alongside — correction requests
+(§16), announcements (`docs/ADMIN.md`), and activity log (§18) — all ship
+with RLS so employees only see their own rows; service-role clients
+inside admin endpoints bypass the policies.
 

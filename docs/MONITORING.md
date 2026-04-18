@@ -20,7 +20,7 @@
 
 ## Monitoring layers
 
-Six layers, each one answering a slightly different question. Shallow + fast on one end, deep + expensive on the other.
+Six outward-facing layers + two internal cron jobs that share the same alert plumbing. Shallow + fast on one end, deep + expensive on the other.
 
 | # | Layer | Cadence | Answers |
 |---|-------|---------|---------|
@@ -30,8 +30,10 @@ Six layers, each one answering a slightly different question. Shallow + fast on 
 | 4 | Synthetic user journeys | every 30 min | "Can a simulated customer actually use the store?" |
 | 5 | Real User Monitoring | continuous | "How are real browsers experiencing the site?" (see [`RUM-SETUP.md`](./RUM-SETUP.md)) |
 | 6 | Lighthouse CI | on PR + nightly | "Did this change break the performance budget?" |
+| 7 | **Commission sync cron** | every 60 min at :30 | "Did every order make it into a commission row?" |
+| 8 | **Weekly WhatsApp summary cron** | Sun 05:00 UTC | "Did each employee receive their weekly recap?" |
 
-They stack — a single regression often shows up in two or more. Monitor catches a 500, synthetic confirms the flow broke, RUM quantifies the blast radius.
+They stack — a single regression often shows up in two or more. Monitor catches a 500, synthetic confirms the flow broke, RUM quantifies the blast radius. Background crons (7 + 8) surface failures through the same alert dedup path so a broken sync is visible alongside a 500 spike.
 
 ---
 
@@ -218,7 +220,7 @@ A single failure escalates across three channels with different urgency:
 
 ### 1. GitHub Issues (primary)
 
-Every alert opens a GitHub issue labelled `alert:active` + `source:<monitor|smoke|synthetic|commission-sync>`. The issue body contains the failing workflow run URL, the specific check that failed, and a timestamp.
+Every alert opens a GitHub issue labelled `alert:active` + `source:<monitor|smoke|synthetic|commission-sync|weekly-summary>`. The issue body contains the failing workflow run URL, the specific check that failed, and a timestamp.
 
 - **Dedup key** — one open issue per `(source, title)` pair. A second failure within an active incident appends a comment, doesn't open a new issue.
 - **Auto-close** — the next green run of that same workflow closes the issue via `alert-dedup.js --recover`.
@@ -274,9 +276,12 @@ On --recover (next green run):
 - `RESEND_API_KEY`, `ALERT_EMAIL`, `RESEND_FROM` — email path
 - `GITHUB_SERVER_URL`, `GITHUB_RUN_ID` — embedded in the message
 
-### Commission sync has its own inline dedup
+### Background crons use the same dedup pattern
 
-`commission-sync.yml` reuses the same pattern but inlines it with `actions/github-script@v7` instead of calling `alert-dedup.js` — the logic is duplicated but the behaviour matches.
+Two scheduled jobs reuse this exact alert-dedup contract. Both open one `alert:active` GitHub Issue per failure, suppress notifications under the 2-hour cooldown, and auto-close on the next green run.
+
+- **`commission-sync.yml`** — hourly order → commission registration. Inlined via `actions/github-script@v7` (the logic is duplicated rather than imported, but the behaviour matches `alert-dedup.js`). A failure here is important because silently missing commission rows means employees get paid wrong.
+- **`weekly-summary.yml`** — Sunday 05:00 UTC WhatsApp summary. Also uses the inline `github-script@v7` pattern. Gated by the `WEEKLY_SUMMARY_DRY_RUN` GitHub Variable so a staging run can't accidentally message employees — a failure in dry-run mode still files the same alert issue so we know the job broke before the next real Sunday.
 
 ---
 
@@ -305,5 +310,9 @@ This monitoring document answers **how we detect**. The incident response doc an
 | Smoke workflow | `.github/workflows/smoke.yml` |
 | Synthetic workflow | `.github/workflows/synthetic.yml` |
 | Status workflow | `.github/workflows/publish-status.yml` |
+| Commission sync workflow | `.github/workflows/commission-sync.yml` |
+| Commission sync script | `scripts/sync-commissions.ts` |
+| Weekly summary workflow | `.github/workflows/weekly-summary.yml` |
+| Weekly summary script | `scripts/weekly-employee-summary.ts` |
 | RUM integration notes | `docs/RUM-SETUP.md` |
 | Incident playbook | `docs/INCIDENT-RESPONSE.md` |

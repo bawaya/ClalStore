@@ -1,12 +1,17 @@
 # Sales PWA
 
-Public reference for the ClalMobile Sales PWA — the mobile-first web app
-field sales agents use to document in-person sales, capture signed
-contract photos, and flow the sale through to the commission ledger.
+Public reference for the **unified ClalMobile Sales PWA** — the one app
+every non-admin employee uses. As of 2026-04-18, the legacy standalone
+`/employee/commissions` screen is gone (it 308-redirects here) and
+`/sales-pwa` now hosts everything a field agent, CRM agent, or any other
+non-admin employee needs: sales documentation, live commission view,
+calculator, correction requests, activity timeline, and broadcast
+announcements.
 
 Route: `/sales-pwa`.
 Source: [`app/sales-pwa/`](../app/sales-pwa/),
 [`app/api/pwa/`](../app/api/pwa/),
+[`app/api/employee/`](../app/api/employee/),
 [`lib/pwa/`](../lib/pwa/).
 
 ---
@@ -14,29 +19,104 @@ Source: [`app/sales-pwa/`](../app/sales-pwa/),
 ## 1. Overview
 
 The Sales PWA is a progressive web app (installable to the home screen,
-mobile-first UI, service worker for static caching) that lets a field
-agent:
+mobile-first UI, service worker for offline support) that is **one app
+for everything a non-admin employee does**:
 
-1. Create a **draft sales doc** with customer + sale metadata.
-2. Optionally **create a new customer** on the spot (phone lookup first).
-3. Upload **required attachments** (photos of the contract, signed form,
-   invoice, device serial) directly to Supabase Storage.
-4. **Submit** the doc, which atomically flips its status and registers
-   the commission.
+- **Document sales** — create, attach, submit. Submission registers the
+  commission immediately.
+- **View commissions** — daily dashboard, month detail, 12-month chart,
+  PDF export.
+- **Preview commissions** — what-if calculator that doesn't touch the
+  ledger.
+- **Dispute commissions** — typed correction requests.
+- **Audit history** — personal activity timeline.
+- **Receive announcements** — priority-coloured broadcast messages.
 
 It's a thin client over the same Supabase backend the rest of the app
-uses — no separate identity, no separate DB. The PWA-specific additions
-are:
+uses — no separate identity, no separate DB. PWA-specific additions:
 
-- A service worker scoped to `/sales-pwa/` for static-asset caching.
+- A service worker scoped to `/sales-pwa/` for offline shell caching +
+  API-GET network-first caching + a POST replay queue (see §10).
 - A manifest so it installs cleanly to the home screen.
-- A set of API routes under `/api/pwa/*` with tight employee-scoped auth.
+- `/api/pwa/*` for sales documentation + customer creation.
+- `/api/employee/*` for commissions, corrections, activity, and
+  announcements.
 
 ### Who uses it
 
-Field agents who close sales in person (stands, events, door-to-door)
-and need a phone-friendly way to record the sale and its supporting
-documents before leaving the customer.
+Every non-admin employee — field agents closing in person, CRM agents
+tracking their deals, and any employee who needs to see their own
+commission picture. Mobile-first, but fully usable on desktop (with a
+left sidebar at ≥ 768 px; bottom tab nav below that).
+
+---
+
+## 1a. Page map
+
+| Route | Purpose |
+|---|---|
+| `/sales-pwa` | Daily dashboard — today's sales, month target progress, recent sales, unread announcements peek, last activities. |
+| `/sales-pwa/new` | Create a new sale (draft → attachments → submit). |
+| `/sales-pwa/docs/[id]` | Sale detail — items, attachments, events, status. |
+| `/sales-pwa/commissions` | Month picker + detailed breakdown + milestones + 12-month chart + PDF export. |
+| `/sales-pwa/calculator` | Live commission calculator (what-if, no ledger writes). |
+| `/sales-pwa/corrections` | Submit + track correction requests. |
+| `/sales-pwa/activity` | Infinite-scroll personal timeline. |
+| `/sales-pwa/announcements` | Broadcast messages from admin, with per-user read state. |
+
+### Navigation
+
+- **Mobile (< 768 px)** — bottom tab bar with 5 icons (home · new sale ·
+  commissions · calculator · activity). Secondary items (corrections,
+  announcements, docs) live in a slide-out drawer behind a menu icon.
+- **Desktop (≥ 768 px)** — left sidebar (reversed for RTL, so it renders
+  on the right) with the full nav list.
+- **Unread bell badge** — the announcements icon shows a red dot + count
+  fed by `/api/employee/announcements` (returns `unreadCount`).
+- **Employee identity** — the shell calls `GET /api/employee/me` on mount
+  and renders `{ name | fallback to email }` in the header.
+  Response shape: `{ id, name, email, role, phone, avatarUrl }`.
+
+### Legacy redirect
+
+`/employee/commissions` is a server-side **308** redirect to
+`/sales-pwa/commissions`. Old emails, push notifications, and bookmarks
+keep working unchanged. Middleware doesn't gate `/employee/*` — the
+redirect short-circuits before any auth wall.
+
+Source: [`components/pwa/SalesPwaShell.tsx`](../components/pwa/SalesPwaShell.tsx),
+[`app/api/employee/me/route.ts`](../app/api/employee/me/route.ts),
+[`app/api/employee/announcements/route.ts`](../app/api/employee/announcements/route.ts).
+
+---
+
+## 1b. Daily dashboard
+
+`/sales-pwa` is the home screen. It renders:
+
+- **Today's KPIs** — sales count + total amount + commission for the
+  current Asia/Jerusalem day.
+- **Month target progress** — percentage of target reached, coloured by
+  pacing:
+  - **green** — on-track or ahead.
+  - **yellow** — behind but still recoverable.
+  - **red** — significantly behind, needs attention.
+
+  Pacing is computed from working days (Sun–Thu, excluding Fri/Sat) and
+  the required-per-day-remaining number is shown next to the target bar.
+- **Milestones hit this month** — a trophy row counting how many
+  contract-wide milestones have been crossed and the bonus earned
+  attributed to this employee. See `docs/COMMISSIONS.md` §3 for the
+  contract-wide milestone model.
+- **Last 5 sales** — most recent rows with a source badge (Pipeline /
+  PWA / Manual / auto_sync).
+- **Unread announcements peek** — a small card with the 1–2 most recent
+  unread announcements and a link to the full list.
+- **Last 3 activities** — a condensed activity timeline card.
+
+Data comes from `GET /api/employee/dashboard` (server-computed, single
+round-trip). Chart data on the commissions page uses
+`GET /api/employee/chart`.
 
 ---
 
@@ -422,44 +502,244 @@ duplicate docs.
 
 ---
 
-## 10. Offline
+## 10. Offline support
 
-**Current state: read-only offline via service worker; writes require
-network.**
+As of 2026-04-18, the PWA has **real offline support** for reads and
+writes. The service worker at `public/sales-pwa/sw.js` owns the
+caching + queueing; `lib/pwa/offline-client.ts` and
+`stores/offline-store.ts` expose it to the UI.
 
-### What works offline
-
-The service worker at `public/sales-pwa/sw.js` caches:
-
-- `/sales-pwa` (list page shell)
-- `/sales-pwa/new` (create form shell)
-- `/sales-pwa/manifest.json`
-
-Strategy:
+### Reads — network-first cache
 
 - **Navigation requests** — network-first, fall back to the cached
-  shell. Lets the agent open the PWA even without signal.
+  shell. Agent can open the PWA with zero signal.
 - **Static assets** — cache-first.
-- **API calls (`/api/*`)** — explicitly bypassed (`return` early in the
-  fetch handler).
+- **API GETs under `/api/employee/*` and `/api/pwa/sales*`** —
+  network-first; the successful response is stored and served as the
+  fallback on subsequent offline loads. Keeps the daily dashboard and
+  commissions page usable when signal drops.
 
-### What doesn't work offline (yet)
+### Writes — IndexedDB POST queue
 
-- `POST` requests — the service worker doesn't queue writes. A submit
-  made without network returns a fetch error; the agent sees the retry
-  UI.
-- Attachment uploads — the signed URL model requires network.
+All `POST` / `PUT` to `/api/pwa/*` (except the attachment endpoints —
+those need a synchronous response for the upload handshake) are wrapped
+by the service worker. When offline, the request body is serialised
+into IndexedDB and a placeholder 202 is returned so the UI keeps
+moving.
 
-### Future work
+Queue schema:
 
-Queued write support is a known follow-up. The `doc_uuid` +
-`idempotency_key` scheme is deliberately designed for it — once
-background-sync lands, queued POSTs can replay safely without creating
-duplicate rows.
+```
+db:       clalmobile-offline
+store:    post-queue
+keyPath:  id (auto-increment)
+record:   { url, method, body, headers, queuedAt }
+```
+
+Drain triggers:
+
+- `online` event — browser reports connectivity.
+- `sync` tag — Background Sync API if available.
+- `postMessage` from the page — e.g. when the user taps "retry now".
+
+Every drained request is replayed server-side and its response is
+`postMessage`d back to the page so the store can reconcile.
+
+### UI helpers
+
+- [`lib/pwa/offline-client.ts`](../lib/pwa/offline-client.ts) —
+  `isOnline()`, `getQueueSize()`, `syncQueue()`, `getQueuedRequests()`.
+- [`stores/offline-store.ts`](../stores/offline-store.ts) — Zustand
+  store with `online` flag, pending-docs list, and subscribers for the
+  top-level banner.
+- [`components/pwa/ConnectionBanner.tsx`](../components/pwa/ConnectionBanner.tsx)
+  — sticky yellow banner that appears when `!isOnline()` and shows the
+  queue size + "retry now" button.
+
+### Idempotency with the queue
+
+The `doc_uuid` + `idempotency_key` scheme (§9) is exactly what makes
+queued replay safe. A create replayed twice (flaky connection + manual
+retry) lands on the partial unique index and the second insert is a
+no-op.
 
 ---
 
-## 11. Row-level security (RLS)
+## 11. Commission details (`/sales-pwa/commissions`)
+
+Replaces the old `/employee/commissions` page.
+
+### Controls
+
+- **Month picker** — dropdown of the last 12 months; default = current
+  Asia/Jerusalem month. URL-synced.
+- **Export PDF** — download link (see §14).
+
+### Summary card
+
+Reads `GET /api/employee/commissions?month=YYYY-MM`. Shows:
+
+| Line | Meaning |
+|------|---------|
+| Lines commission | Sum of line-type commissions for the month |
+| Devices commission | Sum of device-type commissions (post-milestone) |
+| Loyalty bonus | Accrued loyalty payouts on mature lines |
+| Milestone bonus | Device milestone deltas attributed to this employee |
+| Sanctions | Total deductions |
+| **Net** | Final take-home |
+
+Amounts are real; rates are not. No rates from the contract ever leak
+to the employee UI — only the absolute shekel amount.
+
+### Sales table
+
+One row per `commission_sales` row. Click-to-expand reveals a
+calculation explanation string drawn from `rate_snapshot` at the time
+of the sale (so historical sales explain themselves via the rates that
+applied back then — see `docs/COMMISSIONS.md` §4).
+
+Columns: date, type, amount, source badge, customer, commission.
+
+### Milestones list
+
+Each threshold crossing is one row: threshold number, date it was hit,
+bonus earned.
+
+### Chart
+
+A 12-month **recharts** line chart plotting sales amount, commission
+earned, and target per month. Hover tooltip shows the exact month and
+values. Data from `GET /api/employee/chart`.
+
+---
+
+## 12. Calculator (`/sales-pwa/calculator`)
+
+What-if commission preview. **Does not write anything to the ledger.**
+
+- Sale type tab — `line` or `device`.
+- Amount input — debounced; every change fires
+  `POST /api/employee/calculator` with `{ saleType, amount }` and
+  re-renders the result card.
+- Result card — three numbers (`contractCommission`,
+  `employeeCommission`, `ownerProfit`) plus an `explanation` string
+  describing the calculation at a conceptual level.
+- **Offline fallback** — if the request fails or the user is offline, a
+  fully-client local calc runs using contract-default multipliers so
+  the card still shows a sensible preview. The card labels the source
+  (`local` vs `api`).
+- **"Register this sale" button** — jumps to `/sales-pwa/new` with the
+  type + amount pre-filled, so a salesperson can go from "what would
+  this pay?" to actually submitting the sale in one click.
+
+Source: [`app/sales-pwa/calculator/page.tsx`](../app/sales-pwa/calculator/page.tsx).
+
+---
+
+## 13. Corrections (`/sales-pwa/corrections`)
+
+Employee-filed dispute workflow. See `docs/COMMISSIONS.md` §16 for the
+data model and endpoints.
+
+- **List** — own requests, newest first, status pill (pending / approved
+  / rejected / resolved).
+- **New-request modal** — picks a request type (6 options: amount_error,
+  wrong_type, wrong_date, wrong_customer, missing_sale, other) and
+  optionally pins to a specific sale or doc.
+- **Detail** — shows the admin's response once resolved. A
+  `correction_resolved` activity row fires into `/sales-pwa/activity` at
+  the same time.
+
+Admin responds from `/admin/commissions/corrections` — see
+`docs/ADMIN.md`.
+
+---
+
+## 14. PDF export
+
+`/api/employee/commissions/pdf?month=YYYY-MM` returns a PDF of the
+month's commission breakdown.
+
+- **Headings** in English (compatible with every renderer).
+- **Arabic body** via the **Cairo** font shipped at
+  `/public/fonts/cairo-regular.ttf`.
+- **Font loading fallback chain**:
+  1. `fetch('/fonts/cairo-regular.ttf')` from the same origin — works
+     on Vercel and any static host.
+  2. Node `fs.readFile(...)` from the bundled filesystem — local dev
+     and edge cases.
+  3. If neither works — fall back to **Helvetica** with English-only
+     output (layout stays intact; Arabic rows show the transliterated
+     customer name or skip).
+
+The fallback chain is deliberately silent so a font-load failure never
+produces an empty PDF; it degrades to English.
+
+---
+
+## 15. Activity timeline (`/sales-pwa/activity`)
+
+Infinite-scroll timeline of the employee's activity log. One row per
+event; newest first.
+
+Each event has a type icon (via **lucide-react**):
+
+| `event_type` | Icon |
+|---|---|
+| `sale_registered` | `DollarSign` (emerald) |
+| `sale_cancelled` | `XCircle` (rose) |
+| `sanction_added` | `AlertTriangle` (amber) |
+| `target_set` / `target_updated` | `Target` (sky) |
+| `milestone_reached` | `Trophy` (amber) |
+| `correction_submitted` / `correction_resolved` | `FileEdit` / `CheckCircle2` (violet) |
+
+The emoji in product-design mocks (💰 ❌ ⚠️ 🎯 🏆 📝) maps onto these
+icons one-to-one.
+
+Loads 50 rows per page from `GET /api/employee/activity?limit=50&offset=N`
+via an `IntersectionObserver`-driven sentinel.
+
+See `docs/COMMISSIONS.md` §18 for the write path.
+
+---
+
+## 16. Announcements (`/sales-pwa/announcements`)
+
+Broadcast messages published by admin via `/admin/announcements`.
+
+- **Priority colouring** — urgent → rose, high → amber, normal → slate,
+  low → muted gray.
+- **Ordering** — unread first, then by newest.
+- **Read state** — expanding an unread announcement auto-POSTs
+  `/api/employee/announcements/[id]/read` so the unread badge drops
+  and the admin view shows the read count tick up.
+- **Expiry** — announcements past `expires_at` are greyed out /
+  hidden. Admin can set an indefinite expiry by leaving the field
+  empty.
+
+Data model: `admin_announcements` + `admin_announcement_reads`
+(per-user join table). See `docs/ADMIN.md` for the authoring side.
+
+---
+
+## 17. Customer creation (details)
+
+`POST /api/pwa/customers` — covered in §4 above. A quick reminder of
+the dedup rules:
+
+1. **Phone dedup** — `buildCustomerPhoneCandidates(input)` produces
+   `+9725XXXXXXXX`, `9725XXXXXXXX`, and `05XXXXXXXX` variants; the
+   query matches any of them.
+2. **National-id dedup** — if supplied and matches an existing row,
+   that customer is returned instead of inserting.
+3. **Insert** — `source: 'pwa'`, phone normalised (strips `-`/space,
+   keeps leading `+` if present).
+
+Returns `{ customer, existed: boolean }`.
+
+---
+
+## 18. Row-level security (RLS)
 
 Enabled on the whole `sales_docs` family in migration
 `20260418000003_commission_refactor.sql`:
@@ -500,7 +780,7 @@ permission checks today, but RLS is the defence-in-depth layer.
 
 ---
 
-## 12. Pipeline PWA integration
+## 19. Pipeline PWA integration
 
 Sales docs aren't only created by field agents. CRM staff working the
 **pipeline** also generate them — see `COMMISSIONS.md` §5.1. Those docs
@@ -521,7 +801,7 @@ the same `/admin/sales-docs` cancel flow.
 
 ---
 
-## 13. File & route reference
+## 20. File & route reference
 
 | Path | Role |
 |------|------|
@@ -547,7 +827,7 @@ the same `/admin/sales-docs` cancel flow.
 
 ---
 
-## 14. Related docs
+## 21. Related docs
 
 - `docs/COMMISSIONS.md` — what happens after submit.
 - `docs/BOT.md` — WhatsApp bot (separate channel; creates pipeline
@@ -555,34 +835,19 @@ the same `/admin/sales-docs` cancel flow.
 
 ---
 
-## 15. Unified Employee App (2026-04-18)
+## 22. Data model
 
-The former standalone `/employee/commissions` screen and the document-only
-`/sales-pwa` have been merged into a single installable PWA under
-`/sales-pwa`. One session, one layout, one navigation — no more separate
-tabs for sales docs vs. commission tracking.
+The unified PWA is backed by four additional tables (migration
+`20260418000006_unified_employee_pwa.sql`):
 
-### New routes (all under `/sales-pwa`)
+- `commission_correction_requests` — employee-filed disputes (see
+  `docs/COMMISSIONS.md` §16).
+- `admin_announcements` + `admin_announcement_reads` — broadcast
+  messages with per-user read state (see §16 above, and
+  `docs/ADMIN.md`).
+- `employee_activity_log` — personal audit timeline (see
+  `docs/COMMISSIONS.md` §18).
+- `employee_favorite_products` — quick-pick list for the new-sale form.
 
-| Route | Purpose |
-|---|---|
-| `/sales-pwa/commissions` | Daily dashboard: today, month-to-date, pacing, milestones. Replaces `/employee/commissions`. |
-| `/sales-pwa/calculator` | Preview a commission for a hypothetical sale (line or device) without touching the ledger. |
-| `/sales-pwa/corrections` | Employee dispute workflow — submit a correction request, track status. |
-| `/sales-pwa/activity` | Personal audit timeline (sales registered, sanctions, target changes, corrections). |
-| `/sales-pwa/announcements` | Broadcast messages from admin, with per-user read state. |
-
-### Legacy compatibility
-
-`/employee/commissions` is now a server-side 308 redirect to
-`/sales-pwa/commissions`. Old emails, push links, and bookmarks keep
-working unchanged. Middleware does not gate `/employee/*` — the redirect
-short-circuits before any auth wall.
-
-### Data model
-
-Migration `20260418000006_unified_employee_pwa.sql` introduced four
-tables: `commission_correction_requests`, `admin_announcements` +
-`admin_announcement_reads`, `employee_activity_log`, and
-`employee_favorite_products`. RLS restricts reads/writes to the owning
-employee; service role bypasses for admin endpoints.
+All four ship with RLS — employees only read/write their own rows;
+admin endpoints using `service_role` bypass the policies.

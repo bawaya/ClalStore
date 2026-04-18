@@ -115,7 +115,16 @@ The adapter reads `.next/` and emits:
 npx wrangler deploy       # publishes to Cloudflare
 ```
 
-Uploads `worker.js` + assets, wires up R2 bindings from `wrangler.json`, and flips the route at `clalmobile.com` to the new deployment. Deploy takes under a minute.
+Uploads `worker.js` + assets (including `public/fonts/cairo-regular.ttf`, a 92 KB Cairo Regular build with the Arabic + Latin subsets used for bilingual PDF export — see [`I18N.md` → PDF export](./I18N.md#pdf-export--bilingual-handling)), wires up R2 bindings from `wrangler.json`, and flips the route at `clalmobile.com` to the new deployment. Deploy takes under a minute.
+
+**Gotcha — wrangler 4.78 autoconfig loop:** `wrangler deploy` on 4.78.x detects the OpenNext output and tries to "helpfully" call `opennextjs-cloudflare deploy` internally, which then errors because it re-enters its own configuration path. Workaround:
+
+```bash
+# Don't:   npx wrangler deploy       # 4.78 autoconfig error
+# Do:      npx opennextjs-cloudflare deploy
+```
+
+or better, upgrade to wrangler **4.83+** where the autoconfig path was fixed. The `deploy:cf` npm script already calls the OpenNext deploy path directly to sidestep this.
 
 ### Full combo
 
@@ -345,9 +354,20 @@ Playwright snapshots against 120 views (20 pages × 3 viewports × 2 languages).
 
 **Trigger:** cron `30 * * * *` (hourly at :30, deliberately off-the-hour to avoid DST thrash), manual.
 
-Runs `scripts/sync-commissions.ts` via `tsx`. Pulls orders from the last sync cursor, awards commissions to the right employees using the unified `registerSaleCommission` path. On failure, reuses the alert-dedup pattern directly via `github-script@v7`.
+Runs `scripts/sync-commissions.ts` via `tsx`. Pulls orders from a **48-hour sliding window** (wider than a single cadence on purpose, so a late-arriving order or a hiccupped previous run doesn't leave commissions behind) and awards them to the right employees using the unified `registerSaleCommission` path. Orders with `excluded_from_sync = true` are skipped. On failure, reuses the alert-dedup pattern directly via `github-script@v7` — it opens one `alert:active` GitHub Issue per `(source, title)` and reopens/comments instead of spamming. See [`MONITORING.md` — Alert dedup](./MONITORING.md#alert-dedup-and-auto-recovery).
 
 `concurrency: commission-sync` — no overlapping runs.
+
+### `weekly-summary.yml` — Sunday WhatsApp summary
+
+**Trigger:** cron `0 5 * * 0` (Sun 05:00 UTC = 08:00 Asia/Jerusalem — first thing Sunday morning in the local work-week), manual.
+
+Runs `scripts/weekly-employee-summary.ts`. Generates a per-employee recap of the previous week (lines sold, devices sold, commissions accrued, month-to-date pace) and dispatches it over WhatsApp via the Integration Hub. Gated by the GitHub Actions **Repository Variable** `WEEKLY_SUMMARY_DRY_RUN`:
+
+- `WEEKLY_SUMMARY_DRY_RUN=true` — build the summaries, log them, **do not send** (safe-mode rehearsal used during initial rollout)
+- `WEEKLY_SUMMARY_DRY_RUN=false` — send for real. Currently **`false`** in production.
+
+Variable (not a secret) because it's a boolean toggle with no sensitive value. Flip it in GitHub → Settings → Variables → Actions. Failures use the same alert-dedup pattern as `commission-sync.yml`.
 
 ### `scheduled-reports.yml` — Monthly reports scheduler
 
