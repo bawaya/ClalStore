@@ -127,7 +127,8 @@
       "Bash(npx opennextjs-cloudflare *)",
       "Bash(ls -la C:\\\\\\\\CLALSTORE\\\\\\\\clalmobile/)",
       "Bash(echo \"--- exit: $? ---\")",
-      "Bash(node -e \"const {timingSafeEqual} = require\\('crypto'\\); const a = Buffer.from\\(''\\); const b = Buffer.from\\(''\\); console.log\\('len', a.length, 'equal', timingSafeEqual\\(a,b\\)\\);\")"
+      "Bash(node -e \"const {timingSafeEqual} = require\\('crypto'\\); const a = Buffer.from\\(''\\); const b = Buffer.from\\(''\\); console.log\\('len', a.length, 'equal', timingSafeEqual\\(a,b\\)\\);\")",
+      "Bash(curl -sS \"https://www.clalmobile.com/sw.js\")"
     ]
   }
 }
