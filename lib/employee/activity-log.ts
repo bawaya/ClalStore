@@ -22,7 +22,10 @@ export type ActivityEventType =
   | "correction_submitted"
   | "correction_resolved"
   | "profile_updated"
-  | "milestone_reached";
+  | "milestone_reached"
+  | "sales_request_approved"
+  | "sales_request_rejected"
+  | "sales_request_info_requested";
 
 export interface LogActivityInput {
   employeeId: string;

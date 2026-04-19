@@ -208,9 +208,12 @@ describe("SalesPwaShell", () => {
     // — but the hrefs appear there plus the (desktop) sidebar plus the drawer,
     // so verify the full bottom-nav set exists by querying <a href="..."> for
     // each expected path.
+    // Bottom-nav composition:
+    //   Home, New sale, Requests (طلبات), (moved to sidebar: Commissions)…
     const expected = [
       "/sales-pwa",
       "/sales-pwa/new",
+      "/sales-pwa/requests",
       "/sales-pwa/commissions",
       "/sales-pwa/calculator",
       "/sales-pwa/activity",
@@ -251,7 +254,9 @@ describe("SalesPwaShell", () => {
         <div>x</div>
       </SalesPwaShell>,
     );
-    // In the sidebar, the active Commissions link should carry the emerald bg class
+    // Commissions is a sidebar-only item now (replaced by "طلبات" in the
+    // bottom nav). The sidebar link carries the emerald bg class when
+    // active.
     const commissionsLinks = Array.from(
       document.querySelectorAll('a[href="/sales-pwa/commissions"]'),
     ) as HTMLAnchorElement[];
@@ -259,9 +264,19 @@ describe("SalesPwaShell", () => {
       (a.className || "").includes("bg-emerald-500/15"),
     );
     expect(hasActive).toBe(true);
+  });
 
-    // The bottom nav variant uses text-emerald-400 + aria-current=page
-    const activeByAria = commissionsLinks.find(
+  it("highlights the active bottom-nav item for /sales-pwa/requests (aria-current)", () => {
+    mockPathname = "/sales-pwa/requests";
+    render(
+      <SalesPwaShell>
+        <div>x</div>
+      </SalesPwaShell>,
+    );
+    const requestsLinks = Array.from(
+      document.querySelectorAll('a[href="/sales-pwa/requests"]'),
+    ) as HTMLAnchorElement[];
+    const activeByAria = requestsLinks.find(
       (a) => a.getAttribute("aria-current") === "page",
     );
     expect(activeByAria).toBeTruthy();

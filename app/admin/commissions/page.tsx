@@ -159,6 +159,29 @@ export default function CommissionsDashboard() {
   const [locking, setLocking] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<string>(() => parsedSearchParams.get("employee_key") || "");
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+
+  // Pull count of pending sales-requests so the admin sees at a glance
+  // how many need review. Refreshed alongside dashboard refreshes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/sales-requests?count=pending", {
+          credentials: "same-origin",
+        });
+        if (!res.ok) return;
+        const json = await res.json().catch(() => ({}));
+        const c = ((json.data ?? json) as { count?: number }).count || 0;
+        if (!cancelled) setPendingRequestsCount(c);
+      } catch {
+        // silent — non-critical
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load employees from commission_employees table (standalone) + profiles (user-linked)
   useEffect(() => {
@@ -391,6 +414,17 @@ export default function CommissionsDashboard() {
       {/* Sub-navigation */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
         <Link href="/admin/commissions" className="chip chip-active">לוח בקרה</Link>
+        <Link href="/admin/commissions/requests" className="chip relative">
+          📥 طلبات المبيعات
+          {pendingRequestsCount > 0 && (
+            <span
+              className="absolute -top-1.5 -left-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[9px] font-black text-white"
+              aria-label={`${pendingRequestsCount} طلب بانتظار المراجعة`}
+            >
+              {pendingRequestsCount > 99 ? "99+" : pendingRequestsCount}
+            </span>
+          )}
+        </Link>
         <Link href="/admin/commissions/calculator" className="chip">מחשבון</Link>
         <Link href="/admin/commissions/sanctions" className="chip">סנקציות</Link>
         <Link href={historyHref} className="chip">היסטוריה</Link>

@@ -15,6 +15,7 @@ import {
   FileText,
   Menu,
   X,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,9 +30,10 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: "/sales-pwa", label: "الرئيسية", labelHe: "בית", icon: Home, showInBottomNav: true },
   { href: "/sales-pwa/new", label: "بيعة جديدة", labelHe: "חדש", icon: Plus, showInBottomNav: true },
-  { href: "/sales-pwa/commissions", label: "العمولات", labelHe: "עמלות", icon: BarChart3, showInBottomNav: true },
-  { href: "/sales-pwa/calculator", label: "حاسبة", labelHe: "מחשבון", icon: Calculator, showInBottomNav: true },
-  { href: "/sales-pwa/activity", label: "النشاط", labelHe: "פעילות", icon: ActivitySquare, showInBottomNav: true },
+  { href: "/sales-pwa/requests", label: "طلبات", labelHe: "בקשות", icon: ClipboardList, showInBottomNav: true },
+  { href: "/sales-pwa/commissions", label: "العمولات", labelHe: "עמלות", icon: BarChart3 },
+  { href: "/sales-pwa/calculator", label: "حاسبة", labelHe: "מחשבון", icon: Calculator },
+  { href: "/sales-pwa/activity", label: "النشاط", labelHe: "פעילות", icon: ActivitySquare },
   { href: "/sales-pwa/corrections", label: "طلبات التصحيح", labelHe: "תיקונים", icon: FileEdit },
   { href: "/sales-pwa/announcements", label: "الإعلانات", labelHe: "הודעות", icon: Bell },
   { href: "/sales-pwa/docs", label: "الوثائق", labelHe: "מסמכים", icon: FileText },
