@@ -10,9 +10,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireEmployee } from "@/lib/pwa/auth";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, safeError } from "@/lib/api-response";
-import { getCommissionTarget, lastDayOfMonth } from "@/lib/commissions/ledger";
+import {
+  COMMISSION_CONTRACT_TARGET_KEY,
+  getCommissionTarget,
+  lastDayOfMonth,
+} from "@/lib/commissions/ledger";
 import { COMMISSION, calcDeviceCommission } from "@/lib/commissions/calculator";
 import { countWorkingDays } from "@/lib/commissions/date-utils";
+
+const ADMIN_PWA_ROLES = new Set(["admin", "super_admin", "owner"]);
 
 type RateSnapshot = {
   line_multiplier?: number;
@@ -53,27 +59,37 @@ export async function GET(req: NextRequest) {
     const monthStart = `${month}-01`;
     const monthEnd = lastDayOfMonth(month);
 
+    const isAdminScope = ADMIN_PWA_ROLES.has(authed.role);
+    const scope: "admin" | "employee" = isAdminScope ? "admin" : "employee";
+    const targetKeys = isAdminScope
+      ? [COMMISSION_CONTRACT_TARGET_KEY, authed.appUserId]
+      : [authed.appUserId, COMMISSION_CONTRACT_TARGET_KEY];
+
+    let salesQuery = db
+      .from("commission_sales")
+      .select(
+        "id, sale_date, sale_type, customer_name, customer_phone, device_name, package_price, device_sale_amount, commission_amount, contract_commission, source, source_sales_doc_id, source_pipeline_deal_id, rate_snapshot",
+      )
+      .is("deleted_at", null)
+      .gte("sale_date", monthStart)
+      .lte("sale_date", monthEnd)
+      .order("sale_date", { ascending: false })
+      .limit(2000);
+    if (!isAdminScope) salesQuery = salesQuery.eq("employee_id", authed.appUserId);
+
+    let sanctionsQuery = db
+      .from("commission_sanctions")
+      .select("id, sanction_date, sanction_type, amount, description, has_sale_offset")
+      .is("deleted_at", null)
+      .gte("sanction_date", monthStart)
+      .lte("sanction_date", monthEnd)
+      .order("sanction_date", { ascending: false });
+    if (!isAdminScope) sanctionsQuery = sanctionsQuery.eq("user_id", authed.appUserId);
+
     const [salesRes, sanctionsRes, target] = await Promise.all([
-      db
-        .from("commission_sales")
-        .select(
-          "id, sale_date, sale_type, customer_name, customer_phone, device_name, package_price, device_sale_amount, commission_amount, contract_commission, source, source_sales_doc_id, source_pipeline_deal_id, rate_snapshot",
-        )
-        .eq("employee_id", authed.appUserId)
-        .is("deleted_at", null)
-        .gte("sale_date", monthStart)
-        .lte("sale_date", monthEnd)
-        .order("sale_date", { ascending: false })
-        .limit(2000),
-      db
-        .from("commission_sanctions")
-        .select("id, sanction_date, sanction_type, amount, description, has_sale_offset")
-        .eq("user_id", authed.appUserId)
-        .is("deleted_at", null)
-        .gte("sanction_date", monthStart)
-        .lte("sanction_date", monthEnd)
-        .order("sanction_date", { ascending: false }),
-      getCommissionTarget(db, month, [authed.appUserId]),
+      salesQuery,
+      sanctionsQuery,
+      getCommissionTarget(db, month, targetKeys),
     ]);
 
     if (salesRes.error) return safeError(salesRes.error, "details/sales");
@@ -230,6 +246,7 @@ export async function GET(req: NextRequest) {
 
     return apiSuccess({
       month,
+      scope,
       sales,
       sanctions: sanctionsRes.data || [],
       milestones,

@@ -14,6 +14,7 @@ import {
 import { formatCurrency, timeAgo } from "@/lib/utils";
 
 type DashboardData = {
+  scope?: "admin" | "employee";
   today: { date: string; salesCount: number; totalAmount: number; commission: number };
   month: {
     month: string;
@@ -223,6 +224,11 @@ export default function SalesPwaDashboardPage() {
           <div className="flex items-center gap-2">
             <Target className="h-4 w-4 text-sky-300" aria-hidden />
             <div className="text-sm font-bold">الهدف الشهري · יעד חודשי</div>
+            {data.scope === "admin" && (
+              <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-200">
+                عرض العقد (كل الموظفين)
+              </span>
+            )}
           </div>
           <div className={`text-sm font-black ${pacing.text}`}>{pct}%</div>
         </div>
@@ -254,42 +260,56 @@ export default function SalesPwaDashboardPage() {
 
         {/* Gap highlight — SALES remaining + SALES required per day (matches
             the admin page's two-card box exactly). */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className={`rounded-xl border p-3 ${
-            data.month.pacingColor === "green"
+        {(() => {
+          // Distinguish three states:
+          //  1. no target set        → show "لم يُحدد هدف" (neutral)
+          //  2. target set & reached → show "✅ تم"
+          //  3. target set & remaining → show the amount/daily required
+          const hasTarget =
+            (data.month.targetSalesAmount ?? 0) > 0 ||
+            (data.month.targetCommissionAmount ?? data.month.target ?? 0) > 0;
+          const targetReached = hasTarget && data.month.remainingAmount <= 0;
+          const borderClass = !hasTarget
+            ? "border-white/10 bg-white/5"
+            : data.month.pacingColor === "green"
               ? "border-emerald-500/30 bg-emerald-500/10"
               : data.month.pacingColor === "yellow"
                 ? "border-amber-500/30 bg-amber-500/10"
-                : "border-rose-500/30 bg-rose-500/10"
-          }`}>
-            <div className="text-[10px] font-semibold text-slate-200">💸 المتبقي (كل الشهر)</div>
-            <div className={`mt-1 text-lg font-black ${pacing.text}`}>
-              {data.month.remainingAmount <= 0
-                ? "✅ تم"
-                : formatCurrency(data.month.remainingAmount)}
+                : "border-rose-500/30 bg-rose-500/10";
+          const valueClass = !hasTarget ? "text-slate-300" : pacing.text;
+          return (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className={`rounded-xl border p-3 ${borderClass}`}>
+                <div className="text-[10px] font-semibold text-slate-200">💸 المتبقي (كل الشهر)</div>
+                <div className={`mt-1 text-lg font-black ${valueClass}`}>
+                  {!hasTarget
+                    ? "—"
+                    : targetReached
+                      ? "✅ تم"
+                      : formatCurrency(data.month.remainingAmount)}
+                </div>
+                <div className="mt-0.5 text-[10px] text-slate-300">
+                  {!hasTarget
+                    ? "لم يُحدد هدف لهذا الشهر"
+                    : (data.month.targetSalesAmount ?? 0) > 0
+                      ? "مبيعات متبقية"
+                      : "عمولات متبقية"}
+                </div>
+              </div>
+              <div className={`rounded-xl border p-3 ${borderClass}`}>
+                <div className="text-[10px] font-semibold text-slate-200">📈 مطلوب يومياً</div>
+                <div className={`mt-1 text-lg font-black ${valueClass}`}>
+                  {!hasTarget || targetReached
+                    ? "—"
+                    : formatCurrency(data.month.dailyRequired)}
+                </div>
+                <div className="mt-0.5 text-[10px] text-slate-300">
+                  لـ{data.month.workingDaysLeft} أيام عمل
+                </div>
+              </div>
             </div>
-            <div className="mt-0.5 text-[10px] text-slate-300">
-              {data.month.targetSalesAmount > 0 ? "مبيعات متبقية" : "عمولات متبقية"}
-            </div>
-          </div>
-          <div className={`rounded-xl border p-3 ${
-            data.month.pacingColor === "green"
-              ? "border-emerald-500/30 bg-emerald-500/10"
-              : data.month.pacingColor === "yellow"
-                ? "border-amber-500/30 bg-amber-500/10"
-                : "border-rose-500/30 bg-rose-500/10"
-          }`}>
-            <div className="text-[10px] font-semibold text-slate-200">📈 مطلوب يومياً</div>
-            <div className={`mt-1 text-lg font-black ${pacing.text}`}>
-              {data.month.remainingAmount <= 0
-                ? "—"
-                : formatCurrency(data.month.dailyRequired)}
-            </div>
-            <div className="mt-0.5 text-[10px] text-slate-300">
-              لـ{data.month.workingDaysLeft} أيام عمل
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Secondary info row */}
         <div className="mt-3 grid grid-cols-2 gap-3 border-t border-white/5 pt-3">

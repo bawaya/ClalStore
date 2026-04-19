@@ -15,8 +15,17 @@ import {
   calcDeviceCommission,
   COMMISSION,
 } from "@/lib/commissions/calculator";
-import { getCommissionTarget, lastDayOfMonth } from "@/lib/commissions/ledger";
+import {
+  COMMISSION_CONTRACT_TARGET_KEY,
+  getCommissionTarget,
+  lastDayOfMonth,
+} from "@/lib/commissions/ledger";
 import { countWorkingDays } from "@/lib/commissions/date-utils";
+
+// Admin-level roles on the PWA see the contract-wide picture (same scope
+// as the /admin/commissions page with no employee filter). Regular
+// sales / viewer / support users see only their own sales.
+const ADMIN_PWA_ROLES = new Set(["admin", "super_admin", "owner"]);
 
 export async function GET(req: NextRequest) {
   try {
@@ -38,30 +47,53 @@ export async function GET(req: NextRequest) {
     const monthEnd = lastDayOfMonth(monthStr);
 
     const appUserId = authed.appUserId;
+    const isAdminScope = ADMIN_PWA_ROLES.has(authed.role);
+    // Admin/super_admin users see contract-wide data on the PWA (match
+    // the admin screen's unfiltered view). Non-admin employees see only
+    // their own sales.
+    const scope: "admin" | "employee" = isAdminScope ? "admin" : "employee";
+    const targetKeys = isAdminScope
+      ? [COMMISSION_CONTRACT_TARGET_KEY, appUserId]
+      : [appUserId, COMMISSION_CONTRACT_TARGET_KEY];
+
+    // Helper to conditionally apply the employee filter to a query.
+    // `any` is necessary because Supabase's query builder type narrows
+    // after each call and we don't want to enumerate all possible types.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scopeToEmployee = <T extends { eq: (col: string, val: string) => any }>(
+      q: T,
+      col: string,
+    ): T => (isAdminScope ? q : (q.eq(col, appUserId) as T));
 
     const [todayRes, monthRes, sanctionsRes, target] = await Promise.all([
-      db
-        .from("commission_sales")
-        .select("id, commission_amount, package_price, device_sale_amount, sale_type")
-        .eq("employee_id", appUserId)
-        .is("deleted_at", null)
-        .eq("sale_date", todayISO),
-      db
-        .from("commission_sales")
-        .select("id, commission_amount, package_price, device_sale_amount, sale_type, loyalty_start_date, loyalty_status, source, sale_date")
-        .eq("employee_id", appUserId)
-        .is("deleted_at", null)
-        .gte("sale_date", monthStart)
-        .lte("sale_date", monthEnd)
-        .order("sale_date", { ascending: false }),
-      db
-        .from("commission_sanctions")
-        .select("amount")
-        .eq("user_id", appUserId)
-        .is("deleted_at", null)
-        .gte("sanction_date", monthStart)
-        .lte("sanction_date", monthEnd),
-      getCommissionTarget(db, monthStr, [appUserId]),
+      scopeToEmployee(
+        db
+          .from("commission_sales")
+          .select("id, commission_amount, package_price, device_sale_amount, sale_type")
+          .is("deleted_at", null)
+          .eq("sale_date", todayISO),
+        "employee_id",
+      ),
+      scopeToEmployee(
+        db
+          .from("commission_sales")
+          .select("id, commission_amount, package_price, device_sale_amount, sale_type, loyalty_start_date, loyalty_status, source, sale_date")
+          .is("deleted_at", null)
+          .gte("sale_date", monthStart)
+          .lte("sale_date", monthEnd)
+          .order("sale_date", { ascending: false }),
+        "employee_id",
+      ),
+      scopeToEmployee(
+        db
+          .from("commission_sanctions")
+          .select("amount")
+          .is("deleted_at", null)
+          .gte("sanction_date", monthStart)
+          .lte("sanction_date", monthEnd),
+        "user_id",
+      ),
+      getCommissionTarget(db, monthStr, targetKeys),
     ]);
 
     if (todayRes.error) return safeError(todayRes.error, "dashboard/today");
@@ -210,6 +242,7 @@ export async function GET(req: NextRequest) {
     const bonusEarned = milestonesReached * COMMISSION.DEVICE_MILESTONE_BONUS;
 
     return apiSuccess({
+      scope,
       today: {
         date: todayISO,
         salesCount: todaySales.length,

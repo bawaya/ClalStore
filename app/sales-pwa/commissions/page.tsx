@@ -80,6 +80,7 @@ type CommissionsSummary = {
 
 type DetailsPayload = {
   month: string;
+  scope?: "admin" | "employee";
   sales: SaleRow[];
   sanctions: Sanction[];
   milestones: Milestone[];
@@ -286,7 +287,14 @@ export default function CommissionsDetailsPage() {
           {details.summary && (
             <section className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 to-sky-500/5 p-5">
               <div className="mb-3 flex items-end justify-between">
-                <div className="text-sm font-bold">💰 إجمالي المبيعات</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-bold">💰 إجمالي المبيعات</div>
+                  {details.scope === "admin" && (
+                    <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-200">
+                      العقد
+                    </span>
+                  )}
+                </div>
                 <div className="text-3xl font-black text-emerald-300 md:text-4xl">
                   {formatCurrency(details.summary.totalSalesAmount)}
                 </div>
@@ -311,22 +319,23 @@ export default function CommissionsDetailsPage() {
                       style={{ width: `${Math.min(100, details.summary.salesProgress)}%` }}
                     />
                   </div>
-                  {/* Sales gap — remaining + per-day */}
+                  {/* Sales gap — only meaningful when a sales target is set;
+                      when reached (remaining <= 0 AND target > 0) show ✅. */}
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
                       <div className="text-[10px] font-semibold text-slate-300">💸 المتبقي للهدف</div>
                       <div className="mt-1 text-lg font-black text-slate-100">
-                        {details.summary.salesRemaining <= 0
-                          ? "✅"
-                          : formatCurrency(details.summary.salesRemaining)}
+                        {details.summary.salesRemaining > 0
+                          ? formatCurrency(details.summary.salesRemaining)
+                          : "✅ تم"}
                       </div>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
                       <div className="text-[10px] font-semibold text-slate-300">📈 مبيعات يومياً</div>
                       <div className="mt-1 text-lg font-black text-slate-100">
-                        {details.summary.salesRemaining <= 0
-                          ? "—"
-                          : formatCurrency(details.summary.salesRequiredPerDay)}
+                        {details.summary.salesRemaining > 0
+                          ? formatCurrency(details.summary.salesRequiredPerDay)
+                          : "—"}
                       </div>
                       <div className="text-[9px] text-slate-400">
                         لـ{details.summary.workingDaysLeft} أيام عمل
