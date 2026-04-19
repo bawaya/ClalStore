@@ -598,6 +598,63 @@ export default function CommissionsDashboard() {
                 }}
               />
             </div>
+
+            {/* Target gap highlight — the two numbers admin asked for:
+                (1) how much sales value is still needed to reach the target
+                (2) what per-working-day sales pace closes the gap */}
+            {(() => {
+              const salesRemaining = Math.max(0, pace.targetSalesAmount - pace.totalSalesAmount);
+              const targetReached = salesRemaining <= 0;
+              const accent = targetReached
+                ? "#22c55e"
+                : pace.salesProgress >= 50
+                  ? "#eab308"
+                  : "#ef4444";
+              return (
+                <div
+                  className="grid gap-2 mt-3"
+                  style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr" }}
+                >
+                  <div
+                    className="rounded-xl px-3 py-2.5 text-right"
+                    style={{ background: `${accent}18`, border: `1px solid ${accent}40` }}
+                  >
+                    <div className="text-slate-200 font-semibold" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                      💸 נותרו למכירה (כל החודש)
+                    </div>
+                    <div
+                      className="font-black mt-1"
+                      style={{ fontSize: scr.mobile ? 18 : 24, color: accent, lineHeight: 1.1 }}
+                    >
+                      {targetReached ? "✅ הגעת!" : formatCurrency(salesRemaining)}
+                    </div>
+                  </div>
+                  <div
+                    className="rounded-xl px-3 py-2.5 text-right"
+                    style={{ background: `${accent}18`, border: `1px solid ${accent}40` }}
+                  >
+                    <div className="text-slate-200 font-semibold" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                      📈 למכור ליום (כדי לסגור היעד)
+                    </div>
+                    <div
+                      className="font-black mt-1"
+                      style={{ fontSize: scr.mobile ? 18 : 24, color: accent, lineHeight: 1.1 }}
+                    >
+                      {targetReached
+                        ? "—"
+                        : pace.workingDaysLeft > 0
+                          ? formatCurrency(pace.salesRequiredPerDay)
+                          : "אין ימי עבודה"}
+                    </div>
+                    {!targetReached && pace.workingDaysLeft > 0 && (
+                      <div className="text-slate-300 text-[10px] mt-0.5">
+                        ל-{pace.workingDaysLeft} ימי עבודה שנותרו
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         ) : s.targetAmount > 0 ? (
           <div className="text-slate-300 text-[11px] mb-2 text-right">
