@@ -10,8 +10,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireEmployee } from "@/lib/pwa/auth";
 import { createAdminSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, safeError } from "@/lib/api-response";
-import { lastDayOfMonth } from "@/lib/commissions/ledger";
-import { COMMISSION } from "@/lib/commissions/calculator";
+import { getCommissionTarget, lastDayOfMonth } from "@/lib/commissions/ledger";
+import { COMMISSION, calcDeviceCommission } from "@/lib/commissions/calculator";
+import { countWorkingDays } from "@/lib/commissions/date-utils";
 
 type RateSnapshot = {
   line_multiplier?: number;
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
     const monthStart = `${month}-01`;
     const monthEnd = lastDayOfMonth(month);
 
-    const [salesRes, sanctionsRes] = await Promise.all([
+    const [salesRes, sanctionsRes, target] = await Promise.all([
       db
         .from("commission_sales")
         .select(
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
         .gte("sanction_date", monthStart)
         .lte("sanction_date", monthEnd)
         .order("sanction_date", { ascending: false }),
+      getCommissionTarget(db, month, [authed.appUserId]),
     ]);
 
     if (salesRes.error) return safeError(salesRes.error, "details/sales");
@@ -122,7 +124,8 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Milestones touched this month
+    // Milestones touched this month (auto-tracked sales only in the per-row
+    // walk; manual add-on milestones are appended below).
     let running = 0;
     const milestones: Array<{ threshold: number; hit_on: string; bonus: number }> = [];
     for (const s of [...sales].reverse()) {
@@ -140,11 +143,121 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ===== Server-computed summary (mirrors admin dashboard) =====
+    const totalLineSalesAmount = sales
+      .filter((s) => s.type === "line")
+      .reduce((sum, s) => sum + s.amount, 0);
+    const autoTrackedDeviceSales = sales
+      .filter((s) => s.type === "device")
+      .reduce((sum, s) => sum + s.amount, 0);
+
+    const manualSalesAddOn = Number(
+      (target as { manual_sales_add_on?: number | null })?.manual_sales_add_on || 0,
+    );
+    const totalDeviceSalesAmount = autoTrackedDeviceSales + manualSalesAddOn;
+    const totalSalesAmount = totalLineSalesAmount + totalDeviceSalesAmount;
+
+    // Manual add-on may cross a milestone threshold — emit a synthetic
+    // milestone entry so the page shows the bonus. The milestone is
+    // attributed to the last day of the month (no specific sale row).
+    if (manualSalesAddOn > 0) {
+      const before = Math.floor(autoTrackedDeviceSales / COMMISSION.DEVICE_MILESTONE);
+      const after = Math.floor(totalDeviceSalesAmount / COMMISSION.DEVICE_MILESTONE);
+      for (let m = before + 1; m <= after; m++) {
+        milestones.push({
+          threshold: m * COMMISSION.DEVICE_MILESTONE,
+          hit_on: monthEnd,
+          bonus: COMMISSION.DEVICE_MILESTONE_BONUS,
+        });
+      }
+    }
+
+    const autoDeviceCalc = calcDeviceCommission(autoTrackedDeviceSales);
+    const adjustedDeviceCalc = calcDeviceCommission(totalDeviceSalesAmount);
+    const manualAddOnDeviceCommission = manualSalesAddOn > 0
+      ? Math.max(0, adjustedDeviceCalc.total - autoDeviceCalc.total)
+      : 0;
+
+    const linesCommission = sales
+      .filter((s) => s.type === "line")
+      .reduce((sum, s) => sum + s.commission.employeeAmount, 0);
+    const autoDevicesCommission = sales
+      .filter((s) => s.type === "device")
+      .reduce((sum, s) => sum + s.commission.employeeAmount, 0);
+    const devicesCommission = autoDevicesCommission + manualAddOnDeviceCommission;
+    const sanctionsTotal = ((sanctionsRes.data || []) as Array<{ amount: number | null }>).reduce(
+      (sum: number, s: { amount: number | null }) => sum + Number(s.amount || 0),
+      0,
+    );
+    const grossCommission = linesCommission + devicesCommission;
+    const netCommission = grossCommission - sanctionsTotal;
+
+    // Target + pacing
+    const [year, monthNum] = month.split("-").map((n) => parseInt(n, 10));
+    const monthStartDate = new Date(year, monthNum - 1, 1);
+    const monthEndDate = new Date(year, monthNum, 0);
+    const isCurrentMonth = nowIL.getFullYear() === year && (nowIL.getMonth() + 1) === monthNum;
+    const totalWorkingDays = countWorkingDays(monthStartDate, monthEndDate);
+    const todayStart = new Date(nowIL.getFullYear(), nowIL.getMonth(), nowIL.getDate());
+    const workingDaysLeft = isCurrentMonth
+      ? countWorkingDays(todayStart, monthEndDate)
+      : (nowIL > monthEndDate ? 0 : totalWorkingDays);
+    const workingDaysElapsed = Math.max(0, totalWorkingDays - workingDaysLeft);
+    const safeWorkingDaysLeft = Math.max(1, workingDaysLeft);
+
+    const targetCommissionAmount = Number(
+      (target as { target_total?: number | null })?.target_total || 0,
+    );
+    const targetSalesAmount = Number(
+      (target as { target_sales_amount?: number | null })?.target_sales_amount || 0,
+    );
+    const salesRemaining = targetSalesAmount > 0
+      ? Math.max(0, targetSalesAmount - totalSalesAmount)
+      : 0;
+    const salesRequiredPerDay = targetSalesAmount > 0 && workingDaysLeft > 0
+      ? Math.ceil(salesRemaining / safeWorkingDaysLeft)
+      : 0;
+    const salesProgress = targetSalesAmount > 0
+      ? Math.min(100, Math.round((totalSalesAmount / targetSalesAmount) * 100))
+      : 0;
+    const commissionRemaining = Math.max(0, targetCommissionAmount - netCommission);
+    const commissionRequiredPerDay = targetCommissionAmount > 0 && workingDaysLeft > 0
+      ? Math.ceil(commissionRemaining / safeWorkingDaysLeft)
+      : 0;
+    const commissionProgress = targetCommissionAmount > 0
+      ? Math.min(100, Math.round((netCommission / targetCommissionAmount) * 100))
+      : 0;
+
     return apiSuccess({
       month,
       sales,
       sanctions: sanctionsRes.data || [],
       milestones,
+      summary: {
+        totalLineSalesAmount,
+        autoTrackedDeviceSales,
+        manualSalesAddOn,
+        totalDeviceSalesAmount,
+        totalSalesAmount,
+        linesCommission,
+        autoDevicesCommission,
+        manualAddOnDeviceCommission,
+        devicesCommission,
+        sanctionsTotal,
+        grossCommission,
+        netCommission,
+        targetSalesAmount,
+        targetCommissionAmount,
+        salesProgress,
+        salesRemaining,
+        salesRequiredPerDay,
+        commissionProgress,
+        commissionRemaining,
+        commissionRequiredPerDay,
+        workingDaysLeft,
+        workingDaysElapsed,
+        totalWorkingDays,
+      },
     });
   } catch (err) {
     return safeError(err, "EmployeeDetails", "خطأ في السيرفر", 500);

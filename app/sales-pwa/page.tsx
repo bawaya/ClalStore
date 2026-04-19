@@ -19,13 +19,31 @@ type DashboardData = {
     month: string;
     salesCount: number;
     totalAmount: number;
+    // New sales-focused fields (optional — older API responses may omit them)
+    totalLineSalesAmount?: number;
+    totalDeviceSalesAmount?: number;
+    autoTrackedDeviceSales?: number;
+    manualSalesAddOn?: number;
+    manualAddOnDeviceCommission?: number;
     totalCommission: number;
     sanctions: number;
     netCommission: number;
+    targetSalesAmount?: number;
+    salesProgress?: number;
+    salesRemaining?: number;
+    salesRequiredPerDay?: number;
+    salesPerDayPace?: number;
+    targetCommissionAmount?: number;
+    commissionProgress?: number;
+    commissionRemaining?: number;
+    commissionRequiredPerDay?: number;
+    workingDaysElapsed?: number;
+    totalWorkingDays?: number;
+    // Legacy/core (always present)
+    workingDaysLeft: number;
     target: number;
     targetProgress: number;
     remainingAmount: number;
-    workingDaysLeft: number;
     dailyRequired: number;
     pacingColor: "green" | "yellow" | "red";
   };
@@ -199,7 +217,7 @@ export default function SalesPwaDashboardPage() {
         </div>
       </section>
 
-      {/* Target card */}
+      {/* Target card — sales-focused to match admin dashboard */}
       <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -208,6 +226,21 @@ export default function SalesPwaDashboardPage() {
           </div>
           <div className={`text-sm font-black ${pacing.text}`}>{pct}%</div>
         </div>
+
+        {/* Primary label — MBY'AT (sales) when sales target exists, else commission */}
+        <div className="mb-1.5 flex items-center justify-between text-[11px]">
+          <span className="font-bold text-slate-100">
+            {(data.month.targetSalesAmount ?? 0) > 0
+              ? `مبيعات: ${formatCurrency(data.month.totalAmount)} / ${formatCurrency(data.month.targetSalesAmount ?? 0)}`
+              : `عمولات: ${formatCurrency(data.month.netCommission)} / ${formatCurrency(data.month.targetCommissionAmount ?? data.month.target ?? 0)}`}
+          </span>
+          {(data.month.manualSalesAddOn ?? 0) > 0 && (
+            <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-200">
+              +{formatCurrency(data.month.manualSalesAddOn ?? 0)} إضافة يدوية (أجهزة)
+            </span>
+          )}
+        </div>
+
         <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
           <div
             className={`h-full ${pacing.bar} transition-all`}
@@ -218,27 +251,70 @@ export default function SalesPwaDashboardPage() {
             aria-valuemax={100}
           />
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div>
-            <div className="text-[10px] text-slate-400">المتبقي</div>
-            <div className="text-sm font-bold">{formatCurrency(data.month.remainingAmount)}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-slate-400">أيام عمل باقية</div>
-            <div className="text-sm font-bold">{data.month.workingDaysLeft}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-slate-400">مطلوب يومياً</div>
-            <div className={`text-base font-black ${pacing.text}`}>
-              {formatCurrency(data.month.dailyRequired)}
+
+        {/* Gap highlight — SALES remaining + SALES required per day (matches
+            the admin page's two-card box exactly). */}
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className={`rounded-xl border p-3 ${
+            data.month.pacingColor === "green"
+              ? "border-emerald-500/30 bg-emerald-500/10"
+              : data.month.pacingColor === "yellow"
+                ? "border-amber-500/30 bg-amber-500/10"
+                : "border-rose-500/30 bg-rose-500/10"
+          }`}>
+            <div className="text-[10px] font-semibold text-slate-200">💸 المتبقي (كل الشهر)</div>
+            <div className={`mt-1 text-lg font-black ${pacing.text}`}>
+              {data.month.remainingAmount <= 0
+                ? "✅ تم"
+                : formatCurrency(data.month.remainingAmount)}
+            </div>
+            <div className="mt-0.5 text-[10px] text-slate-300">
+              {data.month.targetSalesAmount > 0 ? "مبيعات متبقية" : "عمولات متبقية"}
             </div>
           </div>
+          <div className={`rounded-xl border p-3 ${
+            data.month.pacingColor === "green"
+              ? "border-emerald-500/30 bg-emerald-500/10"
+              : data.month.pacingColor === "yellow"
+                ? "border-amber-500/30 bg-amber-500/10"
+                : "border-rose-500/30 bg-rose-500/10"
+          }`}>
+            <div className="text-[10px] font-semibold text-slate-200">📈 مطلوب يومياً</div>
+            <div className={`mt-1 text-lg font-black ${pacing.text}`}>
+              {data.month.remainingAmount <= 0
+                ? "—"
+                : formatCurrency(data.month.dailyRequired)}
+            </div>
+            <div className="mt-0.5 text-[10px] text-slate-300">
+              لـ{data.month.workingDaysLeft} أيام عمل
+            </div>
+          </div>
+        </div>
+
+        {/* Secondary info row */}
+        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-white/5 pt-3">
           <div>
-            <div className="text-[10px] text-slate-400">صافي الشهر</div>
+            <div className="text-[10px] text-slate-400">صافي عمولات الشهر</div>
             <div className="text-sm font-bold text-emerald-300">
               {formatCurrency(data.month.netCommission)}
             </div>
+            {(data.month.manualAddOnDeviceCommission ?? 0) > 0 && (
+              <div className="text-[9px] text-slate-400">
+                منها {formatCurrency(data.month.manualAddOnDeviceCommission ?? 0)} من الإضافة اليدوية
+              </div>
+            )}
           </div>
+          {(data.month.targetSalesAmount ?? 0) > 0 && (data.month.targetCommissionAmount ?? 0) > 0 && (
+            <div>
+              <div className="text-[10px] text-slate-400">هدف العمولات</div>
+              <div className="text-sm font-bold">
+                {formatCurrency(data.month.netCommission)} / {formatCurrency(data.month.targetCommissionAmount ?? 0)}
+              </div>
+              <div className="text-[9px] text-slate-400">
+                {data.month.commissionProgress ?? 0}% — {formatCurrency(data.month.commissionRequiredPerDay ?? 0)}/يوم
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

@@ -194,9 +194,11 @@ describe("SalesPwaDashboardPage", () => {
     await waitFor(() => {
       expect(screen.getByText("₪1,500")).toBeInTheDocument();
     });
-    expect(screen.getByText("12")).toBeInTheDocument();
-    expect(screen.getByText("مطلوب يومياً")).toBeInTheDocument();
-    expect(screen.getByText("أيام عمل باقية")).toBeInTheDocument();
+    // New UI pairs the daily requirement with working-day context in a
+    // single sentence: "لـ12 أيام عمل". Assert both pieces appear.
+    expect(screen.getByText(/لـ12 أيام عمل/)).toBeInTheDocument();
+    expect(screen.getByText(/مطلوب يومياً/)).toBeInTheDocument();
+    expect(screen.getByText(/المتبقي/)).toBeInTheDocument();
   });
 
   it("milestones card shows current total and next milestone at", async () => {

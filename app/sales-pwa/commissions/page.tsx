@@ -52,11 +52,38 @@ type Sanction = {
 
 type Milestone = { threshold: number; hit_on: string; bonus: number };
 
+type CommissionsSummary = {
+  totalLineSalesAmount: number;
+  autoTrackedDeviceSales: number;
+  manualSalesAddOn: number;
+  totalDeviceSalesAmount: number;
+  totalSalesAmount: number;
+  linesCommission: number;
+  autoDevicesCommission: number;
+  manualAddOnDeviceCommission: number;
+  devicesCommission: number;
+  sanctionsTotal: number;
+  grossCommission: number;
+  netCommission: number;
+  targetSalesAmount: number;
+  targetCommissionAmount: number;
+  salesProgress: number;
+  salesRemaining: number;
+  salesRequiredPerDay: number;
+  commissionProgress: number;
+  commissionRemaining: number;
+  commissionRequiredPerDay: number;
+  workingDaysLeft: number;
+  workingDaysElapsed: number;
+  totalWorkingDays: number;
+};
+
 type DetailsPayload = {
   month: string;
   sales: SaleRow[];
   sanctions: Sanction[];
   milestones: Milestone[];
+  summary?: CommissionsSummary;
 };
 
 type ChartPayload = {
@@ -150,9 +177,23 @@ export default function CommissionsDetailsPage() {
     fetchAll(month);
   }, [month, fetchAll]);
 
-  // Derived totals
+  // Derived totals — prefer server-computed summary (matches admin view
+  // exactly, incl. manual add-on folded in). Falls back to client-side
+  // aggregation for older API responses.
   const totals = useMemo(() => {
     if (!details) return null;
+    if (details.summary) {
+      const s = details.summary;
+      return {
+        linesTotal: s.linesCommission,
+        devicesTotal: s.autoDevicesCommission,
+        loyalty: 0,
+        milestoneBonus: details.milestones.reduce((sum, m) => sum + m.bonus, 0),
+        sanctionsTotal: s.sanctionsTotal,
+        manualAddOnDeviceCommission: s.manualAddOnDeviceCommission,
+        net: s.netCommission,
+      };
+    }
     let linesTotal = 0;
     let devicesTotal = 0;
     for (const s of details.sales) {
@@ -161,11 +202,18 @@ export default function CommissionsDetailsPage() {
     }
     const milestoneBonus = details.milestones.reduce((sum, m) => sum + m.bonus, 0);
     const sanctionsTotal = details.sanctions.reduce((sum, s) => sum + Number(s.amount || 0), 0);
-    // Loyalty bonus isn't returned separately here; surface as 0 for now.
     const loyalty = 0;
     const gross = linesTotal + devicesTotal + milestoneBonus + loyalty;
     const net = gross - sanctionsTotal;
-    return { linesTotal, devicesTotal, loyalty, milestoneBonus, sanctionsTotal, net };
+    return {
+      linesTotal,
+      devicesTotal,
+      loyalty,
+      milestoneBonus,
+      sanctionsTotal,
+      manualAddOnDeviceCommission: 0,
+      net,
+    };
   }, [details]);
 
   const chartData = useMemo(() => {
@@ -233,14 +281,106 @@ export default function CommissionsDetailsPage() {
 
       {!loading && details && totals && (
         <>
-          {/* Summary section */}
+          {/* Sales hero — matches admin dashboard. Only shown when API
+              returned the server-computed summary. */}
+          {details.summary && (
+            <section className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 to-sky-500/5 p-5">
+              <div className="mb-3 flex items-end justify-between">
+                <div className="text-sm font-bold">💰 إجمالي المبيعات</div>
+                <div className="text-3xl font-black text-emerald-300 md:text-4xl">
+                  {formatCurrency(details.summary.totalSalesAmount)}
+                </div>
+              </div>
+              {details.summary.targetSalesAmount > 0 && (
+                <>
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="font-black text-slate-100">{details.summary.salesProgress}%</span>
+                    <span className="font-semibold text-slate-200">
+                      {formatCurrency(details.summary.totalSalesAmount)} / {formatCurrency(details.summary.targetSalesAmount)}
+                    </span>
+                  </div>
+                  <div className="h-4 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className={`h-full transition-all ${
+                        details.summary.salesProgress >= 80
+                          ? "bg-emerald-500"
+                          : details.summary.salesProgress >= 50
+                            ? "bg-amber-500"
+                            : "bg-rose-500"
+                      }`}
+                      style={{ width: `${Math.min(100, details.summary.salesProgress)}%` }}
+                    />
+                  </div>
+                  {/* Sales gap — remaining + per-day */}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
+                      <div className="text-[10px] font-semibold text-slate-300">💸 المتبقي للهدف</div>
+                      <div className="mt-1 text-lg font-black text-slate-100">
+                        {details.summary.salesRemaining <= 0
+                          ? "✅"
+                          : formatCurrency(details.summary.salesRemaining)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
+                      <div className="text-[10px] font-semibold text-slate-300">📈 مبيعات يومياً</div>
+                      <div className="mt-1 text-lg font-black text-slate-100">
+                        {details.summary.salesRemaining <= 0
+                          ? "—"
+                          : formatCurrency(details.summary.salesRequiredPerDay)}
+                      </div>
+                      <div className="text-[9px] text-slate-400">
+                        لـ{details.summary.workingDaysLeft} أيام عمل
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+              {/* Breakdown */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 p-3">
+                  <div className="text-[10px] font-semibold text-slate-200">📡 مبيعات خطوط</div>
+                  <div className="mt-1 text-base font-black text-sky-300">
+                    {formatCurrency(details.summary.totalLineSalesAmount)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3">
+                  <div className="text-[10px] font-semibold text-slate-200">📱 مبيعات أجهزة</div>
+                  <div className="mt-1 text-base font-black text-rose-300">
+                    {formatCurrency(details.summary.totalDeviceSalesAmount)}
+                  </div>
+                  {details.summary.manualSalesAddOn > 0 && (
+                    <div className="mt-1 flex items-center justify-between rounded-md bg-rose-500/15 px-1.5 py-1">
+                      <span className="text-[9px] font-bold text-rose-200">
+                        +{formatCurrency(details.summary.manualAddOnDeviceCommission)} عمولة
+                      </span>
+                      <span className="text-[9px] font-semibold text-slate-100">
+                        +{formatCurrency(details.summary.manualSalesAddOn)} يدوي
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Commission summary section. Device milestone bonuses are
+              already baked into `devicesTotal` by the ledger allocator, so
+              they are NOT shown as a separate additive cell here (pre-existing
+              bug: that double-counted them). Milestones are listed below in
+              their own dedicated section. */}
           <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="mb-3 text-sm font-bold">{COMMISSION_LABELS.summary}</div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-              <SummaryCell label="خطوط" value={totals.linesTotal} color="sky" />
-              <SummaryCell label="أجهزة" value={totals.devicesTotal} color="rose" />
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <SummaryCell label="عمولة خطوط" value={totals.linesTotal} color="sky" />
+              <SummaryCell
+                label="عمولة أجهزة"
+                value={totals.devicesTotal + (totals.manualAddOnDeviceCommission || 0)}
+                color="rose"
+                sub={totals.manualAddOnDeviceCommission > 0
+                  ? `منها ${formatCurrency(totals.manualAddOnDeviceCommission)} يدوي`
+                  : undefined}
+              />
               <SummaryCell label="ولاء" value={totals.loyalty} color="violet" />
-              <SummaryCell label="بونص معالم" value={totals.milestoneBonus} color="amber" />
               <SummaryCell
                 label="عقوبات"
                 value={-totals.sanctionsTotal}
@@ -491,10 +631,12 @@ function SummaryCell({
   label,
   value,
   color,
+  sub,
 }: {
   label: string;
   value: number;
   color: "sky" | "rose" | "violet" | "amber" | "slate" | "emerald";
+  sub?: string;
 }) {
   const cls: Record<typeof color, string> = {
     sky: "text-sky-300",
@@ -508,6 +650,7 @@ function SummaryCell({
     <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-center">
       <div className="text-[10px] text-slate-400">{label}</div>
       <div className={`mt-1 text-sm font-black ${cls[color]}`}>{formatCurrency(value)}</div>
+      {sub && <div className="mt-0.5 text-[9px] text-slate-400">{sub}</div>}
     </div>
   );
 }
