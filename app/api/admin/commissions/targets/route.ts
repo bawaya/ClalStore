@@ -64,6 +64,8 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =
     target_total,
     target_lines_count,
     target_devices_count,
+    target_sales_amount,
+    manual_sales_add_on,
   } = body;
 
   if (!month) return apiError("month required", 400);
@@ -85,6 +87,22 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =
     return apiError("×”×™×¢×“ ×œ×—×•×“×© ×–×” × ×¢×•×œ ×•×œ× × ×™×ª×Ÿ ×œ×¢×¨×™×›×”", 403);
   }
 
+  // Sales-focused fields are optional — only include when caller provided
+  // them, so partial updates don't wipe previously-set values.
+  // target_sales_amount is nullable by design (empty = no sales target),
+  // manual_sales_add_on clamps to 0 since the column is NOT NULL.
+  const salesUpdate: Record<string, number | null> = {};
+  if (target_sales_amount !== undefined) {
+    const parsed = Number(target_sales_amount);
+    salesUpdate.target_sales_amount =
+      Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  if (manual_sales_add_on !== undefined) {
+    const parsed = Number(manual_sales_add_on);
+    salesUpdate.manual_sales_add_on =
+      Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  }
+
   const { data, error } = await db
     .from("commission_targets")
     .upsert(
@@ -96,6 +114,7 @@ export const POST = withAdminAuth(async (req: NextRequest, db: SupabaseClient) =
         target_total: target_total || 0,
         target_lines_count: target_lines_count || 0,
         target_devices_count: target_devices_count || 0,
+        ...salesUpdate,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,month" },

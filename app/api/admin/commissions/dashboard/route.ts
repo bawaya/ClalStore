@@ -140,9 +140,9 @@ export async function GET(req: NextRequest) {
     return apiError("فشل في جلب بيانات لوحة التحكم", 500);
   }
 
-  interface SaleRow { id: number; sale_type: string; sale_date: string; commission_amount: number; device_sale_amount: number; loyalty_start_date: string | null; loyalty_status: string | null; source: string; customer_name: string | null; device_name: string | null; package_price: number; }
+  interface SaleRow { id: number; sale_type: string; sale_date: string; commission_amount: number; device_sale_amount: number; loyalty_start_date: string | null; loyalty_status: string | null; source: string; customer_name: string | null; device_name: string | null; package_price: number; employee_name?: string | null; employee_id?: string | null; }
   interface SanctionRow { amount: number; }
-  interface TargetRow { target_total: number; target_lines_amount: number; target_devices_amount: number; target_lines_count: number; target_devices_count: number; is_locked: boolean; locked_at: string | null; }
+  interface TargetRow { target_total: number; target_lines_amount: number; target_devices_amount: number; target_lines_count: number; target_devices_count: number; is_locked: boolean; locked_at: string | null; target_sales_amount: number | null; manual_sales_add_on: number | null; }
 
   const sales: SaleRow[] = salesRes.data || [];
   const sanctions: SanctionRow[] = sanctionsRes.data || [];
@@ -217,6 +217,16 @@ export async function GET(req: NextRequest) {
   const devicesSalesCount = sales.filter((s: SaleRow) => s.sale_type === "device").length;
   const totalDeviceSalesAmount = totalDeviceSales;
 
+  // Sales VALUES (not commissions) — the page is re-oriented around these.
+  // Line "sale value" = package_price × 1 (single subscription value sold).
+  // Device "sale value" = device_sale_amount (the device price tag).
+  const totalLineSalesAmount = sales
+    .filter((s: SaleRow) => s.sale_type === "line")
+    .reduce((sum: number, s: SaleRow) => sum + (s.package_price || 0), 0);
+  const autoTrackedSalesAmount = totalLineSalesAmount + totalDeviceSalesAmount;
+  const manualSalesAddOn = Number(target?.manual_sales_add_on || 0);
+  const totalSalesAmount = autoTrackedSalesAmount + manualSalesAddOn;
+
   // Pace calculations
   const safeWorkingElapsed = Math.max(1, workingDaysElapsed);
   const safeWorkingDaysLeft = Math.max(1, workingDaysLeft);
@@ -228,6 +238,7 @@ export async function GET(req: NextRequest) {
   const targetLinesCount = target?.target_lines_count || 0;
   const targetDevicesCount = target?.target_devices_count || 0;
   const targetTotal = target?.target_total || 0;
+  const targetSalesAmount = Number(target?.target_sales_amount || 0);
 
   // Lines need box
   const linesRemaining = Math.max(0, targetLinesCount - linesSalesCount);
@@ -242,15 +253,35 @@ export async function GET(req: NextRequest) {
   const devicesPerDayPace = devicesSalesCount / safeWorkingElapsed;
   const devicesPaceStatus = devicesPerDayPace >= devicesExpectedPace ? (devicesPerDayPace > devicesExpectedPace * 1.1 ? "ahead" : "on_track") : "behind";
 
-  // Overall commission pace
+  // Overall commission pace (kept for backward compat + secondary info card)
   const commissionPerDayPace = summary.netCommission / safeWorkingElapsed;
   const commissionRequiredPerDay = targetTotal > 0 && workingDaysLeft > 0
     ? Math.max(0, targetTotal - summary.netCommission) / safeWorkingDaysLeft
     : 0;
   const commissionExpectedPace = totalWorkingDays > 0 ? targetTotal / totalWorkingDays : 0;
-  const overallPaceStatus = commissionPerDayPace >= commissionExpectedPace
-    ? (commissionPerDayPace > commissionExpectedPace * 1.1 ? "ahead" : "on_track")
-    : "behind";
+
+  // Overall SALES pace (the primary focus of the page now)
+  const salesPerDayPace = totalSalesAmount / safeWorkingElapsed;
+  const salesRequiredPerDay = targetSalesAmount > 0 && workingDaysLeft > 0
+    ? Math.max(0, targetSalesAmount - totalSalesAmount) / safeWorkingDaysLeft
+    : 0;
+  const salesExpectedPace = targetSalesAmount > 0 && totalWorkingDays > 0
+    ? targetSalesAmount / totalWorkingDays
+    : 0;
+  const salesProgress = targetSalesAmount > 0
+    ? Math.min(100, Math.round((totalSalesAmount / targetSalesAmount) * 100))
+    : 0;
+
+  // Pace status is driven by SALES when a sales target is set, else falls
+  // back to commission pace so existing "ahead/on_track/behind" chip still
+  // works for targets-only-commission mode.
+  const overallPaceStatus = targetSalesAmount > 0
+    ? (salesPerDayPace >= salesExpectedPace
+        ? (salesPerDayPace > salesExpectedPace * 1.1 ? "ahead" : "on_track")
+        : "behind")
+    : (commissionPerDayPace >= commissionExpectedPace
+        ? (commissionPerDayPace > commissionExpectedPace * 1.1 ? "ahead" : "on_track")
+        : "behind");
 
   const paceTracking = {
     daysInMonth,
@@ -261,6 +292,18 @@ export async function GET(req: NextRequest) {
     workingDaysLeft,
     isCurrentMonth,
     overallPaceStatus,
+    // Sales-focused pace (primary)
+    salesPerDayPace: Math.round(salesPerDayPace),
+    salesRequiredPerDay: Math.round(salesRequiredPerDay),
+    salesExpectedPace: Math.round(salesExpectedPace),
+    totalSalesAmount: Math.round(totalSalesAmount),
+    autoTrackedSalesAmount: Math.round(autoTrackedSalesAmount),
+    manualSalesAddOn: Math.round(manualSalesAddOn),
+    targetSalesAmount: Math.round(targetSalesAmount),
+    salesProgress,
+    totalLineSalesAmount: Math.round(totalLineSalesAmount),
+    totalDeviceSalesAmount: Math.round(totalDeviceSalesAmount),
+    // Commission pace (kept for secondary display)
     commissionPerDayPace: Math.round(commissionPerDayPace),
     commissionRequiredPerDay: Math.round(commissionRequiredPerDay),
     commissionExpectedPace: Math.round(commissionExpectedPace),
@@ -301,11 +344,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  if (isCurrentMonth && overallPaceStatus === "behind" && targetTotal > 0) {
-    alerts.push({
-      text: `קצב נוכחי: ${Math.round(commissionPerDayPace)}₪/יום — נדרש: ${Math.round(commissionRequiredPerDay)}₪/יום`,
-      color: "#ef4444",
-    });
+  // Second alert — now oriented around SALES VALUE per day, not commission.
+  // If a sales target is set, we show the sales-per-day gap. If not, fall
+  // back to the old commission-per-day message so we still say something
+  // useful when admin only configured a commission target.
+  if (isCurrentMonth && overallPaceStatus === "behind") {
+    if (targetSalesAmount > 0) {
+      alerts.push({
+        text: `קצב מכירות נוכחי: ${Math.round(salesPerDayPace).toLocaleString()}₪/יום — נדרש: ${Math.round(salesRequiredPerDay).toLocaleString()}₪/יום במכירות`,
+        color: "#ef4444",
+      });
+    } else if (targetTotal > 0) {
+      alerts.push({
+        text: `קצב עמלות נוכחי: ${Math.round(commissionPerDayPace).toLocaleString()}₪/יום — נדרש: ${Math.round(commissionRequiredPerDay).toLocaleString()}₪/יום בעמלות`,
+        color: "#ef4444",
+      });
+    }
   }
 
   if (deviceCalc.nextMilestoneAt < 15000) {
@@ -382,6 +436,8 @@ export async function GET(req: NextRequest) {
       target_devices_count: target.target_devices_count || 0,
       target_lines_amount: target.target_lines_amount || 0,
       target_devices_amount: target.target_devices_amount || 0,
+      target_sales_amount: Number(target.target_sales_amount || 0),
+      manual_sales_add_on: Number(target.manual_sales_add_on || 0),
       is_locked: target.is_locked || false,
       locked_at: target.locked_at || null,
     } : null,

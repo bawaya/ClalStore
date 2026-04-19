@@ -40,6 +40,18 @@ interface PaceTracking {
   workingDaysLeft: number;
   isCurrentMonth: boolean;
   overallPaceStatus: "ahead" | "on_track" | "behind";
+  // Sales-oriented metrics (primary — used by progress bar + pace card)
+  salesPerDayPace: number;
+  salesRequiredPerDay: number;
+  salesExpectedPace: number;
+  totalSalesAmount: number;
+  autoTrackedSalesAmount: number;
+  manualSalesAddOn: number;
+  targetSalesAmount: number;
+  salesProgress: number;
+  totalLineSalesAmount: number;
+  totalDeviceSalesAmount: number;
+  // Commission pace (secondary)
   commissionPerDayPace: number;
   commissionRequiredPerDay: number;
   commissionExpectedPace: number;
@@ -53,6 +65,8 @@ interface TargetDetails {
   target_devices_count: number;
   target_lines_amount: number;
   target_devices_amount: number;
+  target_sales_amount: number;
+  manual_sales_add_on: number;
   is_locked: boolean;
   locked_at: string | null;
 }
@@ -73,6 +87,7 @@ interface DashboardSale {
   match_method?: string | null;
   match_confidence?: number | null;
   employee_id?: string | null;
+  employee_name?: string | null;
   customer_hot_account_id?: string | null;
 }
 
@@ -135,6 +150,8 @@ export default function CommissionsDashboard() {
   const [targetAmount, setTargetAmount] = useState("");
   const [targetLinesCount, setTargetLinesCount] = useState("");
   const [targetDevicesCount, setTargetDevicesCount] = useState("");
+  const [targetSalesAmountInput, setTargetSalesAmountInput] = useState("");
+  const [manualSalesAddOnInput, setManualSalesAddOnInput] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [showLockConfirm, setShowLockConfirm] = useState(false);
   const [locking, setLocking] = useState(false);
@@ -213,6 +230,17 @@ export default function CommissionsDashboard() {
 
   useEffect(() => { fetchDashboard(month, selectedEmployee); }, [month, selectedEmployee, fetchDashboard]);
 
+  const handleOpenTargetModal = () => {
+    // Pre-fill with existing values so admin can tweak rather than re-enter.
+    const td = data?.targetDetails;
+    setTargetAmount(td?.target_total ? String(td.target_total) : "");
+    setTargetLinesCount(td?.target_lines_count ? String(td.target_lines_count) : "");
+    setTargetDevicesCount(td?.target_devices_count ? String(td.target_devices_count) : "");
+    setTargetSalesAmountInput(td?.target_sales_amount ? String(td.target_sales_amount) : "");
+    setManualSalesAddOnInput(td?.manual_sales_add_on ? String(td.manual_sales_add_on) : "");
+    setShowTargetModal(true);
+  };
+
   const handleSetTarget = async () => {
     const amt = parseFloat(targetAmount);
     if (!amt || amt <= 0) { show("הזן סכום יעד תקין", "warning"); return; }
@@ -226,6 +254,8 @@ export default function CommissionsDashboard() {
           target_total: amt,
           target_lines_count: parseInt(targetLinesCount) || 0,
           target_devices_count: parseInt(targetDevicesCount) || 0,
+          target_sales_amount: targetSalesAmountInput ? parseFloat(targetSalesAmountInput) : null,
+          manual_sales_add_on: manualSalesAddOnInput ? parseFloat(manualSalesAddOnInput) : 0,
         }),
       });
       if (!res.ok) {
@@ -237,6 +267,8 @@ export default function CommissionsDashboard() {
       setTargetAmount("");
       setTargetLinesCount("");
       setTargetDevicesCount("");
+      setTargetSalesAmountInput("");
+      setManualSalesAddOnInput("");
       fetchDashboard(month, selectedEmployee);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "שגיאה בשמירת היעד";
@@ -324,9 +356,9 @@ export default function CommissionsDashboard() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="font-black" style={{ fontSize: scr.mobile ? 16 : 22 }}>
-          💰 לוח בקרה — עמלות
-          {selectedEmployee && <span className="text-muted text-sm font-normal mr-2">({employees.find(e => e.id === selectedEmployee)?.name})</span>}
+        <h1 className="font-black text-slate-50" style={{ fontSize: scr.mobile ? 18 : 26 }}>
+          💰 לוח בקרה — מכירות ועמלות
+          {selectedEmployee && <span className="text-slate-300 text-sm font-normal mr-2">({employees.find(e => e.id === selectedEmployee)?.name})</span>}
         </h1>
         <div className="flex items-center gap-2">
           {employees.length > 0 && (
@@ -366,12 +398,84 @@ export default function CommissionsDashboard() {
         <Link href="/admin/commissions/live" className="chip">📊 לוח חי</Link>
       </div>
 
-      {/* Summary Cards */}
+      {/* Primary Sales Hero — bigger fonts, higher contrast, sales-focused.
+          The whole page is oriented around sales VALUE (₪ sold); commission
+          now appears as secondary info below. */}
+      <div
+        className="card mb-3"
+        style={{
+          padding: scr.mobile ? 14 : 20,
+          background: "linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.08))",
+          borderRight: "4px solid #22c55e",
+        }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-right">
+            <div className="text-slate-200 font-semibold" style={{ fontSize: scr.mobile ? 11 : 13 }}>
+              💰 סה&quot;כ מכירות
+            </div>
+            {pace.manualSalesAddOn > 0 && (
+              <div className="text-[10px] text-slate-300 mt-0.5">
+                כולל {formatCurrency(pace.manualSalesAddOn)} הוספה ידנית
+              </div>
+            )}
+          </div>
+          <div className="text-left">
+            <div
+              className="font-black"
+              style={{
+                fontSize: scr.mobile ? 28 : 40,
+                color: "#22c55e",
+                lineHeight: 1,
+              }}
+            >
+              {formatCurrency(pace.totalSalesAmount)}
+            </div>
+            {pace.targetSalesAmount > 0 && (
+              <div className="text-[11px] text-slate-200 mt-1 font-bold">
+                מתוך {formatCurrency(pace.targetSalesAmount)} — {pace.salesProgress}%
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <div className="text-right rounded-lg p-2" style={{ background: "rgba(59,130,246,0.12)" }}>
+            <div className="flex items-center justify-between">
+              <span style={{ fontSize: 18 }}>📡</span>
+              <span className="text-slate-100 font-semibold" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                מכירות קווים
+              </span>
+            </div>
+            <div
+              className="font-black mt-1"
+              style={{ fontSize: scr.mobile ? 18 : 24, color: "#60a5fa" }}
+            >
+              {formatCurrency(pace.totalLineSalesAmount)}
+            </div>
+          </div>
+          <div className="text-right rounded-lg p-2" style={{ background: "rgba(239,68,68,0.12)" }}>
+            <div className="flex items-center justify-between">
+              <span style={{ fontSize: 18 }}>📱</span>
+              <span className="text-slate-100 font-semibold" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                מכירות מכשירים
+              </span>
+            </div>
+            <div
+              className="font-black mt-1"
+              style={{ fontSize: scr.mobile ? 18 : 24, color: "#f87171" }}
+            >
+              {formatCurrency(pace.totalDeviceSalesAmount)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary — Commission breakdown (user asked this stay as backup info) */}
       <div className="grid gap-2 mb-4" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
         <StatCard icon="📡" label="עמלות קווים" value={formatCurrency(s.linesCommission)} color="#3b82f6" />
         <StatCard icon="📱" label="עמלות מכשירים" value={formatCurrency(s.devicesCommission)} color="#ef4444" />
         <StatCard icon="⚠️" label="סנקציות" value={formatCurrency(s.totalSanctions)} color="#f97316" />
-        <StatCard icon="💰" label="נטו" value={formatCurrency(s.netCommission)} color="#22c55e" />
+        <StatCard icon="💵" label="עמלות נטו" value={formatCurrency(s.netCommission)} color="#22c55e" />
       </div>
 
       {/* Owner Profit Card — only in aggregate view */}
@@ -428,16 +532,17 @@ export default function CommissionsDashboard() {
         </div>
       )}
 
-      {/* Target Progress + Lock */}
+      {/* Target Progress + Lock — primary bar shows SALES progress, secondary
+          shows commission progress as smaller info row. */}
       <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18 }}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             {!isLocked && (
-              <button onClick={() => setShowTargetModal(true)} className="btn-outline" style={{ fontSize: 11, padding: "6px 14px" }}>
-                {s.targetAmount > 0 ? "עדכן יעד" : "הגדר יעד"}
+              <button onClick={handleOpenTargetModal} className="btn-outline" style={{ fontSize: 11, padding: "6px 14px" }}>
+                {(s.targetAmount > 0 || pace.targetSalesAmount > 0) ? "עדכן יעד" : "הגדר יעד"}
               </button>
             )}
-            {s.targetAmount > 0 && (
+            {(s.targetAmount > 0 || pace.targetSalesAmount > 0) && (
               <button
                 onClick={() => setShowLockConfirm(true)}
                 className="btn-outline"
@@ -452,43 +557,77 @@ export default function CommissionsDashboard() {
               </button>
             )}
           </div>
-          <h3 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>🎯 התקדמות ליעד</h3>
+          <h3 className="font-bold" style={{ fontSize: scr.mobile ? 13 : 15 }}>🎯 התקדמות ליעד</h3>
         </div>
-        {s.targetAmount > 0 ? (
-          <>
-            <div className="w-full h-4 bg-surface-elevated rounded-full overflow-hidden mb-2">
+
+        {/* Primary progress — SALES (bigger, bolder) */}
+        {pace.targetSalesAmount > 0 ? (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-black text-slate-100" style={{ fontSize: scr.mobile ? 13 : 16 }}>
+                {pace.salesProgress}%
+              </span>
+              <span className="text-slate-200 font-semibold" style={{ fontSize: scr.mobile ? 11 : 13 }}>
+                מכירות: {formatCurrency(pace.totalSalesAmount)} / {formatCurrency(pace.targetSalesAmount)}
+              </span>
+            </div>
+            <div className="w-full h-5 bg-surface-elevated rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(100, pace.salesProgress)}%`,
+                  background: pace.salesProgress >= 80 ? "#22c55e" : pace.salesProgress >= 50 ? "#eab308" : "#ef4444",
+                }}
+              />
+            </div>
+          </div>
+        ) : s.targetAmount > 0 ? (
+          <div className="text-slate-300 text-[11px] mb-2 text-right">
+            לא הוגדר יעד מכירות (₪). מוצג יעד עמלות בלבד למטה.
+          </div>
+        ) : (
+          <div className="text-center text-slate-300 text-xs py-2">לא הוגדר יעד לחודש זה</div>
+        )}
+
+        {/* Secondary progress — COMMISSION (smaller, secondary) */}
+        {s.targetAmount > 0 && (
+          <div className="pt-2 border-t border-surface-border">
+            <div className="flex items-center justify-between mb-1" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+              <span className="text-slate-300">{s.targetProgress}%</span>
+              <span className="text-slate-300">
+                עמלות: {formatCurrency(s.netCommission)} / {formatCurrency(s.targetAmount)}
+              </span>
+            </div>
+            <div className="w-full h-2.5 bg-surface-elevated rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
                 style={{
                   width: `${Math.min(100, s.targetProgress)}%`,
                   background: s.targetProgress >= 80 ? "#22c55e" : s.targetProgress >= 50 ? "#eab308" : "#ef4444",
+                  opacity: 0.7,
                 }}
               />
             </div>
-            <div className="flex items-center justify-between text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-              <div className="text-muted">
-                {formatCurrency(s.netCommission)} מתוך {formatCurrency(s.targetAmount)} — {s.targetProgress}%
-              </div>
-              {isLocked && td?.locked_at && (
-                <div className="text-dim text-[9px]">
-                  ננעל ב-{new Date(td.locked_at).toLocaleDateString("he-IL")}
-                </div>
-              )}
-            </div>
-            {td && (td.target_lines_count > 0 || td.target_devices_count > 0) && (
-              <div className="flex gap-4 mt-2 text-[10px] text-muted">
-                {td.target_lines_count > 0 && <span>יעד קווים: {td.target_lines_count}</span>}
-                {td.target_devices_count > 0 && <span>יעד מכשירים: {td.target_devices_count}</span>}
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center text-dim text-xs py-2">לא הוגדר יעד לחודש זה</div>
+          </div>
         )}
+
+        {/* Footer — lock date + count targets */}
+        <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
+          <div className="flex gap-3 text-[10px] text-slate-300">
+            {td && td.target_lines_count > 0 && <span>יעד קווים: {td.target_lines_count}</span>}
+            {td && td.target_devices_count > 0 && <span>יעד מכשירים: {td.target_devices_count}</span>}
+          </div>
+          {isLocked && td?.locked_at && (
+            <div className="text-[9px] text-slate-400">
+              ננעל ב-{new Date(td.locked_at).toLocaleDateString("he-IL")}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Pace Tracking Bar */}
-      {pace.isCurrentMonth && s.targetAmount > 0 && (
+      {/* Pace Tracking Bar — primary metric is SALES per day; commission
+          per day is shown as smaller secondary info. */}
+      {pace.isCurrentMonth && (s.targetAmount > 0 || pace.targetSalesAmount > 0) && (
         <div
           className="card mb-4"
           style={{
@@ -496,38 +635,107 @@ export default function CommissionsDashboard() {
             borderRight: `3px solid ${paceStatusColor(pace.overallPaceStatus)}`,
           }}
         >
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <span
               className="font-bold text-[11px] px-2 py-1 rounded"
               style={{
                 color: paceStatusColor(pace.overallPaceStatus),
-                background: `${paceStatusColor(pace.overallPaceStatus)}15`,
+                background: `${paceStatusColor(pace.overallPaceStatus)}20`,
               }}
             >
               {paceStatusIcon(pace.overallPaceStatus)} {paceStatusLabel(pace.overallPaceStatus)}
             </span>
-            <h3 className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>⏱️ מעקב קצב</h3>
+            <h3 className="font-bold" style={{ fontSize: scr.mobile ? 13 : 15 }}>⏱️ מעקב קצב</h3>
           </div>
-          <div className="grid gap-2" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
-            <div className="text-center">
-              <div className="text-muted text-[9px]">ימי עבודה שעברו</div>
-              <div className="font-bold text-sm">{pace.workingDaysElapsed} / {pace.totalWorkingDays}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-muted text-[9px]">ימי עבודה שנותרו</div>
-              <div className="font-bold text-sm">{pace.workingDaysLeft}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-muted text-[9px]">קצב נוכחי (₪/יום)</div>
-              <div className="font-bold text-sm" style={{ color: paceStatusColor(pace.overallPaceStatus) }}>
-                {formatCurrency(pace.commissionPerDayPace)}
+
+          {/* Primary sales pace (if sales target set) */}
+          {pace.targetSalesAmount > 0 && (
+            <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
+              <div className="text-center rounded-lg p-2" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-slate-300 text-[10px] mb-0.5">ימי עבודה</div>
+                <div className="font-black text-slate-100" style={{ fontSize: scr.mobile ? 14 : 18 }}>
+                  {pace.workingDaysElapsed} / {pace.totalWorkingDays}
+                </div>
+              </div>
+              <div className="text-center rounded-lg p-2" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-slate-300 text-[10px] mb-0.5">נותרו</div>
+                <div className="font-black text-slate-100" style={{ fontSize: scr.mobile ? 14 : 18 }}>
+                  {pace.workingDaysLeft} ימים
+                </div>
+              </div>
+              <div className="text-center rounded-lg p-2" style={{ background: `${paceStatusColor(pace.overallPaceStatus)}15` }}>
+                <div className="text-slate-200 text-[10px] mb-0.5 font-semibold">קצב מכירות</div>
+                <div
+                  className="font-black"
+                  style={{
+                    fontSize: scr.mobile ? 14 : 18,
+                    color: paceStatusColor(pace.overallPaceStatus),
+                  }}
+                >
+                  {formatCurrency(pace.salesPerDayPace)}
+                </div>
+                <div className="text-slate-300 text-[9px]">ליום</div>
+              </div>
+              <div className="text-center rounded-lg p-2" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-slate-200 text-[10px] mb-0.5 font-semibold">נדרש מכירות</div>
+                <div className="font-black text-slate-100" style={{ fontSize: scr.mobile ? 14 : 18 }}>
+                  {formatCurrency(pace.salesRequiredPerDay)}
+                </div>
+                <div className="text-slate-300 text-[9px]">ליום</div>
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-muted text-[9px]">נדרש (₪/יום)</div>
-              <div className="font-bold text-sm">{formatCurrency(pace.commissionRequiredPerDay)}</div>
+          )}
+
+          {/* Fallback — if no sales target, show commission pace as primary */}
+          {pace.targetSalesAmount === 0 && s.targetAmount > 0 && (
+            <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
+              <div className="text-center rounded-lg p-2" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-slate-300 text-[10px] mb-0.5">ימי עבודה</div>
+                <div className="font-black text-slate-100" style={{ fontSize: scr.mobile ? 14 : 18 }}>
+                  {pace.workingDaysElapsed} / {pace.totalWorkingDays}
+                </div>
+              </div>
+              <div className="text-center rounded-lg p-2" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-slate-300 text-[10px] mb-0.5">נותרו</div>
+                <div className="font-black text-slate-100" style={{ fontSize: scr.mobile ? 14 : 18 }}>
+                  {pace.workingDaysLeft} ימים
+                </div>
+              </div>
+              <div className="text-center rounded-lg p-2" style={{ background: `${paceStatusColor(pace.overallPaceStatus)}15` }}>
+                <div className="text-slate-200 text-[10px] mb-0.5 font-semibold">קצב עמלות</div>
+                <div
+                  className="font-black"
+                  style={{
+                    fontSize: scr.mobile ? 14 : 18,
+                    color: paceStatusColor(pace.overallPaceStatus),
+                  }}
+                >
+                  {formatCurrency(pace.commissionPerDayPace)}
+                </div>
+                <div className="text-slate-300 text-[9px]">ליום</div>
+              </div>
+              <div className="text-center rounded-lg p-2" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-slate-200 text-[10px] mb-0.5 font-semibold">נדרש עמלות</div>
+                <div className="font-black text-slate-100" style={{ fontSize: scr.mobile ? 14 : 18 }}>
+                  {formatCurrency(pace.commissionRequiredPerDay)}
+                </div>
+                <div className="text-slate-300 text-[9px]">ליום</div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Secondary — commission pace as footnote (only when sales target set) */}
+          {pace.targetSalesAmount > 0 && s.targetAmount > 0 && (
+            <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-300 pt-2 border-t border-surface-border">
+              <span>
+                קצב עמלות: <span className="font-bold text-slate-100">{formatCurrency(pace.commissionPerDayPace)}</span>/יום
+              </span>
+              <span>
+                נדרש עמלות: <span className="font-bold text-slate-100">{formatCurrency(pace.commissionRequiredPerDay)}</span>/יום
+              </span>
+            </div>
+          )}
+
           {/* Time progress bar */}
           <div className="mt-2">
             <div className="w-full h-2 bg-surface-elevated rounded-full overflow-hidden">
@@ -539,7 +747,7 @@ export default function CommissionsDashboard() {
                 }}
               />
             </div>
-            <div className="text-[9px] text-dim text-center mt-1">
+            <div className="text-[10px] text-slate-300 text-center mt-1">
               {pace.totalWorkingDays > 0 ? Math.round((pace.workingDaysElapsed / pace.totalWorkingDays) * 100) : 0}% מהחודש חלף
             </div>
           </div>
@@ -769,48 +977,51 @@ export default function CommissionsDashboard() {
                 {data.historicalSummary.latestSaleDate ? ` (آخر مبيع: ${data.historicalSummary.latestSaleDate})` : ""}.
               </div>
             )}
-            <table className="w-full text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+            <table className="w-full text-right" style={{ fontSize: scr.mobile ? 11 : 13 }}>
               <thead>
-                <tr className="text-muted border-b border-surface-border">
-                  <th className="py-1.5 font-semibold">מקור</th>
-                  <th className="py-1.5 font-semibold">עמלה</th>
-                  <th className="py-1.5 font-semibold">סכום</th>
-                  <th className="py-1.5 font-semibold">פרטים</th>
-                  <th className="py-1.5 font-semibold">סוג</th>
-                  <th className="py-1.5 font-semibold">תאריך</th>
+                <tr className="text-slate-200 border-b border-surface-border">
+                  <th className="py-2 font-bold">מקור</th>
+                  <th className="py-2 font-bold">עובד</th>
+                  <th className="py-2 font-bold">עמלה</th>
+                  <th className="py-2 font-bold">סכום מכירה</th>
+                  <th className="py-2 font-bold">פרטים</th>
+                  <th className="py-2 font-bold">סוג</th>
+                  <th className="py-2 font-bold">תאריך</th>
                 </tr>
               </thead>
               <tbody>
                 {displayedSales.map((sale) => (
                   <tr key={sale.id} className="border-b border-surface-border/50">
-                    <td className="py-1.5">
-                      <span className="text-[9px]">{sale.source === "auto_sync" ? "🔄" : "✏️"}</span>
+                    <td className="py-2">
+                      <span className="text-[10px]">{sale.source === "auto_sync" ? "🔄" : "✏️"}</span>
                     </td>
-                    <td className="py-1.5 font-bold" style={{ color: "#22c55e" }}>{formatCurrency(sale.commission_amount)}</td>
-                    <td className="py-1.5">{formatCurrency(sale.sale_type === "line" ? (sale.package_price || 0) : (sale.device_sale_amount || 0))}</td>
-                    <td className="py-1.5">
-                      <div>{sale.sale_type === "line" ? (sale.customer_name || "—") : (sale.device_name || "—")}</div>
+                    <td className="py-2">
+                      {sale.employee_name ? (
+                        <span className="font-semibold text-slate-100">{sale.employee_name}</span>
+                      ) : (
+                        <span className="badge" style={{ background: "#f59e0b20", color: "#f59e0b", fontSize: 9 }}>
+                          ללא שיוך
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 font-bold" style={{ color: "#22c55e" }}>{formatCurrency(sale.commission_amount)}</td>
+                    <td className="py-2 font-bold text-slate-100">{formatCurrency(sale.sale_type === "line" ? (sale.package_price || 0) : (sale.device_sale_amount || 0))}</td>
+                    <td className="py-2">
+                      <div className="text-slate-100">{sale.sale_type === "line" ? (sale.customer_name || "—") : (sale.device_name || "—")}</div>
                       {(sale.order_id || sale.store_customer_code_snapshot) && (
-                        <div className="mt-1 text-[9px] text-muted">
+                        <div className="mt-1 text-[10px] text-slate-300">
                           {sale.order_id ? `#${sale.order_id}` : ""}
                           {sale.order_id && sale.store_customer_code_snapshot ? " · " : ""}
                           {sale.store_customer_code_snapshot || ""}
                         </div>
                       )}
-                      {sale.source === "auto_sync" && !sale.employee_id && (
-                        <div className="mt-1 flex flex-wrap justify-end gap-1 text-[9px]">
-                          <span className="badge" style={{ background: "#f59e0b20", color: "#f59e0b" }}>
-                            ללא עובד
-                          </span>
-                        </div>
-                      )}
                     </td>
-                    <td className="py-1.5">
-                      <span className="badge text-[9px]" style={{ background: sale.sale_type === "line" ? "#3b82f620" : "#ef444420", color: sale.sale_type === "line" ? "#3b82f6" : "#ef4444" }}>
+                    <td className="py-2">
+                      <span className="badge text-[10px]" style={{ background: sale.sale_type === "line" ? "#3b82f620" : "#ef444420", color: sale.sale_type === "line" ? "#60a5fa" : "#f87171" }}>
                         {sale.sale_type === "line" ? "קו" : "מכשיר"}
                       </span>
                     </td>
-                    <td className="py-1.5">{sale.sale_date}</td>
+                    <td className="py-2 text-slate-200">{sale.sale_date}</td>
                   </tr>
                 ))}
               </tbody>
@@ -875,34 +1086,69 @@ export default function CommissionsDashboard() {
             </div>
           ) : (
             <>
-              <FormField label="סכום יעד כולל (₪)" required>
-                <input
-                  type="number"
-                  className="input"
-                  value={targetAmount}
-                  onChange={(e) => setTargetAmount(e.target.value)}
-                  placeholder="לדוגמה: 15000"
-                />
-              </FormField>
-              <FormField label="יעד קווים (מספר קווים)">
-                <input
-                  type="number"
-                  className="input"
-                  value={targetLinesCount}
-                  onChange={(e) => setTargetLinesCount(e.target.value)}
-                  placeholder="לדוגמה: 50"
-                />
-              </FormField>
-              <FormField label="יעד מכירות מכשירים (מספר מכשירים)">
-                <input
-                  type="number"
-                  className="input"
-                  value={targetDevicesCount}
-                  onChange={(e) => setTargetDevicesCount(e.target.value)}
-                  placeholder="לדוגמה: 20"
-                />
-              </FormField>
-              <div className="text-muted text-[10px] mb-3">חודש: {month}</div>
+              {/* Sales-focused fields first (primary page focus) */}
+              <div className="rounded-xl border border-state-success/30 bg-state-success/5 p-3 mb-3">
+                <div className="font-bold text-state-success text-[12px] mb-2 text-right">
+                  💰 יעדי מכירות (₪)
+                </div>
+                <FormField label="יעד מכירות חודשי (₪) — סך קווים + מכשירים">
+                  <input
+                    type="number"
+                    className="input"
+                    value={targetSalesAmountInput}
+                    onChange={(e) => setTargetSalesAmountInput(e.target.value)}
+                    placeholder="לדוגמה: 300000"
+                  />
+                </FormField>
+                <FormField label="הוספה ידנית למכירות (₪) — מכירות אופליין או חיצוניות">
+                  <input
+                    type="number"
+                    className="input"
+                    value={manualSalesAddOnInput}
+                    onChange={(e) => setManualSalesAddOnInput(e.target.value)}
+                    placeholder="לדוגמה: 15000 (ערך מכירה, לא עמלה)"
+                  />
+                  <div className="text-[10px] text-slate-300 mt-1">
+                    מתווסף לסכום המכירות האוטומטי, לא מחליף אותו.
+                  </div>
+                </FormField>
+              </div>
+
+              {/* Commission target (still needed, but secondary) */}
+              <div className="rounded-xl border border-surface-border bg-surface/50 p-3 mb-3">
+                <div className="font-bold text-slate-200 text-[12px] mb-2 text-right">
+                  💵 יעדי עמלות
+                </div>
+                <FormField label="יעד עמלות חודשי (₪)" required>
+                  <input
+                    type="number"
+                    className="input"
+                    value={targetAmount}
+                    onChange={(e) => setTargetAmount(e.target.value)}
+                    placeholder="לדוגמה: 15000"
+                  />
+                </FormField>
+                <FormField label="יעד קווים (מספר קווים)">
+                  <input
+                    type="number"
+                    className="input"
+                    value={targetLinesCount}
+                    onChange={(e) => setTargetLinesCount(e.target.value)}
+                    placeholder="לדוגמה: 50"
+                  />
+                </FormField>
+                <FormField label="יעד מכירות מכשירים (מספר מכשירים)">
+                  <input
+                    type="number"
+                    className="input"
+                    value={targetDevicesCount}
+                    onChange={(e) => setTargetDevicesCount(e.target.value)}
+                    placeholder="לדוגמה: 20"
+                  />
+                </FormField>
+              </div>
+
+              <div className="text-slate-300 text-[11px] mb-3">חודש: {month}</div>
               <button onClick={handleSetTarget} className="btn-primary w-full">שמור יעד</button>
             </>
           )}
