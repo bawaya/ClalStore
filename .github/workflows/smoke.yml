@@ -16,7 +16,7 @@ jobs:
     # Only run for successful deployments or when manually/scheduled
     if: github.event.deployment_status.state == 'success' || github.event_name != 'deployment_status'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
