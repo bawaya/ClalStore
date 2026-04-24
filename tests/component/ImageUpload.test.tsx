@@ -8,6 +8,7 @@ vi.mock("@/lib/hooks", () => ({
 
 vi.mock("@/lib/csrf-client", () => ({
   csrfHeaders: () => ({ "Content-Type": "application/json" }),
+  getCsrfToken: () => "test-csrf-token",
 }));
 
 import { ImageUpload } from "@/components/admin/ImageUpload";

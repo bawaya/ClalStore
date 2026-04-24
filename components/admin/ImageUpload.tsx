@@ -66,6 +66,7 @@ export function ImageUpload({
       const data = await res.json();
       if (data.success && data.url) {
         onChange(data.url);
+        setError("");
       } else {
         setError(data.error || "فشل رفع الصورة");
       }
@@ -108,6 +109,7 @@ export function ImageUpload({
       const data = await res.json();
       if (data.success && data.url) {
         onChange(data.url);
+        setError("");
       } else {
         setError(data.error || "فشل تحسين الصورة");
       }
