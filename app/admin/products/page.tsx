@@ -12,7 +12,7 @@ import { PRODUCT_TYPES } from "@/lib/constants";
 import { calcMargin } from "@/lib/utils";
 import { aiEnhanceProduct, translateProductName, detectProductType, findDuplicates } from "@/lib/admin/ai-tools";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
-import { csrfHeaders } from "@/lib/csrf-client";
+import { csrfHeaders, getCsrfToken } from "@/lib/csrf-client";
 
 const EMPTY: Partial<Product> = {
   type: "device", brand: "", name_ar: "", name_en: "", name_he: "", price: 0, old_price: undefined,
@@ -68,7 +68,12 @@ export default function ProductsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+      // CSRF: send only the token header — browser sets multipart boundary automatically.
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: { "x-csrf-token": getCsrfToken() },
+        body: formData,
+      });
       const data = await res.json();
       if (data.success) return data.url;
       show(`❌ ${data.error}`, "error");

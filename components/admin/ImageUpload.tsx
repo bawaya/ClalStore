@@ -8,7 +8,7 @@
 
 import { useState, useRef } from "react";
 import { useScreen } from "@/lib/hooks";
-import { csrfHeaders } from "@/lib/csrf-client";
+import { csrfHeaders, getCsrfToken } from "@/lib/csrf-client";
 
 interface ImageUploadProps {
   value: string;
@@ -57,7 +57,12 @@ export function ImageUpload({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+      // CSRF: only the token header — let the browser set the multipart boundary automatically.
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: { "x-csrf-token": getCsrfToken() },
+        body: formData,
+      });
       const data = await res.json();
       if (data.success && data.url) {
         onChange(data.url);
