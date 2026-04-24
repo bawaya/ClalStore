@@ -12,7 +12,7 @@ export interface CartItem {
   name: string;
   name_he?: string;        // Hebrew name for language switching
   brand: string;
-  type: "device" | "accessory";
+  type: "device" | "accessory" | "appliance" | "tv" | "computer" | "tablet" | "network";
   price: number;
   image?: string;
   color?: string;
@@ -39,6 +39,13 @@ interface CartStore {
   getSubtotal: () => number;
   getTotal: () => number;
   hasDevices: () => boolean;
+  hasAppliances: () => boolean;
+  /**
+   * True if the cart contains any big-ticket item that should go through the
+   * bank-transfer + installment checkout flow. Mirrors the mobile device flow
+   * for appliances so the customer experience is identical.
+   */
+  hasInstallmentItems: () => boolean;
   hasOnlyAccessories: () => boolean;
 }
 
@@ -99,6 +106,13 @@ export const useCart = create<CartStore>()(
       getTotal: () => Math.max(0, get().getSubtotal() - get().discountAmount),
 
       hasDevices: () => get().items.some((i) => i.type === "device"),
+
+      hasAppliances: () => get().items.some((i) => i.type === "appliance"),
+
+      // Bank-transfer + ID-required flow applies to anything that's not a pure accessory.
+      // TV/computer/tablet/appliance/device all use the same checkout experience.
+      hasInstallmentItems: () =>
+        get().items.some((i) => i.type !== "accessory"),
 
       hasOnlyAccessories: () => {
         const items = get().items;

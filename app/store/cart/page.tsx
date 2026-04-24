@@ -235,7 +235,9 @@ export default function CartPage() {
   const items = cart.items;
   const subtotal = cart.getSubtotal();
   const total = cart.getTotal();
-  const hasDevices = cart.hasDevices();
+  // hasInstallmentItems: any device OR appliance → bank transfer + installments flow
+  // (mobile devices and smart appliances share the exact same payment experience)
+  const hasInstallmentItems = cart.hasInstallmentItems();
   const onlyAccessories = cart.hasOnlyAccessories();
 
   const [step, setStep] = useState(0);
@@ -358,7 +360,7 @@ export default function CartPage() {
     if (info.email && !validateEmail(info.email)) e.email = "بريد غير صالح";
     if (!info.city) e.city = "اختر مدينة";
     if (!info.address.trim()) e.address = "مطلوب";
-    if (hasDevices && !validateIsraeliID(info.idNumber)) e.idNumber = "هوية غير صالحة (9 أرقام)";
+    if (hasInstallmentItems && !validateIsraeliID(info.idNumber)) e.idNumber = "هوية غير صالحة (9 أرقام)";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -366,8 +368,8 @@ export default function CartPage() {
   // === Validate Payment ===
   const validatePay = (): boolean => {
     const e: Record<string, string> = {};
-    // Devices → bank transfer only, need bank details
-    if (hasDevices) {
+    // Devices + appliances → bank transfer only, need bank details
+    if (hasInstallmentItems) {
       if (!pay.bank) e.bank = "اختر بنك";
       if (!validateBranch(pay.branch)) e.branch = "3 أرقام";
       if (!validateAccount(pay.account)) e.account = "4-9 أرقام";
@@ -382,9 +384,9 @@ export default function CartPage() {
     setLoading(true);
     try {
       // 1. Create the order
-      // Devices → bank transfer only | Accessories → credit (Rivhit redirect)
+      // Devices + appliances → bank transfer only | Accessories → credit (Rivhit redirect)
       const monthlyAmount = pay.installments > 1 ? Math.ceil(total / pay.installments) : total;
-      const paymentData = hasDevices
+      const paymentData = hasInstallmentItems
         ? { type: "bank", bank: pay.bank, branch: pay.branch, account: pay.account, installments: pay.installments, monthly_amount: monthlyAmount }
         : { type: "credit" };
 
@@ -472,7 +474,7 @@ export default function CartPage() {
         customer: info.name,
         phone: info.phone,
         notes: info.notes,
-        hasDevice: hasDevices,
+        hasDevice: hasInstallmentItems,
         date: new Date().toLocaleDateString("ar-EG"),
         installments: pay.installments,
         monthlyAmount: pay.installments > 1 ? Math.ceil(total / pay.installments) : total,
@@ -549,7 +551,7 @@ export default function CartPage() {
               🎉 خصم: -₪{cart.discountAmount}
             </div>
           )}
-          {hasDevices && (
+          {hasInstallmentItems && (
             <div className="bg-state-info/10 rounded-xl p-2.5 mb-2 text-state-info text-right" style={{ fontSize: scr.mobile ? 9 : 11 }}>
               📋 سلتك تحتوي جهاز — يخضع لفحص الفريق + ستحتاج هوية وبيانات بنك
             </div>
@@ -614,7 +616,7 @@ export default function CartPage() {
           <div className="flex-1"><CityCombobox value={info.city} onChange={(v) => setInfo({ ...info, city: v })} error={errors.city} /></div>
           <div className="flex-1"><Field label="📍 العنوان بالتفصيل *" error={errors.address} htmlFor="checkout-address"><input id="checkout-address" className={inp} value={info.address} onChange={(e) => setInfo({ ...info, address: e.target.value })} placeholder="شارع + رقم بيت" /></Field></div>
         </div>
-        {hasDevices && (
+        {hasInstallmentItems && (
           <Field label="🪪 رقم الهوية * (תעודת זהות — 9 أرقام)" error={errors.idNumber} htmlFor="checkout-id">
             <input id="checkout-id" className={inp} value={info.idNumber} onChange={(e) => setInfo({ ...info, idNumber: e.target.value.replace(/\D/g, "").slice(0, 9) })} placeholder="XXXXXXXXX" maxLength={9} dir="ltr" />
           </Field>
@@ -641,9 +643,9 @@ export default function CartPage() {
           <div className="text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 11 }}>{items.length} منتج • التوصيل: {info.city}</div>
         </div>
 
-        {hasDevices ? (
+        {hasInstallmentItems ? (
           <>
-            {/* Devices → bank transfer only */}
+            {/* Devices + appliances → bank transfer only */}
             <div className="rounded-xl p-3 mb-3 text-right" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.12)" }}>
               <div className="text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>📋 طلبات الأجهزة تخضع لفحص ومراجعة الفريق — الدفع عبر تحويل بنكي</div>
             </div>
@@ -707,7 +709,7 @@ export default function CartPage() {
           className={`btn-primary w-full mt-2 disabled:opacity-50 ${loading ? "animate-pulse cursor-not-allowed" : ""}`}
           style={{ fontSize: scr.mobile ? 14 : 16, padding: "14px 20px" }}
         >
-          {loading ? "⏳ جاري المعالجة..." : hasDevices
+          {loading ? "⏳ جاري المعالجة..." : hasInstallmentItems
             ? `📋 تأكيد الطلب — ₪${total.toLocaleString()}`
             : `🔒 متابعة للدفع الآمن — ₪${total.toLocaleString()}`}
         </button>

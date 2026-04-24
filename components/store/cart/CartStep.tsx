@@ -20,7 +20,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
   const subtotal = useCart((s) => s.getSubtotal());
   const total = useCart((s) => s.getTotal());
   const discountAmount = useCart((s) => s.discountAmount);
-  const hasDevices = useCart((s) => s.hasDevices());
+  const hasInstallmentItems = useCart((s) => s.hasInstallmentItems());
   const onlyAccessories = useCart((s) => s.hasOnlyAccessories());
   const removeItem = useCart((s) => s.removeItem);
 
@@ -57,7 +57,15 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
                   {lang === "he" ? (item.name_he || item.name) : item.name}
                 </div>
                 <div className="text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                  {item.brand} • {item.type === "device" ? "📱 جهاز" : "🔌 إكسسوار"}
+                  {item.brand} • {
+                    item.type === "device" ? "📱 جهاز"
+                    : item.type === "appliance" ? "🏠 جهاز ذكي"
+                    : item.type === "tv" ? "📺 تلفزيون"
+                    : item.type === "computer" ? "💻 كمبيوتر"
+                    : item.type === "tablet" ? "📱 تابلت"
+                    : item.type === "network" ? "📡 راوتر"
+                    : "🔌 إكسسوار"
+                  }
                   {item.color && ` • ${lang === "he" ? (item.color_he || item.color) : item.color}`}
                   {item.storage && ` • ${item.storage}`}
                 </div>
@@ -93,7 +101,7 @@ export function CartStep({ couponInput, setCouponInput, onApplyCoupon, onNext }:
               🎉 خصم: -₪{discountAmount}
             </div>
           )}
-          {hasDevices && (
+          {hasInstallmentItems && (
             <div
               className="glass-elevated rounded-xl p-2.5 mb-2 text-state-info text-right"
               style={{ fontSize: scr.mobile ? 9 : 11 }}

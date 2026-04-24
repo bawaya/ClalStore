@@ -12,7 +12,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function StorePage() {
   const [products, heroes, linePlans] = await Promise.all([
-    getProducts({ limit: 500 }),
+    getProducts({ limit: 500, types: ["device", "accessory"] }),
+    // Note: appliance / tv / computer / tablet / network have their own dedicated storefronts.
     getHeroes(),
     getLinePlans(),
   ]);

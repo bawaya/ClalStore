@@ -113,7 +113,8 @@ export function useAdminApi<T>({ endpoint, autoFetch = true, paginate }: UseAdmi
   const remove = async (id: string) => {
     setError("");
     try {
-      const res = await fetch(`${endpoint}?id=${id}`, { method: "DELETE", headers: csrfHeaders() });
+      const sep = endpoint.includes("?") ? "&" : "?";
+      const res = await fetch(`${endpoint}${sep}id=${id}`, { method: "DELETE", headers: csrfHeaders() });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       await silentRefresh();
@@ -127,7 +128,8 @@ export function useAdminApi<T>({ endpoint, autoFetch = true, paginate }: UseAdmi
   const bulkRemove = async (ids: string[]) => {
     setError("");
     try {
-      const res = await fetch(`${endpoint}?ids=${ids.join(",")}`, { method: "DELETE", headers: csrfHeaders() });
+      const sep = endpoint.includes("?") ? "&" : "?";
+      const res = await fetch(`${endpoint}${sep}ids=${ids.join(",")}`, { method: "DELETE", headers: csrfHeaders() });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       await silentRefresh();

@@ -108,6 +108,9 @@ export const GET = withPermission(
   "view",
   async (req: NextRequest) => {
     const { searchParams } = new URL(req.url);
+    const pt = searchParams.get("productType");
+    const productType: "device" | "accessory" | "appliance" | undefined =
+      pt === "device" || pt === "accessory" || pt === "appliance" ? pt : undefined;
     const filters = {
       status: searchParams.get("status") || undefined,
       source: searchParams.get("source") || undefined,
@@ -116,6 +119,7 @@ export const GET = withPermission(
       dateTo: searchParams.get("dateTo") || undefined,
       amountMin: searchParams.get("amountMin") ? Number(searchParams.get("amountMin")) : undefined,
       amountMax: searchParams.get("amountMax") ? Number(searchParams.get("amountMax")) : undefined,
+      productType,
     };
     const data = await getCRMOrders(filters);
     return apiSuccess(data);

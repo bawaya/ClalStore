@@ -328,9 +328,61 @@ export type Database = {
 
 // ===== Entity Types =====
 
+export type ProductType =
+  | "device"
+  | "accessory"
+  | "appliance"
+  | "tv"
+  | "computer"
+  | "tablet"
+  | "network";
+
+export type ApplianceKind =
+  | "robot_vacuum"
+  | "air_fryer"
+  | "espresso"
+  | "kettle"
+  | "blender"
+  | "ninja_pot"
+  | "coffee_maker"
+  | "iron"
+  | "hair_dryer"
+  | "smart_speaker"
+  | "food_processor"
+  | "stand_mixer"
+  | "stick_vacuum"
+  | "hair_styler"
+  | "shaver_trimmer"
+  | "juicer"
+  | "toaster"
+  | "steam_grill"
+  | "popcorn"
+  | "ice_maker"
+  | "ipl_hair_removal"
+  | "cookware_set"
+  | "fan"
+  | "microwave"
+  | "other";
+
+export type TvSubkind = "oled" | "qled" | "neo_qled" | "mini_led" | "uhd" | "nano" | "fhd" | "other";
+export type ComputerSubkind =
+  | "laptop_gaming"
+  | "laptop_business"
+  | "laptop_2in1"
+  | "desktop"
+  | "printer_inkjet"
+  | "printer_laser"
+  | "printer_aio"
+  | "other";
+export type TabletSubkind = "apple_pro" | "apple_air" | "apple_basic" | "kids" | "android" | "other";
+export type NetworkSubkind = "router_mesh" | "wifi_extender" | "switch" | "access_point" | "other";
+export type ProductSubkind = TvSubkind | ComputerSubkind | TabletSubkind | NetworkSubkind;
+
+export type ProductVariantKind = "storage" | "model" | "color_only";
+
 export type Product = {
   id: string;
-  type: "device" | "accessory";
+  type: ProductType;
   brand: string;
   name_ar: string;
   name_en?: string;
@@ -352,6 +404,11 @@ export type Product = {
   active: boolean;
   featured: boolean;
   sort_position?: number;
+  warranty_months?: number | null;
+  model_number?: string | null;
+  variant_kind?: ProductVariantKind;
+  appliance_kind?: ApplianceKind | null;
+  subkind?: ProductSubkind | null;
   created_at: string;
   updated_at: string;
 }
@@ -666,11 +723,14 @@ export type AuditEntry = {
   created_at: string;
 }
 
+export type CategoryKind = "mobile" | "appliance";
+
 export type Category = {
   id: string;
   name_ar: string;
   name_he: string;
   type: "auto" | "manual";
+  kind?: CategoryKind;
   rule?: string;           // for auto collections
   product_ids: string[];   // for manual collections
   sort_order: number;
@@ -985,11 +1045,13 @@ export type LoyaltyTransaction = {
   created_at: string;
 }
 
+export type CommissionSaleType = "line" | "device" | "appliance" | "tv" | "computer" | "tablet" | "network";
+
 export type CommissionSale = {
   id: number;
   user_id?: string | null;
   sale_date: string;
-  sale_type: "line" | "device";
+  sale_type: CommissionSaleType;
   source: "manual" | "auto_sync" | "csv_import";
   order_id?: string | null;
   customer_id?: string | null;
@@ -1061,6 +1123,8 @@ export type EmployeeCommissionProfile = {
   line_multiplier: number;
   device_rate: number;
   device_milestone_bonus: number;
+  appliance_rate: number;
+  appliance_milestone_bonus: number;
   min_package_price: number;
   loyalty_bonuses: Record<string, number>;
   notes?: string | null;
@@ -1112,7 +1176,7 @@ export type SalesDoc = {
 export type SalesDocItem = {
   id: number;
   sales_doc_id: number;
-  item_type: "line" | "device" | "accessory";
+  item_type: "line" | "device" | "accessory" | "appliance" | "tv" | "computer" | "tablet" | "network";
   product_id?: string | null;
   product_name?: string | null;
   qty: number;

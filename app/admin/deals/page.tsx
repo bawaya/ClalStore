@@ -230,6 +230,7 @@ export default function AdminDealsPage() {
                   label="صورة العرض"
                   dimensions={IMAGE_DIMS.deal}
                   previewHeight={100}
+                  enableEnhance
                 />
               </div>
               <FormField label="الكمية المحدودة (0 = بلا حد)">

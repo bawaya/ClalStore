@@ -3,7 +3,7 @@
 import { useState, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, Scale, Smartphone, Plug, Truck, Camera, Battery, Cpu } from "lucide-react";
+import { Heart, Scale, Smartphone, Plug, Home, Truck, Camera, Battery, Cpu } from "lucide-react";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
@@ -11,6 +11,7 @@ import { useCompare } from "@/lib/store/compare";
 import { useWishlist } from "@/lib/store/wishlist";
 import { calcDiscount, getProductName, getColorName, getDescription } from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
+import { INSTALLMENTS_BY_TYPE } from "@/lib/constants";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
 
 /* ── variant helpers ── */
@@ -42,6 +43,8 @@ function getWarrantyKey(p: Product): string | null {
     return "store.warrantyYear";
   }
   if (p.type === "device") return "store.warranty2";
+  if (p.type === "appliance" && p.warranty_months && p.warranty_months >= 24) return "store.warranty2";
+  if (p.type === "appliance" && p.warranty_months && p.warranty_months >= 12) return "store.warrantyYear";
   return null;
 }
 
@@ -82,7 +85,7 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
       name: p.name_ar,
       name_he: p.name_he || undefined,
       brand: p.brand,
-      type: p.type as "device" | "accessory",
+      type: p.type,
       price: displayPrice,
       image: (activeColor?.image) || p.image_url || undefined,
       color: activeColor?.name_ar,
@@ -203,6 +206,8 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
             <span className="flex items-center justify-center">
               {p.type === "device" ? (
                 <Smartphone size={scr.mobile ? 32 : 48} className="opacity-15" />
+              ) : p.type === "appliance" ? (
+                <Home size={scr.mobile ? 32 : 48} className="opacity-15" />
               ) : (
                 <Plug size={scr.mobile ? 32 : 48} className="opacity-15" />
               )}
@@ -350,14 +355,22 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
             </span>
           )}
         </div>
-        {p.type === "device" && displayPrice > 0 && (
-          <div className="mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-            <span className="text-[#a78bfa] font-semibold">
-              ₪{(activeVariant?.monthly_price ?? Math.ceil(displayPrice / 36)).toLocaleString()} × 36
-            </span>
-            <span className="text-[#a1a1aa] me-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>{t("store2.monthly")}</span>
-          </div>
-        )}
+        {(() => {
+          const months = INSTALLMENTS_BY_TYPE[p.type] || 0;
+          if (!months || displayPrice <= 0) return null;
+          const monthly = activeVariant?.monthly_price;
+          // Only show "× 36" line when admin has set an explicit monthly_price (long-term financed price).
+          // We never invent a price/36 fallback because that would misrepresent the installment cost.
+          if (!monthly) return null;
+          return (
+            <div className="mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+              <span className="text-[#a78bfa] font-semibold">
+                ₪{monthly.toLocaleString()} × {months}
+              </span>
+              <span className="text-[#a1a1aa] me-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>{t("store2.monthly")}</span>
+            </div>
+          );
+        })()}
 
         {/* ── Stock indicator ── */}
         {(() => {

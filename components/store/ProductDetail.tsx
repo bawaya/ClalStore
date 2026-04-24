@@ -14,7 +14,9 @@ import { ProductCard } from "./ProductCard";
 import { ProductReviews } from "./ProductReviews";
 import { Footer } from "@/components/website/sections";
 import { ToastContainer } from "@/components/ui/Toast";
-import type { Product, ProductColor, ProductVariant } from "@/types/database";
+import { ProductAssistantWidget } from "./ProductAssistantWidget";
+import { APPLIANCE_KINDS, INSTALLMENTS_BY_TYPE } from "@/lib/constants";
+import type { Product, ProductColor, ProductVariant, ProductVariantKind } from "@/types/database";
 
 /* ── variant helpers ── */
 function getActiveVariant(p: Product, storageIdx: number): ProductVariant | null {
@@ -103,7 +105,7 @@ export function ProductDetailClient({
       name: p.name_ar,
       name_he: p.name_he || undefined,
       brand: p.brand,
-      type: p.type as "device" | "accessory",
+      type: p.type,
       price: displayPrice,
       image: (activeColor?.image) || p.image_url || undefined,
       color: activeColor?.name_ar,
@@ -142,7 +144,7 @@ export function ProductDetailClient({
                 <Image src={allImages[selImage] || allImages[0]} alt={productName} fill sizes="(max-width: 768px) 100vw, 380px" className="object-contain drop-shadow-lg p-4" priority />
               ) : (
                 <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
-                  {p.type === "device" ? "📱" : "🔌"}
+                  {p.type === "device" ? "📱" : p.type === "appliance" ? "🏠" : "🔌"}
                 </span>
               )}
             </div>
@@ -203,10 +205,17 @@ export function ProductDetailClient({
                 </>
               )}
             </div>
-            {p.type === "device" && displayPrice > 0 && (
+            {/* Cash price tag — eligible for cash or up to 18 interest-free installments */}
+            {displayPrice > 0 && (INSTALLMENTS_BY_TYPE[p.type] || 0) > 0 && (
+              <div className="mb-1 text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                💵 {lang === "he" ? "מזומן או עד 18 תשלומים ללא ריבית" : "نقد أو حتى 18 قسط بدون فوائد"}
+              </div>
+            )}
+            {/* Long-term financed installment — only when admin set monthly_price explicitly */}
+            {displayPrice > 0 && activeVariant?.monthly_price && (INSTALLMENTS_BY_TYPE[p.type] || 0) > 0 && (
               <div className="mb-4" style={{ fontSize: scr.mobile ? 12 : 14 }}>
                 <span className="text-[#a78bfa] font-bold">
-                  ₪{(activeVariant?.monthly_price ?? Math.ceil(displayPrice / 36)).toLocaleString()} × 36
+                  أو ₪{activeVariant.monthly_price.toLocaleString()} × {INSTALLMENTS_BY_TYPE[p.type]}
                 </span>
                 <span className="text-muted me-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t("store2.monthlyInstallment")}</span>
               </div>
@@ -221,6 +230,35 @@ export function ProductDetailClient({
             {p.type === "accessory" && (
               <div className="glass-elevated rounded-button p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
                 <span className="text-state-success">{t("detail.accessoryNote")}</span>
+              </div>
+            )}
+            {p.type === "appliance" && (
+              <div className="glass-elevated rounded-button p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                <span className="text-cyan-300/90">{t("detail.applianceNote")}</span>
+              </div>
+            )}
+
+            {(p.type === "appliance" || p.type === "tv" || p.type === "computer" || p.type === "tablet" || p.type === "network") &&
+              ((p.warranty_months != null && p.warranty_months > 0) || p.model_number || p.appliance_kind) && (
+              <div className="flex flex-wrap gap-2 mb-3 text-[11px] text-muted">
+                {p.warranty_months != null && p.warranty_months > 0 && (
+                  <span className="badge bg-surface-elevated">
+                    {t("detail.warranty")}: {p.warranty_months} {lang === "he" ? "חודשים" : "شهر"}
+                  </span>
+                )}
+                {p.model_number && (
+                  <span className="badge bg-surface-elevated" dir="ltr">
+                    {t("detail.modelNumber")}: {p.model_number}
+                  </span>
+                )}
+                {p.appliance_kind && APPLIANCE_KINDS[p.appliance_kind as keyof typeof APPLIANCE_KINDS] && (
+                  <span className="badge bg-surface-elevated">
+                    {APPLIANCE_KINDS[p.appliance_kind as keyof typeof APPLIANCE_KINDS].icon}{" "}
+                    {lang === "he"
+                      ? APPLIANCE_KINDS[p.appliance_kind as keyof typeof APPLIANCE_KINDS].labelHe
+                      : APPLIANCE_KINDS[p.appliance_kind as keyof typeof APPLIANCE_KINDS].label}
+                  </span>
+                )}
               </div>
             )}
 
@@ -251,10 +289,14 @@ export function ProductDetailClient({
               </div>
             )}
 
-            {/* Storage */}
+            {/* Storage / model options (hidden for color_only with no options) */}
             {storage.length > 0 && (
               <div className="mb-4">
-                <div className="text-muted mb-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t("detail.storage")}</div>
+                <div className="text-muted mb-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+                  {p.type === "appliance" && (p.variant_kind as ProductVariantKind | undefined) === "model"
+                    ? t("detail.variantModel")
+                    : t("detail.storage")}
+                </div>
                 <div className="flex gap-1">
                   {storage.map((s, i) => (
                     <button
@@ -370,6 +412,8 @@ export function ProductDetailClient({
       </div>
 
       <ToastContainer toasts={toasts} />
+
+      <ProductAssistantWidget page="product" product={p} />
 
       <Footer />
     </div>

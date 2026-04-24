@@ -232,6 +232,8 @@ describe("registerSaleCommission — happy paths", () => {
       line_multiplier: 5,
       device_rate: 0.07,
       device_milestone_bonus: 3000,
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 25,
       loyalty_bonuses: { "6": 150 },
     };

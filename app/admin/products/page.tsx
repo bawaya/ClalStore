@@ -23,7 +23,8 @@ const EMPTY: Partial<Product> = {
 export default function ProductsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  const { data: products, loading, error, clearError, create, update, remove, bulkRemove, pagination, setPage } = useAdminApi<Product>({ endpoint: "/api/admin/products", paginate: { limit: 20 } });
+  // Mobile admin: only devices + accessories. Appliances have their own /admin/appliances page.
+  const { data: products, loading, error, clearError, create, update, remove, bulkRemove, pagination, setPage } = useAdminApi<Product>({ endpoint: "/api/admin/products?types=device,accessory", paginate: { limit: 20 } });
 
   const [modal, setModal] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());

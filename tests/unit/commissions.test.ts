@@ -69,6 +69,8 @@ describe("Commission Helpers", () => {
           line_multiplier: 4,
           device_rate: 0.03,
           device_milestone_bonus: 1000,
+          appliance_rate: 0.05,
+          appliance_milestone_bonus: 0,
           min_package_price: 19.9,
           loyalty_bonuses: {},
         },

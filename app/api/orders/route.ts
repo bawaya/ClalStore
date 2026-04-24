@@ -78,8 +78,10 @@ export async function POST(req: NextRequest) {
       return apiError("عناصر غير صالحة — يجب أن يحتوي كل منتج على معرّف", 400);
     }
 
-    const hasDevice = items.some((i: CartItem) => i.type === "device");
-    if (hasDevice && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
+    const hasInstallment = items.some(
+      (i: CartItem) => i.type === "device" || i.type === "appliance",
+    );
+    if (hasInstallment && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
       return apiError("رقم هوية غير صالح", 400);
     }
 
@@ -250,7 +252,7 @@ export async function POST(req: NextRequest) {
       }
     }
     const total = Math.max(0, itemsTotal - discount);
-    const _onlyAccessories = !hasDevice && items.length > 0;
+    const _onlyAccessories = !hasInstallment && items.length > 0;
 
     // === 2b. Atomic order creation via RPC (single transaction) ===
     const orderItems = verifiedItems.map((i: CartItem) => ({
@@ -276,10 +278,10 @@ export async function POST(req: NextRequest) {
         p_discount_amount: discount,
         p_total: total,
         p_coupon_code: couponCode || "",
-        p_payment_method: hasDevice ? "bank" : "credit",
+        p_payment_method: hasInstallment ? "bank" : "credit",
         p_payment_details: {
           ...(payment || {}),
-          payment_status: hasDevice ? "pending" : "awaiting_redirect",
+          payment_status: hasInstallment ? "pending" : "awaiting_redirect",
         },
         p_shipping_city: customer.city,
         p_shipping_address: customer.address,
@@ -345,7 +347,7 @@ export async function POST(req: NextRequest) {
             customer.name,
             total,
             verifiedItems.map((i: CartItem) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
-            hasDevice ? "bank" : "credit",
+            hasInstallment ? "bank" : "credit",
             customer.city,
             customer.address,
           );
@@ -363,12 +365,12 @@ export async function POST(req: NextRequest) {
     return apiSuccess({
       orderId,
       total,
-      status: hasDevice ? "new" : "pending_payment",
+      status: hasInstallment ? "new" : "pending_payment",
       // Only accessories get Rivhit payment redirect
-      needsPayment: !hasDevice,
+      needsPayment: !hasInstallment,
       customerCode: customerCode || undefined,
       isNewCustomer,
-      message: hasDevice
+      message: hasInstallment
         ? "تم استلام الطلب — الفريق سيتواصل معك"
         : "جاري تحويلك لصفحة الدفع الآمنة...",
     });

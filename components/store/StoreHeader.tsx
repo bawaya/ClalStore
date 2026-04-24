@@ -32,6 +32,11 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
   const navLinks = [
     { href: "/", label: t("nav.home") },
     { href: "/store", label: t("nav.store") },
+    { href: "/store/tvs", label: t("nav.tvs") },
+    { href: "/store/computers", label: t("nav.computers") },
+    { href: "/store/tablets", label: t("nav.tablets") },
+    { href: "/store/smart-home", label: t("nav.smartHome") },
+    { href: "/store/network", label: t("nav.network") },
     { href: "/#plans", label: t("nav.plans") },
     { href: "/about", label: t("nav.about") },
     { href: "/faq", label: t("nav.faq") },

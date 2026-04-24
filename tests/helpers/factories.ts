@@ -288,7 +288,7 @@ export function makeCommissionSyncLog(o: Partial<CommissionSyncLog> = {}): Commi
 }
 
 export function makeEmployeeCommissionProfile(o: Partial<EmployeeCommissionProfile> = {}): EmployeeCommissionProfile {
-  return { user_id: uuid(), line_multiplier: 1.0, device_rate: 0.03, device_milestone_bonus: 300, min_package_price: 39, loyalty_bonuses: { "6": 200, "12": 500 }, notes: null, active: true, created_at: now(), updated_at: now(), ...o };
+  return { user_id: uuid(), line_multiplier: 1.0, device_rate: 0.03, device_milestone_bonus: 300, appliance_rate: 0.03, appliance_milestone_bonus: 0, min_package_price: 39, loyalty_bonuses: { "6": 200, "12": 500 }, notes: null, active: true, created_at: now(), updated_at: now(), ...o };
 }
 
 // ───── Pipeline ─────

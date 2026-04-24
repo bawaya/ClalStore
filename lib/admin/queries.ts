@@ -46,14 +46,33 @@ export async function getDashboardStats() {
 }
 
 // ===== Products CRUD =====
-export async function getAdminProducts(opts?: { limit?: number; offset?: number }) {
+export async function getAdminProducts(opts?: {
+  limit?: number;
+  offset?: number;
+  /** Filter by product type. `types: ['device','accessory']` mimics the
+   *  pre-appliance behavior so the mobile admin page is never polluted
+   *  with appliance rows. */
+  types?: Array<"device" | "accessory" | "appliance" | "tv" | "computer" | "tablet" | "network">;
+}) {
   const limit = opts?.limit ?? 0;
   const offset = opts?.offset ?? 0;
+  const types = opts?.types;
+
+  const buildBase = () => {
+    let q = db().from("products").select("*");
+    if (types && types.length > 0) q = q.in("type", types);
+    return q.order("sort_position", { ascending: true }).order("created_at", { ascending: false });
+  };
+  const buildCount = () => {
+    let q = db().from("products").select("id", { count: "exact", head: true });
+    if (types && types.length > 0) q = q.in("type", types);
+    return q;
+  };
 
   if (limit > 0) {
     const [{ data, error }, { count }] = await Promise.all([
-      db().from("products").select("*").order("sort_position", { ascending: true }).order("created_at", { ascending: false }).range(offset, offset + limit - 1),
-      db().from("products").select("id", { count: "exact", head: true }),
+      buildBase().range(offset, offset + limit - 1),
+      buildCount(),
     ]);
     if (error) throw error;
     return { data: (data || []) as Product[], total: count ?? 0 };
@@ -61,13 +80,8 @@ export async function getAdminProducts(opts?: { limit?: number; offset?: number 
 
   // No pagination — safety cap + exact total count (avoid misleading totals when > 500 rows)
   const [{ data }, { count }] = await Promise.all([
-    db()
-      .from("products")
-      .select("*")
-      .order("sort_position", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(500),
-    db().from("products").select("id", { count: "exact", head: true }),
+    buildBase().limit(500),
+    buildCount(),
   ]);
   return { data: (data || []) as Product[], total: count ?? (data || []).length };
 }

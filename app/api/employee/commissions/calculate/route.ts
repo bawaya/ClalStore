@@ -19,7 +19,7 @@ import {
 import { z } from "zod";
 
 const schema = z.object({
-  saleType: z.enum(["line", "device"]),
+  saleType: z.enum(["line", "device", "appliance"]),
   amount: z.number().positive().max(100000),
   hasValidHK: z.boolean().optional().default(true),
 });
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profileRow } = await db
       .from("employee_commission_profiles")
-      .select("line_multiplier, device_rate, device_milestone_bonus, min_package_price, loyalty_bonuses")
+      .select("line_multiplier, device_rate, device_milestone_bonus, appliance_rate, appliance_milestone_bonus, min_package_price, loyalty_bonuses")
       .eq("user_id", authed.appUserId)
       .eq("active", true)
       .maybeSingle();
@@ -61,6 +61,10 @@ export async function POST(req: NextRequest) {
     let calculationText: string;
     if (saleType === "line") {
       calculationText = `${amount} × ${COMMISSION.LINE_MULTIPLIER} = ${contractCommission.toFixed(2)} (contract) | ${amount} × ${profile.line_multiplier} = ${employeeCommission.toFixed(2)} (employee)`;
+    } else if (saleType === "appliance") {
+      const contractPct = (COMMISSION.APPLIANCE_RATE * 100).toFixed(1);
+      const employeePct = (profile.appliance_rate * 100).toFixed(1);
+      calculationText = `${amount} × ${contractPct}% = ${contractCommission.toFixed(2)} (contract) | ${amount} × ${employeePct}% = ${employeeCommission.toFixed(2)} (employee)`;
     } else {
       const contractPct = (COMMISSION.DEVICE_RATE * 100).toFixed(1);
       const employeePct = (profile.device_rate * 100).toFixed(1);

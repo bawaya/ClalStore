@@ -37,7 +37,7 @@ async function authenticate(req: NextRequest): Promise<boolean> {
 async function getEmployeeProfile(db: SupabaseClient, employeeId: string): Promise<EmployeeProfile | null> {
   const { data } = await db
     .from("employee_commission_profiles")
-    .select("line_multiplier, device_rate, device_milestone_bonus, min_package_price, loyalty_bonuses")
+    .select("line_multiplier, device_rate, device_milestone_bonus, appliance_rate, appliance_milestone_bonus, min_package_price, loyalty_bonuses")
     .eq("user_id", employeeId)
     .eq("active", true)
     .maybeSingle();

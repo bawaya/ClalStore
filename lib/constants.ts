@@ -125,4 +125,88 @@ export const INTEGRATION_TYPES = {
 export const PRODUCT_TYPES = {
   device: { label: "جهاز", labelHe: "מכשיר", icon: "📱" },
   accessory: { label: "إكسسوار", labelHe: "אביזר", icon: "🔌" },
+  appliance: { label: "جهاز ذكي", labelHe: "מכשיר חכם", icon: "🏠" },
+  tv: { label: "تلفزيون", labelHe: "טלוויזיה", icon: "📺" },
+  computer: { label: "كمبيوتر", labelHe: "מחשב", icon: "💻" },
+  tablet: { label: "تابلت", labelHe: "טאבלט", icon: "📱" },
+  network: { label: "شبكة / راوتر", labelHe: "ראוטר / רשת", icon: "📡" },
+} as const;
+
+// Number of installments shown next to the cash price.
+// Cash price is for "نقد أو حتى 18 قسط بدون فوائد" — long installments use a separate `monthly_price` field.
+export const INSTALLMENTS_BY_TYPE: Record<string, number> = {
+  device: 36,
+  appliance: 36,
+  tv: 36,
+  computer: 36,
+  tablet: 36,
+  network: 18,
+  accessory: 0, // accessories: cash only, no installment line shown
+};
+
+export const APPLIANCE_KINDS = {
+  robot_vacuum: { label: "روبوت فاكوم", labelHe: "שואב רובוטי", icon: "🤖" },
+  air_fryer: { label: "قلاية هوائية", labelHe: "מטגן אוויר", icon: "🍟" },
+  espresso: { label: "آلة إسبرسو", labelHe: "מכונת אספרסו", icon: "☕" },
+  kettle: { label: "غلاية كهربائية", labelHe: "קומקום חשמלי", icon: "🫖" },
+  blender: { label: "خلاط ذكي", labelHe: "בלנדר חכם", icon: "🥤" },
+  ninja_pot: { label: "طنجرة نينجا", labelHe: "סיר נינג'ה", icon: "🍲" },
+  coffee_maker: { label: "ماكينة قهوة", labelHe: "מכונת קפה", icon: "☕" },
+  iron: { label: "مكواة بخار", labelHe: "מגהץ קיטור", icon: "👔" },
+  hair_dryer: { label: "مجفف شعر", labelHe: "מייבש שיער", icon: "💨" },
+  smart_speaker: { label: "سماعة ذكية", labelHe: "רמקול חכם", icon: "🔊" },
+  food_processor: { label: "معالج طعام", labelHe: "מעבד מזון", icon: "🥘" },
+  stand_mixer: { label: "خلاط مكتبي", labelHe: "מיקסר שולחני", icon: "🥣" },
+  stick_vacuum: { label: "مكنسة عمودية", labelHe: "שואב מקל", icon: "🧹" },
+  hair_styler: { label: "مصفف شعر", labelHe: "מעצב שיער", icon: "💇" },
+  shaver_trimmer: { label: "ماكينة حلاقة", labelHe: "מכונת גילוח", icon: "💈" },
+  juicer: { label: "عصارة", labelHe: "מסחטה", icon: "🍊" },
+  toaster: { label: "محمصة خبز", labelHe: "מצנם", icon: "🍞" },
+  steam_grill: { label: "شواية كهربائية", labelHe: "גריל חשמלי", icon: "🥩" },
+  popcorn: { label: "ماكينة فشار", labelHe: "מכונת פופקורן", icon: "🍿" },
+  ice_maker: { label: "ماكينة آيس كريم/جليد", labelHe: "מכונת קרח/גלידה", icon: "🍦" },
+  ipl_hair_removal: { label: "إزالة شعر IPL", labelHe: "מסיר שיער IPL", icon: "✨" },
+  cookware_set: { label: "طقم طناجر/سكاكين", labelHe: "סט סירים/סכינים", icon: "🍳" },
+  fan: { label: "مروحة", labelHe: "מאוורר", icon: "🌀" },
+  microwave: { label: "ميكروويف", labelHe: "מיקרוגל", icon: "♨️" },
+  other: { label: "أخرى", labelHe: "אחר", icon: "🏠" },
+} as const;
+
+export const TV_SUBKINDS = {
+  oled: { label: "OLED", labelHe: "OLED", icon: "🖥️" },
+  qled: { label: "QLED", labelHe: "QLED", icon: "📺" },
+  neo_qled: { label: "Neo QLED", labelHe: "Neo QLED", icon: "📺" },
+  mini_led: { label: "Mini LED", labelHe: "Mini LED", icon: "📺" },
+  uhd: { label: "UHD 4K", labelHe: "UHD 4K", icon: "📺" },
+  nano: { label: "NANO Cell", labelHe: "NANO", icon: "📺" },
+  fhd: { label: "Full HD", labelHe: "FHD", icon: "📺" },
+  other: { label: "أخرى", labelHe: "אחר", icon: "📺" },
+} as const;
+
+export const COMPUTER_SUBKINDS = {
+  laptop_gaming: { label: "لابتوب ألعاب", labelHe: "לפטופ גיימינג", icon: "🎮" },
+  laptop_business: { label: "لابتوب أعمال", labelHe: "לפטופ עסקי", icon: "💼" },
+  laptop_2in1: { label: "لابتوب 2-in-1", labelHe: "לפטופ 2 ב-1", icon: "🔄" },
+  desktop: { label: "كمبيوتر مكتبي", labelHe: "מחשב נייח", icon: "🖥️" },
+  printer_inkjet: { label: "طابعة حبر", labelHe: "מדפסת הזרקת דיו", icon: "🖨️" },
+  printer_laser: { label: "طابعة ليزر", labelHe: "מדפסת לייזר", icon: "🖨️" },
+  printer_aio: { label: "طابعة متعددة الوظائف", labelHe: "מדפסת רב-תכליתית", icon: "🖨️" },
+  other: { label: "أخرى", labelHe: "אחר", icon: "💻" },
+} as const;
+
+export const TABLET_SUBKINDS = {
+  apple_pro: { label: "iPad Pro", labelHe: "iPad Pro", icon: "📱" },
+  apple_air: { label: "iPad Air", labelHe: "iPad Air", icon: "📱" },
+  apple_basic: { label: "iPad / Mini", labelHe: "iPad / Mini", icon: "📱" },
+  kids: { label: "تابلت أطفال", labelHe: "טאבלט לילדים", icon: "👶" },
+  android: { label: "أندرويد", labelHe: "אנדרואיד", icon: "🤖" },
+  other: { label: "أخرى", labelHe: "אחר", icon: "📱" },
+} as const;
+
+export const NETWORK_SUBKINDS = {
+  router_mesh: { label: "راوتر Mesh", labelHe: "ראוטר Mesh", icon: "📡" },
+  wifi_extender: { label: "موسّع شبكة", labelHe: "מגדיל טווח", icon: "📶" },
+  switch: { label: "سويتش", labelHe: "מתג", icon: "🔌" },
+  access_point: { label: "نقطة وصول", labelHe: "נקודת גישה", icon: "📡" },
+  other: { label: "أخرى", labelHe: "אחר", icon: "📡" },
 } as const;

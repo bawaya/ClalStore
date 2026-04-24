@@ -227,4 +227,23 @@ describe("Cart Store", () => {
       expect(useCart.getState().hasOnlyAccessories()).toBe(false);
     });
   });
+
+  describe("hasAppliances / hasInstallmentItems", () => {
+    it("hasInstallmentItems is true for devices", () => {
+      useCart.getState().addItem(makeItem({ type: "device" }));
+      expect(useCart.getState().hasInstallmentItems()).toBe(true);
+      expect(useCart.getState().hasAppliances()).toBe(false);
+    });
+
+    it("hasInstallmentItems is true for appliances (same checkout as devices)", () => {
+      useCart.getState().addItem(makeItem({ type: "appliance", productId: "ap1", name: "Vacuum" }));
+      expect(useCart.getState().hasInstallmentItems()).toBe(true);
+      expect(useCart.getState().hasAppliances()).toBe(true);
+    });
+
+    it("hasInstallmentItems is false for accessories only", () => {
+      useCart.getState().addItem(makeItem({ type: "accessory" }));
+      expect(useCart.getState().hasInstallmentItems()).toBe(false);
+    });
+  });
 });

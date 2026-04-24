@@ -24,6 +24,8 @@ describe("calcDualCommission — absolute MIN_PACKAGE_PRICE floor (issue 4.9)", 
       line_multiplier: 4,
       device_rate: 0.05,
       device_milestone_bonus: 2500,
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 15,
       loyalty_bonuses: {},
     };
@@ -37,6 +39,8 @@ describe("calcDualCommission — absolute MIN_PACKAGE_PRICE floor (issue 4.9)", 
       line_multiplier: 4,
       device_rate: 0.05,
       device_milestone_bonus: 2500,
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 25,
       loyalty_bonuses: {},
     };
@@ -50,6 +54,8 @@ describe("calcDualCommission — absolute MIN_PACKAGE_PRICE floor (issue 4.9)", 
       line_multiplier: 5, // custom
       device_rate: 0.05,
       device_milestone_bonus: 2500,
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 15,
       loyalty_bonuses: {},
     };
@@ -63,6 +69,8 @@ describe("calcDualCommission — absolute MIN_PACKAGE_PRICE floor (issue 4.9)", 
       line_multiplier: 4,
       device_rate: 0.05,
       device_milestone_bonus: 2500,
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 15,
       loyalty_bonuses: {},
     };
@@ -85,6 +93,8 @@ describe("calcDualCommission — device sales (base % only, milestone comes late
       line_multiplier: 4,
       device_rate: 0.08,
       device_milestone_bonus: 3000,
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 19.9,
       loyalty_bonuses: {},
     };
@@ -149,6 +159,8 @@ describe("allocateDeviceCommissionRows — contract-wide milestone (decision 4)"
       line_multiplier: 4,
       device_rate: 0.08,
       device_milestone_bonus: 3000, // profile bonus NOT used — contract bonus wins
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 19.9,
       loyalty_bonuses: {},
     };
@@ -172,6 +184,8 @@ describe("allocateDeviceCommissionRows — contract-wide milestone (decision 4)"
       line_multiplier: 4,
       device_rate: 0.1,
       device_milestone_bonus: 2500,
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 19.9,
       loyalty_bonuses: {},
     };
@@ -179,6 +193,8 @@ describe("allocateDeviceCommissionRows — contract-wide milestone (decision 4)"
       line_multiplier: 4,
       device_rate: 0.03,
       device_milestone_bonus: 2500,
+      appliance_rate: 0.05,
+      appliance_milestone_bonus: 0,
       min_package_price: 19.9,
       loyalty_bonuses: {},
     };

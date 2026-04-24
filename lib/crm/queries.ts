@@ -125,6 +125,8 @@ export async function getCRMOrders(filters?: {
   dateTo?: string;
   amountMin?: number;
   amountMax?: number;
+  /** Filter to orders that contain at least one line of this product type (device / accessory / appliance). */
+  productType?: "device" | "accessory" | "appliance";
   limit?: number;
   offset?: number;
 }) {
@@ -132,7 +134,31 @@ export async function getCRMOrders(filters?: {
   const limit = filters?.limit || 100;
   const offset = filters?.offset || 0;
 
+  let orderIdFilter: string[] | null = null;
+  if (filters?.productType) {
+    const { data: typeRows, error: typeErr } = await s
+      .from("order_items")
+      .select("order_id")
+      .eq("product_type", filters.productType);
+    if (typeErr) {
+      console.error("getCRMOrders productType filter:", typeErr);
+    } else {
+      const rows = (typeRows ?? []) as { order_id: string | null }[];
+      const ids: string[] = rows
+        .map((r) => r.order_id)
+        .filter((id: string | null | undefined): id is string => Boolean(id));
+      const unique: string[] = [...new Set(ids)];
+      orderIdFilter = unique;
+      if (unique.length === 0) {
+        return { data: [], total: 0 };
+      }
+    }
+  }
+
   let query = s.from("orders").select(`*, order_items(*), order_notes(*), customers(name, phone, segment, id_number)`, { count: "exact" }).is("deleted_at", null).order("created_at", { ascending: false });
+  if (orderIdFilter) {
+    query = query.in("id", orderIdFilter);
+  }
   if (filters?.status) {
     if (filters.status === "no_reply_all") query = query.like("status", "no_reply%");
     else query = query.eq("status", filters.status);

@@ -594,6 +594,8 @@ describe("Admin Commissions API", () => {
             line_multiplier: 5,
             device_rate: 0.05,
             device_milestone_bonus: 500,
+            appliance_rate: 0.05,
+            appliance_milestone_bonus: 0,
             min_package_price: 39,
           },
         });

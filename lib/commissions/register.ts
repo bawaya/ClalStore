@@ -24,7 +24,10 @@ import {
   calcDualCommission,
   COMMISSION,
 } from "./calculator";
-import { recalculateDeviceCommissionsForMonths } from "./ledger";
+import {
+  recalculateDeviceCommissionsForMonths,
+  recalculateApplianceCommissionsForMonths,
+} from "./ledger";
 import { logEmployeeActivity } from "@/lib/employee/activity-log";
 
 export type CommissionSource =
@@ -36,10 +39,10 @@ export type CommissionSource =
   | "csv_import";
 
 export interface RegisterSaleInput {
-  saleType: "line" | "device";
+  saleType: "line" | "device" | "appliance";
   /**
    * For lines: the monthly package price (e.g. 39.90).
-   * For devices: the total device sale amount.
+   * For devices/appliances: the total sale amount.
    */
   amount: number;
   employeeId: string;
@@ -60,7 +63,7 @@ export interface RegisterSaleInput {
   hasValidHK?: boolean;
   loyaltyStartDate?: string | null;
 
-  /** Device-only fields */
+  /** Device/appliance-only fields */
   deviceName?: string | null;
 
   notes?: string | null;
@@ -91,8 +94,8 @@ function validateInput(input: RegisterSaleInput) {
   if (input.amount > MAX_SALE_AMOUNT) {
     throw new Error(`registerSaleCommission: amount exceeds ${MAX_SALE_AMOUNT}`);
   }
-  if (input.saleType !== "line" && input.saleType !== "device") {
-    throw new Error("registerSaleCommission: saleType must be line or device");
+  if (input.saleType !== "line" && input.saleType !== "device" && input.saleType !== "appliance") {
+    throw new Error("registerSaleCommission: saleType must be line, device or appliance");
   }
 }
 
@@ -103,7 +106,7 @@ async function fetchCurrentProfile(
   const { data } = await db
     .from("employee_commission_profiles")
     .select(
-      "line_multiplier, device_rate, device_milestone_bonus, min_package_price, loyalty_bonuses",
+      "line_multiplier, device_rate, device_milestone_bonus, appliance_rate, appliance_milestone_bonus, min_package_price, loyalty_bonuses",
     )
     .eq("user_id", employeeId)
     .eq("active", true)
@@ -155,6 +158,7 @@ export async function registerSaleCommission(
     row.loyalty_status = "pending";
     row.device_sale_amount = 0;
   } else {
+    // device or appliance — both use device_sale_amount column
     row.device_name = input.deviceName ?? null;
     row.device_sale_amount = input.amount;
     row.package_price = 0;
@@ -173,13 +177,18 @@ export async function registerSaleCommission(
     throw new Error(`registerSaleCommission failed: ${error.message}`);
   }
 
-  // 5. For devices, recompute the whole month so the contract-wide milestone
-  //    is applied correctly after this new sale.
+  // 5. For devices/appliances, recompute the whole month so the contract-wide
+  //    milestone is applied correctly after this new sale. Counters are isolated:
+  //    device sales trigger device recalc; appliance sales trigger appliance recalc.
   let finalEmployeeCommission = employeeCommission;
   let finalContractCommission = contractCommission;
-  if (input.saleType === "device") {
+  if (input.saleType === "device" || input.saleType === "appliance") {
     const month = input.saleDate.slice(0, 7);
-    await recalculateDeviceCommissionsForMonths(db, [month]);
+    if (input.saleType === "device") {
+      await recalculateDeviceCommissionsForMonths(db, [month]);
+    } else {
+      await recalculateApplianceCommissionsForMonths(db, [month]);
+    }
 
     // Re-read the row to get the possibly-updated commission_amount
     const { data: updated } = await db
@@ -194,10 +203,16 @@ export async function registerSaleCommission(
   }
 
   // 6. Log activity for the employee's timeline (best-effort; never throws)
+  const saleTitle =
+    input.saleType === "line"
+      ? "بيعة خط جديدة"
+      : input.saleType === "appliance"
+        ? "بيعة جهاز ذكي جديدة"
+        : "بيعة جهاز جديدة";
   void logEmployeeActivity(db, {
     employeeId: input.employeeId,
     eventType: "sale_registered",
-    title: input.saleType === "device" ? "بيعة جهاز جديدة" : "بيعة خط جديدة",
+    title: saleTitle,
     description: `${input.amount.toLocaleString("he-IL")}₪ — عمولة ${finalEmployeeCommission.toLocaleString("he-IL")}₪`,
     metadata: {
       commission_sale_id: data.id,
@@ -244,13 +259,21 @@ async function cancelCommissionsByFilter(
   }
 
   const cancelledIds = rows.map((r) => r.id as number);
-  const affectedMonths = [
+  const affectedDeviceMonths = [
     ...new Set(
       rows
         .filter((r) => r.sale_type === "device")
         .map((r) => String(r.sale_date).slice(0, 7)),
     ),
   ];
+  const affectedApplianceMonths = [
+    ...new Set(
+      rows
+        .filter((r) => r.sale_type === "appliance")
+        .map((r) => String(r.sale_date).slice(0, 7)),
+    ),
+  ];
+  const affectedMonths = [...new Set([...affectedDeviceMonths, ...affectedApplianceMonths])];
 
   const { error: updateError } = await db
     .from("commission_sales")
@@ -259,8 +282,11 @@ async function cancelCommissionsByFilter(
 
   if (updateError) throw new Error(`cancelCommissions: ${updateError.message}`);
 
-  if (affectedMonths.length > 0) {
-    await recalculateDeviceCommissionsForMonths(db, affectedMonths);
+  if (affectedDeviceMonths.length > 0) {
+    await recalculateDeviceCommissionsForMonths(db, affectedDeviceMonths);
+  }
+  if (affectedApplianceMonths.length > 0) {
+    await recalculateApplianceCommissionsForMonths(db, affectedApplianceMonths);
   }
 
   // Log a cancellation entry per row so each affected employee sees it

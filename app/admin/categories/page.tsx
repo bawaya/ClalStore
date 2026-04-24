@@ -2,17 +2,27 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState } from "@/components/admin/shared";
-import type { Category } from "@/types/database";
+import type { Category, CategoryKind } from "@/types/database";
+
+const KIND_CHIPS: { k: "all" | CategoryKind; label: string }[] = [
+  { k: "all", label: "الكل" },
+  { k: "mobile", label: "📱 موبايل" },
+  { k: "appliance", label: "🏠 أجهزة ذكية" },
+];
 
 export default function AdminCategoriesPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
-  
-  const { data: categories, loading, create, update, remove } = useAdminApi<Category>({ endpoint: "/api/admin/categories" });
+  const [kindFilter, setKindFilter] = useState<"all" | CategoryKind>("all");
+
+  const endpoint =
+    kindFilter === "all" ? "/api/admin/categories" : `/api/admin/categories?kind=${kindFilter}`;
+
+  const { data: categories, loading, create, update, remove } = useAdminApi<Category>({ endpoint, autoFetch: true });
   
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Partial<Category>>({});
@@ -20,13 +30,14 @@ export default function AdminCategoriesPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const openCreate = () => {
-    setForm({ name_ar: "", name_he: "", type: "manual", product_ids: [], rule: "", sort_order: 0, active: true });
+    const defaultKind: CategoryKind = kindFilter === "appliance" ? "appliance" : "mobile";
+    setForm({ name_ar: "", name_he: "", type: "manual", kind: defaultKind, product_ids: [], rule: "", sort_order: 0, active: true });
     setEditId(null);
     setModal(true);
   };
 
   const openEdit = (c: Category) => {
-    setForm({ ...c });
+    setForm({ ...c, kind: c.kind ?? "mobile" });
     setEditId(c.id);
     setModal(true);
   };
@@ -67,11 +78,25 @@ export default function AdminCategoriesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <PageHeader title="🗂️ التصنيفات (Categories)" count={categories.length} />
-        <button onClick={openCreate} className="btn-primary px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-brand/20">
-          ➕ إضافة تصنيف
-        </button>
+      <div className="flex flex-col gap-2 mb-3">
+        <div className="flex gap-1 overflow-x-auto">
+          {KIND_CHIPS.map((c) => (
+            <button
+              key={c.k}
+              type="button"
+              onClick={() => setKindFilter(c.k)}
+              className={`chip whitespace-nowrap ${kindFilter === c.k ? "chip-active" : ""}`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-between">
+          <PageHeader title="🗂️ التصنيفات" count={categories.length} />
+          <button onClick={openCreate} className="btn-primary px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-brand/20">
+            ➕ إضافة تصنيف
+          </button>
+        </div>
       </div>
 
       {categories.length === 0 ? (
@@ -98,6 +123,9 @@ export default function AdminCategoriesPage() {
                 <div className="font-bold flex items-center justify-end gap-2 text-sm">
                   {c.name_ar}
                   <span className="text-[10px] text-muted px-2 py-0.5 bg-surface-elevated rounded-full">
+                    {(c.kind ?? "mobile") === "appliance" ? "🏠" : "📱"}
+                  </span>
+                  <span className="text-[10px] text-muted px-2 py-0.5 bg-surface-elevated rounded-full">
                     {c.type === "auto" ? "🤖 تلقائي" : "✍️ يدوي"}
                   </span>
                 </div>
@@ -121,8 +149,23 @@ export default function AdminCategoriesPage() {
           </FormField>
         </div>
 
+        <FormField label="قسم العرض (المتجر)">
+          <div className="flex gap-1.5">
+            {(["mobile", "appliance"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setForm({ ...form, kind: k })}
+                className={`chip flex-1 ${(form.kind ?? "mobile") === k ? "chip-active" : ""}`}
+              >
+                {k === "mobile" ? "📱 موبايل" : "🏠 أجهزة ذكية"}
+              </button>
+            ))}
+          </div>
+        </FormField>
+
         <FormField label="نوع التصنيف">
-          <select className="input" value={form.type || "manual"} onChange={(e) => setForm({ ...form, type: e.target.value as any })}>
+          <select className="input" value={form.type || "manual"} onChange={(e) => setForm({ ...form, type: e.target.value as "manual" | "auto" })}>
             <option value="manual">✍️ يدوي (تحديد المنتجات)</option>
             <option value="auto">🤖 تلقائي (قواعد معينة)</option>
           </select>

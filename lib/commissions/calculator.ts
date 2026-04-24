@@ -12,6 +12,9 @@ export const COMMISSION = {
   DEVICE_RATE: 0.05,
   DEVICE_MILESTONE: 50000,
   DEVICE_MILESTONE_BONUS: 2500,
+  APPLIANCE_RATE: 0.05,
+  APPLIANCE_MILESTONE: 50000,
+  APPLIANCE_MILESTONE_BONUS: 0,
   LOYALTY_BONUSES: { 5: 80, 9: 30, 12: 20, 15: 50 } as Record<number, number>,
   SANCTIONS: {
     FAKE_PAYMENT: { label: 'אמצעי תשלום פיקטיבי / לא תקין', amount: 2500, withOffset: true },
@@ -33,6 +36,8 @@ export interface EmployeeProfile {
   line_multiplier: number;
   device_rate: number;
   device_milestone_bonus: number;
+  appliance_rate: number;
+  appliance_milestone_bonus: number;
   min_package_price: number;
   loyalty_bonuses: Record<number, number>;
 }
@@ -41,6 +46,8 @@ export const DEFAULT_EMPLOYEE_PROFILE: EmployeeProfile = {
   line_multiplier: COMMISSION.LINE_MULTIPLIER,
   device_rate: COMMISSION.DEVICE_RATE,
   device_milestone_bonus: COMMISSION.DEVICE_MILESTONE_BONUS,
+  appliance_rate: COMMISSION.APPLIANCE_RATE,
+  appliance_milestone_bonus: COMMISSION.APPLIANCE_MILESTONE_BONUS,
   min_package_price: COMMISSION.MIN_PACKAGE_PRICE,
   loyalty_bonuses: { ...COMMISSION.LOYALTY_BONUSES },
 };
@@ -67,11 +74,11 @@ export function calcEmployeeDeviceCommission(totalNetSales: number, profile: Emp
 }
 
 // Calculate both contract and employee commission for a single sale.
-// Important: device rows compute ONLY the base % here; milestone bonuses are
-// applied later by allocateDeviceCommissionRows (ledger) on a contract-wide
-// running total, per decision 4.
+// Important: device/appliance rows compute ONLY the base % here; milestone
+// bonuses are applied later by allocate*CommissionRows (ledger) on a
+// contract-wide running total, per decision 4.
 export function calcDualCommission(
-  saleType: 'line' | 'device',
+  saleType: 'line' | 'device' | 'appliance',
   value: number,
   hasValidHK: boolean,
   profile: EmployeeProfile | null,
@@ -92,6 +99,15 @@ export function calcDualCommission(
     const contractCommission = value * COMMISSION.LINE_MULTIPLIER;
     const employeeCommission = profile
       ? value * profile.line_multiplier
+      : contractCommission;
+    return { contractCommission, employeeCommission };
+  }
+
+  if (saleType === 'appliance') {
+    // appliance — base % only; milestone applied by ledger recalc (separate counter from devices)
+    const contractCommission = value * COMMISSION.APPLIANCE_RATE;
+    const employeeCommission = profile
+      ? value * profile.appliance_rate
       : contractCommission;
     return { contractCommission, employeeCommission };
   }
@@ -128,6 +144,44 @@ export function calcDeviceCommission(totalNetSales: number): {
   const currentInMilestone = totalNetSales % COMMISSION.DEVICE_MILESTONE;
   const nextMilestoneAt = COMMISSION.DEVICE_MILESTONE - currentInMilestone;
   const nextMilestoneProgress = (currentInMilestone / COMMISSION.DEVICE_MILESTONE) * 100;
+
+  return { basePct, milestoneCount, milestoneBonus, total, nextMilestoneAt, nextMilestoneProgress };
+}
+
+// Employee appliance commission (custom rate + milestone, isolated from devices)
+export function calcEmployeeApplianceCommission(totalNetSales: number, profile: EmployeeProfile): {
+  basePct: number;
+  milestoneCount: number;
+  milestoneBonus: number;
+  total: number;
+} {
+  const basePct = totalNetSales * profile.appliance_rate;
+  const milestoneCount = profile.appliance_milestone_bonus > 0
+    ? Math.floor(totalNetSales / COMMISSION.APPLIANCE_MILESTONE)
+    : 0;
+  const milestoneBonus = milestoneCount * profile.appliance_milestone_bonus;
+  return { basePct, milestoneCount, milestoneBonus, total: basePct + milestoneBonus };
+}
+
+// Appliance commission breakdown (contract reference rates)
+export function calcApplianceCommission(totalNetSales: number): {
+  basePct: number;
+  milestoneCount: number;
+  milestoneBonus: number;
+  total: number;
+  nextMilestoneAt: number;
+  nextMilestoneProgress: number;
+} {
+  const basePct = totalNetSales * COMMISSION.APPLIANCE_RATE;
+  const milestoneCount = COMMISSION.APPLIANCE_MILESTONE_BONUS > 0
+    ? Math.floor(totalNetSales / COMMISSION.APPLIANCE_MILESTONE)
+    : 0;
+  const milestoneBonus = milestoneCount * COMMISSION.APPLIANCE_MILESTONE_BONUS;
+  const total = basePct + milestoneBonus;
+
+  const currentInMilestone = totalNetSales % COMMISSION.APPLIANCE_MILESTONE;
+  const nextMilestoneAt = COMMISSION.APPLIANCE_MILESTONE - currentInMilestone;
+  const nextMilestoneProgress = (currentInMilestone / COMMISSION.APPLIANCE_MILESTONE) * 100;
 
   return { basePct, milestoneCount, milestoneBonus, total, nextMilestoneAt, nextMilestoneProgress };
 }
@@ -268,6 +322,7 @@ export function calcMonthlySummary(
 ): {
   linesCommission: number;
   devicesCommission: number;
+  appliancesCommission: number;
   loyaltyBonus: number;
   grossCommission: number;
   totalSanctions: number;
@@ -285,7 +340,11 @@ export function calcMonthlySummary(
     .filter((s) => s.sale_type === 'device')
     .reduce((sum, s) => sum + (s.commission_amount || 0), 0);
 
-  const grossCommission = linesCommission + devicesCommission + loyaltyBonuses;
+  const appliancesCommission = sales
+    .filter((s) => s.sale_type === 'appliance')
+    .reduce((sum, s) => sum + (s.commission_amount || 0), 0);
+
+  const grossCommission = linesCommission + devicesCommission + appliancesCommission + loyaltyBonuses;
   const totalSanctions = sanctions.reduce((sum, s) => sum + s.amount, 0);
   const netCommission = grossCommission - totalSanctions;
 
@@ -298,6 +357,7 @@ export function calcMonthlySummary(
   return {
     linesCommission,
     devicesCommission,
+    appliancesCommission,
     loyaltyBonus: loyaltyBonuses,
     grossCommission,
     totalSanctions,

@@ -80,6 +80,7 @@ export default function HeroesPage() {
           label="صورة البنر"
           dimensions={IMAGE_DIMS.banner}
           previewHeight={120}
+          enableEnhance
         />
         <FormField label="رابط الزر"><input className="input" value={form.link_url || ""} onChange={(e) => setForm({ ...form, link_url: e.target.value })} placeholder="/store" dir="ltr" /></FormField>
         <div className="flex gap-2">

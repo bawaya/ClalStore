@@ -30,7 +30,7 @@ export default async function HomePage() {
 
   try {
     [products, plans, cms] = await Promise.all([
-      getProducts({ featured: true }),
+      getProducts({ featured: true, types: ["device", "accessory"] }),
       getLinePlans(),
       getWebsiteContent(),
     ]);

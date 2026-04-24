@@ -24,6 +24,8 @@ type RateSnapshot = {
   line_multiplier?: number;
   device_rate?: number;
   device_milestone_bonus?: number;
+  appliance_rate?: number;
+  appliance_milestone_bonus?: number;
   min_package_price?: number;
 };
 
@@ -39,6 +41,15 @@ function explainDevice(amount: number, snap: RateSnapshot | null): string {
   const contractTotal = (amount * COMMISSION.DEVICE_RATE).toFixed(2);
   const empTotal = (amount * empRate).toFixed(2);
   const contractPct = (COMMISSION.DEVICE_RATE * 100).toFixed(1);
+  const empPct = (empRate * 100).toFixed(1);
+  return `${amount} × ${contractPct}% = ${contractTotal} (contract) | ${amount} × ${empPct}% = ${empTotal} (employee)`;
+}
+
+function explainAppliance(amount: number, snap: RateSnapshot | null): string {
+  const empRate = snap?.appliance_rate ?? COMMISSION.APPLIANCE_RATE;
+  const contractTotal = (amount * COMMISSION.APPLIANCE_RATE).toFixed(2);
+  const empTotal = (amount * empRate).toFixed(2);
+  const contractPct = (COMMISSION.APPLIANCE_RATE * 100).toFixed(1);
   const empPct = (empRate * 100).toFixed(1);
   return `${amount} × ${contractPct}% = ${contractTotal} (contract) | ${amount} × ${empPct}% = ${empTotal} (employee)`;
 }
@@ -128,7 +139,11 @@ export async function GET(req: NextRequest) {
           employeeAmount,
           ownerProfit: contractAmount - employeeAmount,
           calculation:
-            s.sale_type === "line" ? explainLine(amount, snap) : explainDevice(amount, snap),
+            s.sale_type === "line"
+              ? explainLine(amount, snap)
+              : s.sale_type === "appliance"
+                ? explainAppliance(amount, snap)
+                : explainDevice(amount, snap),
         },
         customer: s.customer_name,
         phone: s.customer_phone,

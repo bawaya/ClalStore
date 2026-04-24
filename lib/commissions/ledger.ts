@@ -351,7 +351,7 @@ export async function recalculateDeviceCommissionsForMonths(
     if (employeeIds.length > 0) {
       const { data: profiles, error: profilesError } = await db
         .from("employee_commission_profiles")
-        .select("user_id, line_multiplier, device_rate, device_milestone_bonus, min_package_price, loyalty_bonuses")
+        .select("user_id, line_multiplier, device_rate, device_milestone_bonus, appliance_rate, appliance_milestone_bonus, min_package_price, loyalty_bonuses")
         .in("user_id", employeeIds)
         .eq("active", true);
 
@@ -362,6 +362,125 @@ export async function recalculateDeviceCommissionsForMonths(
     }
 
     const allocations = allocateDeviceCommissionRows(
+      rows.map((row) => ({
+        id: row.id,
+        sale_date:
+          typeof row.sale_date === "string" ? row.sale_date : String(row.sale_date),
+        device_sale_amount: Number(row.device_sale_amount || 0),
+        employee_id: row.employee_id || null,
+        rate_snapshot: (row.rate_snapshot as EmployeeProfile | null) || null,
+      })),
+      profileMap,
+    );
+
+    for (const row of rows) {
+      const allocation = allocations.get(row.id);
+      if (!allocation) continue;
+
+      const { error: updateError } = await db
+        .from("commission_sales")
+        .update({
+          commission_amount: allocation.commission_amount,
+          contract_commission: allocation.contract_commission,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+
+      if (updateError) throw updateError;
+    }
+  }
+}
+
+/**
+ * Allocate appliance commissions across a month.
+ *
+ * Mirrors `allocateDeviceCommissionRows` but reads appliance_rate /
+ * appliance_milestone_bonus from the profile and uses the APPLIANCE_MILESTONE
+ * threshold. Running total is ISOLATED from devices — selling a vacuum
+ * never counts toward a mobile-device milestone and vice versa.
+ */
+export function allocateApplianceCommissionRows(
+  rows: DeviceCommissionAllocationRow[],
+  profileMap = new Map<string, EmployeeProfile | null>(),
+) {
+  const allocations = new Map<
+    number | string,
+    { contract_commission: number; commission_amount: number }
+  >();
+
+  const sortedRows = sortBySaleDateAndId(rows);
+
+  let contractRunningTotal = 0;
+  for (const row of sortedRows) {
+    const amount = Number(row.device_sale_amount || 0);
+
+    const profile =
+      row.rate_snapshot ??
+      (row.employee_id ? profileMap.get(row.employee_id) : null) ??
+      DEFAULT_EMPLOYEE_PROFILE;
+
+    const beforeMilestones = Math.floor(contractRunningTotal / COMMISSION.APPLIANCE_MILESTONE);
+    const afterMilestones = Math.floor((contractRunningTotal + amount) / COMMISSION.APPLIANCE_MILESTONE);
+    const milestoneDelta = afterMilestones - beforeMilestones;
+
+    const basePct = amount * profile.appliance_rate;
+    // Employee-level milestone bonus (admin-configured per profile)
+    const milestoneBonus = milestoneDelta * profile.appliance_milestone_bonus;
+    const employeeCommission = basePct + milestoneBonus;
+
+    // Contract-level reference uses contract defaults
+    const contractCommission =
+      amount * COMMISSION.APPLIANCE_RATE + milestoneDelta * COMMISSION.APPLIANCE_MILESTONE_BONUS;
+
+    allocations.set(row.id, {
+      contract_commission: contractCommission,
+      commission_amount: employeeCommission,
+    });
+
+    contractRunningTotal += amount;
+  }
+
+  return allocations;
+}
+
+export async function recalculateApplianceCommissionsForMonths(
+  db: SupabaseClient,
+  months: string[],
+) {
+  const uniqueMonths = [...new Set(months.filter(Boolean))];
+  if (uniqueMonths.length === 0) return;
+
+  for (const month of uniqueMonths) {
+    const { data: rows, error } = await db
+      .from("commission_sales")
+      .select("id, sale_date, device_sale_amount, employee_id, rate_snapshot")
+      .eq("sale_type", "appliance")
+      .is("deleted_at", null)
+      .gte("sale_date", `${month}-01`)
+      .lte("sale_date", lastDayOfMonth(month));
+
+    if (error) throw error;
+    if (!rows?.length) continue;
+
+    const employeeIds = [
+      ...new Set(rows.map((row) => row.employee_id).filter(Boolean) as string[]),
+    ];
+    const profileMap = new Map<string, EmployeeProfile | null>();
+
+    if (employeeIds.length > 0) {
+      const { data: profiles, error: profilesError } = await db
+        .from("employee_commission_profiles")
+        .select("user_id, line_multiplier, device_rate, device_milestone_bonus, appliance_rate, appliance_milestone_bonus, min_package_price, loyalty_bonuses")
+        .in("user_id", employeeIds)
+        .eq("active", true);
+
+      if (profilesError) throw profilesError;
+      for (const profile of profiles || []) {
+        profileMap.set(profile.user_id, profile as EmployeeProfile);
+      }
+    }
+
+    const allocations = allocateApplianceCommissionRows(
       rows.map((row) => ({
         id: row.id,
         sale_date:

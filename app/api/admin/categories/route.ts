@@ -9,11 +9,13 @@ export async function GET(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
+    const kind = new URL(req.url).searchParams.get("kind");
+    const kindFilter = kind === "mobile" || kind === "appliance" ? kind : null;
+
     const sb = createServerSupabase();
-    const { data, error } = await sb
-      .from("categories")
-      .select("*")
-      .order("sort_order", { ascending: true });
+    let q = sb.from("categories").select("*");
+    if (kindFilter) q = q.eq("kind", kindFilter);
+    const { data, error } = await q.order("sort_order", { ascending: true });
 
     if (error) throw error;
     return apiSuccess(data);
@@ -39,6 +41,7 @@ export async function POST(req: NextRequest) {
         name_ar: validated.name_ar,
         name_he: validated.name_he,
         type: validated.type,
+        kind: validated.kind,
         rule: validated.rule,
         product_ids: validated.product_ids,
         sort_order: validated.sort_order,

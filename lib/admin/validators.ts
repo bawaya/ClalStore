@@ -1,10 +1,75 @@
 import { z } from "zod";
 
+export const APPLIANCE_KINDS = [
+  "robot_vacuum",
+  "air_fryer",
+  "espresso",
+  "kettle",
+  "blender",
+  "ninja_pot",
+  "coffee_maker",
+  "iron",
+  "hair_dryer",
+  "smart_speaker",
+  "food_processor",
+  "stand_mixer",
+  "stick_vacuum",
+  "hair_styler",
+  "shaver_trimmer",
+  "juicer",
+  "toaster",
+  "steam_grill",
+  "popcorn",
+  "ice_maker",
+  "ipl_hair_removal",
+  "cookware_set",
+  "fan",
+  "microwave",
+  "other",
+] as const;
+
+export const PRODUCT_TYPE_VALUES = [
+  "device",
+  "accessory",
+  "appliance",
+  "tv",
+  "computer",
+  "tablet",
+  "network",
+] as const;
+
+export const TV_SUBKINDS = ["oled", "qled", "neo_qled", "mini_led", "uhd", "nano", "fhd", "other"] as const;
+export const COMPUTER_SUBKINDS = [
+  "laptop_gaming",
+  "laptop_business",
+  "laptop_2in1",
+  "desktop",
+  "printer_inkjet",
+  "printer_laser",
+  "printer_aio",
+  "other",
+] as const;
+export const TABLET_SUBKINDS = ["apple_pro", "apple_air", "apple_basic", "kids", "android", "other"] as const;
+export const NETWORK_SUBKINDS = ["router_mesh", "wifi_extender", "switch", "access_point", "other"] as const;
+export const ALL_SUBKINDS = [
+  ...TV_SUBKINDS,
+  ...COMPUTER_SUBKINDS,
+  ...TABLET_SUBKINDS,
+  ...NETWORK_SUBKINDS,
+] as const;
+
+const SUBKINDS_PER_TYPE: Record<string, readonly string[]> = {
+  tv: TV_SUBKINDS,
+  computer: COMPUTER_SUBKINDS,
+  tablet: TABLET_SUBKINDS,
+  network: NETWORK_SUBKINDS,
+};
+
 export const productSchema = z.object({
   name_ar: z.string().min(1).max(200),
   name_he: z.string().max(200).default(""),
   brand: z.string().min(1).max(100),
-  type: z.enum(["device", "accessory"]),
+  type: z.enum(PRODUCT_TYPE_VALUES),
   price: z.number().min(0),
   old_price: z.number().min(0).optional().nullable(),
   cost: z.number().min(0).default(0),
@@ -20,9 +85,74 @@ export const productSchema = z.object({
   featured: z.boolean().default(false),
   description_ar: z.string().max(5000).optional().nullable(),
   description_he: z.string().max(5000).optional().nullable(),
+  category_id: z.string().uuid().optional().nullable(),
+  warranty_months: z.number().int().min(0).max(120).optional().nullable(),
+  model_number: z.string().max(100).optional().nullable(),
+  variant_kind: z.enum(["storage", "model", "color_only"]).optional().default("storage"),
+  appliance_kind: z.enum(APPLIANCE_KINDS).optional().nullable(),
+  subkind: z.enum(ALL_SUBKINDS).optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.type === "appliance" && !data.appliance_kind) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["appliance_kind"],
+      message: "نوع الجهاز الذكي مطلوب عند اختيار نوع المنتج 'جهاز ذكي'",
+    });
+  }
+  if (data.type !== "appliance" && data.appliance_kind) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["appliance_kind"],
+      message: "نوع الجهاز الذكي يجب أن يكون فارغاً لهذا النوع من المنتجات",
+    });
+  }
+  // subkind must match the type's whitelist when present
+  const allowedSub = SUBKINDS_PER_TYPE[data.type];
+  if (data.subkind && allowedSub && !allowedSub.includes(data.subkind)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["subkind"],
+      message: `subkind غير صالح لنوع المنتج ${data.type}`,
+    });
+  }
+  if (data.subkind && !allowedSub && data.type !== "appliance") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["subkind"],
+      message: "subkind غير مدعوم لهذا النوع",
+    });
+  }
 });
 
-export const productUpdateSchema = productSchema.partial();
+// For PATCH/PUT: allow partial updates
+const productPlainSchema = z.object({
+  name_ar: z.string().min(1).max(200).optional(),
+  name_he: z.string().max(200).optional(),
+  brand: z.string().min(1).max(100).optional(),
+  type: z.enum(PRODUCT_TYPE_VALUES).optional(),
+  price: z.number().min(0).optional(),
+  old_price: z.number().min(0).optional().nullable(),
+  cost: z.number().min(0).optional(),
+  stock: z.number().int().min(0).optional(),
+  sold: z.number().int().min(0).optional(),
+  image_url: z.string().max(1000).optional().nullable(),
+  gallery: z.array(z.string()).optional(),
+  colors: z.array(z.any()).optional(),
+  storage_options: z.array(z.string()).optional(),
+  variants: z.array(z.any()).optional(),
+  specs: z.record(z.string(), z.string()).optional(),
+  active: z.boolean().optional(),
+  featured: z.boolean().optional(),
+  description_ar: z.string().max(5000).optional().nullable(),
+  description_he: z.string().max(5000).optional().nullable(),
+  category_id: z.string().uuid().optional().nullable(),
+  warranty_months: z.number().int().min(0).max(120).optional().nullable(),
+  model_number: z.string().max(100).optional().nullable(),
+  variant_kind: z.enum(["storage", "model", "color_only"]).optional(),
+  appliance_kind: z.enum(APPLIANCE_KINDS).optional().nullable(),
+  subkind: z.enum(ALL_SUBKINDS).optional().nullable(),
+});
+export const productUpdateSchema = productPlainSchema;
 
 export const couponSchema = z.object({
   code: z.string().min(1).max(50).transform((v) => v.toUpperCase()),
@@ -56,6 +186,7 @@ export const categorySchema = z.object({
   name_ar: z.string().min(1).max(200),
   name_he: z.string().max(200).nullable().default(""),
   type: z.enum(["manual", "auto"]).default("manual"),
+  kind: z.enum(["mobile", "appliance"]).default("mobile"),
   rule: z.string().max(500).optional().nullable(),
   product_ids: z.array(z.string()).optional().default([]),
   sort_order: z.number().int().min(0).default(0),

@@ -4,11 +4,13 @@
 // =====================================================
 
 import { createServerSupabase } from "@/lib/supabase";
-import type { Product, Hero, LinePlan, Coupon, Category, WebsiteContent } from "@/types/database";
+import type { Product, Hero, LinePlan, Coupon, Category, WebsiteContent, CategoryKind, ProductType } from "@/types/database";
 
 // ===== Products =====
 export async function getProducts(options?: {
-  type?: "device" | "accessory";
+  type?: ProductType;
+  /** If set, only these product types (e.g. `["device","accessory"]` to exclude appliances/TVs/etc. from the main storefront). */
+  types?: ProductType[];
   brand?: string;
   featured?: boolean;
   limit?: number;
@@ -22,7 +24,11 @@ export async function getProducts(options?: {
     .order("featured", { ascending: false })
     .order("sold", { ascending: false });
 
-  if (options?.type) query = query.eq("type", options.type);
+  if (options?.types && options.types.length > 0) {
+    query = query.in("type", options.types);
+  } else if (options?.type) {
+    query = query.eq("type", options.type);
+  }
   if (options?.brand) query = query.eq("brand", options.brand);
   if (options?.featured) query = query.eq("featured", true);
   if (options?.limit) query = query.limit(options.limit);
@@ -76,14 +82,12 @@ export async function getLinePlans(): Promise<LinePlan[]> {
 }
 
 // ===== Categories =====
-export async function getCategories(): Promise<Category[]> {
+export async function getCategories(options?: { kind?: CategoryKind }): Promise<Category[]> {
   const supabase = createServerSupabase();
   if (!supabase) return [];
-  const { data } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("active", true)
-    .order("sort_order");
+  let q = supabase.from("categories").select("*").eq("active", true);
+  if (options?.kind) q = q.eq("kind", options.kind);
+  const { data } = await q.order("sort_order");
 
   return (data as Category[]) || [];
 }

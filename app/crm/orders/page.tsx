@@ -29,6 +29,7 @@ export default function OrdersPage() {
   const [dateTo, setDateTo] = useState("");
   const [amountMin, setAmountMin] = useState("");
   const [amountMax, setAmountMax] = useState("");
+  const [productTypeFilter, setProductTypeFilter] = useState<"all" | "device" | "accessory" | "appliance">("all");
   const debouncedSearch = useDebounce(search, 300);
   const [selected, setSelected] = useState<any>(null);
   const [noteText, setNoteText] = useState("");
@@ -46,6 +47,7 @@ export default function OrdersPage() {
       if (dateTo) params.set("dateTo", dateTo);
       if (amountMin) params.set("amountMin", amountMin);
       if (amountMax) params.set("amountMax", amountMax);
+      if (productTypeFilter !== "all") params.set("productType", productTypeFilter);
       const res = await fetch(`/api/crm/orders?${params}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -58,7 +60,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, sourceFilter, debouncedSearch, dateFrom, dateTo, amountMin, amountMax, show]);
+  }, [statusFilter, sourceFilter, debouncedSearch, dateFrom, dateTo, amountMin, amountMax, productTypeFilter, show]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -229,6 +231,25 @@ export default function OrdersPage() {
         ))}
       </div>
 
+      {/* Product type (line items) */}
+      <div className="flex gap-1 mb-2 overflow-x-auto">
+        {[
+          { k: "all" as const, l: "كل المنتجات" },
+          { k: "device" as const, l: "📱 موبايل" },
+          { k: "accessory" as const, l: "🔌 إكسسوار" },
+          { k: "appliance" as const, l: "🏠 أجهزة منزلية" },
+        ].map((t) => (
+          <button
+            key={t.k}
+            type="button"
+            onClick={() => setProductTypeFilter(t.k)}
+            className={`chip whitespace-nowrap text-[10px] ${productTypeFilter === t.k ? "chip-active" : ""}`}
+          >
+            {t.l}
+          </button>
+        ))}
+      </div>
+
       {/* Date + Amount filters */}
       <div className="flex flex-wrap gap-2 mb-2">
         <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-surface-elevated border border-surface-border rounded-lg px-2 py-1 text-xs" />
@@ -263,6 +284,9 @@ export default function OrdersPage() {
             {orders.map((o) => {
               const st = ORDER_STATUS[o.status as keyof typeof ORDER_STATUS];
               const src = ORDER_SOURCE[o.source as keyof typeof ORDER_SOURCE];
+              const hasAppliance =
+                Array.isArray(o.order_items) &&
+                o.order_items.some((it: { product_type?: string }) => it.product_type === "appliance");
               return (
                 <div key={o.id} className="card cursor-pointer hover:border-brand/30 transition-all flex items-start gap-2"
                   style={{ padding: scr.mobile ? "10px 12px" : "14px 18px" }}
@@ -289,8 +313,13 @@ export default function OrdersPage() {
                       </div>
                     </div>
                     <div className="text-right flex-1 mr-2">
-                      <div className="flex items-center gap-1.5 justify-end">
+                      <div className="flex items-center gap-1.5 justify-end flex-wrap">
                         <span className="font-bold" style={{ fontSize: scr.mobile ? 12 : 14 }}>{o.id}</span>
+                        {hasAppliance && (
+                          <span className="badge text-[9px]" title="يحتوي أجهزة منزلية" style={{ background: "rgba(6,182,212,0.12)", color: "#22d3ee" }}>
+                            🏠 أجهزة
+                          </span>
+                        )}
                         {st && <span className="badge" style={{ background: `${st.color}15`, color: st.color }}>{st.icon} {st.label}</span>}
                         {src && <span className="text-[9px]" style={{ color: src.color }}>{src.icon}</span>}
                       </div>

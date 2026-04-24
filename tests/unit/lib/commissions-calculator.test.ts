@@ -297,6 +297,8 @@ describe("calcDualCommission", () => {
     line_multiplier: 3,
     device_rate: 0.03,
     device_milestone_bonus: 1000,
+    appliance_rate: 0.05,
+    appliance_milestone_bonus: 0,
     min_package_price: 29,
     loyalty_bonuses: {},
   };
@@ -386,6 +388,8 @@ describe("calcEmployeeDeviceCommission", () => {
       ...DEFAULT_EMPLOYEE_PROFILE,
       device_rate: 0.03,
       device_milestone_bonus: 1000,
+    appliance_rate: 0.05,
+    appliance_milestone_bonus: 0,
     };
     const result = calcEmployeeDeviceCommission(20000, profile);
     expect(result.basePct).toBe(600); // 20000 * 0.03
@@ -398,6 +402,8 @@ describe("calcEmployeeDeviceCommission", () => {
       ...DEFAULT_EMPLOYEE_PROFILE,
       device_rate: 0.03,
       device_milestone_bonus: 1000,
+    appliance_rate: 0.05,
+    appliance_milestone_bonus: 0,
     };
     const result = calcEmployeeDeviceCommission(55000, profile);
     expect(result.basePct).toBe(1650); // 55000 * 0.03
@@ -411,6 +417,8 @@ describe("calcEmployeeDeviceCommission", () => {
       ...DEFAULT_EMPLOYEE_PROFILE,
       device_rate: 0.04,
       device_milestone_bonus: 0,
+    appliance_rate: 0.05,
+    appliance_milestone_bonus: 0,
     };
     const result = calcEmployeeDeviceCommission(100000, profile);
     expect(result.milestoneCount).toBe(0);

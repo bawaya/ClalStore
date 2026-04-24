@@ -76,7 +76,22 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(Math.max(0, Number(searchParams.get("limit")) || 0), 200);
     const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
 
-    const { data: products, total } = await getAdminProducts(limit > 0 ? { limit, offset } : undefined);
+    // ?types=device,accessory OR ?type=tv — filters the listing so each admin page
+    // sees only its own product type.
+    const ALLOWED_TYPES = ["device", "accessory", "appliance", "tv", "computer", "tablet", "network"] as const;
+    type AllowedType = (typeof ALLOWED_TYPES)[number];
+    const rawTypes = [
+      ...(searchParams.get("types")?.split(",") || []),
+      ...(searchParams.get("type") ? [searchParams.get("type")!] : []),
+    ]
+      .map((t) => t.trim())
+      .filter((t): t is AllowedType => (ALLOWED_TYPES as readonly string[]).includes(t));
+    const types = rawTypes.length > 0 ? [...new Set(rawTypes)] : undefined;
+
+    const { data: products, total } = await getAdminProducts({
+      ...(limit > 0 ? { limit, offset } : {}),
+      ...(types ? { types } : {}),
+    });
     return apiSuccess(
       products,
       limit > 0 ? { limit, offset, total, totalPages: Math.ceil(total / limit) } : undefined,

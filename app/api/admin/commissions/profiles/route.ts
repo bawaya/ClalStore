@@ -18,6 +18,8 @@ const profileSchema = z.object({
   line_multiplier: z.number().min(0).max(10).default(4),
   device_rate: z.number().min(0).max(1).default(0.05),
   device_milestone_bonus: z.number().min(0).default(0),
+  appliance_rate: z.number().min(0).max(1).default(0.05),
+  appliance_milestone_bonus: z.number().min(0).default(0),
   min_package_price: z.number().min(0).default(19.90),
   loyalty_bonuses: z.record(z.string(), z.number()).default({}),
   notes: z.string().max(500).optional(),
