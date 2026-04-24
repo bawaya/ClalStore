@@ -115,6 +115,10 @@ jobs:
           EOF
 
       - uses: actions/configure-pages@v5
+        with:
+          # Auto-enables GitHub Pages on first run if not yet enabled.
+          # Source: https://github.com/actions/configure-pages#enablement
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
