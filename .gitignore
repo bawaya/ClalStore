@@ -76,6 +76,9 @@ reports/mutation/
 synthetic-report/
 synthetic-results.json
 
+# Postman: local environment (use ClalMobile.local.example.postman_environment.json, then npm run postman:sync-env)
+postman/*.local.postman_environment.json
+
 # Private documentation — never push to the public repo
 /docs/private/
 /docs/internal/

@@ -256,8 +256,15 @@ describe("ProductCard", () => {
     expect(screen.getByText("ايفون 15")).toBeInTheDocument();
   });
 
-  it("shows monthly payment for device type", () => {
-    render(<ProductCard product={baseProduct as any} />);
+  it("shows monthly payment for device type when variant has monthly_price", () => {
+    const withMonthly = {
+      ...baseProduct,
+      storage_options: ["128GB"],
+      variants: [
+        { storage: "128GB", price: 3500, old_price: 4000, monthly_price: 97, stock: 10 },
+      ],
+    };
+    render(<ProductCard product={withMonthly as any} />);
     expect(screen.getByText(/× 36/)).toBeInTheDocument();
   });
 });

@@ -113,7 +113,12 @@ export async function middleware(request: NextRequest) {
     rlPrefix = "api";
   }
 
-  if (rlConfig) {
+  // Local dev: Newman/Postman runners fire many /api/* calls per minute; the default
+  // 60/min bucket causes 429 before layers finish. Skip only the generic "api" bucket in development.
+  const skipGenericApiRateLimit =
+    process.env.NODE_ENV === "development" && rlPrefix === "api";
+
+  if (rlConfig && !skipGenericApiRateLimit) {
     const rl = checkRateLimit(getRateLimitKey(clientIp, rlPrefix), rlConfig);
     if (!rl.allowed) {
       return NextResponse.json(

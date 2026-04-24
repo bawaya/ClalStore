@@ -246,8 +246,15 @@ describe("ProductDetailClient", () => {
     expect(screen.getByText("ايفون 15 برو")).toBeInTheDocument();
   });
 
-  it("shows monthly payment for device type", () => {
-    render(<ProductDetailClient product={baseProduct as any} related={[]} />);
+  it("shows monthly payment for device type when variant has monthly_price", () => {
+    const withMonthly = {
+      ...baseProduct,
+      storage_options: ["256GB"],
+      variants: [
+        { storage: "256GB", price: 4500, old_price: 5000, monthly_price: 125, stock: 10 },
+      ],
+    };
+    render(<ProductDetailClient product={withMonthly as any} related={[]} />);
     expect(screen.getByText(/× 36/)).toBeInTheDocument();
   });
 });

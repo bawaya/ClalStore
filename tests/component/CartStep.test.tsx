@@ -34,7 +34,7 @@ let mockItems: any[] = [];
 let mockSubtotal = 0;
 let mockTotal = 0;
 let mockDiscountAmount = 0;
-let mockHasDevices = false;
+let mockHasInstallmentItems = false;
 let mockOnlyAccessories = false;
 
 vi.mock("@/lib/store/cart", () => ({
@@ -44,7 +44,7 @@ vi.mock("@/lib/store/cart", () => ({
       getSubtotal: () => mockSubtotal,
       getTotal: () => mockTotal,
       discountAmount: mockDiscountAmount,
-      hasDevices: () => mockHasDevices,
+      hasInstallmentItems: () => mockHasInstallmentItems,
       hasOnlyAccessories: () => mockOnlyAccessories,
       removeItem: mockRemoveItem,
     };
@@ -68,7 +68,7 @@ describe("CartStep", () => {
     mockSubtotal = 0;
     mockTotal = 0;
     mockDiscountAmount = 0;
-    mockHasDevices = false;
+    mockHasInstallmentItems = false;
     mockOnlyAccessories = false;
     mockUseScreen.mockReturnValue({ mobile: false, tablet: false, desktop: true, width: 1024 });
   });
@@ -162,13 +162,13 @@ describe("CartStep", () => {
     expect(screen.getByText(/خصم: -₪200/)).toBeInTheDocument();
   });
 
-  it("shows device warning when cart has devices", () => {
+  it("shows device warning when cart has installment items (device/appliance)", () => {
     mockItems = [
       { cartId: "c1", productId: "p1", name: "ايفون 15", brand: "Apple", type: "device", price: 3500 },
     ];
     mockSubtotal = 3500;
     mockTotal = 3500;
-    mockHasDevices = true;
+    mockHasInstallmentItems = true;
     render(<CartStep {...defaultProps} />);
     expect(screen.getByText(/سلتك تحتوي جهاز/)).toBeInTheDocument();
   });

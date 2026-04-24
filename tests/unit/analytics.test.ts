@@ -1,4 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// trackEvent* checks readConsent() for analytics/advertising before calling gtag/fbq.
+vi.mock("@/lib/consent", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/lib/consent")>();
+  const allGranted: mod.ConsentState = {
+    essential: true,
+    functional: true,
+    analytics: true,
+    advertising: true,
+    version: mod.PRIVACY_VERSION,
+    updated_at: new Date().toISOString(),
+  };
+  return { ...mod, readConsent: () => allGranted };
+});
+
 import {
   trackAddToCart,
   trackPurchase,

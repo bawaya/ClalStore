@@ -27,6 +27,8 @@ vi.mock("@/lib/store/cart", () => ({
     getSubtotal: () => 0,
     getTotal: () => 0,
     hasDevices: () => false,
+    hasAppliances: () => false,
+    hasInstallmentItems: () => false,
     hasOnlyAccessories: () => false,
     applyCoupon: vi.fn(),
     couponCode: null,

@@ -21,7 +21,10 @@
     "test:coverage": "vitest run --coverage",
     "db:migrate": "npx supabase db push",
     "db:seed": "tsx supabase/seed/index.ts",
-    "db:reset": "npx supabase db reset"
+    "db:reset": "npx supabase db reset",
+    "postman:build": "node scripts/postman/build-collection.mjs",
+    "postman:run-layers": "node scripts/postman/run-layers.mjs",
+    "postman:sync-env": "node scripts/postman/sync-env.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

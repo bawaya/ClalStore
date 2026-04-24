@@ -20,6 +20,7 @@ vi.mock("@/lib/hooks", () => ({
   useScreen: () => mockUseScreen(),
 }));
 
+import { PRIVACY_VERSION } from "@/lib/consent";
 import { CookieConsent } from "@/components/shared/CookieConsent";
 
 describe("CookieConsent", () => {
@@ -43,18 +44,28 @@ describe("CookieConsent", () => {
     act(() => {
       vi.advanceTimersByTime(1100);
     });
-    expect(screen.getByText("cookie.text")).toBeInTheDocument();
-    expect(screen.getByText("cookie.accept")).toBeInTheDocument();
-    expect(screen.getByText("cookie.link")).toBeInTheDocument();
+    expect(screen.getByText("cookie.body")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cookie\.acceptAll/ })).toBeInTheDocument();
+    expect(screen.getByText("cookie.policyLink")).toBeInTheDocument();
   });
 
   it("does not render when consent is already stored", () => {
-    localStorage.setItem("clal_cookie_consent", "accepted");
+    localStorage.setItem(
+      "clal_consent_v2",
+      JSON.stringify({
+        essential: true,
+        functional: true,
+        analytics: true,
+        advertising: false,
+        version: PRIVACY_VERSION,
+        updated_at: new Date().toISOString(),
+      }),
+    );
     render(<CookieConsent />);
     act(() => {
       vi.advanceTimersByTime(2000);
     });
-    expect(screen.queryByText("cookie.text")).not.toBeInTheDocument();
+    expect(screen.queryByText("cookie.body")).not.toBeInTheDocument();
   });
 
   it("hides banner and stores consent when accept is clicked", () => {
@@ -62,10 +73,14 @@ describe("CookieConsent", () => {
     act(() => {
       vi.advanceTimersByTime(1100);
     });
-    const acceptBtn = screen.getByText("cookie.accept");
+    const acceptBtn = screen.getByRole("button", { name: /cookie\.acceptAll/ });
     fireEvent.click(acceptBtn);
-    expect(screen.queryByText("cookie.text")).not.toBeInTheDocument();
-    expect(localStorage.getItem("clal_cookie_consent")).toBe("accepted");
+    expect(screen.queryByText("cookie.body")).not.toBeInTheDocument();
+    const raw = localStorage.getItem("clal_consent_v2");
+    expect(raw).toBeTruthy();
+    const stored = JSON.parse(raw!);
+    expect(stored.version).toBe(PRIVACY_VERSION);
+    expect(stored.analytics).toBe(true);
   });
 
   it("has a privacy link pointing to /privacy", () => {
@@ -73,7 +88,7 @@ describe("CookieConsent", () => {
     act(() => {
       vi.advanceTimersByTime(1100);
     });
-    const link = screen.getByText("cookie.link");
+    const link = screen.getByText("cookie.policyLink");
     expect(link).toHaveAttribute("href", "/privacy");
   });
 
@@ -83,9 +98,9 @@ describe("CookieConsent", () => {
     act(() => {
       vi.advanceTimersByTime(1100);
     });
-    const banner = screen.getByText("cookie.text").closest("div[dir='rtl']") as HTMLElement | null;
-    expect(banner).toBeInTheDocument();
-    expect(banner?.style.padding).toContain("12px");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.style.padding).toMatch(/14px/);
   });
 
   it("renders desktop view with larger padding", () => {
@@ -94,7 +109,7 @@ describe("CookieConsent", () => {
     act(() => {
       vi.advanceTimersByTime(1100);
     });
-    const banner = screen.getByText("cookie.text").closest("div[dir='rtl']") as HTMLElement | null;
-    expect(banner?.style.padding).toContain("16px");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.style.padding).toMatch(/20px/);
   });
 });

@@ -17,9 +17,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const db = createAdminSupabase();
     if (!db) return apiError("DB unavailable", 500);
 
-    const { id } = await ctx.params;
-    const annId = Number(id);
-    if (!annId || Number.isNaN(annId)) return apiError("Invalid id", 400);
+    const { id: rawId } = await ctx.params;
+    if (rawId == null || String(rawId).trim() === "") {
+      return apiError("Invalid id", 400);
+    }
+    const annId = Number(rawId);
+    if (!Number.isFinite(annId) || !Number.isInteger(annId) || annId < 1) {
+      return apiError("Invalid id", 400);
+    }
 
     const { error } = await db
       .from("admin_announcement_reads")
