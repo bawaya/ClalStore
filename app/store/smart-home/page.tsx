@@ -3,7 +3,8 @@ import { getProducts } from "@/lib/store/queries";
 import { SmartHomeClient } from "@/components/store/SmartHomeClient";
 import { getStoreMetadata } from "@/lib/seo";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
   const m = getStoreMetadata();

@@ -4,7 +4,9 @@ import { getProducts, getHeroes, getLinePlans } from "@/lib/store/queries";
 import { StoreClient } from "@/components/store/StoreClient";
 import { getStoreMetadata } from "@/lib/seo";
 
-export const revalidate = 3600;
+// Always render dynamically — build-time DB unreachable would cache empty/fallback HTML for 30 days.
+export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
   return getStoreMetadata();

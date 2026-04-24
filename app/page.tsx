@@ -8,7 +8,9 @@ import { getProducts, getLinePlans, getWebsiteContent } from "@/lib/store/querie
 import { HomeClient } from "@/components/website/HomeClient";
 import type { WebsiteContent } from "@/types/database";
 
-export const revalidate = 3600;
+// Always render dynamically — prevents serving build-time stale fallback data when DB is unreachable at build.
+export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata = {
   title: "ClalMobile — وكيل رسمي لـ HOT Mobile | أجهزة وباقات",

@@ -40,7 +40,14 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
   const [smartResults, setSmartResults] = useState<Product[] | null>(null);
   const [smartSuggestion, setSmartSuggestion] = useState("");
 
-  const items = products.length > 0 ? products : FALLBACK_PRODUCTS;
+  // Never show FALLBACK_PRODUCTS in production — their fake IDs (d1, d2…) cause 404s on click.
+  // Fallback exists only for local development against an empty DB.
+  const items =
+    products.length > 0
+      ? products
+      : process.env.NODE_ENV === "production"
+        ? []
+        : FALLBACK_PRODUCTS;
 
   const brands = useMemo(
     () => [...new Set(items.map((p) => p.brand))],
