@@ -1,11 +1,17 @@
 name: ClalMobile CI
 
 on:
+  # All branches (including main) so direct pushes to main run lint, Vitest (incl. API),
+  # Playwright E2E, and build — not only Staging.
   push:
-    branches-ignore: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+# Same commit can trigger both push and pull_request; one group per commit avoids duplicate CI.
+concurrency:
+  group: clalmobile-ci-${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: true
 
 jobs:
   lint-typecheck:
