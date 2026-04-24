@@ -526,6 +526,19 @@ export type Customer = {
   auth_token?: string;
   auth_token_expires_at?: string;
   last_login?: string;
+  // Consent flags (Israeli Privacy Protection Law — Amendment 13)
+  consent_essential?: boolean;
+  consent_functional?: boolean;
+  consent_analytics?: boolean;
+  consent_advertising?: boolean;
+  consent_marketing_email?: boolean;
+  consent_marketing_sms?: boolean;
+  consent_marketing_whatsapp?: boolean;
+  privacy_version_accepted?: string | null;
+  privacy_accepted_at?: string | null;
+  // Soft-delete (right to erasure)
+  deletion_requested_at?: string | null;
+  deletion_processed_at?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -374,6 +374,10 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
         { href: "/contact", label: t("nav.contact") },
         { href: "/legal", label: t("footer.legal") },
         { href: "/privacy", label: t("footer.privacy") },
+        { href: "/returns", label: t("footer.returns") },
+        { href: "/shipping", label: t("footer.shipping") },
+        { href: "/warranty", label: t("footer.warranty") },
+        { href: "/accessibility", label: t("footer.accessibility") },
       ],
     },
     {
@@ -414,8 +418,22 @@ export function Footer({ cms }: { cms?: WebsiteContent }) {
         </div>
 
         {/* Bottom */}
-        <div className="border-t border-surface-border mt-6 pt-4 flex items-center justify-between">
-          <Link href="/privacy" className="text-dim text-[11px] hover:text-muted">{t("footer.privacy")}</Link>
+        <div className="border-t border-surface-border mt-6 pt-4 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link href="/privacy" className="text-dim text-[11px] hover:text-muted">{t("footer.privacy")}</Link>
+            <Link href="/accessibility" className="text-dim text-[11px] hover:text-muted">♿ {t("footer.accessibility")}</Link>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("clal-consent-reopen"));
+                }
+              }}
+              className="text-dim text-[11px] hover:text-muted bg-transparent border-0 cursor-pointer p-0"
+            >
+              🍪 {t("footer.manageCookies")}
+            </button>
+          </div>
           <span className="text-dim text-[11px]">© {year} ClalMobile. {t("footer.rights")}.</span>
         </div>
       </div>

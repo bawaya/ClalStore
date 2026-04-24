@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       itemsByOrder[item.order_id].push(item);
     }
 
-    // Combine
+    // Combine — include cancellation metadata so the UI can show the cancel button
     const result = (orders || []).map((order: any) => ({
       id: order.id,
       status: order.status,
@@ -68,6 +68,12 @@ export async function GET(req: NextRequest) {
       shipping_address: order.shipping_address,
       created_at: order.created_at,
       updated_at: order.updated_at,
+      delivered_at: order.delivered_at ?? null,
+      shipped_at: order.shipped_at ?? null,
+      cancelled_at_customer: order.cancelled_at_customer ?? null,
+      cancellation_reason: order.cancellation_reason ?? null,
+      cancellation_fee: order.cancellation_fee ?? null,
+      cancellation_refund: order.cancellation_refund ?? null,
       items: itemsByOrder[order.id] || [],
     }));
 

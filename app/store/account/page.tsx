@@ -51,6 +51,12 @@ interface OrderData {
   shipping_address: string;
   created_at: string;
   updated_at: string;
+  delivered_at?: string | null;
+  shipped_at?: string | null;
+  cancelled_at_customer?: string | null;
+  cancellation_reason?: string | null;
+  cancellation_fee?: number | null;
+  cancellation_refund?: number | null;
   items: {
     id: string;
     product_name: string;
@@ -60,6 +66,18 @@ interface OrderData {
     color?: string;
     storage?: string;
   }[];
+}
+
+/** Whether the customer can still cancel this order under Israeli Consumer Protection
+ *  Cancellation Regulations 2010 — 14 days from delivery (or shipped/created if no delivery date),
+ *  4 months when extended_window is declared by the customer. */
+function canCustomerCancel(order: OrderData, extendedWindow: boolean): { allowed: boolean; daysLeft: number } {
+  const finalised = ["cancelled", "rejected", "returned"];
+  if (finalised.includes(order.status)) return { allowed: false, daysLeft: 0 };
+  const ref = order.delivered_at || order.shipped_at || order.created_at;
+  const ageDays = (Date.now() - new Date(ref).getTime()) / 86_400_000;
+  const max = extendedWindow ? 120 : 14;
+  return { allowed: ageDays <= max, daysLeft: Math.max(0, Math.ceil(max - ageDays)) };
 }
 
 const STATUS_CONFIG: Record<
@@ -121,6 +139,13 @@ export default function AccountPage() {
   const [profileMsg, setProfileMsg] = useState("");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [token, setToken] = useState("");
+  // Cancellation modal state
+  const [cancelOrder, setCancelOrder] = useState<OrderData | null>(null);
+  const [cancelReason, setCancelReason] = useState<"changed_mind" | "defect" | "late_delivery" | "wrong_item" | "other">("changed_mind");
+  const [cancelNotes, setCancelNotes] = useState("");
+  const [cancelExtended, setCancelExtended] = useState(false);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState("");
 
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
@@ -242,6 +267,46 @@ export default function AccountPage() {
       setProfileMsg(lang === "he" ? "שגיאה" : "خطأ في الاتصال");
     }
     setSavingProfile(false);
+  };
+
+  // Submit cancellation request
+  const submitCancel = async () => {
+    if (!cancelOrder) return;
+    setCancelSubmitting(true);
+    setCancelMsg("");
+    try {
+      const res = await fetch(`/api/customer/orders/${encodeURIComponent(cancelOrder.id)}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reason: cancelReason,
+          notes: cancelNotes || undefined,
+          extended_window: cancelExtended,
+        }),
+      });
+      const json = await res.json();
+      const data = json.data ?? json;
+      if (json.success) {
+        setCancelMsg(data.message || (lang === "he" ? "הזמנה בוטלה" : "تم إلغاء الطلب"));
+        // Refresh orders list
+        await fetchOrders();
+        setTimeout(() => {
+          setCancelOrder(null);
+          setCancelMsg("");
+          setCancelNotes("");
+          setCancelReason("changed_mind");
+          setCancelExtended(false);
+        }, 2200);
+      } else {
+        setCancelMsg(json.error || (lang === "he" ? "שגיאה" : "خطأ"));
+      }
+    } catch {
+      setCancelMsg(lang === "he" ? "שגיאת רשת" : "خطأ في الاتصال");
+    }
+    setCancelSubmitting(false);
   };
 
   const handleAddAllWishlistToCart = () => {
@@ -440,6 +505,42 @@ export default function AccountPage() {
                                 </div>
                               )}
                             </div>
+
+                            {/* Cancellation status (already cancelled) */}
+                            {order.status === "cancelled" && order.cancelled_at_customer && (
+                              <div className="mt-3 rounded-xl border border-state-error/30 bg-state-error/5 p-3 text-xs text-state-error">
+                                ❌ {lang === "he" ? "הזמנה בוטלה על ידך" : "تم إلغاء الطلب من قبلك"}
+                                {order.cancellation_refund != null && (
+                                  <div className="mt-1 text-muted">
+                                    {lang === "he" ? "החזר" : "المُعاد"}: ₪{order.cancellation_refund} •{" "}
+                                    {lang === "he" ? "דמי ביטול" : "رسوم الإلغاء"}: ₪{order.cancellation_fee || 0}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Cancel button (only when window is still open) */}
+                            {(() => {
+                              const ccc = canCustomerCancel(order, false);
+                              if (!ccc.allowed) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCancelOrder(order);
+                                    setCancelReason("changed_mind");
+                                    setCancelNotes("");
+                                    setCancelExtended(false);
+                                    setCancelMsg("");
+                                  }}
+                                  className="mt-3 w-full rounded-xl border border-state-error/40 bg-state-error/5 py-2 text-xs font-bold text-state-error hover:bg-state-error/10 transition-colors"
+                                >
+                                  ↩️ {lang === "he"
+                                    ? `בטל הזמנה (נותרו ${ccc.daysLeft} ימים)`
+                                    : `إلغاء الطلب (متبقّي ${ccc.daysLeft} يوم)`}
+                                </button>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -714,6 +815,110 @@ export default function AccountPage() {
           )}
         </div>
       </main>
+
+      {/* ───── Cancellation modal ───── */}
+      {cancelOrder && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-3"
+          dir="rtl"
+          onClick={() => !cancelSubmitting && setCancelOrder(null)}
+        >
+          <div
+            className="card w-full max-w-md rounded-2xl bg-surface-card p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-black text-white mb-1">
+              ↩️ {lang === "he" ? "ביטול הזמנה" : "إلغاء الطلب"}
+            </h3>
+            <p className="text-xs text-muted mb-3">
+              {lang === "he"
+                ? `הזמנה ${cancelOrder.id} • ₪${cancelOrder.total}`
+                : `طلب ${cancelOrder.id} • ₪${cancelOrder.total}`}
+            </p>
+
+            <label className="block mb-3">
+              <span className="text-xs text-muted mb-1 block">
+                {lang === "he" ? "סיבת הביטול *" : "سبب الإلغاء *"}
+              </span>
+              <select
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value as typeof cancelReason)}
+                className="input w-full"
+                disabled={cancelSubmitting}
+              >
+                <option value="changed_mind">{lang === "he" ? "שיניתי את דעתי" : "غيّرت رأيي"}</option>
+                <option value="defect">{lang === "he" ? "מוצר פגום (ללא דמי ביטול)" : "منتج معيب (بدون رسوم)"}</option>
+                <option value="late_delivery">{lang === "he" ? "איחור באספקה" : "تأخّر التوصيل"}</option>
+                <option value="wrong_item">{lang === "he" ? "מוצר לא מתאים" : "منتج خاطئ"}</option>
+                <option value="other">{lang === "he" ? "אחר" : "آخر"}</option>
+              </select>
+            </label>
+
+            <label className="block mb-3">
+              <span className="text-xs text-muted mb-1 block">
+                {lang === "he" ? "הערות (אופציונלי)" : "ملاحظات (اختياري)"}
+              </span>
+              <textarea
+                value={cancelNotes}
+                onChange={(e) => setCancelNotes(e.target.value)}
+                className="input w-full min-h-[60px] resize-y"
+                disabled={cancelSubmitting}
+                maxLength={500}
+              />
+            </label>
+
+            <label className="flex items-start gap-2 mb-3 cursor-pointer rounded-xl border border-surface-border bg-surface-elevated p-2.5">
+              <input
+                type="checkbox"
+                checked={cancelExtended}
+                onChange={(e) => setCancelExtended(e.target.checked)}
+                disabled={cancelSubmitting}
+                className="mt-0.5 w-4 h-4 accent-[#c41040]"
+              />
+              <span className="text-[11px] text-muted leading-relaxed">
+                {lang === "he"
+                  ? "אני אזרח/ית 65+, אדם עם מוגבלות, או עולה חדש (5 שנים מתעודת עולה) — חלון מורחב של 4 חודשים."
+                  : "أنا فوق 65 سنة، أو من ذوي الإعاقة، أو مهاجر جديد (خلال 5 سنوات من شهادة العولة) — فترة ممتدة 4 شهور."}
+              </span>
+            </label>
+
+            <div className="rounded-xl bg-state-info/5 border border-state-info/20 p-2.5 mb-3 text-[11px] text-state-info leading-relaxed">
+              ℹ️ {lang === "he"
+                ? "בכל סיבה שאינה פגם — דמי ביטול של 5% או ₪100, הנמוך מביניהם. במקרה של מוצר פגום — ללא דמי ביטול."
+                : "لأي سبب غير العيب — رسوم إلغاء 5% أو ₪100 (الأقل). للمنتج المعيب — بدون رسوم."}
+            </div>
+
+            {cancelMsg && (
+              <div className="rounded-xl bg-state-success/10 border border-state-success/30 p-2.5 mb-3 text-xs text-state-success">
+                {cancelMsg}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelOrder(null)}
+                disabled={cancelSubmitting}
+                className="flex-1 rounded-xl border border-surface-border bg-surface-elevated py-2.5 text-sm font-bold text-white"
+              >
+                {lang === "he" ? "ביטול" : "تراجع"}
+              </button>
+              <button
+                type="button"
+                onClick={submitCancel}
+                disabled={cancelSubmitting}
+                className="flex-1 rounded-xl border-2 border-state-error bg-state-error py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {cancelSubmitting
+                  ? "⏳ ..."
+                  : lang === "he"
+                    ? "אשר ביטול"
+                    : "تأكيد الإلغاء"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
