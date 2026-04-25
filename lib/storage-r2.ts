@@ -5,6 +5,7 @@
 // =====================================================
 
 import { uploadImage } from "@/lib/storage";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
 // R2 S3-compatible endpoint
 const R2_ENDPOINT = () => {
@@ -24,11 +25,12 @@ export async function uploadToR2(
   filename: string,
   contentType: string
 ): Promise<string> {
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretKey = process.env.R2_SECRET_ACCESS_KEY;
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const publicUrl = R2_PUBLIC_URL();
-  const bucket = R2_BUCKET();
+  const storageCfg = await getIntegrationConfig("storage");
+  const accessKeyId = storageCfg.access_key_id || process.env.R2_ACCESS_KEY_ID;
+  const secretKey = storageCfg.secret_access_key || process.env.R2_SECRET_ACCESS_KEY;
+  const accountId = storageCfg.account_id || process.env.R2_ACCOUNT_ID;
+  const publicUrl = storageCfg.public_url || R2_PUBLIC_URL();
+  const bucket = storageCfg.bucket_name || R2_BUCKET();
 
   // Try R2 if configured
   if (accessKeyId && secretKey && accountId && publicUrl) {

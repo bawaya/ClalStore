@@ -11,12 +11,14 @@ export const SENSITIVE_INTEGRATION_KEYS = new Set([
   "api_key",
   "auth_token",
   "secret_key",
+  "secret_access_key",
   "password",
   "access_token",
   "client_secret",
   "verify_token",
   "project_token",
   "private_key",
+  "group_private_token",
   "token",
 ]);
 

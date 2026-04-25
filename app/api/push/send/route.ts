@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
 // ── Web Push helpers (Edge-compatible, no web-push npm package) ──
 
@@ -225,13 +226,14 @@ export async function POST(req: NextRequest) {
       return apiError("Missing title or body", 400);
     }
 
-    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    const pushCfg = await getIntegrationConfig("push_notifications");
+    const vapidPublicKey = pushCfg.public_key || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPrivateKey = pushCfg.private_key || process.env.VAPID_PRIVATE_KEY;
+    const vapidSubject = pushCfg.subject || process.env.VAPID_SUBJECT || "mailto:info@clalmobile.com";
+
+    if (!vapidPublicKey || !vapidPrivateKey) {
       return apiError("VAPID keys not configured", 500);
     }
-
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-    const vapidSubject = process.env.VAPID_SUBJECT || "mailto:info@clalmobile.com";
 
     // Get all active subscriptions
     const { data: subs } = await db.from("push_subscriptions")

@@ -11,61 +11,147 @@ import { resolveIntegrationConfigForRequest } from "@/lib/integrations/secrets";
 
 type TestResult = { ok: boolean; message: string };
 
+function toBool(value: unknown): boolean {
+  return value === true || value === "true" || value === "1";
+}
+
+function toInt(value: unknown, fallback: number): number {
+  const parsed = parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+async function testRivhit(cfg: Record<string, any>): Promise<TestResult> {
+  const groupPrivateToken = cfg.group_private_token;
+  if (!groupPrivateToken) {
+    return { ok: false, message: "GroupPrivateToken مفقود" };
+  }
+
+  const url = toBool(cfg.test_mode)
+    ? "https://testicredit.rivhit.co.il/API/PaymentPageRequest.svc/GetUrl"
+    : "https://icredit.rivhit.co.il/API/PaymentPageRequest.svc/GetUrl";
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        GroupPrivateToken: groupPrivateToken,
+        Items: [{ Description: "Connection Test", UnitPrice: 1, Quantity: 1 }],
+        RedirectURL: "https://clalmobile.com/store/checkout/success?test=1",
+        FailRedirectURL: "https://clalmobile.com/store/checkout/failed?test=1",
+        IPNURL: "https://clalmobile.com/api/payment/callback",
+        IPNMethod: 2,
+        MaxPayments: toInt(cfg.max_payments, 1),
+        MinPayments: toInt(cfg.min_payments, 1),
+        Currency: 1,
+        PriceIncludeVAT: true,
+        CustomerFirstName: "Test",
+        CustomerLastName: "Admin",
+        PhoneNumber: "0500000000",
+        EmailAddress: "test@clalmobile.com",
+        Order: "integration-test",
+        Comments: "ClalMobile integration test",
+        DocumentLanguage: cfg.document_language || "he",
+        HideItemList: true,
+        DisplayBackButton: false,
+        SaleType: toInt(cfg.sale_type, 1),
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && (data?.Status === 0 || data?.URL)) {
+      return { ok: true, message: "✅ بوابة iCredit متصلة بنجاح" };
+    }
+
+    return {
+      ok: false,
+      message: data?.DebugMessage || data?.Message || `iCredit responded with ${res.status}`,
+    };
+  } catch (error: unknown) {
+    return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+  }
+}
+
+async function testUpay(cfg: Record<string, any>): Promise<TestResult> {
+  const apiUsername = cfg.api_username;
+  const apiKey = cfg.api_key;
+
+  if (!apiUsername || !apiKey) {
+    return { ok: false, message: "اسم المستخدم ومفتاح UPay مطلوبان" };
+  }
+
+  try {
+    const { upayLogin } = await import("@/lib/integrations/upay");
+    const ok = await upayLogin({
+      apiUsername,
+      apiKey,
+      testMode: toBool(cfg.test_mode),
+      language: cfg.language || "HE",
+      maxPayments: toInt(cfg.max_payments, 1),
+    });
+
+    return ok
+      ? { ok: true, message: "✅ بوابة UPay متصلة بنجاح" }
+      : { ok: false, message: "فشل تسجيل الدخول إلى UPay — تحقق من اسم المستخدم والمفتاح" };
+  } catch (error: unknown) {
+    return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+  }
+}
+
+async function testSendGrid(cfg: Record<string, any>): Promise<TestResult> {
+  const apiKey = cfg.api_key;
+  if (!apiKey) return { ok: false, message: "مفتاح SendGrid API مفقود" };
+
+  try {
+    const res = await fetch("https://api.sendgrid.com/v3/user/profile", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (res.ok) return { ok: true, message: "✅ SendGrid متصل بنجاح" };
+    if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
+    return { ok: false, message: `SendGrid responded with ${res.status}` };
+  } catch (error: unknown) {
+    return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+  }
+}
+
+async function testResend(cfg: Record<string, any>): Promise<TestResult> {
+  const apiKey = cfg.api_key;
+  if (!apiKey) return { ok: false, message: "مفتاح Resend API مفقود" };
+
+  try {
+    const res = await fetch("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (res.ok) return { ok: true, message: "✅ Resend متصل بنجاح" };
+    if ([401, 403].includes(res.status)) return { ok: false, message: "مفتاح API غير صالح" };
+    return { ok: false, message: `Resend responded with ${res.status}` };
+  } catch (error: unknown) {
+    return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+  }
+}
+
 const TESTS: Record<string, (config: Record<string, any>, provider?: string) => Promise<TestResult>> = {
-  payment: async (cfg) => {
-    const apiKey = cfg.api_key;
-    const businessId = cfg.business_id;
-    if (!apiKey || !businessId) {
-      return { ok: false, message: "مفتاح API أو معرف العمل مفقود" };
+  payment: async (cfg, provider) => {
+    if (provider && provider !== "רווחית (Rivhit)") {
+      return { ok: false, message: `مزود غير مدعوم لهذا النوع: ${provider}` };
     }
-
-    try {
-      const res = await fetch("https://api.rivhit.co.il/online/api/PaymentPageRequest.svc/GetUrl", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_token: apiKey,
-          business_id: Number(businessId),
-          type: 320,
-          description: "Connection Test",
-          sum: 0.01,
-          currency: "ILS",
-          client_name: "Test",
-          client_phone: "0500000000",
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
-
-      const data = await res.json();
-      if (data.status === 1 || data.payment_url) {
-        return { ok: true, message: "✅ Rivhit متصل بنجاح" };
-      }
-
-      return {
-        ok: false,
-        message: data.error_message || `Rivhit error: ${data.error_code || "unknown"}`,
-      };
-    } catch (error: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
-    }
+    return testRivhit(cfg);
   },
 
-  email: async (cfg) => {
-    const apiKey = cfg.api_key;
-    if (!apiKey) return { ok: false, message: "مفتاح SendGrid API مفقود" };
+  payment_upay: async (cfg) => {
+    return testUpay(cfg);
+  },
 
-    try {
-      const res = await fetch("https://api.sendgrid.com/v3/user/profile", {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (res.ok) return { ok: true, message: "✅ SendGrid متصل بنجاح" };
-      if (res.status === 401) return { ok: false, message: "مفتاح API غير صالح" };
-      return { ok: false, message: `SendGrid responded with ${res.status}` };
-    } catch (error: unknown) {
-      return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
-    }
+  email: async (cfg, provider) => {
+    if (provider === "SendGrid") return testSendGrid(cfg);
+    if (provider === "Resend") return testResend(cfg);
+    if (cfg.api_key && cfg.from_email) return testResend(cfg);
+    return { ok: false, message: "اختر مزود البريد أولًا" };
   },
 
   whatsapp: async (cfg) => {
@@ -144,6 +230,24 @@ const TESTS: Record<string, (config: Record<string, any>, provider?: string) => 
       return { ok: false, message: "معرف التتبع مفقود" };
     }
     return { ok: true, message: "✅ بيانات التحليلات محفوظة" };
+  },
+
+  storage: async (cfg) => {
+    const required = ["account_id", "access_key_id", "secret_access_key", "public_url"];
+    const missing = required.filter((key) => !cfg[key]);
+    if (missing.length > 0) {
+      return { ok: false, message: `حقول مفقودة: ${missing.join(", ")}` };
+    }
+
+    return { ok: true, message: "✅ إعدادات Cloudflare R2 مكتملة وجاهزة للاستخدام" };
+  },
+
+  push_notifications: async (cfg) => {
+    if (!cfg.public_key || !cfg.private_key) {
+      return { ok: false, message: "مفتاحا VAPID العام والخاص مطلوبان" };
+    }
+
+    return { ok: true, message: "✅ مفاتيح Web Push محفوظة وجاهزة للإرسال" };
   },
 
   ai_chat: async (cfg, provider) => {
@@ -226,7 +330,7 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    const { type, config } = await req.json();
+    const { type, config, provider } = await req.json();
 
     if (!type || !config) {
       return apiError("نوع التكامل أو الإعدادات مفقودة", 400);
@@ -238,7 +342,7 @@ export async function POST(req: NextRequest) {
     }
 
     const resolved = await resolveIntegrationConfigForRequest(type, config);
-    const result = await testFn(resolved.config, resolved.provider);
+    const result = await testFn(resolved.config, provider || resolved.provider);
 
     return apiSuccess(result);
   } catch (error: unknown) {

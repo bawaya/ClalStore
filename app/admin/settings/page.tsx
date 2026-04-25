@@ -1,359 +1,785 @@
 "use client";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { csrfHeaders } from "@/lib/csrf-client";
 import { useAdminSettings } from "@/lib/admin/hooks";
-import { FormField, Toggle } from "@/components/admin/shared";
+import {
+  ErrorBanner,
+  FormField,
+  PageHeader,
+  ToastContainer,
+  Toggle,
+} from "@/components/admin/shared";
 import { INTEGRATION_TYPES } from "@/lib/constants";
 import { invalidateLogoCache } from "@/components/shared/Logo";
 
-// ===== Provider Config Fields =====
-const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string; placeholder: string }[]> = {
+type ProviderField = {
+  key: string;
+  label: string;
+  type: "text" | "password" | "email";
+  placeholder: string;
+  required?: boolean;
+};
+
+type IntegrationInfo = {
+  icon: string;
+  label: string;
+  providers: readonly string[];
+};
+
+type IntegrationRecord = {
+  id: string;
+  type: string;
+  provider: string;
+  status: "active" | "inactive" | "error";
+  config: Record<string, string>;
+  last_synced_at?: string | null;
+};
+
+const SECRET_MASK = "••••••••";
+
+const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
   "רווחית (Rivhit)": [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "أدخل Rivhit API Key" },
-    { key: "business_id", label: "Business ID", type: "text", placeholder: "رقم العمل" },
+    {
+      key: "group_private_token",
+      label: "GroupPrivateToken",
+      type: "password",
+      placeholder: "أدخل GroupPrivateToken",
+      required: true,
+    },
+    {
+      key: "max_payments",
+      label: "الحد الأقصى للأقساط",
+      type: "text",
+      placeholder: "12",
+    },
+    {
+      key: "test_mode",
+      label: "وضع الاختبار",
+      type: "text",
+      placeholder: "true أو false",
+    },
+    {
+      key: "document_language",
+      label: "لغة المستند",
+      type: "text",
+      placeholder: "he أو ar",
+    },
   ],
-  Tranzila: [
-    { key: "terminal", label: "Terminal Name", type: "text", placeholder: "اسم الطرفية" },
-    { key: "password", label: "Password", type: "password", placeholder: "كلمة المرور" },
+  UPay: [
+    {
+      key: "api_username",
+      label: "اسم المستخدم",
+      type: "text",
+      placeholder: "merchant@example.com",
+      required: true,
+    },
+    {
+      key: "api_key",
+      label: "مفتاح API",
+      type: "password",
+      placeholder: "UPay API Key",
+      required: true,
+    },
+    {
+      key: "language",
+      label: "لغة البوابة",
+      type: "text",
+      placeholder: "HE أو EN",
+    },
+    {
+      key: "max_payments",
+      label: "الحد الأقصى للأقساط",
+      type: "text",
+      placeholder: "1",
+    },
+    {
+      key: "test_mode",
+      label: "وضع الاختبار",
+      type: "text",
+      placeholder: "true أو false",
+    },
   ],
-  PayPlus: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "PayPlus API Key" },
-    { key: "secret_key", label: "Secret Key", type: "password", placeholder: "PayPlus Secret" },
-  ],
-  Stripe: [
-    { key: "api_key", label: "Secret Key", type: "password", placeholder: "sk_live_xxxxx" },
-    { key: "publishable_key", label: "Publishable Key", type: "text", placeholder: "pk_live_xxxxx" },
+  Resend: [
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "re_...",
+      required: true,
+    },
+    {
+      key: "from_email",
+      label: "بريد المرسل",
+      type: "email",
+      placeholder: "ClalMobile <noreply@clalmobile.com>",
+      required: true,
+    },
   ],
   SendGrid: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "SG.xxxxx" },
-    { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "noreply@clalmobile.com" },
-  ],
-  Mailgun: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "key-xxxxx" },
-    { key: "domain", label: "Domain", type: "text", placeholder: "mg.clalmobile.com" },
-    { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "noreply@clalmobile.com" },
-  ],
-  "Amazon SES": [
-    { key: "access_key", label: "Access Key ID", type: "password", placeholder: "" },
-    { key: "secret_key", label: "Secret Access Key", type: "password", placeholder: "" },
-    { key: "region", label: "Region", type: "text", placeholder: "eu-west-1" },
-    { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "noreply@clalmobile.com" },
-  ],
-  SMTP: [
-    { key: "host", label: "SMTP Host", type: "text", placeholder: "smtp.example.com" },
-    { key: "port", label: "Port", type: "text", placeholder: "587" },
-    { key: "username", label: "Username", type: "text", placeholder: "" },
-    { key: "password", label: "Password", type: "password", placeholder: "" },
-    { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "noreply@clalmobile.com" },
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "SG.xxxxx",
+      required: true,
+    },
+    {
+      key: "from_email",
+      label: "بريد المرسل",
+      type: "email",
+      placeholder: "noreply@clalmobile.com",
+      required: true,
+    },
   ],
   "Anthropic Claude": [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "sk-ant-..." },
-    { key: "model", label: "Model", type: "text", placeholder: "claude-sonnet-4-20250514" },
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "sk-ant-...",
+      required: true,
+    },
+    {
+      key: "model",
+      label: "Model",
+      type: "text",
+      placeholder: "claude-sonnet-4-20250514",
+      required: true,
+    },
   ],
   "Google Gemini": [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "AIza..." },
-    { key: "model", label: "Model", type: "text", placeholder: "gemini-1.5-flash-latest" },
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "AIza...",
+      required: true,
+    },
+    {
+      key: "model",
+      label: "Model",
+      type: "text",
+      placeholder: "gemini-2.5-pro",
+      required: true,
+    },
   ],
   yCloud: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
-    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "رقم الهاتف" },
-    { key: "webhook_url", label: "Webhook URL", type: "text", placeholder: "https://clalmobile.com/api/webhook/whatsapp" },
-    { key: "admin_phone", label: "📱 رقم الأدمن", type: "text", placeholder: "05X-XXXXXXX — يستقبل إشعارات الطلبات" },
-    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", placeholder: "05X-XXXXXXX — يستقبل التقارير" },
-  ],
-  "Meta API": [
-    { key: "access_token", label: "Access Token", type: "password", placeholder: "" },
-    { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "" },
-    { key: "verify_token", label: "Verify Token", type: "text", placeholder: "" },
-  ],
-  Twilio: [
-    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
-    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
-    { key: "phone_number", label: "From Number", type: "text", placeholder: "+1..." },
-  ],
-  InforUMobile: [
-    { key: "username", label: "اسم المستخدم", type: "text", placeholder: "" },
-    { key: "password", label: "كلمة المرور", type: "password", placeholder: "" },
-    { key: "sender", label: "اسم المرسل", type: "text", placeholder: "ClalMobile" },
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "yCloud API Key",
+      required: true,
+    },
+    {
+      key: "phone_id",
+      label: "Phone Number ID",
+      type: "text",
+      placeholder: "رقم الهاتف",
+      required: true,
+    },
+    {
+      key: "webhook_url",
+      label: "Webhook URL",
+      type: "text",
+      placeholder: "https://clalmobile.com/api/webhook/whatsapp",
+    },
+    {
+      key: "admin_phone",
+      label: "رقم إشعارات الطلبات",
+      type: "text",
+      placeholder: "05X-XXXXXXX",
+    },
+    {
+      key: "reports_phone",
+      label: "رقم التقارير",
+      type: "text",
+      placeholder: "05X-XXXXXXX",
+    },
   ],
   "Twilio SMS": [
-    { key: "account_sid", label: "Account SID", type: "text", placeholder: "AC..." },
-    { key: "auth_token", label: "Auth Token", type: "password", placeholder: "" },
-    { key: "verify_service_sid", label: "Verify Service SID (OTP)", type: "text", placeholder: "VA..." },
-    { key: "phone_number", label: "From Number (اختياري)", type: "text", placeholder: "+1..." },
-    { key: "messaging_service_sid", label: "Messaging Service SID (اختياري)", type: "text", placeholder: "MG..." },
+    {
+      key: "account_sid",
+      label: "Account SID",
+      type: "text",
+      placeholder: "AC...",
+      required: true,
+    },
+    {
+      key: "auth_token",
+      label: "Auth Token",
+      type: "password",
+      placeholder: "",
+      required: true,
+    },
+    {
+      key: "verify_service_sid",
+      label: "Verify Service SID",
+      type: "text",
+      placeholder: "VA...",
+      required: true,
+    },
+    {
+      key: "phone_number",
+      label: "رقم الإرسال",
+      type: "text",
+      placeholder: "+1...",
+    },
+    {
+      key: "messaging_service_sid",
+      label: "Messaging Service SID",
+      type: "text",
+      placeholder: "MG...",
+    },
   ],
-  HubSpot: [
-    { key: "api_key", label: "API Key", type: "password", placeholder: "HubSpot Private App Token" },
+  "Cloudflare R2": [
+    {
+      key: "account_id",
+      label: "Account ID",
+      type: "text",
+      placeholder: "Cloudflare Account ID",
+      required: true,
+    },
+    {
+      key: "access_key_id",
+      label: "Access Key ID",
+      type: "text",
+      placeholder: "R2 access key id",
+      required: true,
+    },
+    {
+      key: "secret_access_key",
+      label: "Secret Access Key",
+      type: "password",
+      placeholder: "R2 secret access key",
+      required: true,
+    },
+    {
+      key: "bucket_name",
+      label: "اسم الحاوية",
+      type: "text",
+      placeholder: "clalmobile-images",
+    },
+    {
+      key: "public_url",
+      label: "الرابط العام",
+      type: "text",
+      placeholder: "https://cdn.example.com",
+      required: true,
+    },
   ],
-  Salesforce: [
-    { key: "client_id", label: "Client ID", type: "text", placeholder: "" },
-    { key: "client_secret", label: "Client Secret", type: "password", placeholder: "" },
-    { key: "instance_url", label: "Instance URL", type: "text", placeholder: "https://xxx.salesforce.com" },
-  ],
-  "Google Analytics": [
-    { key: "measurement_id", label: "Measurement ID", type: "text", placeholder: "G-XXXXXXXX" },
-  ],
-  Mixpanel: [
-    { key: "project_token", label: "Project Token", type: "text", placeholder: "" },
+  "Web Push (VAPID)": [
+    {
+      key: "public_key",
+      label: "VAPID Public Key",
+      type: "text",
+      placeholder: "B...",
+      required: true,
+    },
+    {
+      key: "private_key",
+      label: "VAPID Private Key",
+      type: "password",
+      placeholder: "x...",
+      required: true,
+    },
+    {
+      key: "subject",
+      label: "Subject",
+      type: "text",
+      placeholder: "mailto:info@clalmobile.com",
+    },
   ],
 };
 
-// ===== Integration Card =====
+const INTEGRATION_GROUPS = [
+  {
+    key: "communication",
+    title: "التواصل والذكاء",
+    description: "رسائل واتساب وSMS والبريد والمساعد الذكي في مكان واحد.",
+    types: ["whatsapp", "sms", "email", "ai_chat"],
+  },
+  {
+    key: "payments",
+    title: "الدفع والتحصيل",
+    description: "بوابات الدفع حسب السوق المحلي أو العالمي مع حقول مطابقة للتشغيل الفعلي.",
+    types: ["payment", "payment_upay"],
+  },
+  {
+    key: "infrastructure",
+    title: "البنية والتوزيع",
+    description: "تخزين الصور والإشعارات ومفاتيح التشغيل التي تخدم بقية المنظومة.",
+    types: ["storage", "push_notifications"],
+  },
+] as const;
+
+const INTEGRATION_NOTES: Record<string, string> = {
+  whatsapp: "هذا التكامل يدير الرسائل الواردة عبر /api/webhook/whatsapp وإشعارات الأرقام المخصصة.",
+  sms: "هذا التكامل يغذي رسائل OTP والرسائل النصية النظامية.",
+  payment: "هذا المسار يستخدمه دفع إسرائيل عبر iCredit مباشرة داخل المتجر.",
+  payment_upay: "هذا المسار يستخدمه الدفع لفلسطين والعالم عبر UPay.",
+  email: "يُستخدم لرسائل الطلبات والتنبيهات ورسائل النماذج.",
+  ai_chat: "يغذي البوت والبحث الذكي واستيراد الإكسل وبعض وظائف CRM.",
+  storage: "يُستخدم حاليًا لرفع الصور المحسنة إلى Cloudflare R2 مع وجود رجوع احتياطي عند الحاجة.",
+  push_notifications: "يغذي مفاتيح الاشتراك العام والإرسال من لوحة الإدارة.",
+};
+
+type StoreField = {
+  key: string;
+  label: string;
+  type: "text" | "color";
+  hint?: string;
+  placeholder?: string;
+};
+
+const STORE_FIELDS: StoreField[] = [
+  { key: "store_name", label: "اسم المتجر", type: "text" as const },
+  { key: "store_tagline_ar", label: "الوصف العربي", type: "text" as const },
+  { key: "store_tagline_he", label: "الوصف العبري", type: "text" as const },
+  { key: "phone", label: "رقم الهاتف", type: "text" as const },
+  { key: "whatsapp_number", label: "رقم الواتساب", type: "text" as const },
+  { key: "email", label: "البريد الإلكتروني", type: "text" as const },
+  {
+    key: "admin_phone",
+    label: "رقم إشعارات الإدارة",
+    type: "text" as const,
+    hint: "يستقبل إشعارات الطلبات الجديدة والتنبيهات المهمة.",
+    placeholder: "05X-XXXXXXX",
+  },
+  {
+    key: "reports_phone",
+    label: "رقم التقارير",
+    type: "text" as const,
+    hint: "يستقبل التقارير اليومية والأسبوعية عبر واتساب.",
+    placeholder: "05X-XXXXXXX",
+  },
+  { key: "delivery_note_ar", label: "ملاحظة التوصيل بالعربية", type: "text" as const },
+  { key: "delivery_note_he", label: "ملاحظة التوصيل بالعبرية", type: "text" as const },
+  { key: "accent_color", label: "اللون الرئيسي", type: "color" as const },
+] as const;
+
+function fieldHasValue(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function IntegrationCard({
-  type, info, integ, scr, onUpdate, show,
+  type,
+  info,
+  integ,
+  note,
+  scr,
+  onUpdate,
+  show,
 }: {
   type: string;
-  info: { icon: string; label: string; providers: readonly string[] };
-  integ: any;
-  scr: { mobile: boolean };
-  onUpdate: (type: string, updates: { provider?: string; config?: Record<string, string>; status?: string }) => Promise<void>;
-  show: (msg: string) => void;
+  info: IntegrationInfo;
+  integ?: IntegrationRecord;
+  note?: string;
+  scr: ReturnType<typeof useScreen>;
+  onUpdate: (
+    type: string,
+    updates: { provider?: string; config?: Record<string, string>; status?: string }
+  ) => Promise<void>;
+  show: (msg: string, type?: "success" | "error" | "warning" | "info") => void;
 }) {
+  const [selectedProvider, setSelectedProvider] = useState(integ?.provider || info.providers[0] || "");
   const [configDraft, setConfigDraft] = useState<Record<string, string>>(integ?.config || {});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const selectedProvider = integ?.provider || "";
+  useEffect(() => {
+    setSelectedProvider(integ?.provider || info.providers[0] || "");
+    setConfigDraft((integ?.config as Record<string, string>) || {});
+    setShowSecrets({});
+    setTestResult(null);
+  }, [info.providers, integ]);
+
   const fields = PROVIDER_FIELDS[selectedProvider] || [];
 
-  // Check which sensitive fields are already saved (from _has_ flags)
-  const hasSavedKey = (key: string) => !!configDraft[`_has_${key}`];
-  const MASK = "••••••••";
+  const hasSavedKey = (key: string) => Boolean(configDraft[`_has_${key}`]);
+
+  const configuredCount = fields.filter((field) => {
+    return fieldHasValue(configDraft[field.key]) || hasSavedKey(field.key);
+  }).length;
+
+  const hasRequiredFields = fields
+    .filter((field) => field.required)
+    .every((field) => fieldHasValue(configDraft[field.key]) || hasSavedKey(field.key));
 
   const handleSelectProvider = async (provider: string) => {
-    const newConfig = provider === selectedProvider ? configDraft : {};
-    setConfigDraft(newConfig);
+    if (provider === selectedProvider && provider === integ?.provider) return;
+
+    setSelectedProvider(provider);
+    setConfigDraft(provider === integ?.provider ? integ?.config || {} : {});
+    setShowSecrets({});
     setTestResult(null);
-    await onUpdate(type, { provider, config: newConfig, status: "inactive" });
-    show(`✅ تم اختيار ${provider}`);
+
+    if (provider !== integ?.provider) {
+      await onUpdate(type, { provider, config: {}, status: "inactive" });
+      show(`تم اختيار ${provider}`);
+    }
+  };
+
+  const handleFieldChange = (key: string, value: string) => {
+    setConfigDraft((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const clearMaskedValue = (key: string) => {
+    setConfigDraft((prev) => {
+      const next = { ...prev, [key]: "" };
+      delete next[`_has_${key}`];
+      return next;
+    });
+  };
+
+  const cleanConfigForRequest = () => {
+    const configToSend = { ...configDraft };
+    for (const key of Object.keys(configToSend)) {
+      if (key.startsWith("_has_")) delete configToSend[key];
+    }
+    return configToSend;
   };
 
   const handleSaveConfig = async () => {
+    if (!selectedProvider) {
+      show("اختر مزودًا أولًا", "warning");
+      return;
+    }
+
     setSaving(true);
     try {
-      // Send config — API will handle masked values by keeping old ones
-      const configToSend = { ...configDraft };
-      // Remove _has_ metadata before sending
-      for (const key of Object.keys(configToSend)) {
-        if (key.startsWith("_has_")) delete configToSend[key];
-      }
-      // Auto-activate: if config has meaningful values, set status to active
-      const hasValues = Object.entries(configToSend).some(([, v]) => v && !v.includes(MASK));
-      const newStatus = hasValues ? "active" : (integ?.status || "inactive");
-      await onUpdate(type, { config: configToSend, status: newStatus });
-      show("✅ تم حفظ الإعدادات" + (newStatus === "active" ? " وتفعيلها" : ""));
-    } catch { show("❌ خطأ في الحفظ"); }
-    setSaving(false);
+      const configToSend = cleanConfigForRequest();
+      const nextStatus = fields.length === 0 || hasRequiredFields ? "active" : integ?.status || "inactive";
+
+      await onUpdate(type, {
+        provider: selectedProvider,
+        config: configToSend,
+        status: nextStatus,
+      });
+
+      show(nextStatus === "active" ? "تم حفظ الإعدادات وتفعيلها" : "تم حفظ الإعدادات");
+    } catch {
+      show("فشل حفظ إعدادات التكامل", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleToggleStatus = async (active: boolean) => {
-    await onUpdate(type, { status: active ? "active" : "inactive" });
-    show(active ? "✅ تم التفعيل" : "⏸️ تم الإيقاف");
+    await onUpdate(type, { provider: selectedProvider, status: active ? "active" : "inactive" });
+    show(active ? "تم تفعيل التكامل" : "تم إيقاف التكامل");
   };
 
   const handleTest = async () => {
+    if (!selectedProvider) {
+      show("اختر مزودًا أولًا", "warning");
+      return;
+    }
+
     setTesting(true);
     setTestResult(null);
+
     try {
-      // For test, send actual values — masked values will be resolved by API
-      const configToTest = { ...configDraft };
-      for (const key of Object.keys(configToTest)) {
-        if (key.startsWith("_has_")) delete configToTest[key];
-      }
       const res = await fetch("/api/admin/integrations/test", {
         method: "POST",
         headers: csrfHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ type, config: configToTest }),
+        body: JSON.stringify({
+          type,
+          provider: selectedProvider,
+          config: cleanConfigForRequest(),
+        }),
       });
-      const data = await res.json();
-      setTestResult({ ok: data.ok, message: data.message || data.error || "" });
-    } catch (err: any) {
-      setTestResult({ ok: false, message: err.message });
+
+      const json = await res.json();
+      const ok = Boolean(json.data?.ok ?? json.ok);
+      const message =
+        json.data?.message || json.message || json.error || "لم تصل رسالة واضحة من الخادم";
+
+      setTestResult({ ok, message });
+      if (!res.ok && !ok) show(message, "error");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "فشل اختبار التكامل";
+      setTestResult({ ok: false, message });
+      show(message, "error");
+    } finally {
+      setTesting(false);
     }
-    setTesting(false);
   };
 
-  // Count how many required fields have values (either entered or saved)
-  const configuredCount = fields.filter((f) => {
-    const val = configDraft[f.key];
-    return val && val.length > 0;
-  }).length;
-  const hasRequiredFields = configuredCount > 0;
-
   return (
-    <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          {integ && (
-            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold" style={{
-              background: integ.status === "active" ? "rgba(34,197,94,0.15)" : integ.status === "error" ? "rgba(239,68,68,0.15)" : "rgba(63,63,70,0.15)",
-              color: integ.status === "active" ? "#22c55e" : integ.status === "error" ? "#ef4444" : "#71717a",
-            }}>
-              {integ.status === "active" ? "✅ فعّال" : integ.status === "error" ? "❌ خطأ" : "⏸️ غير فعّال"}
-            </span>
+    <div className="card" style={{ padding: scr.mobile ? 14 : 18 }}>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          {integ?.provider && (
+            <Toggle value={integ.status === "active"} onChange={handleToggleStatus} />
           )}
-          {integ?.provider && <Toggle value={integ.status === "active"} onChange={handleToggleStatus} />}
+          <span
+            className="text-[9px] px-2 py-0.5 rounded-md font-bold"
+            style={{
+              background:
+                integ?.status === "active"
+                  ? "rgba(34,197,94,0.15)"
+                  : integ?.status === "error"
+                    ? "rgba(239,68,68,0.15)"
+                    : "rgba(63,63,70,0.15)",
+              color:
+                integ?.status === "active"
+                  ? "#22c55e"
+                  : integ?.status === "error"
+                    ? "#ef4444"
+                    : "#a1a1aa",
+            }}
+          >
+            {integ?.status === "active"
+              ? "فعال"
+              : integ?.status === "error"
+                ? "خطأ"
+                : "غير فعال"}
+          </span>
         </div>
+
         <div className="text-right">
-          <div className="font-bold" style={{ fontSize: scr.mobile ? 13 : 15 }}>{info.icon} {info.label}</div>
+          <div className="font-black" style={{ fontSize: scr.mobile ? 13 : 15 }}>
+            {info.icon} {info.label}
+          </div>
           {integ?.last_synced_at && (
-            <div className="text-muted" style={{ fontSize: scr.mobile ? 8 : 9 }}>
-              آخر مزامنة: {new Date(integ.last_synced_at).toLocaleString("ar")}
+            <div className="text-muted" style={{ fontSize: scr.mobile ? 8 : 10 }}>
+              آخر تحديث: {new Date(integ.last_synced_at).toLocaleString("ar")}
             </div>
           )}
         </div>
       </div>
 
-      {/* Provider chips */}
-      <div className="flex gap-1.5 flex-wrap mb-2">
+      {note && (
+        <div
+          className="rounded-xl px-3 py-2 mb-3 text-right text-muted"
+          style={{
+            fontSize: scr.mobile ? 9 : 11,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          {note}
+        </div>
+      )}
+
+      <div className="flex gap-1.5 flex-wrap mb-3">
         {info.providers.map((provider) => (
-          <button key={provider} onClick={() => handleSelectProvider(provider)}
-            className={`chip text-[10px] ${integ?.provider === provider ? "chip-active" : ""}`}>
+          <button
+            key={provider}
+            onClick={() => void handleSelectProvider(provider)}
+            className={`chip text-[10px] ${selectedProvider === provider ? "chip-active" : ""}`}
+          >
             {provider}
           </button>
         ))}
       </div>
 
-      {/* Config fields */}
-      {selectedProvider && fields.length > 0 && (
-        <div className="mt-3 bg-surface-elevated rounded-xl p-3 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="font-bold text-right text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-              🔑 إعدادات {selectedProvider}
+      {selectedProvider && fields.length > 0 ? (
+        <div className="rounded-2xl bg-surface-elevated border border-surface-border p-3">
+          <div className="flex items-center justify-between mb-3">
+            <span
+              className="text-[9px] px-2 py-0.5 rounded-md font-bold"
+              style={{
+                background: configuredCount ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)",
+                color: configuredCount ? "#22c55e" : "#a1a1aa",
+              }}
+            >
+              {configuredCount}/{fields.length} حقول مكتملة
+            </span>
+            <div className="font-bold text-muted text-right" style={{ fontSize: scr.mobile ? 10 : 12 }}>
+              إعدادات {selectedProvider}
             </div>
-            {configuredCount > 0 && (
-              <span className="text-[9px] px-2 py-0.5 rounded-md font-bold"
-                style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
-                ✅ {configuredCount}/{fields.length} مُعد
-              </span>
-            )}
           </div>
-          {fields.map((f) => {
-            const isSensitive = f.type === "password";
-            const isSaved = hasSavedKey(f.key);
-            const currentVal = configDraft[f.key] || "";
-            const isStillMasked = isSensitive && currentVal.includes(MASK);
 
-            return (
-              <div key={f.key}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1">
-                    {isSaved && (
-                      <span className="text-[8px] px-1.5 py-0.5 rounded font-bold"
-                        style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
-                        ✅ محفوظ
-                      </span>
+          <div className="space-y-2.5">
+            {fields.map((field) => {
+              const isSensitive = field.type === "password";
+              const currentValue = configDraft[field.key] || "";
+              const isMasked = isSensitive && currentValue.includes(SECRET_MASK);
+
+              return (
+                <div key={field.key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1">
+                      {hasSavedKey(field.key) && (
+                        <span
+                          className="text-[8px] px-1.5 py-0.5 rounded font-bold"
+                          style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}
+                        >
+                          محفوظ
+                        </span>
+                      )}
+                      {field.required && (
+                        <span
+                          className="text-[8px] px-1.5 py-0.5 rounded font-bold"
+                          style={{ background: "rgba(196,16,64,0.12)", color: "#fda4af" }}
+                        >
+                          مطلوب
+                        </span>
+                      )}
+                    </div>
+                    <label className="text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 10 }}>
+                      {field.label}
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type={isSensitive && !showSecrets[field.key] ? "password" : field.type === "email" ? "email" : "text"}
+                      className="input flex-1"
+                      style={{ fontSize: scr.mobile ? 11 : 13 }}
+                      dir="ltr"
+                      placeholder={hasSavedKey(field.key) ? "أدخل قيمة جديدة إذا أردت الاستبدال" : field.placeholder}
+                      value={currentValue}
+                      onChange={(event) => handleFieldChange(field.key, event.target.value)}
+                      onFocus={() => {
+                        if (isMasked) clearMaskedValue(field.key);
+                      }}
+                    />
+
+                    {isSensitive && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowSecrets((prev) => ({ ...prev, [field.key]: !prev[field.key] }))
+                        }
+                        className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-xs"
+                        title={showSecrets[field.key] ? "إخفاء" : "إظهار"}
+                      >
+                        {showSecrets[field.key] ? "🙈" : "👁️"}
+                      </button>
                     )}
                   </div>
-                  <label className="text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 10 }}>{f.label}</label>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type={isSensitive && !showSecrets[f.key] ? "password" : "text"}
-                    className="input flex-1" style={{ fontSize: scr.mobile ? 11 : 13 }}
-                    placeholder={isSaved ? "اضغط لتحديث القيمة..." : f.placeholder}
-                    value={currentVal}
-                    onChange={(e) => setConfigDraft((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                    onFocus={() => {
-                      // Clear masked value on focus so user can enter new one
-                      if (isStillMasked) {
-                        setConfigDraft((prev) => ({ ...prev, [f.key]: "" }));
-                      }
-                    }}
-                    dir="ltr"
-                  />
-                  {isSensitive && (
-                    <button onClick={() => setShowSecrets((p) => ({ ...p, [f.key]: !p[f.key] }))}
-                      className="w-8 h-8 rounded-lg border border-surface-border bg-transparent text-muted cursor-pointer flex items-center justify-center text-xs"
-                      title={showSecrets[f.key] ? "إخفاء" : "إظهار"}>
-                      {showSecrets[f.key] ? "🙈" : "👁️"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          {/* Actions */}
-          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-surface-border">
-            <button onClick={handleSaveConfig} disabled={saving} className="btn-primary flex-1"
-              style={{ fontSize: scr.mobile ? 10 : 12, padding: scr.mobile ? "8px 12px" : "10px 16px", opacity: saving ? 0.6 : 1 }}>
-              {saving ? "⏳ جاري الحفظ..." : "💾 حفظ الإعدادات"}
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-surface-border">
+            <button
+              onClick={() => void handleTest()}
+              disabled={testing || !hasRequiredFields}
+              className="btn-outline"
+              style={{
+                fontSize: scr.mobile ? 10 : 12,
+                padding: scr.mobile ? "8px 12px" : "10px 16px",
+                opacity: testing || !hasRequiredFields ? 0.55 : 1,
+              }}
+            >
+              {testing ? "جارٍ الاختبار..." : "اختبار"}
             </button>
-            <button onClick={handleTest} disabled={testing || !hasRequiredFields} className="btn-outline"
-              style={{ fontSize: scr.mobile ? 10 : 12, padding: scr.mobile ? "8px 12px" : "10px 16px", opacity: testing || !hasRequiredFields ? 0.5 : 1 }}>
-              {testing ? "⏳ جاري..." : "🔍 اختبار"}
+            <button
+              onClick={() => void handleSaveConfig()}
+              disabled={saving}
+              className="btn-primary flex-1"
+              style={{
+                fontSize: scr.mobile ? 10 : 12,
+                padding: scr.mobile ? "8px 12px" : "10px 16px",
+                opacity: saving ? 0.6 : 1,
+              }}
+            >
+              {saving ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
             </button>
           </div>
-          {/* Test result */}
+
           {testResult && (
-            <div className="rounded-lg px-3 py-2 text-center font-bold" style={{
-              fontSize: scr.mobile ? 10 : 12,
-              background: testResult.ok ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
-              color: testResult.ok ? "#22c55e" : "#ef4444",
-              border: `1px solid ${testResult.ok ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
-            }}>
-              {testResult.ok ? "✅" : "❌"} {testResult.message}
+            <div
+              className="rounded-xl px-3 py-2 text-center font-bold mt-3"
+              style={{
+                fontSize: scr.mobile ? 10 : 12,
+                background: testResult.ok ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+                color: testResult.ok ? "#22c55e" : "#ef4444",
+                border: `1px solid ${testResult.ok ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
+              }}
+            >
+              {testResult.message}
             </div>
           )}
         </div>
-      )}
-
-      {/* No-config provider hint */}
-      {selectedProvider && fields.length === 0 && (
-        <div className="mt-2 bg-surface-elevated rounded-xl p-2 text-muted text-right" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-          ℹ️ هذا المزوّد لا يتطلب إعدادات إضافية حالياً
+      ) : (
+        <div className="rounded-xl px-3 py-2 text-right text-muted bg-surface-elevated border border-surface-border">
+          اختر مزودًا حتى تظهر الحقول المرتبطة به.
         </div>
       )}
     </div>
   );
 }
 
-// ===== Main Settings Page =====
 export default function SettingsPage() {
   const scr = useScreen();
-  const { toasts, show } = useToast();
-  const { settings, integrations, loading, updateSetting, updateIntegration } = useAdminSettings();
+  const { toasts, show, dismiss } = useToast();
+  const { settings, integrations, loading, error, clearError, updateSetting, updateIntegration } =
+    useAdminSettings();
   const [tab, setTab] = useState<"store" | "integrations">("store");
+  const [storeDraft, setStoreDraft] = useState<Record<string, string>>({});
+  const [savingSettingKey, setSavingSettingKey] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const logoSize = parseInt(settings.logo_size || "48", 10);
 
-  if (loading) return <div className="text-center py-20 text-muted">⏳</div>;
+  useEffect(() => {
+    setStoreDraft(settings);
+  }, [settings]);
+
+  const logoSize = parseInt(storeDraft.logo_size || settings.logo_size || "48", 10);
+  const logoUrl = storeDraft.logo_url || settings.logo_url || "";
+
+  const integrationSummary = useMemo(() => {
+    const active = integrations.filter((integration) => integration.status === "active").length;
+    const configured = integrations.filter((integration) => {
+      return Object.keys(integration.config || {}).some(
+        (key) => !key.startsWith("_has_") && fieldHasValue(integration.config[key]),
+      );
+    }).length;
+
+    return {
+      total: integrations.length,
+      active,
+      configured,
+    };
+  }, [integrations]);
+
+  if (loading) {
+    return <div className="text-center py-20 text-muted">جارٍ تحميل الإعدادات...</div>;
+  }
 
   const tabs = [
     { key: "store" as const, icon: "🏪", label: "المتجر" },
     { key: "integrations" as const, icon: "🔌", label: "التكاملات" },
   ];
 
-  const settingFields = [
-    { key: "store_name", label: "اسم المتجر", type: "text" },
-    { key: "store_tagline_ar", label: "الوصف (عربي)", type: "text" },
-    { key: "store_tagline_he", label: "הסיסמה (עברית)", type: "text" },
-    { key: "phone", label: "📞 رقم الهاتف", type: "text" },
-    { key: "whatsapp_number", label: "💬 رقم الواتساب", type: "text" },
-    { key: "email", label: "📧 البريد الإلكتروني", type: "text" },
-    { key: "admin_phone", label: "👨‍💼 رقم الأدمن (الإشعارات)", type: "text", hint: "يستقبل تنبيهات الطلبات الجديدة والمشاكل" },
-    { key: "reports_phone", label: "📊 رقم التقارير", type: "text", hint: "يستقبل التقارير اليومية والأسبوعية عبر واتساب" },
-    { key: "delivery_note_ar", label: "ملاحظة التوصيل (عربي)", type: "text" },
-    { key: "delivery_note_he", label: "הערת משלוח (עברית)", type: "text" },
-    { key: "accent_color", label: "🎨 اللون الرئيسي", type: "color" },
-  ];
+  const saveStoreField = async (key: string, successMessage?: string) => {
+    const nextValue = storeDraft[key] || "";
+    if ((settings[key] || "") === nextValue) return;
+
+    setSavingSettingKey(key);
+    try {
+      await updateSetting(key, nextValue);
+      show(successMessage || "تم حفظ الإعداد");
+    } catch {
+      show("فشل حفظ الإعداد", "error");
+    } finally {
+      setSavingSettingKey(null);
+    }
+  };
 
   const handleUpdateIntegration = async (
     type: string,
-    updates: { provider?: string; config?: Record<string, string>; status?: string }
+    updates: { provider?: string; config?: Record<string, string>; status?: string },
   ) => {
-    const integ = integrations.find((i) => i.type === type);
-    if (!integ) return;
-    await updateIntegration(integ.id, {
+    const integration = integrations.find((item) => item.type === type);
+    if (!integration) return;
+
+    await updateIntegration(integration.id, {
       ...(updates.provider !== undefined && { provider: updates.provider }),
       ...(updates.config !== undefined && { config: updates.config }),
       ...(updates.status !== undefined && { status: updates.status }),
@@ -361,161 +787,282 @@ export default function SettingsPage() {
     });
   };
 
+  const handleLogoUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      show("الحد الأقصى لملف الشعار هو 2MB", "error");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const res = await fetch("/api/admin/upload-logo", {
+        method: "POST",
+        body: fd,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        show(data.error || "فشل رفع الشعار", "error");
+        return;
+      }
+
+      setStoreDraft((prev) => ({ ...prev, logo_url: data.url }));
+      await updateSetting("logo_url", data.url);
+      invalidateLogoCache();
+      show("تم رفع الشعار بنجاح");
+    } catch {
+      show("فشل رفع الشعار", "error");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    try {
+      await fetch("/api/admin/upload-logo", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: logoUrl }),
+      });
+      setStoreDraft((prev) => ({ ...prev, logo_url: "" }));
+      await updateSetting("logo_url", "");
+      invalidateLogoCache();
+      show("تم حذف الشعار");
+    } catch {
+      show("فشل حذف الشعار", "error");
+    }
+  };
+
   return (
     <div>
-      <h1 className="font-black mb-4" style={{ fontSize: scr.mobile ? 16 : 22 }}>⚙️ الإعدادات</h1>
+      <PageHeader title="الإعدادات" />
 
-      {/* Tabs */}
       <div className="flex gap-1.5 mb-4">
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`chip ${tab === t.key ? "chip-active" : ""}`}>
-            {t.icon} {t.label}
+        {tabs.map((item) => (
+          <button
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`chip ${tab === item.key ? "chip-active" : ""}`}
+          >
+            {item.icon} {item.label}
           </button>
         ))}
       </div>
 
-      {/* Store Settings */}
-      {tab === "store" && (
-        <div className="space-y-3">
-          {/* Logo Upload Section */}
-          <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
-            <h2 className="font-bold text-right mb-3" style={{ fontSize: scr.mobile ? 14 : 16 }}>🖼️ شعار المتجر</h2>
+      <ErrorBanner message={error} onDismiss={clearError} />
 
-            <div className="flex items-center gap-4 flex-wrap">
-              {/* Preview */}
-              <div className="w-24 h-24 rounded-xl border-2 border-dashed border-surface-border flex items-center justify-center bg-surface-elevated shrink-0 overflow-hidden">
-                {settings.logo_url ? (
-                  <img src={settings.logo_url} alt="Logo" className="object-contain" style={{ width: logoSize, height: logoSize }} />
+      {tab === "store" && (
+        <div className="space-y-4">
+          <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="text-right">
+                <div className="font-black" style={{ fontSize: scr.mobile ? 14 : 16 }}>
+                  هوية المتجر
+                </div>
+                <div className="text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                  الشعار والحجم والألوان والبيانات العامة.
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <span className="chip chip-active text-[10px]">{logoSize}px</span>
+                <span className="chip text-[10px]">{storeDraft.accent_color || settings.accent_color || "#c41040"}</span>
+              </div>
+            </div>
+
+            <div className="grid gap-4" style={{ gridTemplateColumns: scr.mobile ? "1fr" : "140px 1fr" }}>
+              <div className="rounded-2xl border border-dashed border-surface-border bg-surface-elevated flex items-center justify-center overflow-hidden min-h-[140px]">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="Logo"
+                    className="object-contain"
+                    style={{ width: logoSize, height: logoSize }}
+                  />
                 ) : (
                   <div className="text-center text-muted">
-                    <div className="text-2xl mb-0.5">🖼️</div>
-                    <div style={{ fontSize: 9 }}>لا يوجد شعار</div>
+                    <div className="text-3xl mb-1">🖼️</div>
+                    <div style={{ fontSize: 10 }}>لا يوجد شعار</div>
                   </div>
                 )}
               </div>
 
-              {/* Actions */}
-              <div className="flex-1 space-y-2">
-                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (file.size > 2 * 1024 * 1024) { show("❌ الحد الأقصى 2MB"); return; }
-                    setUploading(true);
-                    try {
-                      const fd = new FormData();
-                      fd.append("file", file);
-                      const res = await fetch("/api/admin/upload-logo", { method: "POST", body: fd });
-                      const data = await res.json();
-                      if (data.url) {
-                        await updateSetting("logo_url", data.url);
-                        invalidateLogoCache();
-                        show("✅ تم رفع الشعار");
-                      } else {
-                        show(`❌ ${data.error || "خطأ"}`);
-                      }
-                    } catch { show("❌ خطأ في الرفع"); }
-                    setUploading(false);
-                    if (fileRef.current) fileRef.current.value = "";
+              <div className="space-y-3">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void handleLogoUpload(file);
                   }}
                 />
-                <div className="flex gap-2">
-                  <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                    className="btn-primary" style={{ fontSize: scr.mobile ? 10 : 12, padding: "8px 16px", opacity: uploading ? 0.6 : 1 }}>
-                    {uploading ? "⏳ جاري الرفع..." : "📤 رفع شعار"}
+
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="btn-primary"
+                    style={{ opacity: uploading ? 0.6 : 1 }}
+                  >
+                    {uploading ? "جارٍ الرفع..." : "رفع شعار"}
                   </button>
-                  {settings.logo_url && (
-                    <button className="btn-outline" style={{ fontSize: scr.mobile ? 10 : 12, padding: "8px 16px" }}
-                      onClick={async () => {
-                        try {
-                          await fetch("/api/admin/upload-logo", {
-                            method: "DELETE",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ url: settings.logo_url }),
-                          });
-                          await updateSetting("logo_url", "");
-                          invalidateLogoCache();
-                          show("✅ تم حذف الشعار");
-                        } catch { show("❌ خطأ في الحذف"); }
-                      }}>
-                      🗑️ حذف
+                  {logoUrl && (
+                    <button onClick={() => void handleLogoDelete()} className="btn-outline">
+                      حذف الشعار
                     </button>
                   )}
                 </div>
-                <p className="text-muted" style={{ fontSize: 9 }}>JPG, PNG, WebP, SVG — حد أقصى 2MB</p>
+
+                <div className="text-muted" style={{ fontSize: 10 }}>
+                  الصيغ المدعومة: JPG, PNG, WebP, SVG — الحد الأقصى 2MB.
+                </div>
+
+                <FormField label="حجم الشعار">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={24}
+                      max={120}
+                      step={4}
+                      value={logoSize}
+                      className="flex-1 accent-brand"
+                      onChange={(event) => {
+                        setStoreDraft((prev) => ({ ...prev, logo_size: event.target.value }));
+                      }}
+                      onMouseUp={() => void saveStoreField("logo_size", "تم حفظ حجم الشعار")}
+                      onTouchEnd={() => void saveStoreField("logo_size", "تم حفظ حجم الشعار")}
+                    />
+                    <span className="text-muted text-xs font-mono w-12 text-center">{logoSize}px</span>
+                  </div>
+                </FormField>
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="text-right">
+                <div className="font-black" style={{ fontSize: scr.mobile ? 14 : 16 }}>
+                  بيانات المتجر
+                </div>
+                <div className="text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                  التعديل صار محليًا أولًا ثم يُحفظ عند الخروج من الحقل بدل الحفظ مع كل حرف.
+                </div>
               </div>
             </div>
 
-            {/* Size Slider */}
-            <div className="mt-4">
-              <FormField label="📐 حجم الشعار (بكسل)">
-                <div className="flex items-center gap-3">
-                  <input type="range" min={24} max={120} step={4} value={logoSize}
-                    className="flex-1 accent-brand"
-                    onChange={async (e) => {
-                      await updateSetting("logo_size", e.target.value);
-                    }}
-                    onMouseUp={() => show("✅ تم الحفظ")}
-                    onTouchEnd={() => show("✅ تم الحفظ")}
-                  />
-                  <span className="text-muted text-xs font-mono w-10 text-center">{logoSize}px</span>
-                </div>
+            {STORE_FIELDS.map((field) => (
+              <FormField key={field.key} label={field.label}>
+                {field.type === "color" ? (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={storeDraft[field.key] || "#c41040"}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setStoreDraft((prev) => ({ ...prev, [field.key]: value }));
+                        void updateSetting(field.key, value)
+                          .then(() => show("تم حفظ اللون الرئيسي"))
+                          .catch(() => show("فشل حفظ اللون", "error"));
+                      }}
+                      className="w-10 h-10 rounded-lg cursor-pointer border border-surface-border"
+                    />
+                    <span className="text-muted text-xs font-mono">
+                      {storeDraft[field.key] || "#c41040"}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      className="input"
+                      dir={field.key.endsWith("_he") ? "rtl" : "auto"}
+                      value={storeDraft[field.key] || ""}
+                      placeholder={field.placeholder}
+                      onChange={(event) =>
+                        setStoreDraft((prev) => ({ ...prev, [field.key]: event.target.value }))
+                      }
+                      onBlur={() => void saveStoreField(field.key)}
+                      disabled={savingSettingKey === field.key}
+                    />
+                    {field.hint && (
+                      <p className="text-dim mt-0.5" style={{ fontSize: 9, lineHeight: 1.4 }}>
+                        {field.hint}
+                      </p>
+                    )}
+                  </>
+                )}
               </FormField>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "integrations" && (
+        <div className="space-y-4">
+          <div className="card" style={{ padding: scr.mobile ? 14 : 18 }}>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="text-right">
+                <div className="font-black" style={{ fontSize: scr.mobile ? 14 : 16 }}>
+                  مركز التكاملات
+                </div>
+                <div className="text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                  رتبنا الصفحة حسب الوظيفة وربطنا الحقول مع مسارات التشغيل الفعلية قدر الإمكان.
+                </div>
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                <span className="chip chip-active text-[10px]">الإجمالي: {integrationSummary.total}</span>
+                <span className="chip text-[10px]">الفعالة: {integrationSummary.active}</span>
+                <span className="chip text-[10px]">المكتملة: {integrationSummary.configured}</span>
+              </div>
             </div>
           </div>
 
-          {/* Store Fields */}
-          <div className="card" style={{ padding: scr.mobile ? 14 : 20 }}>
-            <h2 className="font-bold text-right mb-3" style={{ fontSize: scr.mobile ? 14 : 16 }}>🏪 إعدادات المتجر</h2>
-          {settingFields.map((f) => (
-            <FormField key={f.key} label={f.label}>
-              {f.type === "color" ? (
-                <div className="flex items-center gap-2">
-                  <input type="color" value={settings[f.key] || "#c41040"}
-                    onChange={async (e) => { await updateSetting(f.key, e.target.value); show("✅"); }}
-                    className="w-10 h-10 rounded-lg cursor-pointer border border-surface-border" />
-                  <span className="text-muted text-xs font-mono">{settings[f.key] || "#c41040"}</span>
+          {INTEGRATION_GROUPS.map((group) => (
+            <div key={group.key} className="card" style={{ padding: scr.mobile ? 14 : 18 }}>
+              <div className="mb-4 text-right">
+                <div className="font-black" style={{ fontSize: scr.mobile ? 14 : 16 }}>
+                  {group.title}
                 </div>
-              ) : (
-                <>
-                  <input className="input" value={settings[f.key] || ""}
-                    onChange={(e) => updateSetting(f.key, e.target.value)}
-                    onBlur={() => show("✅ تم الحفظ")}
-                    dir={f.key.endsWith("_he") ? "rtl" : "auto"}
-                    placeholder={f.key === "admin_phone" || f.key === "reports_phone" ? "05X-XXXXXXX" : undefined}
-                  />
-                  {"hint" in f && f.hint && (
-                    <p className="text-dim mt-0.5" style={{ fontSize: 9, lineHeight: 1.4 }}>{f.hint}</p>
-                  )}
-                </>
-              )}
-            </FormField>
+                <div className="text-muted" style={{ fontSize: scr.mobile ? 9 : 11 }}>
+                  {group.description}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {group.types.map((type) => {
+                  const info = INTEGRATION_TYPES[type as keyof typeof INTEGRATION_TYPES];
+                  const integration = integrations.find((item) => item.type === type) as
+                    | IntegrationRecord
+                    | undefined;
+
+                  if (!info) return null;
+
+                  return (
+                    <IntegrationCard
+                      key={type}
+                      type={type}
+                      info={info}
+                      integ={integration}
+                      note={INTEGRATION_NOTES[type]}
+                      scr={scr}
+                      onUpdate={handleUpdateIntegration}
+                      show={show}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           ))}
         </div>
-        </div>
       )}
 
-      {/* Integrations Hub */}
-      {tab === "integrations" && (
-        <div>
-          <p className="text-muted text-right mb-3" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-            اختر المزوّد المناسب لكل خدمة وأدخل بيانات الاتصال. يمكنك التبديل لاحقاً بدون تغيير الكود.
-          </p>
-          <div className="space-y-3">
-            {Object.entries(INTEGRATION_TYPES).map(([type, info]) => {
-              const integ = integrations.find((i) => i.type === type);
-              return (
-                <IntegrationCard key={type} type={type} info={info} integ={integ}
-                  scr={scr} onUpdate={handleUpdateIntegration} show={show} />
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Toast */}
-      {toasts.map((t) => <div key={t.id} className="fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm border-state-success text-state-success">{t.message}</div>)}
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }

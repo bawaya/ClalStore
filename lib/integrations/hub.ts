@@ -166,19 +166,31 @@ export async function getProvider<T>(type: ProviderType): Promise<T | null> {
 export async function initializeProviders() {
   // Payment — Rivhit (check DB config first, then env)
   const paymentCfg = await getIntegrationConfig("payment");
-  if (paymentCfg.api_key || process.env.RIVHIT_API_KEY) {
+  if (paymentCfg.group_private_token || process.env.ICREDIT_GROUP_PRIVATE_TOKEN) {
     const { RivhitProvider } = await import("./rivhit");
     registerProvider("payment", new RivhitProvider());
   }
 
-  // Email — Resend (primary) or SendGrid (fallback)
-  const emailCfg = await getIntegrationConfig("email");
-  if (emailCfg.api_key || process.env.RESEND_API_KEY) {
-    const { ResendProvider } = await import("./resend");
-    registerProvider("email", new ResendProvider());
-  } else if (process.env.SENDGRID_API_KEY) {
-    const { SendGridProvider } = await import("./sendgrid");
-    registerProvider("email", new SendGridProvider());
+  // Email — honor the selected provider from the admin settings
+  const { integration: emailIntegration, config: emailCfg } = await getIntegrationByTypeWithSecrets("email");
+  if (emailIntegration?.status === "active") {
+    if (emailIntegration.provider === "SendGrid") {
+      if (emailCfg.api_key || process.env.SENDGRID_API_KEY) {
+        const { SendGridProvider } = await import("./sendgrid");
+        registerProvider("email", new SendGridProvider());
+      }
+    } else if (emailIntegration.provider === "Resend") {
+      if (emailCfg.api_key || process.env.RESEND_API_KEY) {
+        const { ResendProvider } = await import("./resend");
+        registerProvider("email", new ResendProvider());
+      }
+    } else if (emailCfg.api_key || process.env.RESEND_API_KEY) {
+      const { ResendProvider } = await import("./resend");
+      registerProvider("email", new ResendProvider());
+    } else if (process.env.SENDGRID_API_KEY) {
+      const { SendGridProvider } = await import("./sendgrid");
+      registerProvider("email", new SendGridProvider());
+    }
   }
 
   // SMS — Twilio (check DB config first, then env)
