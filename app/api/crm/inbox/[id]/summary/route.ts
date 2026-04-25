@@ -7,7 +7,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
-import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
+import { cleanAlternatingMessages } from "@/lib/ai/claude";
+import { callConfiguredAI } from "@/lib/ai/runtime";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
@@ -133,14 +134,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const cleaned = cleanAlternatingMessages(claudeMessages);
 
     // 8. Call Claude
-    const result = await callClaude({
+    const result = await callConfiguredAI({
       systemPrompt,
       messages: cleaned,
       maxTokens: 500,
       temperature: 0.3,
       jsonMode: true,
-      apiKey: process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY,
-    });
+    }, "admin");
 
     if (!result) {
       return apiError("تعذر تلخيص المحادثة", 500);

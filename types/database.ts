@@ -90,6 +90,16 @@ export type Database = {
         Update: Partial<Omit<Integration, "id">>;
         Relationships: [];
       };
+      integration_secrets: {
+        Row: IntegrationSecret;
+        Insert: Omit<IntegrationSecret, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<IntegrationSecret, "id" | "integration_id" | "created_at">>;
+        Relationships: [];
+      };
       users: {
         Row: AppUser;
         Insert: Omit<AppUser, "id" | "created_at">;
@@ -656,6 +666,18 @@ export type Integration = {
   config: Record<string, any>;
   status: "active" | "inactive" | "error";
   last_synced_at?: string;
+}
+
+export type IntegrationSecret = {
+  id: string;
+  integration_id: string;
+  secret_key: string;
+  encrypted_value: string;
+  value_hint?: string | null;
+  key_version: number;
+  created_at: string;
+  updated_at: string;
+  updated_by?: string | null;
 }
 
 export type AppUser = {

@@ -6,7 +6,7 @@
 
 import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { callClaude } from "@/lib/ai/claude";
+import { callConfiguredAI } from "@/lib/ai/runtime";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
@@ -106,14 +106,13 @@ export async function GET(req: NextRequest) {
 - "أحسن هاتف عندكم" → {"type":"device","sort":"rating"}
 - "هاتف بطارية قوية" → {"type":"device","features":["battery"],"sort":"rating"}`;
 
-      const result = await callClaude({
+      const result = await callConfiguredAI({
         systemPrompt,
         messages: [{ role: "user", content: q }],
         maxTokens: 200,
         temperature: 0.2,
         jsonMode: true,
-        apiKey: process.env.ANTHROPIC_API_KEY_STORE || process.env.ANTHROPIC_API_KEY,
-      });
+      }, "store");
 
       if (result?.json) {
         const j = result.json as Record<string, unknown>;

@@ -5,7 +5,8 @@
 // =====================================================
 
 import { createAdminSupabase } from "@/lib/supabase";
-import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
+import { cleanAlternatingMessages } from "@/lib/ai/claude";
+import { callConfiguredAI } from "@/lib/ai/runtime";
 import { getProductByQuery } from "@/lib/ai/product-context";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 
@@ -127,12 +128,6 @@ export async function getAIResponse(
   currentMessage: string,
   context: AIContext
 ): Promise<{ text: string; quickReplies?: string[] } | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.warn("ANTHROPIC_API_KEY_BOT not set — AI responses disabled");
-    return null;
-  }
-
   try {
     // 1. Load conversation history
     const history = await getConversationHistory(conversationId);
@@ -169,15 +164,17 @@ export async function getAIResponse(
     const cleaned = cleanAlternatingMessages(claudeMessages);
 
     // 5. Call Claude via shared client
-    const result = await callClaude({
+    const result = await callConfiguredAI({
       systemPrompt,
       messages: cleaned,
       maxTokens: 400,
       temperature: 0.7,
-      apiKey,
-    });
+    }, "bot");
 
-    if (!result) return null;
+    if (!result) {
+      console.warn("AI bot integration is not configured — responses disabled");
+      return null;
+    }
 
     // 6. Track usage
     trackAIUsage({

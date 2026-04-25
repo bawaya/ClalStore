@@ -4,21 +4,19 @@
 // Change provider without changing business logic
 // =====================================================
 
-import { createAdminSupabase } from "@/lib/supabase";
+import { getIntegrationByTypeWithSecrets } from "@/lib/integrations/secrets";
 
 // ===== DB Config Helper =====
 /** Read integration config from DB by type, returns config JSONB or empty object */
 export async function getIntegrationConfig(type: string): Promise<Record<string, any>> {
   try {
-    const db = createAdminSupabase();
-    const { data } = await db
-      .from("integrations")
-      .select("config, status")
-      .eq("type", type)
-      .single();
-    console.warn(`[IntegrationConfig] type=${type} status=${data?.status} hasConfig=${!!data?.config} keys=${data?.config ? Object.keys(data.config).join(",") : "none"}`);
-    if (data && data.status === "active" && data.config) {
-      return data.config as Record<string, any>;
+    const { integration, config } = await getIntegrationByTypeWithSecrets(type);
+    const hasConfig = !!config && Object.keys(config).length > 0;
+    console.warn(
+      `[IntegrationConfig] type=${type} status=${integration?.status} hasConfig=${hasConfig} keys=${hasConfig ? Object.keys(config).join(",") : "none"}`
+    );
+    if (integration && integration.status === "active" && hasConfig) {
+      return config;
     }
   } catch (err) {
     console.error(`[IntegrationConfig] Error fetching ${type}:`, err);

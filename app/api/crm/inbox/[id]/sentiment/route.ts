@@ -1,10 +1,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
+import { cleanAlternatingMessages } from "@/lib/ai/claude";
+import { callConfiguredAI } from "@/lib/ai/runtime";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { requireAdmin } from "@/lib/admin/auth";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function POST(
   req: NextRequest,
@@ -52,19 +53,17 @@ export async function POST(
 - neutral: سؤال عادي, استفسار
 - positive: شكر, رضا, حماس`;
 
-    const apiKey = process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY;
     const cleaned = cleanAlternatingMessages([
       { role: "user", content: transcript },
     ]);
 
-    const result = await callClaude({
+    const result = await callConfiguredAI({
       systemPrompt,
       messages: cleaned,
       maxTokens: 100,
       temperature: 0.2,
       jsonMode: true,
-      apiKey,
-    });
+    }, "bot");
 
     if (!result?.json) {
       return apiSuccess({ sentiment: "neutral", confidence: 0 });

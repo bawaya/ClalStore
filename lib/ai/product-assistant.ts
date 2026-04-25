@@ -3,9 +3,12 @@
 // =====================================================
 
 import type { Product } from "@/types/database";
+import { callGemini } from "@/lib/ai/gemini";
+import { getConfiguredAIRuntime } from "@/lib/ai/runtime";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const MODEL = process.env.ANTHROPIC_PRODUCT_ASSISTANT_MODEL || "claude-sonnet-4-20250514";
+const DEFAULT_ANTHROPIC_MODEL =
+  process.env.ANTHROPIC_PRODUCT_ASSISTANT_MODEL || "claude-sonnet-4-20250514";
 
 const WEB_TOOL = {
   type: "web_search_20250305" as const,
@@ -58,9 +61,8 @@ export async function runProductAssistant(input: {
   /** When false, skip web search (faster, cheaper) — e.g. if env disables tools */
   useWebSearch?: boolean;
 }): Promise<{ text: string; usedWebSearch: boolean } | { error: string }> {
-  const apiKey =
-    process.env.ANTHROPIC_API_KEY_STORE || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const runtime = await getConfiguredAIRuntime("store");
+  if (!runtime) {
     return { error: "خدمة المساعد غير مفعّلة على الخادم" };
   }
 
@@ -80,8 +82,26 @@ export async function runProductAssistant(input: {
     return { error: "لا يوجد رسائل" };
   }
 
+  if (runtime.provider === "Google Gemini") {
+    const result = await callGemini({
+      apiKey: runtime.apiKey,
+      model: runtime.model,
+      systemPrompt: system,
+      messages,
+      maxTokens: 2000,
+      temperature: 0.5,
+      timeout: 60_000,
+    });
+
+    if (!result?.text?.trim()) {
+      return { error: "لم يعد النموذج نصًا كافيًا" };
+    }
+
+    return { text: result.text.trim(), usedWebSearch: false };
+  }
+
   const body: Record<string, unknown> = {
-    model: MODEL,
+    model: runtime.model || DEFAULT_ANTHROPIC_MODEL,
     max_tokens: 2000,
     temperature: 0.5,
     system,
@@ -97,7 +117,7 @@ export async function runProductAssistant(input: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
+        "x-api-key": runtime.apiKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify(b),

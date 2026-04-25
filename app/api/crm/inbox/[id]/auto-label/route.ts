@@ -1,10 +1,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
-import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
+import { cleanAlternatingMessages } from "@/lib/ai/claude";
+import { callConfiguredAI } from "@/lib/ai/runtime";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { requireAdmin } from "@/lib/admin/auth";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { apiSuccess, apiError } from "@/lib/api-response";
 import type { InboxLabel, InboxMessage } from "@/types/database";
 
 interface SuggestedLabel {
@@ -65,15 +66,13 @@ export async function POST(
       { role: "user", content: transcript },
     ]);
 
-    const apiKey = process.env.ANTHROPIC_API_KEY_BOT || process.env.ANTHROPIC_API_KEY;
-    const result = await callClaude({
+    const result = await callConfiguredAI({
       systemPrompt,
       messages: cleaned,
       maxTokens: 200,
       temperature: 0.3,
       jsonMode: true,
-      apiKey,
-    });
+    }, "bot");
 
     if (!result?.json) {
       return apiSuccess({ labels: [] });

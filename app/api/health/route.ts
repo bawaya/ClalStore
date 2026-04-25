@@ -5,6 +5,7 @@
 
 import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
+import { getConfiguredAIRuntime } from "@/lib/ai/runtime";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
@@ -43,16 +44,19 @@ export async function GET(req: NextRequest) {
   // 5. WhatsApp provider
   checks.whatsapp = { ok: !!process.env.YCLOUD_API_KEY };
 
-  // 5b. AI providers — separate keys per feature
-  const aiKeys = {
-    bot:   process.env.ANTHROPIC_API_KEY_BOT   || process.env.ANTHROPIC_API_KEY || "",
-    admin: process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || "",
-    store: process.env.ANTHROPIC_API_KEY_STORE || process.env.ANTHROPIC_API_KEY || "",
-    openai: process.env.OPENAI_API_KEY_ADMIN   || process.env.OPENAI_API_KEY   || "",
-  };
-  checks.ai = {
-    ok: !!(aiKeys.bot && aiKeys.admin),
-  };
+  // 5b. AI providers — unified via admin integration with env fallback
+  try {
+    const [botAI, adminAI, storeAI] = await Promise.all([
+      getConfiguredAIRuntime("bot"),
+      getConfiguredAIRuntime("admin"),
+      getConfiguredAIRuntime("store"),
+    ]);
+    checks.ai = {
+      ok: !!(botAI && adminAI && storeAI),
+    };
+  } catch {
+    checks.ai = { ok: false };
+  }
 
   // 6. SMS integration (DB)
   try {

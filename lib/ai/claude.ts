@@ -26,6 +26,7 @@ const MODEL = "claude-sonnet-4-20250514";
 
 export async function callClaude(req: ClaudeRequest): Promise<ClaudeResponse | null> {
   const apiKey = req.apiKey || process.env.ANTHROPIC_API_KEY;
+  const model = req.model || MODEL;
   if (!apiKey) {
     console.error("[AI] No Anthropic API key provided");
     return null;
@@ -47,7 +48,7 @@ export async function callClaude(req: ClaudeRequest): Promise<ClaudeResponse | n
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         max_tokens: req.maxTokens || 500,
         temperature: req.temperature ?? 0.7,
         system: systemPrompt,

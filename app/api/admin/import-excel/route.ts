@@ -1,15 +1,16 @@
 // =====================================================
 // Admin: Excel bulk import for non-mobile catalogs
 // 1) POST /api/admin/import-excel?step=parse     (multipart) -> parses file -> JSON rows
-// 2) POST /api/admin/import-excel?step=classify  (json)      -> Google Gemini classifies + translates
+// 2) POST /api/admin/import-excel?step=classify  (json)      -> AI classifies + translates
 // 3) POST /api/admin/import-excel?step=insert    (json)      -> bulk inserts to products
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getIntegrationByType } from "@/lib/admin/queries";
+import { callClaude } from "@/lib/ai/claude";
 import { callGemini } from "@/lib/ai/gemini";
+import { getIntegrationByTypeWithSecrets } from "@/lib/integrations/secrets";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { createAdminSupabase } from "@/lib/supabase";
 import type {
@@ -20,14 +21,16 @@ import type {
   ProductVariantKind,
 } from "@/types/database";
 
+type AiProvider = "Google Gemini" | "Anthropic Claude";
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = "gemini-1.5-flash-latest";
+const ANTHROPIC_API_KEY =
+  process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || "";
+const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 
-// Excluded brand sections that belong to mobile phones.
-const EXCLUDED_BRAND_RE = /(iPhone|Galaxy|Xiaomi|Redmi|ZTE)/i;
-
-// Detect duplicate "HOT Mobile supply" rows that should remain visible but skipped by default.
-const HOT_DUP_RE = /אספקה הוט מובייל/;
+const EXCLUDED_BRAND_RE = /(iphone|galaxy|xiaomi|redmi|zte)/i;
+const HOT_DUP_RE = /אספקה הוט מובייל/i;
 
 interface RawRow {
   sheet: string;
@@ -43,7 +46,6 @@ interface RawRow {
 
 interface ClassifyInput {
   rows: RawRow[];
-  /** Cost margin estimate (0..1). default 0.65 (cost = cash * 0.65) */
   costRatio?: number;
 }
 
@@ -91,6 +93,12 @@ function toSafeNumber(value: unknown): number {
   }
 
   return 0;
+}
+
+function isLikelyMobileRow(row: RawRow): boolean {
+  return EXCLUDED_BRAND_RE.test(
+    `${row.brand_section} ${row.desc} ${row.model}`.replace(/\s+/g, " ").trim()
+  );
 }
 
 function parseSheetRows(workbook: XLSX.WorkBook, sheetName: string): RawRow[] {
@@ -160,7 +168,7 @@ async function handleParse(req: NextRequest) {
   }
 
   const total = rows.length;
-  rows = rows.filter((row) => !EXCLUDED_BRAND_RE.test(row.brand_section));
+  rows = rows.filter((row) => !isLikelyMobileRow(row));
   const afterMobileFilter = rows.length;
   const hotDuplicates = rows.filter((row) => row.is_hot_supply).length;
 
@@ -208,52 +216,103 @@ function buildUserPrompt(rows: RawRow[]): string {
       desc: row.desc,
       model: row.model,
       brand_section: row.brand_section,
-    })),
+    }))
   );
 }
 
-async function callGeminiClassifier(rows: RawRow[], apiKey: string, model: string): Promise<unknown[]> {
-  const response = await callGemini({
-    apiKey,
-    systemPrompt: CLASSIFIER_SYSTEM,
-    messages: [{ role: "user", content: buildUserPrompt(rows) }],
-    maxTokens: 8000,
-    temperature: 0,
-    timeout: 120_000,
-    model,
-  });
-
-  const text = response?.text?.trim();
-  if (!text) {
-    throw new Error("Gemini returned an empty response");
-  }
-
-  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+function parseClassifierArray(payload: string, provider: AiProvider): unknown[] {
+  const cleaned = payload.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
   const parsed = JSON.parse(cleaned);
 
   if (!Array.isArray(parsed)) {
-    throw new Error("Gemini returned a non-array payload");
+    throw new Error(`${provider} returned a non-array payload`);
   }
 
   return parsed;
 }
 
-async function handleClassify(req: NextRequest) {
-  const integration = await getIntegrationByType("ai_chat");
-  const integrationProvider = integration?.provider || "";
-  const integrationConfig =
-    integration?.status === "active" && integration?.config && typeof integration.config === "object"
-      ? integration.config
-      : {};
-  const integrationApiKey =
-    integrationProvider === "Google Gemini" ? String(integrationConfig.api_key || "").trim() : "";
-  const integrationModel =
-    integrationProvider === "Google Gemini" ? String(integrationConfig.model || "").trim() : "";
-  const apiKey = integrationApiKey || GEMINI_API_KEY;
-  const model = integrationModel || GEMINI_MODEL;
+async function callGeminiClassifier(
+  rows: RawRow[],
+  apiKey: string,
+  model: string
+): Promise<unknown[]> {
+  const response = await callGemini({
+    apiKey,
+    model,
+    systemPrompt: CLASSIFIER_SYSTEM,
+    messages: [{ role: "user", content: buildUserPrompt(rows) }],
+    maxTokens: 8000,
+    temperature: 0,
+    timeout: 120_000,
+  });
 
-  if (!apiKey) {
-    return apiError("مفتاح Google Gemini غير مفعّل", 503);
+  const text = response?.text?.trim();
+  if (!text) {
+    throw new Error("Google Gemini returned an empty response");
+  }
+
+  return parseClassifierArray(text, "Google Gemini");
+}
+
+async function callClaudeClassifier(
+  rows: RawRow[],
+  apiKey: string,
+  model: string
+): Promise<unknown[]> {
+  const response = await callClaude({
+    apiKey,
+    model,
+    systemPrompt: CLASSIFIER_SYSTEM,
+    messages: [{ role: "user", content: buildUserPrompt(rows) }],
+    maxTokens: 8000,
+    temperature: 0,
+    timeout: 120_000,
+  });
+
+  const text = response?.text?.trim();
+  if (!text) {
+    throw new Error("Anthropic Claude returned an empty response");
+  }
+
+  return parseClassifierArray(text, "Anthropic Claude");
+}
+
+async function resolveClassifierConfig(): Promise<{
+  provider: AiProvider;
+  apiKey: string;
+  model: string;
+}> {
+  const { integration, config } = await getIntegrationByTypeWithSecrets("ai_chat");
+  const activeProvider =
+    integration?.status === "active" && integration.provider === "Google Gemini"
+      ? "Google Gemini"
+      : integration?.status === "active" && integration.provider === "Anthropic Claude"
+        ? "Anthropic Claude"
+        : null;
+
+  const provider: AiProvider =
+    activeProvider || (GEMINI_API_KEY ? "Google Gemini" : "Anthropic Claude");
+
+  if (provider === "Google Gemini") {
+    return {
+      provider,
+      apiKey: String(config.api_key || GEMINI_API_KEY).trim(),
+      model: String(config.model || GEMINI_MODEL).trim(),
+    };
+  }
+
+  return {
+    provider,
+    apiKey: String(config.api_key || ANTHROPIC_API_KEY).trim(),
+    model: String(config.model || ANTHROPIC_MODEL).trim(),
+  };
+}
+
+async function handleClassify(req: NextRequest) {
+  const classifier = await resolveClassifierConfig();
+
+  if (!classifier.apiKey) {
+    return apiError(`مفتاح ${classifier.provider} غير مفعّل`, 503);
   }
 
   const body = (await req.json()) as ClassifyInput;
@@ -270,9 +329,12 @@ async function handleClassify(req: NextRequest) {
     let aiRes: unknown[] = [];
 
     try {
-      aiRes = await callGeminiClassifier(batch, apiKey, model);
+      aiRes =
+        classifier.provider === "Google Gemini"
+          ? await callGeminiClassifier(batch, classifier.apiKey, classifier.model)
+          : await callClaudeClassifier(batch, classifier.apiKey, classifier.model);
     } catch (error) {
-      console.error("Gemini classify batch failed:", error);
+      console.error(`${classifier.provider} classify batch failed:`, error);
       aiRes = batch.map(() => ({ skip: true, skip_reason: "ai_error" }));
     }
 
@@ -315,7 +377,11 @@ async function handleClassify(req: NextRequest) {
     }
   }
 
-  return apiSuccess({ classified: out });
+  return apiSuccess({
+    classified: out,
+    provider: classifier.provider,
+    model: classifier.model,
+  });
 }
 
 async function handleInsert(req: NextRequest) {

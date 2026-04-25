@@ -7,7 +7,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
-import { callClaude, cleanAlternatingMessages } from "@/lib/ai/claude";
+import { cleanAlternatingMessages } from "@/lib/ai/claude";
+import { callConfiguredAI } from "@/lib/ai/runtime";
 import { getProductByQuery } from "@/lib/ai/product-context";
 import { trackAIUsage } from "@/lib/ai/usage-tracker";
 import { apiSuccess, apiError } from "@/lib/api-response";
@@ -131,13 +132,12 @@ ${agentContext ? `ملاحظة من الموظف: ${agentContext}` : ""}
     const cleaned = cleanAlternatingMessages(claudeMessages);
 
     // 8. Call Claude
-    const result = await callClaude({
+    const result = await callConfiguredAI({
       systemPrompt,
       messages: cleaned,
       maxTokens: 500,
       temperature: 0.7,
-      apiKey: process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY,
-    });
+    }, "admin");
 
     if (!result) {
       return apiError("تعذر اقتراح رد — حاول مجدداً", 500);

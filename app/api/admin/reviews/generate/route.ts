@@ -7,8 +7,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin/auth";
-import { callClaude } from "@/lib/ai/claude";
-import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { callConfiguredAI } from "@/lib/ai/runtime";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 // ── Common Arab Israeli first + last names ──
 const FIRST_NAMES_MALE_AR = [
@@ -99,11 +99,6 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-
-    if (!process.env.ANTHROPIC_API_KEY_ADMIN && !process.env.ANTHROPIC_API_KEY) {
-      return apiError("Anthropic Admin API key not configured", 500);
-    }
-    const aiKey = process.env.ANTHROPIC_API_KEY_ADMIN || process.env.ANTHROPIC_API_KEY || "";
 
     const supabase = createAdminSupabase();
     if (!supabase) return apiError("DB unavailable", 500);
@@ -236,16 +231,15 @@ ${specsText ? `المواصفات: ${specsText}` : ""}
 اكتب ${batchCount} تقييمات متنوعة وفريدة:
 ${reviewRequests}`;
 
-      const result = await callClaude({
+      const result = await callConfiguredAI({
         systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
         maxTokens: 4000,
         temperature: 0.95,
         timeout: 60000,
-        apiKey: aiKey,
-      });
+      }, "admin");
 
-      if (!result) throw new Error("Claude API call failed — تأكد من ANTHROPIC_API_KEY_ADMIN");
+      if (!result) throw new Error("AI provider call failed — تأكد من إعداد تكامل الذكاء");
       const raw = result.text;
 
       // Parse JSON
