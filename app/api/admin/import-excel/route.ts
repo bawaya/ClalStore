@@ -1,32 +1,37 @@
 // =====================================================
 // Admin: Excel bulk import for non-mobile catalogs
-// 1) POST /api/admin/import-excel?step=parse  (multipart) — parses file → JSON rows
-// 2) POST /api/admin/import-excel?step=classify (json)    — Claude Haiku classifies + translates
-// 3) POST /api/admin/import-excel?step=insert (json)      — bulk inserts to products
+// 1) POST /api/admin/import-excel?step=parse     (multipart) -> parses file -> JSON rows
+// 2) POST /api/admin/import-excel?step=classify  (json)      -> Google Gemini classifies + translates
+// 3) POST /api/admin/import-excel?step=insert    (json)      -> bulk inserts to products
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { requireAdmin } from "@/lib/admin/auth";
+import { getIntegrationByType } from "@/lib/admin/queries";
+import { callGemini } from "@/lib/ai/gemini";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { createAdminSupabase } from "@/lib/supabase";
-import type { Product, ProductType, ApplianceKind, ProductSubkind, ProductVariantKind } from "@/types/database";
+import type {
+  ApplianceKind,
+  Product,
+  ProductSubkind,
+  ProductType,
+  ProductVariantKind,
+} from "@/types/database";
 
-const ANTHROPIC_API_KEY =
-  process.env.ANTHROPIC_API_KEY_ADMIN ||
-  process.env.ANTHROPIC_API_KEY ||
-  "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = "gemini-1.5-flash-latest";
 
-const CLAUDE_MODEL = process.env.ANTHROPIC_IMPORT_MODEL || "claude-haiku-4-5-20251001";
-
-// ===== Excluded brand sections (mobile phones) =====
+// Excluded brand sections that belong to mobile phones.
 const EXCLUDED_BRAND_RE = /(iPhone|Galaxy|Xiaomi|Redmi|ZTE)/i;
-// Detect duplicate "HOT Mobile supply" rows
+
+// Detect duplicate "HOT Mobile supply" rows that should remain visible but skipped by default.
 const HOT_DUP_RE = /אספקה הוט מובייל/;
 
 interface RawRow {
   sheet: string;
-  brand_section: string; // last seen brand header
+  brand_section: string;
   barcode: string;
   desc: string;
   model: string;
@@ -34,6 +39,43 @@ interface RawRow {
   monthly: number;
   cash: number;
   is_hot_supply: boolean;
+}
+
+interface ClassifyInput {
+  rows: RawRow[];
+  /** Cost margin estimate (0..1). default 0.65 (cost = cash * 0.65) */
+  costRatio?: number;
+}
+
+interface ClassifiedRow {
+  barcode: string;
+  desc: string;
+  model: string;
+  brand_section: string;
+  stock: number;
+  monthly: number;
+  cash: number;
+  type: ProductType;
+  subkind?: ProductSubkind | null;
+  appliance_kind?: ApplianceKind | null;
+  brand: string;
+  name_ar: string;
+  name_he: string;
+  name_en: string;
+  warranty_months: number;
+  variant_kind: ProductVariantKind;
+  specs: Record<string, string>;
+  cost: number;
+  group_key: string;
+  variant_label: string;
+  skip: boolean;
+  skip_reason?: string;
+}
+
+interface InsertInput {
+  rows: ClassifiedRow[];
+  preserveStock999?: boolean;
+  costRatio?: number;
 }
 
 function toSafeNumber(value: unknown): number {
@@ -51,29 +93,39 @@ function toSafeNumber(value: unknown): number {
   return 0;
 }
 
-function parseSheetRows(wb: XLSX.WorkBook, sheetName: string): RawRow[] {
-  const ws = wb.Sheets[sheetName];
-  if (!ws) return [];
-  const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+function parseSheetRows(workbook: XLSX.WorkBook, sheetName: string): RawRow[] {
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) return [];
+
+  const rowsMatrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: null,
+  });
+
   const rows: RawRow[] = [];
   let currentBrand = "";
-  for (let i = 1; i < aoa.length; i++) {
-    const r = aoa[i];
-    if (!r || r.length === 0) continue;
-    const barcode = r[0] != null ? String(r[0]).trim() : "";
+
+  for (let index = 1; index < rowsMatrix.length; index += 1) {
+    const row = rowsMatrix[index];
+    if (!row || row.length === 0) continue;
+
+    const barcode = row[0] != null ? String(row[0]).trim() : "";
     if (!barcode) continue;
+
     if (barcode.includes("◆")) {
-      // brand header — extract: "◆  Apple — iPhone  ◆  (53)" → "Apple — iPhone"
-      const m = barcode.match(/◆\s*([^◆]+?)\s*◆/);
-      currentBrand = m ? m[1].trim() : "";
+      const match = barcode.match(/◆\s*([^◆]+?)\s*◆/);
+      currentBrand = match ? match[1].trim() : "";
       continue;
     }
-    const desc = String(r[1] || "").trim();
-    const model = String(r[2] || "").trim();
-    const stock = toSafeNumber(r[3]);
-    const monthly = toSafeNumber(r[4]);
-    const cash = toSafeNumber(r[5]);
+
+    const desc = String(row[1] || "").trim();
+    const model = String(row[2] || "").trim();
+    const stock = toSafeNumber(row[3]);
+    const monthly = toSafeNumber(row[4]);
+    const cash = toSafeNumber(row[5]);
+
     if (!desc) continue;
+
     rows.push({
       sheet: sheetName,
       brand_section: currentBrand,
@@ -86,81 +138,41 @@ function parseSheetRows(wb: XLSX.WorkBook, sheetName: string): RawRow[] {
       is_hot_supply: HOT_DUP_RE.test(desc),
     });
   }
+
   return rows;
 }
 
-// ============================================================
-// Step 1: PARSE — read uploaded xlsx → flat JSON rows
-// ============================================================
 async function handleParse(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file");
+
   if (!file || !(file instanceof File)) {
     return apiError("ملف غير صالح", 400);
   }
+
   const buffer = Buffer.from(await file.arrayBuffer());
-  const wb = XLSX.read(buffer, { type: "buffer" });
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const sheetNames = workbook.SheetNames.filter((name) => !/test/i.test(name));
 
-  // We accept all sheets but skip TEST and never include mobile-phone sections
-  const allSheets = wb.SheetNames.filter((n) => !/test/i.test(n));
   let rows: RawRow[] = [];
-  for (const s of allSheets) rows.push(...parseSheetRows(wb, s));
+  for (const sheetName of sheetNames) {
+    rows.push(...parseSheetRows(workbook, sheetName));
+  }
 
-  const before = rows.length;
-  rows = rows.filter((r) => !EXCLUDED_BRAND_RE.test(r.brand_section));
-  const afterMobile = rows.length;
-  const dupCount = rows.filter((r) => r.is_hot_supply).length;
-  // Keep HOT-supply rows in the response so the UI can show them and let the user toggle.
+  const total = rows.length;
+  rows = rows.filter((row) => !EXCLUDED_BRAND_RE.test(row.brand_section));
+  const afterMobileFilter = rows.length;
+  const hotDuplicates = rows.filter((row) => row.is_hot_supply).length;
 
   return apiSuccess({
     rows,
     stats: {
-      total: before,
-      after_mobile_filter: afterMobile,
-      hot_duplicates: dupCount,
-      sheets: allSheets,
+      total,
+      after_mobile_filter: afterMobileFilter,
+      hot_duplicates: hotDuplicates,
+      sheets: sheetNames,
     },
   });
-}
-
-// ============================================================
-// Step 2: CLASSIFY — send rows to Claude in batches of 12
-//   Returns: { classified: ClassifiedRow[] }
-// ============================================================
-
-interface ClassifyInput {
-  rows: RawRow[];
-  /** Cost margin estimate (0..1). default 0.65 (cost = cash * 0.65) */
-  costRatio?: number;
-}
-
-interface ClassifiedRow {
-  // forwarded
-  barcode: string;
-  desc: string;
-  model: string;
-  brand_section: string;
-  stock: number;
-  monthly: number;
-  cash: number;
-  // ai-derived
-  type: ProductType;
-  subkind?: ProductSubkind | null;
-  appliance_kind?: ApplianceKind | null;
-  brand: string;
-  name_ar: string;
-  name_he: string;
-  name_en: string;
-  warranty_months: number;
-  variant_kind: ProductVariantKind;
-  specs: Record<string, string>;
-  cost: number;
-  // for grouping into variants in step 3
-  group_key: string;
-  variant_label: string;
-  /** Suggested action: skip if true (mobile leak / unknown) */
-  skip: boolean;
-  skip_reason?: string;
 }
 
 const CLASSIFIER_SYSTEM = `You classify Israeli electronics catalog items written in Hebrew/English into one of these types and subkinds for a Next.js storefront.
@@ -190,80 +202,89 @@ Return ONLY a JSON array, one object per input row, in the SAME ORDER. No commen
 
 function buildUserPrompt(rows: RawRow[]): string {
   return JSON.stringify(
-    rows.map((r, i) => ({
-      i,
-      barcode: r.barcode,
-      desc: r.desc,
-      model: r.model,
-      brand_section: r.brand_section,
+    rows.map((row, index) => ({
+      i: index,
+      barcode: row.barcode,
+      desc: row.desc,
+      model: row.model,
+      brand_section: row.brand_section,
     })),
   );
 }
 
-async function callClaude(rows: RawRow[]): Promise<unknown[]> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 8000,
-      system: CLASSIFIER_SYSTEM,
-      messages: [{ role: "user", content: buildUserPrompt(rows) }],
-    }),
-    signal: AbortSignal.timeout(120_000),
+async function callGeminiClassifier(rows: RawRow[], apiKey: string, model: string): Promise<unknown[]> {
+  const response = await callGemini({
+    apiKey,
+    systemPrompt: CLASSIFIER_SYSTEM,
+    messages: [{ role: "user", content: buildUserPrompt(rows) }],
+    maxTokens: 8000,
+    temperature: 0,
+    timeout: 120_000,
+    model,
   });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Claude HTTP ${res.status}: ${t.slice(0, 200)}`);
+
+  const text = response?.text?.trim();
+  if (!text) {
+    throw new Error("Gemini returned an empty response");
   }
-  const data = await res.json();
-  const text = (data.content || [])
-    .filter((b: { type: string }) => b.type === "text")
-    .map((b: { text: string }) => b.text)
-    .join("\n")
-    .trim();
-  // Strip code-fence if present
+
   const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
-  try {
-    const parsed = JSON.parse(cleaned);
-    if (!Array.isArray(parsed)) throw new Error("not an array");
-    return parsed;
-  } catch (e) {
-    throw new Error(`Claude returned non-JSON: ${cleaned.slice(0, 200)}`);
+  const parsed = JSON.parse(cleaned);
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Gemini returned a non-array payload");
   }
+
+  return parsed;
 }
 
 async function handleClassify(req: NextRequest) {
-  if (!ANTHROPIC_API_KEY) return apiError("Anthropic API key غير مفعّل", 503);
+  const integration = await getIntegrationByType("ai_chat");
+  const integrationProvider = integration?.provider || "";
+  const integrationConfig =
+    integration?.status === "active" && integration?.config && typeof integration.config === "object"
+      ? integration.config
+      : {};
+  const integrationApiKey =
+    integrationProvider === "Google Gemini" ? String(integrationConfig.api_key || "").trim() : "";
+  const integrationModel =
+    integrationProvider === "Google Gemini" ? String(integrationConfig.model || "").trim() : "";
+  const apiKey = integrationApiKey || GEMINI_API_KEY;
+  const model = integrationModel || GEMINI_MODEL;
+
+  if (!apiKey) {
+    return apiError("مفتاح Google Gemini غير مفعّل", 503);
+  }
+
   const body = (await req.json()) as ClassifyInput;
   if (!Array.isArray(body.rows) || body.rows.length === 0) {
     return apiError("لا يوجد صفوف للتصنيف", 400);
   }
-  const costRatio = Math.min(0.95, Math.max(0.1, body.costRatio ?? 0.65));
 
+  const costRatio = Math.min(0.95, Math.max(0.1, body.costRatio ?? 0.65));
   const out: ClassifiedRow[] = [];
-  const BATCH = 12;
-  for (let i = 0; i < body.rows.length; i += BATCH) {
-    const batch = body.rows.slice(i, i + BATCH);
+  const batchSize = 12;
+
+  for (let index = 0; index < body.rows.length; index += batchSize) {
+    const batch = body.rows.slice(index, index + batchSize);
     let aiRes: unknown[] = [];
+
     try {
-      aiRes = await callClaude(batch);
-    } catch (e) {
-      console.error("Claude classify batch failed:", e);
-      // Fall back: mark these rows as skip:unknown
+      aiRes = await callGeminiClassifier(batch, apiKey, model);
+    } catch (error) {
+      console.error("Gemini classify batch failed:", error);
       aiRes = batch.map(() => ({ skip: true, skip_reason: "ai_error" }));
     }
-    for (let j = 0; j < batch.length; j++) {
-      const raw = batch[j];
-      const ai = (aiRes[j] || {}) as Partial<ClassifiedRow>;
+
+    for (let rowIndex = 0; rowIndex < batch.length; rowIndex += 1) {
+      const raw = batch[rowIndex];
+      const ai = (aiRes[rowIndex] || {}) as Partial<ClassifiedRow>;
       const stock = toSafeNumber(raw.stock);
       const monthly = toSafeNumber(raw.monthly);
       const cash = toSafeNumber(raw.cash);
-      const cost = ai.cost && ai.cost > 0 ? Number(ai.cost) : Math.round(cash * costRatio);
+      const cost =
+        ai.cost && ai.cost > 0 ? Number(ai.cost) : Math.round(cash * costRatio);
+
       out.push({
         barcode: raw.barcode,
         desc: raw.desc,
@@ -275,13 +296,16 @@ async function handleClassify(req: NextRequest) {
         type: (ai.type || "appliance") as ProductType,
         subkind: ai.subkind ?? null,
         appliance_kind: ai.appliance_kind ?? null,
-        brand: ai.brand || raw.brand_section.split(/[—\-]/)[0].trim() || "غير معروف",
+        brand: ai.brand || raw.brand_section.split(/[—-]/)[0].trim() || "غير معروف",
         name_ar: ai.name_ar || raw.desc,
         name_he: ai.name_he || raw.desc,
         name_en: ai.name_en || "",
         warranty_months: Number(ai.warranty_months) || 12,
         variant_kind: (ai.variant_kind || "model") as ProductVariantKind,
-        specs: (ai.specs && typeof ai.specs === "object" ? (ai.specs as Record<string, string>) : {}),
+        specs:
+          ai.specs && typeof ai.specs === "object"
+            ? (ai.specs as Record<string, string>)
+            : {},
         cost,
         group_key: ai.group_key || raw.barcode,
         variant_label: ai.variant_label || "",
@@ -294,58 +318,56 @@ async function handleClassify(req: NextRequest) {
   return apiSuccess({ classified: out });
 }
 
-// ============================================================
-// Step 3: INSERT — group classified rows into products + variants and bulk-insert
-// ============================================================
-
-interface InsertInput {
-  rows: ClassifiedRow[];
-  /** Stock value to use for "متوفر بالطلب" sentinel (default 999 keeps Excel value) */
-  preserveStock999?: boolean;
-  /** Override default cost ratio for any row missing cost */
-  costRatio?: number;
-}
-
 async function handleInsert(req: NextRequest) {
   const supabase = createAdminSupabase();
   const body = (await req.json()) as InsertInput;
+
   if (!supabase) return apiError("supabase غير مفعّل", 503);
   if (!Array.isArray(body.rows)) return apiError("صيغة غير صالحة", 400);
 
-  const rows = body.rows.filter((r) => !r.skip);
+  const rows = body.rows.filter((row) => !row.skip);
   const groups = new Map<string, ClassifiedRow[]>();
-  for (const r of rows) {
-    const key = r.group_key || r.barcode;
-    const arr = groups.get(key) || [];
-    arr.push(r);
-    groups.set(key, arr);
+
+  for (const row of rows) {
+    const key = row.group_key || row.barcode;
+    const current = groups.get(key) || [];
+    current.push(row);
+    groups.set(key, current);
   }
 
   const products: Array<Partial<Product>> = [];
+
   for (const [, members] of groups) {
     const head = members[0];
-    const variants = members.map((m) => ({
-      storage: m.variant_label || m.model || m.barcode.slice(-6),
-      price: Math.round(toSafeNumber(m.cash)),
-      monthly_price: toSafeNumber(m.monthly) > 0 ? Math.round(toSafeNumber(m.monthly)) : undefined,
-      cost: Math.round(m.cost),
-      stock: Math.max(0, Math.round(toSafeNumber(m.stock))),
+    const variants = members.map((member) => ({
+      storage: member.variant_label || member.model || member.barcode.slice(-6),
+      price: Math.round(toSafeNumber(member.cash)),
+      monthly_price:
+        toSafeNumber(member.monthly) > 0
+          ? Math.round(toSafeNumber(member.monthly))
+          : undefined,
+      cost: Math.round(member.cost),
+      stock: Math.max(0, Math.round(toSafeNumber(member.stock))),
     }));
-    const minPrice = Math.min(...variants.map((v) => v.price).filter((p) => p > 0));
+
+    const positivePrices = variants.map((variant) => variant.price).filter((price) => price > 0);
+    const minPrice =
+      positivePrices.length > 0 ? Math.min(...positivePrices) : Math.round(toSafeNumber(head.cash));
+
     products.push({
       type: head.type,
       brand: head.brand,
       name_ar: head.name_ar,
       name_he: head.name_he,
       name_en: head.name_en || undefined,
-      price: minPrice > 0 && minPrice < Infinity ? minPrice : Math.round(toSafeNumber(head.cash)),
+      price: minPrice,
       cost: Math.round(head.cost),
-      stock: variants.reduce((s, v) => s + v.stock, 0),
+      stock: variants.reduce((sum, variant) => sum + variant.stock, 0),
       sold: 0,
       image_url: undefined,
       gallery: [],
       colors: [],
-      storage_options: variants.map((v) => v.storage),
+      storage_options: variants.map((variant) => variant.storage),
       variants,
       specs: head.specs,
       active: true,
@@ -358,18 +380,23 @@ async function handleInsert(req: NextRequest) {
     });
   }
 
-  // Bulk insert in chunks of 50
   let inserted = 0;
   const errors: string[] = [];
-  const CHUNK = 50;
-  for (let i = 0; i < products.length; i += CHUNK) {
-    const slice = products.slice(i, i + CHUNK);
-    const { data, error } = await supabase.from("products").insert(slice as never[]).select("id");
+  const chunkSize = 50;
+
+  for (let index = 0; index < products.length; index += chunkSize) {
+    const slice = products.slice(index, index + chunkSize);
+    const { data, error } = await supabase
+      .from("products")
+      .insert(slice as never[])
+      .select("id");
+
     if (error) {
       console.error("Insert error:", error);
       errors.push(error.message);
       continue;
     }
+
     inserted += data?.length || 0;
   }
 
@@ -382,14 +409,15 @@ export async function POST(req: NextRequest) {
 
   const url = new URL(req.url);
   const step = url.searchParams.get("step");
+
   try {
     if (step === "parse") return await handleParse(req);
     if (step === "classify") return await handleClassify(req);
     if (step === "insert") return await handleInsert(req);
     return apiError("step غير معروف (parse | classify | insert)", 400);
-  } catch (err: unknown) {
-    console.error("import-excel error:", err);
-    const msg = err instanceof Error ? err.message : "خطأ غير متوقع";
-    return apiError(msg, 500);
+  } catch (error: unknown) {
+    console.error("import-excel error:", error);
+    const message = error instanceof Error ? error.message : "خطأ غير متوقع";
+    return apiError(message, 500);
   }
 }

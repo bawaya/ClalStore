@@ -31,7 +31,15 @@ async function resolveConfig(type: string, config: Record<string, any>): Promise
   return resolved;
 }
 
-const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boolean; message: string }>> = {
+async function getExistingIntegration(type: string) {
+  const integrations = await getIntegrations();
+  return integrations.find((i: any) => i.type === type) || null;
+}
+
+const TESTS: Record<
+  string,
+  (config: Record<string, any>, provider?: string) => Promise<{ ok: boolean; message: string }>
+> = {
   // ===== Payment — Rivhit =====
   payment: async (cfg) => {
     const apiKey = cfg.api_key;
@@ -155,6 +163,76 @@ const TESTS: Record<string, (config: Record<string, any>) => Promise<{ ok: boole
     if (!cfg.tracking_id && !cfg.api_key) return { ok: false, message: "معرف التتبع مفقود" };
     return { ok: true, message: "✅ بيانات التحليلات محفوظة" };
   },
+  // ===== AI =====
+  ai_chat: async (cfg, provider) => {
+    if (!provider) {
+      return { ok: false, message: "Ø§Ø®ØªØ± Ù…Ø²ÙˆØ¯ Ø§Ù„Ø°ÙƒØ§Ø¡ Ø£ÙˆÙ„Ø§Ù‹" };
+    }
+
+    if (provider === "Google Gemini") {
+      const apiKey = cfg.api_key;
+      const model = cfg.model || "gemini-1.5-flash-latest";
+      if (!apiKey) return { ok: false, message: "Ù…ÙØªØ§Ø­ Google Gemini API Ù…ÙÙ‚ÙˆØ¯" };
+
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: "ping" }] }],
+              generationConfig: { temperature: 0, maxOutputTokens: 8 },
+            }),
+            signal: AbortSignal.timeout(10000),
+          }
+        );
+
+        if (res.ok) return { ok: true, message: "âœ… Google Gemini Ù…ØªØµÙ„ Ø¨Ù†Ø¬Ø§Ø­" };
+        if (res.status === 400 || res.status === 401 || res.status === 403) {
+          const text = await res.text().catch(() => "");
+          return { ok: false, message: text || "Ù…ÙØªØ§Ø­ Gemini Ø£Ùˆ Ø§Ù„Ù†Ù…ÙˆØ°Ø¬ ØºÙŠØ± ØµØ­ÙŠØ­" };
+        }
+        return { ok: false, message: `Gemini responded with ${res.status}` };
+      } catch (err: unknown) {
+        return { ok: false, message: `Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø§ØªØµØ§Ù„: ${errMsg(err, "Unknown error")}` };
+      }
+    }
+
+    if (provider === "Anthropic Claude") {
+      const apiKey = cfg.api_key;
+      const model = cfg.model || "claude-sonnet-4-20250514";
+      if (!apiKey) return { ok: false, message: "Ù…ÙØªØ§Ø­ Anthropic API Ù…ÙÙ‚ÙˆØ¯" };
+
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 8,
+            messages: [{ role: "user", content: "ping" }],
+          }),
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (res.ok) return { ok: true, message: "âœ… Anthropic Claude Ù…ØªØµÙ„ Ø¨Ù†Ø¬Ø§Ø­" };
+        if (res.status === 400 || res.status === 401 || res.status === 403) {
+          const text = await res.text().catch(() => "");
+          return { ok: false, message: text || "Ù…ÙØªØ§Ø­ Claude Ø£Ùˆ Ø§Ù„Ù†Ù…ÙˆØ°Ø¬ ØºÙŠØ± ØµØ­ÙŠØ­" };
+        }
+        return { ok: false, message: `Anthropic responded with ${res.status}` };
+      } catch (err: unknown) {
+        return { ok: false, message: `Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø§ØªØµØ§Ù„: ${errMsg(err, "Unknown error")}` };
+      }
+    }
+
+    return { ok: false, message: `Ù…Ø²ÙˆØ¯ ØºÙŠØ± Ù…Ø¯Ø¹ÙˆÙ…: ${provider}` };
+  },
 };
 
 export async function POST(req: NextRequest) {
@@ -173,9 +251,10 @@ export async function POST(req: NextRequest) {
       return apiError(`لا يوجد اختبار لنوع التكامل: ${type}`, 400);
     }
 
-    // Resolve any masked values from DB before testing
+    const existing = await getExistingIntegration(type);
+    const provider = existing?.provider || "";
     const resolvedConfig = await resolveConfig(type, config);
-    const result = await testFn(resolvedConfig);
+    const result = await testFn(resolvedConfig, provider);
     return apiSuccess(result);
   } catch (err: unknown) {
     console.error("Integration test error:", err);

@@ -6,10 +6,11 @@
 import type { ClaudeRequest, ClaudeResponse } from "./claude";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const MODEL = "gemini-1.5-flash-latest"; 
+const MODEL = "gemini-1.5-flash-latest";
 
 export async function callGemini(req: ClaudeRequest): Promise<ClaudeResponse | null> {
   const apiKey = req.apiKey || process.env.GEMINI_API_KEY;
+  const model = req.model || MODEL;
   if (!apiKey) {
     console.error("[AI] No Gemini API key provided");
     return null;
@@ -28,7 +29,7 @@ export async function callGemini(req: ClaudeRequest): Promise<ClaudeResponse | n
   }));
 
   try {
-    const url = `${GEMINI_API_BASE}/${MODEL}:generateContent?key=${apiKey}`;
+    const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

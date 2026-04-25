@@ -50,6 +50,14 @@ const PROVIDER_FIELDS: Record<string, { key: string; label: string; type: string
     { key: "password", label: "Password", type: "password", placeholder: "" },
     { key: "from_email", label: "بريد المرسل", type: "email", placeholder: "noreply@clalmobile.com" },
   ],
+  "Anthropic Claude": [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "sk-ant-..." },
+    { key: "model", label: "Model", type: "text", placeholder: "claude-sonnet-4-20250514" },
+  ],
+  "Google Gemini": [
+    { key: "api_key", label: "API Key", type: "password", placeholder: "AIza..." },
+    { key: "model", label: "Model", type: "text", placeholder: "gemini-1.5-flash-latest" },
+  ],
   yCloud: [
     { key: "api_key", label: "API Key", type: "password", placeholder: "yCloud API Key" },
     { key: "phone_id", label: "Phone Number ID", type: "text", placeholder: "رقم الهاتف" },

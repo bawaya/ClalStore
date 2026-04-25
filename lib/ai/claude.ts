@@ -11,6 +11,7 @@ export interface ClaudeRequest {
   jsonMode?: boolean; // if true → appends "أجب بـ JSON فقط" to system prompt
   timeout?: number; // ms, default: 15000
   apiKey?: string; // override — pass specific key per feature
+  model?: string; // optional model override
 }
 
 export interface ClaudeResponse {

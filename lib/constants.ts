@@ -122,6 +122,8 @@ export const INTEGRATION_TYPES = {
   push_notifications: { label: "إشعارات Push", icon: "🔔", providers: ["Web Push (VAPID)"] as readonly string[] },
 } as const;
 
+(INTEGRATION_TYPES.ai_chat.providers as unknown as string[]).push("Google Gemini");
+
 export const PRODUCT_TYPES = {
   device: { label: "جهاز", labelHe: "מכשיר", icon: "📱" },
   accessory: { label: "إكسسوار", labelHe: "אביזר", icon: "🔌" },
