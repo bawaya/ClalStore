@@ -183,9 +183,9 @@ export const ProductCard = memo(function ProductCard({
   return (
     <Link
       href={`/store/product/${product.id}`}
-      className="group relative flex h-full flex-col overflow-hidden rounded-[28px] border border-[#373740] bg-[linear-gradient(180deg,#25252a_0%,#1e1e24_100%)] shadow-[0_24px_48px_rgba(0,0,0,0.28)] transition-transform duration-200 hover:-translate-y-1"
+      className="group relative flex h-full flex-col overflow-hidden rounded-[22px] border border-[#383842] bg-[linear-gradient(180deg,#242429_0%,#1e1e24_100%)] shadow-[0_24px_48px_rgba(0,0,0,0.3)] transition-transform duration-200 hover:-translate-y-0.5"
     >
-      <div className="pointer-events-none absolute left-0 right-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,51,81,0.16),transparent_70%)] opacity-70" />
+      <div className="pointer-events-none absolute left-0 right-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,51,81,0.12),transparent_72%)] opacity-70" />
 
       <div className="absolute left-4 top-4 z-10 flex flex-col items-start gap-2">
         {discount > 0 && (
@@ -204,7 +204,7 @@ export const ProductCard = memo(function ProductCard({
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
         <button
           onClick={handleCompare}
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors ${
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
             inCompare
               ? "border-[#ff3351]/45 bg-[#ff3351]/10 text-white"
               : "border-[#3a3a44] bg-black/10 text-[#d7d7de] hover:border-[#ff3351]/35 hover:text-white"
@@ -217,7 +217,7 @@ export const ProductCard = memo(function ProductCard({
 
         <button
           onClick={handleWishlist}
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all ${
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all ${
             inWishlist
               ? "border-[#ff3351]/45 bg-[#ff3351]/10 text-[#ff92a3]"
               : "border-[#3a3a44] bg-black/10 text-[#d7d7de] hover:border-[#ff3351]/35 hover:text-white"
@@ -237,8 +237,8 @@ export const ProductCard = memo(function ProductCard({
       )}
 
       <div
-        className="relative flex items-center justify-center overflow-hidden px-4 pt-16"
-        style={{ minHeight: scr.mobile ? 220 : 280 }}
+        className="relative flex items-center justify-center overflow-hidden px-4 pt-14"
+        style={{ minHeight: scr.mobile ? 210 : 250 }}
       >
         {imageSrc ? (
           <Image
@@ -262,7 +262,7 @@ export const ProductCard = memo(function ProductCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col px-5 pb-5 pt-2">
+      <div className="flex flex-1 flex-col px-[1.15rem] pb-[1.2rem] pt-1">
         <div className="mb-3 flex items-center gap-2 text-[#babac4]">
           {brandLogo && (
             <Image
@@ -280,21 +280,21 @@ export const ProductCard = memo(function ProductCard({
         </div>
 
         <h2
-          className="min-h-[3.2rem] text-lg font-black leading-tight text-white md:text-[1.7rem]"
+          className="min-h-[3.3rem] text-[1.22rem] font-black leading-tight text-white md:text-[1.5rem]"
           dir="auto"
         >
           {productName}
         </h2>
 
         {description && (
-          <p className="mt-3 min-h-[3.4rem] text-sm leading-7 text-[#b8b8c2]">
+          <p className="mt-3 min-h-[3.3rem] text-sm leading-7 text-[#b8b8c2]">
             {description.length > 88 ? `${description.slice(0, 88)}...` : description}
           </p>
         )}
 
         <div className="mt-4">
           <div className="flex items-end gap-2">
-            <strong className="text-[1.95rem] font-black leading-none text-[#ff3351] md:text-[2.2rem]">
+            <strong className="text-[1.8rem] font-black leading-none text-[#ff3351] md:text-[2rem]">
               ₪{displayPrice.toLocaleString()}
             </strong>
             {displayOldPrice && (
@@ -324,7 +324,7 @@ export const ProductCard = memo(function ProductCard({
                   e.stopPropagation();
                   setSelStorage(index);
                 }}
-                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+                className={`min-w-[4.35rem] rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors ${
                   selStorage === index
                     ? "border-[#ff3351]/50 bg-[#ff3351]/10 text-white"
                     : "border-[#53535e] bg-transparent text-[#d4d4dc] hover:border-[#ff3351]/35 hover:text-white"
@@ -350,8 +350,8 @@ export const ProductCard = memo(function ProductCard({
                 aria-label={getColorName(color, lang)}
                 className="rounded-full transition-all"
                 style={{
-                  width: scr.mobile ? 20 : 22,
-                  height: scr.mobile ? 20 : 22,
+                  width: scr.mobile ? 19 : 21,
+                  height: scr.mobile ? 19 : 21,
                   background: color.hex,
                   border:
                     selColor === index
@@ -376,7 +376,7 @@ export const ProductCard = memo(function ProductCard({
           </span>
 
           {product.featured && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5 text-xs font-semibold text-[#d8d8df]">
+            <span className="hidden items-center gap-1 rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5 text-xs font-semibold text-[#d8d8df] md:inline-flex">
               <ShieldCheck size={13} />
               {t("store.freeShipping")}
             </span>

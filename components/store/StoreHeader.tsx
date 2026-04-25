@@ -30,8 +30,8 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
   const wishlistCount = useWishlist((s) => s.getCount());
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
-
   const [custName, setCustName] = useState<string | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -147,7 +147,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#26262e] bg-[#111114]/95 text-white backdrop-blur-xl">
+    <header className="sticky top-0 z-50 bg-[#111114]/92 text-white backdrop-blur-xl">
       <div className="border-t-2 border-[#ff0e34] bg-[#070709]">
         <div className="mx-auto flex max-w-[1540px] items-center justify-center gap-4 px-4 py-2 text-[11px] text-[#f4f4f5] md:text-xs">
           {topStripItems.map((item) => (
@@ -156,11 +156,100 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1540px] px-4 md:px-6">
-        <div className="grid gap-4 border-b border-[#23232b] py-4 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
-          <div className="flex items-center justify-between gap-3 lg:justify-start">
-            <div className="flex items-center gap-2">
-              {scr.mobile && (
+      <div className="mx-auto max-w-[1540px] px-3 md:px-5 lg:px-6">
+        <div className="overflow-hidden rounded-b-[24px] border border-t-0 border-[#2a2a31] bg-[#131317]/96 shadow-[0_24px_48px_rgba(0,0,0,0.3)]">
+          <div className="hidden border-b border-[#2a2a31] px-5 py-4 lg:grid lg:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.05fr)] lg:items-center lg:gap-6">
+            <div className="grid gap-4">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+                <div className="grid gap-1 text-right">
+                  <span className="inline-flex w-fit rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold text-[#c0c0c7]">
+                    {lang === "he" ? "חנות רשמית" : "متجر رسمي"}
+                  </span>
+                  <strong className="text-[1.32rem] font-black tracking-[0.02em] text-white">
+                    <span className="text-[#ff3351]">Clal</span>Mobile
+                  </strong>
+                  <small className="text-sm text-[#8f8f99]">
+                    {t("store.hotAgent")}
+                  </small>
+                </div>
+
+                <Link
+                  href="/store"
+                  className="inline-flex h-[76px] w-[76px] items-center justify-center rounded-[20px] border border-[#383842] bg-[#101014]"
+                >
+                  <Logo size={34} />
+                </Link>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {showBack && (
+                  <Link
+                    href="/store"
+                    className="inline-flex min-h-[38px] items-center rounded-full border border-[#3a3a44] bg-white/[0.03] px-4 text-sm font-semibold text-[#d7d7de] transition-colors hover:border-[#ff3351]/35 hover:text-white"
+                  >
+                    {lang === "he" ? "חזרה לחנות" : "العودة للمتجر"}
+                  </Link>
+                )}
+
+                {utilityLinks.map(
+                  ({ href, label, icon: Icon, count, active }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`relative inline-flex min-h-[38px] items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors ${
+                        active
+                          ? "border-[#ff3351]/45 bg-[#ff3351]/10 text-white"
+                          : "border-[#3a3a44] bg-white/[0.03] text-[#d5d5dc] hover:border-[#ff3351]/35 hover:text-white"
+                      }`}
+                    >
+                      <Icon size={15} />
+                      <span className="max-w-[140px] truncate">{label}</span>
+                      {count && (
+                        <span className="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#ff0e34] px-1 text-[10px] font-black text-white">
+                          {count}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                )}
+
+                <div className="mr-auto">
+                  <LangSwitcher size="sm" />
+                </div>
+              </div>
+            </div>
+
+            <form
+              onSubmit={handleSearchSubmit}
+              className="flex items-center gap-3"
+              role="search"
+            >
+              <label className="relative flex min-h-[54px] flex-1 items-center overflow-hidden rounded-full border border-[#51515a] bg-white/[0.03]">
+                <Search size={18} className="absolute right-4 text-[#d5d5dd]" />
+                <input
+                  className="h-full w-full bg-transparent px-4 pr-11 text-sm text-white outline-none placeholder:text-[#9c9ca8]"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={
+                    lang === "he"
+                      ? "חיפוש מכשיר, צבע, נפח או מותג"
+                      : "ابحث عن جهاز، لون، سعة، أو علامة"
+                  }
+                />
+              </label>
+
+              <button
+                type="submit"
+                className="inline-flex min-h-[54px] items-center rounded-full border border-[#ff0e34] px-5 text-sm font-bold text-[#ff5e78] transition-colors hover:bg-[#ff0e34]/10"
+              >
+                {lang === "he" ? "חיפוש" : "بحث"}
+              </button>
+            </form>
+          </div>
+
+          <div className="grid gap-4 border-b border-[#26262f] px-4 py-4 lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setMenuOpen((open) => !open)}
                   aria-label={lang === "he" ? "תפריט" : "القائمة"}
@@ -169,121 +258,112 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
                 >
                   <Menu size={18} />
                 </button>
-              )}
-              {showBack && (
-                <Link
-                  href="/store"
-                  className="inline-flex h-10 items-center justify-center rounded-2xl border border-[#353540] bg-[#17171b] px-3 text-sm font-semibold text-[#d9d9df] transition-colors hover:border-[#ff3351]/40 hover:text-white"
-                >
-                  {lang === "he" ? "חזרה לחנות" : "العودة للمتجر"}
-                </Link>
-              )}
-            </div>
 
-            <Link href="/store" className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#34343d] bg-[#17171b]">
-                <Logo size={scr.mobile ? 28 : 30} />
-              </div>
-              <div className="hidden text-right sm:block">
-                <div className="text-base font-black tracking-[0.02em]">
-                  <span className="text-[#ff3351]">Clal</span>Mobile
-                </div>
-                <div className="text-[11px] text-[#9d9daa]">
-                  {t("store.hotAgent")}
-                </div>
-              </div>
-            </Link>
-          </div>
-
-          <form
-            onSubmit={handleSearchSubmit}
-            className="order-3 flex items-center gap-2 lg:order-2"
-            role="search"
-          >
-            <label className="relative flex min-h-[52px] flex-1 items-center overflow-hidden rounded-full border border-[#53535e] bg-white/[0.03]">
-              <Search size={18} className="absolute right-4 text-[#d5d5dd]" />
-              <input
-                className="h-full w-full bg-transparent px-4 pr-11 text-sm text-white outline-none placeholder:text-[#9c9ca8]"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={
-                  lang === "he"
-                    ? "חיפוש מכשיר, צבע, נפח או מותג"
-                    : "ابحث عن جهاز، لون، سعة، أو علامة"
-                }
-              />
-            </label>
-            <button
-              type="submit"
-              className="hidden min-h-[52px] rounded-full border border-[#ff0e34] px-5 text-sm font-bold text-[#ff4c67] transition-colors hover:bg-[#ff0e34]/10 lg:inline-flex lg:items-center"
-            >
-              {lang === "he" ? "חיפוש" : "بحث"}
-            </button>
-          </form>
-
-          <div className="order-2 flex items-center justify-end gap-2 lg:order-3">
-            <div className="hidden lg:block">
-              <LangSwitcher size="sm" />
-            </div>
-
-            {utilityLinks.map(({ href, label, icon: Icon, count, active }) => (
-              <Link
-                key={href}
-                href={href}
-                title={label}
-                className={`relative inline-flex h-11 items-center justify-center rounded-2xl border px-3 transition-colors ${
-                  active
-                    ? "border-[#ff3351]/50 bg-[#ff3351]/10 text-white"
-                    : "border-[#34343d] bg-[#17171b] text-[#d6d6dd] hover:border-[#ff3351]/35 hover:text-white"
-                } ${scr.mobile ? "w-11" : "min-w-[48px]"}`}
-              >
-                <Icon size={18} />
-                {count && (
-                  <span className="absolute -top-1 -left-1 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#ff0e34] px-1 text-[10px] font-black text-white">
-                    {count}
-                  </span>
+                {showBack && (
+                  <Link
+                    href="/store"
+                    className="inline-flex h-10 items-center justify-center rounded-2xl border border-[#353540] bg-[#17171b] px-3 text-sm font-semibold text-[#d9d9df] transition-colors hover:border-[#ff3351]/40 hover:text-white"
+                  >
+                    {lang === "he" ? "חזרה" : "عودة"}
+                  </Link>
                 )}
+              </div>
+
+              <Link href="/store" className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#34343d] bg-[#17171b]">
+                  <Logo size={28} />
+                </div>
+                <div className="hidden text-right sm:block">
+                  <div className="text-base font-black tracking-[0.02em]">
+                    <span className="text-[#ff3351]">Clal</span>Mobile
+                  </div>
+                  <div className="text-[11px] text-[#9d9daa]">
+                    {t("store.hotAgent")}
+                  </div>
+                </div>
               </Link>
-            ))}
 
-            {scr.mobile && <LangSwitcher size="sm" />}
-          </div>
-        </div>
+              <div className="flex items-center justify-end gap-2">
+                {utilityLinks.map(({ href, label, icon: Icon, count, active }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    title={label}
+                    className={`relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition-colors ${
+                      active
+                        ? "border-[#ff3351]/50 bg-[#ff3351]/10 text-white"
+                        : "border-[#34343d] bg-[#17171b] text-[#d6d6dd] hover:border-[#ff3351]/35 hover:text-white"
+                    }`}
+                  >
+                    <Icon size={18} />
+                    {count && (
+                      <span className="absolute -top-1 -left-1 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#ff0e34] px-1 text-[10px] font-black text-white">
+                        {count}
+                      </span>
+                    )}
+                  </Link>
+                ))}
 
-        <nav className="hidden items-center justify-center gap-7 overflow-x-auto py-4 text-sm lg:flex">
-          {storeNav.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`relative whitespace-nowrap pb-2 font-semibold transition-colors ${
-                link.active ? "text-white" : "text-[#d3d3da] hover:text-white"
-              }`}
+                <LangSwitcher size="sm" />
+              </div>
+            </div>
+
+            <form
+              onSubmit={handleSearchSubmit}
+              className="flex items-center gap-2"
+              role="search"
             >
-              {link.label}
-              {link.active && (
-                <span className="absolute inset-x-0 bottom-0 h-[3px] rounded-full bg-[#ff3351]" />
-              )}
-            </Link>
-          ))}
-        </nav>
-      </div>
+              <label className="relative flex min-h-[50px] flex-1 items-center overflow-hidden rounded-full border border-[#53535e] bg-white/[0.03]">
+                <Search size={18} className="absolute right-4 text-[#d5d5dd]" />
+                <input
+                  className="h-full w-full bg-transparent px-4 pr-11 text-sm text-white outline-none placeholder:text-[#9c9ca8]"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={
+                    lang === "he"
+                      ? "חיפוש מכשיר, צבע, נפח או מותג"
+                      : "ابحث عن جهاز، لون، سعة، أو علامة"
+                  }
+                />
+              </label>
+            </form>
+          </div>
 
-      {scr.mobile && menuOpen && (
-        <div className="border-t border-[#23232b] bg-[#15151a] px-4 py-4">
-          <nav className="space-y-2">
-            {navLinks.map((link) => (
+          <nav className="hidden items-center justify-center gap-7 overflow-x-auto px-5 py-4 text-sm lg:flex">
+            {storeNav.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                onClick={() => setMenuOpen(false)}
-                className="block rounded-2xl border border-[#2e2e37] bg-[#1b1b22] px-4 py-3 text-sm font-semibold text-[#f3f3f5]"
+                className={`relative whitespace-nowrap pb-2 font-semibold transition-colors ${
+                  link.active ? "text-white" : "text-[#d3d3da] hover:text-white"
+                }`}
               >
                 {link.label}
+                {link.active && (
+                  <span className="absolute inset-x-0 bottom-0 h-[3px] rounded-full bg-[#ff3351]" />
+                )}
               </Link>
             ))}
           </nav>
+
+          {scr.mobile && menuOpen && (
+            <div className="border-t border-[#23232b] bg-[#15151a] px-4 py-4">
+              <nav className="space-y-2">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="block rounded-2xl border border-[#2e2e37] bg-[#1b1b22] px-4 py-3 text-sm font-semibold text-[#f3f3f5]"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </header>
   );
 }

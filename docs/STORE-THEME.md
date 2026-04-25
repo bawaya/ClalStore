@@ -340,6 +340,7 @@
 - `docs/STORE.md`
 - `prototypes/store-enterprise/telecom-dark-preview.html`
 - `prototypes/store-enterprise/assets/telecom-dark-preview.css`
+- النموذج المعتمد: `telecom-dark-preview`
 
 أي تعديل بصري جديد يجب أن يراجع هذا الملف أولًا قبل التنفيذ.
 

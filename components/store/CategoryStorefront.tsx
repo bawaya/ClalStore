@@ -179,6 +179,27 @@ export function CategoryStorefront({
           screenSize: "حجم الشاشة",
         };
 
+  const selectedKinds = kindSet
+    ? subkindEntries
+        .filter(([key]) => kindSet.has(key))
+        .map(([, meta]) => (lang === "he" ? meta.labelHe : meta.label))
+    : [];
+
+  const toolbarPills = [
+    intro.title,
+    brandCat === "all"
+      ? lang === "he"
+        ? "כל המותגים"
+        : "كل العلامات"
+      : brandCat,
+    selectedKinds[0] ||
+      (subkindEntries.length > 0
+        ? intro.categoryTitle
+        : lang === "he"
+          ? "תצוגת כרטיסים"
+          : "عرض بطاقات"),
+  ];
+
   return (
     <div
       dir="rtl"
@@ -413,19 +434,32 @@ export function CategoryStorefront({
           </aside>
 
           <div className="space-y-4">
-            <section className="rounded-[24px] border border-[#2f2f38] bg-[linear-gradient(180deg,#17171b_0%,#131318_100%)] px-5 py-4 shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                <div>
-                  <span className="inline-flex rounded-full border border-[#ff3351]/18 bg-[#ff3351]/08 px-3 py-1 text-xs font-semibold text-[#ff8297]">
-                    {intro.toolbarTitle}
-                  </span>
-                  <p className="mt-3 text-sm leading-8 text-[#b8b8c2]">
-                    {intro.toolbarText}
-                  </p>
+            <section className="rounded-[20px] border border-[#2f2f38] bg-[linear-gradient(180deg,#17171b_0%,#131318_100%)] px-4 py-4 shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div className="flex flex-wrap items-center gap-2">
+                  {toolbarPills.map((pill) => (
+                    <span
+                      key={pill}
+                      className="inline-flex min-h-[34px] items-center rounded-full border border-[#383842] bg-white/[0.03] px-4 text-sm font-semibold text-[#dbdbe1]"
+                    >
+                      {pill}
+                    </span>
+                  ))}
                 </div>
 
-                <div className="rounded-[18px] border border-[#30303a] bg-white/[0.03] px-4 py-3 text-sm text-[#e7e7eb]">
-                  {intro.foundPrefix} {filtered.length} {intro.products}
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-full border border-[#30303a] bg-white/[0.03] px-4 py-2 text-sm text-[#e7e7eb]">
+                    {intro.foundPrefix} {filtered.length} {intro.products}
+                  </span>
+
+                  <div className="inline-flex items-center gap-1 rounded-full border border-[#383842] bg-[#151519] px-1 py-1 text-xs">
+                    <span className="rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 font-semibold text-white">
+                      {lang === "he" ? "רשת" : "شبكة"}
+                    </span>
+                    <span className="px-3 py-1 text-[#9999a4]">
+                      {lang === "he" ? "מורחב" : "موسع"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </section>
