@@ -37,6 +37,19 @@ interface ClassifiedRow extends RawRow {
   skip_reason?: string;
 }
 
+function toSafeNumber(value: unknown): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/,/g, "").replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
 const TYPE_LABEL: Record<string, string> = {
   tv: "📺 تلفزيون",
   computer: "💻 كمبيوتر",
@@ -81,7 +94,13 @@ export default function ImportExcelPage() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "فشل القراءة");
-      setRawRows(data.data.rows as RawRow[]);
+      const normalizedRows = (data.data.rows as RawRow[]).map((row) => ({
+        ...row,
+        stock: toSafeNumber(row.stock),
+        monthly: toSafeNumber(row.monthly),
+        cash: toSafeNumber(row.cash),
+      }));
+      setRawRows(normalizedRows);
       setStats(data.data.stats);
       show(`✅ تم قراءة ${data.data.rows.length} صف من الملف`);
     } catch (err) {
@@ -102,7 +121,13 @@ export default function ImportExcelPage() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "فشل التصنيف");
-      setClassified(data.data.classified as ClassifiedRow[]);
+      const normalizedClassified = (data.data.classified as ClassifiedRow[]).map((row) => ({
+        ...row,
+        stock: toSafeNumber(row.stock),
+        monthly: toSafeNumber(row.monthly),
+        cash: toSafeNumber(row.cash),
+      }));
+      setClassified(normalizedClassified);
       show(`✅ تم تصنيف ${data.data.classified.length} منتج بالذكاء`);
     } catch (err) {
       show(`❌ ${err instanceof Error ? err.message : "خطأ"}`, "error");

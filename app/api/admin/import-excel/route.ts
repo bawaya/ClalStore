@@ -36,6 +36,21 @@ interface RawRow {
   is_hot_supply: boolean;
 }
 
+function toSafeNumber(value: unknown): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.replace(/,/g, "").replace(/[^\d.-]/g, "");
+    if (!normalized) return 0;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
 function parseSheetRows(wb: XLSX.WorkBook, sheetName: string): RawRow[] {
   const ws = wb.Sheets[sheetName];
   if (!ws) return [];
@@ -55,9 +70,9 @@ function parseSheetRows(wb: XLSX.WorkBook, sheetName: string): RawRow[] {
     }
     const desc = String(r[1] || "").trim();
     const model = String(r[2] || "").trim();
-    const stock = Number(r[3] || 0);
-    const monthly = Number(r[4] || 0);
-    const cash = Number(r[5] || 0);
+    const stock = toSafeNumber(r[3]);
+    const monthly = toSafeNumber(r[4]);
+    const cash = toSafeNumber(r[5]);
     if (!desc) continue;
     rows.push({
       sheet: sheetName,
@@ -245,16 +260,18 @@ async function handleClassify(req: NextRequest) {
     for (let j = 0; j < batch.length; j++) {
       const raw = batch[j];
       const ai = (aiRes[j] || {}) as Partial<ClassifiedRow>;
-      const cash = Number(raw.cash) || 0;
+      const stock = toSafeNumber(raw.stock);
+      const monthly = toSafeNumber(raw.monthly);
+      const cash = toSafeNumber(raw.cash);
       const cost = ai.cost && ai.cost > 0 ? Number(ai.cost) : Math.round(cash * costRatio);
       out.push({
         barcode: raw.barcode,
         desc: raw.desc,
         model: raw.model,
         brand_section: raw.brand_section,
-        stock: raw.stock,
-        monthly: raw.monthly,
-        cash: raw.cash,
+        stock,
+        monthly,
+        cash,
         type: (ai.type || "appliance") as ProductType,
         subkind: ai.subkind ?? null,
         appliance_kind: ai.appliance_kind ?? null,
@@ -309,10 +326,10 @@ async function handleInsert(req: NextRequest) {
     const head = members[0];
     const variants = members.map((m) => ({
       storage: m.variant_label || m.model || m.barcode.slice(-6),
-      price: Math.round(m.cash),
-      monthly_price: m.monthly > 0 ? Math.round(m.monthly) : undefined,
+      price: Math.round(toSafeNumber(m.cash)),
+      monthly_price: toSafeNumber(m.monthly) > 0 ? Math.round(toSafeNumber(m.monthly)) : undefined,
       cost: Math.round(m.cost),
-      stock: Math.max(0, Math.round(m.stock)),
+      stock: Math.max(0, Math.round(toSafeNumber(m.stock))),
     }));
     const minPrice = Math.min(...variants.map((v) => v.price).filter((p) => p > 0));
     products.push({
@@ -321,7 +338,7 @@ async function handleInsert(req: NextRequest) {
       name_ar: head.name_ar,
       name_he: head.name_he,
       name_en: head.name_en || undefined,
-      price: minPrice > 0 && minPrice < Infinity ? minPrice : Math.round(head.cash),
+      price: minPrice > 0 && minPrice < Infinity ? minPrice : Math.round(toSafeNumber(head.cash)),
       cost: Math.round(head.cost),
       stock: variants.reduce((s, v) => s + v.stock, 0),
       sold: 0,
