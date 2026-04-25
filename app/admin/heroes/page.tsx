@@ -40,7 +40,16 @@ export default function HeroesPage() {
 
   return (
     <div>
-      <PageHeader title="🖼️ بنرات" count={heroes.length} onAdd={openCreate} addLabel="بنر جديد" />
+      <PageHeader title="🖼️ صور الهيرو والبنرات" count={heroes.length} onAdd={openCreate} addLabel="شريحة جديدة" />
+
+      <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 16, borderColor: "rgba(196,16,64,0.18)" }}>
+        <div className="text-right">
+          <div className="text-xs font-bold text-brand">المكتبة البصرية الرئيسية للمتجر</div>
+          <div className="mt-1 text-[11px] leading-6 text-muted">
+            من هنا تدير الشرائح والصور الرئيسية التي تظهر في واجهة المتجر، مع الإبقاء على أدوات الرفع والتحسين الحالية كما هي.
+          </div>
+        </div>
+      </div>
 
       {heroes.length === 0 ? <EmptyState icon="🖼️" title="لا يوجد بنرات" /> : (
         <div className="space-y-1.5">
@@ -68,7 +77,7 @@ export default function HeroesPage() {
         </div>
       )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل بنر" : "بنر جديد"}
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? "تعديل شريحة رئيسية" : "شريحة رئيسية جديدة"}
         footer={<button onClick={handleSave} className="btn-primary w-full">{editId ? "💾 حفظ" : "✅ إضافة"}</button>}>
         <FormField label="العنوان (عربي)" required><input className="input" value={form.title_ar || ""} onChange={(e) => setForm({ ...form, title_ar: e.target.value })} /></FormField>
         <FormField label="العنوان (עברית)"><input className="input" value={form.title_he || ""} onChange={(e) => setForm({ ...form, title_he: e.target.value })} dir="rtl" /></FormField>

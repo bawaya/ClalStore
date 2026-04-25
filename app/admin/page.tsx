@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { useScreen } from "@/lib/hooks";
 import { StatCard } from "@/components/admin/shared";
@@ -74,6 +75,33 @@ const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
   { key: "30d", label: "30 يوم" },
   { key: "90d", label: "90 يوم" },
   { key: "all", label: "الكل" },
+];
+
+const QUICK_LINKS = [
+  {
+    href: "/admin/orders",
+    icon: "🧾",
+    title: "الطلبات",
+    sub: "إدارة التنفيذ والحالات",
+  },
+  {
+    href: "/admin/products",
+    icon: "📱",
+    title: "الكتالوج",
+    sub: "الهواتف والإكسسوارات وأدوات الصور",
+  },
+  {
+    href: "/admin/homepage",
+    icon: "🏠",
+    title: "واجهة المتجر",
+    sub: "الرأس والهيرو والبنرات والأقسام",
+  },
+  {
+    href: "/admin/heroes",
+    icon: "🖼️",
+    title: "صور الهيرو والبنرات",
+    sub: "الشرائح والصور الرئيسية",
+  },
 ];
 
 function getDateRange(key: RangeKey): { dateFrom?: string; dateTo?: string } {
@@ -230,6 +258,32 @@ export default function AdminDashboard() {
           >
             📄 PDF
           </button>
+        </div>
+      </div>
+
+      <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18, borderColor: "rgba(196,16,64,0.22)" }}>
+        <div className="text-right">
+          <div className="text-xs font-bold text-brand">مركز التشغيل السريع</div>
+          <div className="mt-1 text-[11px] leading-6 text-muted">
+            وصول مباشر إلى أهم مسارات الإدارة بعد تحديث الخارطة والمسميات لتطابق المتجر الجديد.
+          </div>
+        </div>
+
+        <div
+          className="mt-3 grid gap-2"
+          style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "repeat(4, minmax(0, 1fr))" }}
+        >
+          {QUICK_LINKS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-2xl border border-surface-border bg-surface-elevated/60 px-4 py-4 text-right transition-all hover:border-brand/30 hover:bg-brand/5"
+            >
+              <div className="text-lg">{item.icon}</div>
+              <div className="mt-2 text-sm font-bold text-white">{item.title}</div>
+              <div className="mt-1 text-[11px] leading-5 text-muted">{item.sub}</div>
+            </Link>
+          ))}
         </div>
       </div>
 

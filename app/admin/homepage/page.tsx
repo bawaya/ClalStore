@@ -21,15 +21,46 @@ import { csrfHeaders } from "@/lib/csrf-client";
 
 // ===== Section Meta =====
 const SECTIONS: { key: string; icon: string; label: string; desc: string }[] = [
-  { key: "header", icon: "📌", label: "الهيدر (شريط التنقل)", desc: "الشعار والقائمة وأزرار الهيدر العلوي" },
-  { key: "hero", icon: "🏠", label: "الهيرو الرئيسي", desc: "العنوان والوصف وأزرار الصفحة الرئيسية" },
-  { key: "banners", icon: "🖼️", label: "البنرات (الكاروسيل)", desc: "بنرات العروض المتحركة في صفحة المتجر" },
+  { key: "header", icon: "📌", label: "الرأس وشريط التنقل", desc: "الشعار والقائمة والبحث وروابط الهيدر العلوي" },
+  { key: "hero", icon: "🏠", label: "الهيرو الرئيسي", desc: "العنوان والوصف وصورة الخلفية وأزرار الواجهة" },
+  { key: "banners", icon: "🖼️", label: "صور الهيرو والبنرات", desc: "الشرائح والصور الرئيسية المتحركة في واجهة المتجر" },
   { key: "stats", icon: "📊", label: "شريط الإحصائيات", desc: "الأرقام المعروضة (عملاء، منتجات، توصيل...)" },
   { key: "features", icon: "⭐", label: "المميزات", desc: "مميزات المتجر (وكيل رسمي، توصيل مجاني...)" },
   { key: "faq", icon: "❓", label: "الأسئلة الشائعة", desc: "أسئلة وأجوبة الزبائن" },
   { key: "cta", icon: "📣", label: "الدعوة للعمل (CTA)", desc: "القسم التحفيزي قبل الفوتر" },
   { key: "footer", icon: "📋", label: "الفوتر", desc: "معلومات التواصل والروابط الاجتماعية والشعار" },
   { key: "subpages", icon: "📄", label: "صفحات فرعية", desc: "إضافة وإدارة صفحات فرعية مخصصة" },
+];
+
+const STORE_FRONT_SHORTCUTS = [
+  {
+    key: "hero",
+    icon: "🏠",
+    title: "الهيرو الرئيسي",
+    sub: "العنوان، النص، وصورة الخلفية",
+    action: "expand" as const,
+  },
+  {
+    key: "banners",
+    icon: "🖼️",
+    title: "صور الهيرو والبنرات",
+    sub: "الشرائح والصور الرئيسية المتحركة",
+    action: "expand" as const,
+  },
+  {
+    key: "header",
+    icon: "🧭",
+    title: "الرأس والتنقل",
+    sub: "الشعار، البحث، وروابط المتجر",
+    action: "expand" as const,
+  },
+  {
+    key: "create-banner",
+    icon: "➕",
+    title: "إضافة بنر جديد",
+    sub: "رفع شريحة جديدة فورًا",
+    action: "create-banner" as const,
+  },
 ];
 
 export default function HomepageAdminPage() {
@@ -158,11 +189,44 @@ export default function HomepageAdminPage() {
 
   return (
     <div>
-      <PageHeader title="🏠 الصفحة الرئيسية" count={sections.length} />
+      <PageHeader title="🏠 واجهة المتجر" count={sections.length} />
 
       <p className="text-muted text-right mb-4" style={{ fontSize: scr.mobile ? 11 : 13 }}>
-        تحكم كامل بكل أقسام الصفحة الرئيسية — اضغط على أي قسم لتعديله
+        تحكم كامل بواجهة المتجر الجديدة، بما في ذلك الهيرو الرئيسي والبنرات والرأس والصفحات الفرعية.
       </p>
+
+      <div className="card mb-4" style={{ padding: scr.mobile ? 12 : 18, borderColor: "rgba(196,16,64,0.22)" }}>
+        <div className="text-right">
+          <div className="text-xs font-bold text-brand">مكان التحكم في صور الهيرو والبنرات</div>
+          <div className="mt-1 text-[11px] leading-6 text-muted">
+            هذه الصفحة أصبحت نقطة التحكم الرئيسية في واجهة المتجر، وأسرع طريق منها إلى صورة الهيرو الرئيسية والشرائح المتحركة.
+          </div>
+        </div>
+
+        <div
+          className="mt-3 grid gap-2"
+          style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "repeat(4, minmax(0, 1fr))" }}
+        >
+          {STORE_FRONT_SHORTCUTS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                if (item.action === "create-banner") {
+                  openHeroCreate();
+                  return;
+                }
+                setExpanded(item.key);
+              }}
+              className="rounded-2xl border border-surface-border bg-surface-elevated/60 px-4 py-4 text-right transition-all hover:border-brand/30 hover:bg-brand/5"
+            >
+              <div className="text-lg">{item.icon}</div>
+              <div className="mt-2 text-sm font-bold text-white">{item.title}</div>
+              <div className="mt-1 text-[11px] leading-5 text-muted">{item.sub}</div>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="space-y-2">
         {SECTIONS.map(({ key, icon, label, desc }) => {
