@@ -22,6 +22,15 @@ export const SENSITIVE_INTEGRATION_KEYS = new Set([
 
 type SecretRowMap = Record<string, IntegrationSecret>;
 
+function isMissingIntegrationSecretsTable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as { code?: string; message?: string; details?: string };
+  const text = `${maybeError.message || ""} ${maybeError.details || ""}`.toLowerCase();
+
+  return maybeError.code === "42P01" || text.includes("integration_secrets");
+}
+
 function db() {
   const client = createAdminSupabase();
   if (!client) {
@@ -118,6 +127,32 @@ async function getIntegrationRecordById(id: string): Promise<Integration | null>
   return (data as Integration | null) || null;
 }
 
+async function listIntegrationSecretsForIds(integrationIds: string[]): Promise<IntegrationSecret[]> {
+  if (integrationIds.length === 0) return [];
+
+  const { data, error } = await db()
+    .from("integration_secrets")
+    .select("*")
+    .in("integration_id", integrationIds);
+
+  if (error) {
+    if (isMissingIntegrationSecretsTable(error)) {
+      console.warn("integration_secrets table is not available yet — falling back to legacy integration.config");
+      return [];
+    }
+    throw error;
+  }
+
+  return (data || []) as IntegrationSecret[];
+}
+
+async function isIntegrationSecretsTableAvailable(): Promise<boolean> {
+  const { error } = await db().from("integration_secrets").select("id").limit(1);
+  if (!error) return true;
+  if (isMissingIntegrationSecretsTable(error)) return false;
+  throw error;
+}
+
 export async function getIntegrationByTypeWithSecrets(type: string): Promise<{
   integration: Integration | null;
   config: Record<string, any>;
@@ -144,14 +179,7 @@ export async function getIntegrationByIdWithSecrets(id: string): Promise<{
     return { integration: null, config: {}, secretRows: {} };
   }
 
-  const { data, error } = await db()
-    .from("integration_secrets")
-    .select("*")
-    .eq("integration_id", id);
-
-  if (error) throw error;
-
-  const secretRows = ((data || []) as IntegrationSecret[]).reduce<SecretRowMap>((acc, row) => {
+  const secretRows = (await listIntegrationSecretsForIds([id])).reduce<SecretRowMap>((acc, row) => {
     acc[row.secret_key] = row;
     return acc;
   }, {});
@@ -173,14 +201,7 @@ export async function maskIntegrationsForAdmin(integrations: Integration[]): Pro
   if (integrations.length === 0) return integrations;
 
   const integrationIds = integrations.map((integration) => integration.id);
-  const { data, error } = await db()
-    .from("integration_secrets")
-    .select("*")
-    .in("integration_id", integrationIds);
-
-  if (error) throw error;
-
-  const secretMap = ((data || []) as IntegrationSecret[]).reduce<Record<string, SecretRowMap>>(
+  const secretMap = (await listIntegrationSecretsForIds(integrationIds)).reduce<Record<string, SecretRowMap>>(
     (acc, row) => {
       if (!acc[row.integration_id]) acc[row.integration_id] = {};
       acc[row.integration_id][row.secret_key] = row;
@@ -252,6 +273,7 @@ export async function prepareIntegrationConfigForUpdate(params: {
   const publicConfig: Record<string, any> = {};
   const secretsToUpsert: Array<{ secretKey: string; value: string }> = [];
   const secretsToDelete: string[] = [];
+  const vaultAvailable = await isIntegrationSecretsTableAvailable();
 
   for (const [key, rawValue] of Object.entries(params.config || {})) {
     if (key.startsWith("_has_")) continue;
@@ -263,7 +285,7 @@ export async function prepareIntegrationConfigForUpdate(params: {
 
     if (isMaskedIntegrationSecret(rawValue)) {
       if (!secretRows[key] && typeof runtimeConfig[key] === "string" && runtimeConfig[key]) {
-        if (hasIntegrationVaultKey()) {
+        if (vaultAvailable && hasIntegrationVaultKey()) {
           secretsToUpsert.push({ secretKey: key, value: runtimeConfig[key] });
         } else if (typeof integration.config?.[key] === "string" && integration.config[key]) {
           publicConfig[key] = integration.config[key];
@@ -277,6 +299,11 @@ export async function prepareIntegrationConfigForUpdate(params: {
     const value = rawValue.trim();
     if (!value) {
       secretsToDelete.push(key);
+      continue;
+    }
+
+    if (!vaultAvailable) {
+      publicConfig[key] = value;
       continue;
     }
 
@@ -294,7 +321,7 @@ export async function prepareIntegrationConfigForUpdate(params: {
       .eq("integration_id", params.integrationId)
       .in("secret_key", secretsToDelete);
 
-    if (error) throw error;
+    if (error && !isMissingIntegrationSecretsTable(error)) throw error;
   }
 
   for (const secret of secretsToUpsert) {
@@ -313,7 +340,13 @@ export async function prepareIntegrationConfigForUpdate(params: {
       .from("integration_secrets")
       .upsert(payload, { onConflict: "integration_id,secret_key" });
 
-    if (error) throw error;
+    if (error) {
+      if (isMissingIntegrationSecretsTable(error)) {
+        publicConfig[secret.secretKey] = secret.value;
+        continue;
+      }
+      throw error;
+    }
   }
 
   return publicConfig;
