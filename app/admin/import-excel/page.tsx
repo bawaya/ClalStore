@@ -43,19 +43,40 @@ function toSafeNumber(value: unknown): number {
   }
 
   if (typeof value === "string") {
-    const parsed = Number(value.replace(/,/g, "").replace(/[^\d.-]/g, ""));
+    const normalized = value.replace(/,/g, "").replace(/[^\d.-]/g, "");
+    if (!normalized) return 0;
+    const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
   return 0;
 }
 
+function normalizeRawRow(row: RawRow): RawRow {
+  return {
+    ...row,
+    stock: toSafeNumber(row.stock),
+    monthly: toSafeNumber(row.monthly),
+    cash: toSafeNumber(row.cash),
+  };
+}
+
+function normalizeClassifiedRow(row: ClassifiedRow): ClassifiedRow {
+  return {
+    ...row,
+    stock: toSafeNumber(row.stock),
+    monthly: toSafeNumber(row.monthly),
+    cash: toSafeNumber(row.cash),
+    cost: toSafeNumber(row.cost),
+  };
+}
+
 const TYPE_LABEL: Record<string, string> = {
-  tv: "📺 تلفزيون",
-  computer: "💻 كمبيوتر",
-  tablet: "📱 تابلت",
-  network: "📡 شبكة",
-  appliance: "🏠 جهاز ذكي",
+  tv: "تلفزيون",
+  computer: "حاسوب",
+  tablet: "جهاز لوحي",
+  network: "شبكات",
+  appliance: "جهاز منزلي",
 };
 
 export default function ImportExcelPage() {
@@ -67,18 +88,26 @@ export default function ImportExcelPage() {
   const [inserting, setInserting] = useState(false);
   const [rawRows, setRawRows] = useState<RawRow[] | null>(null);
   const [classified, setClassified] = useState<ClassifiedRow[] | null>(null);
-  const [stats, setStats] = useState<{ total: number; after_mobile_filter: number; hot_duplicates: number; sheets: string[] } | null>(null);
+  const [stats, setStats] = useState<{
+    total: number;
+    after_mobile_filter: number;
+    hot_duplicates: number;
+    sheets: string[];
+  } | null>(null);
   const [costRatio, setCostRatio] = useState(0.65);
-  const [insertResult, setInsertResult] = useState<{ inserted: number; total_groups: number; errors: string[] } | null>(null);
+  const [insertResult, setInsertResult] = useState<{
+    inserted: number;
+    total_groups: number;
+    errors: string[];
+  } | null>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) {
-      setFile(f);
-      setRawRows(null);
-      setClassified(null);
-      setInsertResult(null);
-    }
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+    setFile(selected);
+    setRawRows(null);
+    setClassified(null);
+    setInsertResult(null);
   };
 
   const doParse = async () => {
@@ -94,17 +123,13 @@ export default function ImportExcelPage() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "فشل القراءة");
-      const normalizedRows = (data.data.rows as RawRow[]).map((row) => ({
-        ...row,
-        stock: toSafeNumber(row.stock),
-        monthly: toSafeNumber(row.monthly),
-        cash: toSafeNumber(row.cash),
-      }));
+
+      const normalizedRows = (data.data.rows as RawRow[]).map(normalizeRawRow);
       setRawRows(normalizedRows);
       setStats(data.data.stats);
-      show(`✅ تم قراءة ${data.data.rows.length} صف من الملف`);
+      show(`تمت قراءة ${normalizedRows.length} صف من الملف`);
     } catch (err) {
-      show(`❌ ${err instanceof Error ? err.message : "خطأ"}`, "error");
+      show(err instanceof Error ? err.message : "حدث خطأ أثناء قراءة الملف", "error");
     } finally {
       setParsing(false);
     }
@@ -121,16 +146,14 @@ export default function ImportExcelPage() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "فشل التصنيف");
-      const normalizedClassified = (data.data.classified as ClassifiedRow[]).map((row) => ({
-        ...row,
-        stock: toSafeNumber(row.stock),
-        monthly: toSafeNumber(row.monthly),
-        cash: toSafeNumber(row.cash),
-      }));
+
+      const normalizedClassified = (data.data.classified as ClassifiedRow[]).map(
+        normalizeClassifiedRow,
+      );
       setClassified(normalizedClassified);
-      show(`✅ تم تصنيف ${data.data.classified.length} منتج بالذكاء`);
+      show(`تم تصنيف ${normalizedClassified.length} صف`);
     } catch (err) {
-      show(`❌ ${err instanceof Error ? err.message : "خطأ"}`, "error");
+      show(err instanceof Error ? err.message : "حدث خطأ أثناء التصنيف", "error");
     } finally {
       setClassifying(false);
     }
@@ -138,20 +161,23 @@ export default function ImportExcelPage() {
 
   const doInsert = async () => {
     if (!classified) return;
-    if (!confirm(`سيتم إدراج المنتجات (${classified.filter((r) => !r.skip).length} صف بعد التجميع). متابعة؟`)) return;
+    const rowsForInsert = classified.map(normalizeClassifiedRow);
+    const count = rowsForInsert.filter((row) => !row.skip).length;
+    if (!confirm(`سيتم إدراج ${count} صف بعد التجميع. هل تريد المتابعة؟`)) return;
+
     setInserting(true);
     try {
       const res = await fetch("/api/admin/import-excel?step=insert", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders() },
-        body: JSON.stringify({ rows: classified }),
+        body: JSON.stringify({ rows: rowsForInsert }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "فشل الإدراج");
       setInsertResult(data.data);
-      show(`✅ تم إدراج ${data.data.inserted} منتج`);
+      show(`تم إدراج ${data.data.inserted} منتج`);
     } catch (err) {
-      show(`❌ ${err instanceof Error ? err.message : "خطأ"}`, "error");
+      show(err instanceof Error ? err.message : "حدث خطأ أثناء الإدراج", "error");
     } finally {
       setInserting(false);
     }
@@ -160,37 +186,52 @@ export default function ImportExcelPage() {
   const toggleSkip = (idx: number) => {
     if (!classified) return;
     const next = [...classified];
-    next[idx] = { ...next[idx], skip: !next[idx].skip };
+    next[idx] = { ...normalizeClassifiedRow(next[idx]), skip: !next[idx].skip };
     setClassified(next);
   };
 
   const updateRowField = (idx: number, key: keyof ClassifiedRow, value: unknown) => {
     if (!classified) return;
     const next = [...classified];
-    next[idx] = { ...next[idx], [key]: value } as ClassifiedRow;
+    next[idx] = normalizeClassifiedRow({
+      ...next[idx],
+      [key]: value,
+    } as ClassifiedRow);
     setClassified(next);
   };
 
-  const counts = classified
-    ? classified.reduce(
-        (acc, r) => {
-          if (r.skip) acc.skipped++;
-          else acc[r.type as keyof typeof acc] = (acc[r.type as keyof typeof acc] || 0) + 1;
+  const safeClassified = classified?.map(normalizeClassifiedRow) ?? null;
+  const insertableCount = safeClassified?.filter((row) => !row.skip).length ?? 0;
+
+  const counts = safeClassified
+    ? safeClassified.reduce(
+        (acc, row) => {
+          if (row.skip) acc.skipped++;
+          else acc[row.type as keyof typeof acc] = (acc[row.type as keyof typeof acc] || 0) + 1;
           return acc;
         },
-        { skipped: 0, tv: 0, computer: 0, tablet: 0, network: 0, appliance: 0 } as Record<string, number>,
+        {
+          skipped: 0,
+          tv: 0,
+          computer: 0,
+          tablet: 0,
+          network: 0,
+          appliance: 0,
+        } as Record<string, number>,
       )
     : null;
 
   return (
     <div>
-      <PageHeader title="📥 استيراد منتجات من Excel" />
+      <PageHeader title="استيراد منتجات من Excel" />
 
       <div className="card mb-4" style={{ padding: 14 }}>
-        <h3 className="font-bold text-sm mb-2">المرحلة 1 — رفع الملف</h3>
+        <h3 className="font-bold text-sm mb-2">المرحلة 1 - رفع الملف</h3>
         <p className="text-[11px] text-muted mb-2">
-          يقرأ ملف Excel متعدد الورقات. يتجاهل تلقائياً صفوف الموبايل (iPhone, Galaxy, Xiaomi, ZTE) وورقة TEST.
+          يقرأ ملف Excel متعدد الأوراق، ويتجاهل تلقائيًا أقسام الهواتف المحمولة وورقة
+          TEST.
         </p>
+
         <div className="flex gap-2 items-center flex-wrap">
           <input type="file" accept=".xlsx,.xls" onChange={handleFile} className="text-xs" />
           <button
@@ -199,23 +240,25 @@ export default function ImportExcelPage() {
             disabled={!file || parsing}
             className="btn-primary disabled:opacity-50"
           >
-            {parsing ? "⏳ جاري القراءة..." : "📖 اقرأ الملف"}
+            {parsing ? "جاري القراءة..." : "اقرأ الملف"}
           </button>
         </div>
+
         {stats && (
           <div className="mt-3 text-[11px] text-muted">
-            الورقات: {stats.sheets.join(" | ")} • إجمالي: {stats.total} • بعد فلترة الموبايل: {stats.after_mobile_filter} •
-            مكرّرات HOT: {stats.hot_duplicates}
+            الأوراق: {stats.sheets.join(" | ")} • الإجمالي: {stats.total} • بعد فلترة
+            الهواتف: {stats.after_mobile_filter} • مكررات HOT: {stats.hot_duplicates}
           </div>
         )}
       </div>
 
       {rawRows && (
         <div className="card mb-4" style={{ padding: 14 }}>
-          <h3 className="font-bold text-sm mb-2">المرحلة 2 — تصنيف بالذكاء الاصطناعي (Claude)</h3>
+          <h3 className="font-bold text-sm mb-2">المرحلة 2 - التصنيف بالذكاء</h3>
           <p className="text-[11px] text-muted mb-2">
-            يحدّد لكل منتج: النوع (تلفزيون / كمبيوتر / تابلت / شبكة / جهاز منزلي)، الفئة الفرعية، الترجمة العربية، والمواصفات.
+            يتم تحديد النوع، الفئة الفرعية، الأسماء، والمواصفات الأساسية لكل صف.
           </p>
+
           <div className="flex gap-3 items-center mb-2 flex-wrap">
             <label className="flex items-center gap-1 text-xs">
               <span className="text-muted">نسبة التكلفة من النقد:</span>
@@ -230,28 +273,30 @@ export default function ImportExcelPage() {
                 dir="ltr"
               />
             </label>
+
             <button
               type="button"
               onClick={doClassify}
               disabled={classifying}
               className="btn-primary disabled:opacity-50"
             >
-              {classifying ? "⏳ جاري التصنيف (قد يستغرق دقيقة)..." : "🤖 صنّف بالذكاء"}
+              {classifying ? "جاري التصنيف..." : "صنّف بالذكاء"}
             </button>
           </div>
         </div>
       )}
 
-      {classified && counts && (
+      {safeClassified && counts && (
         <div className="card mb-4" style={{ padding: 14 }}>
-          <h3 className="font-bold text-sm mb-2">المرحلة 3 — معاينة وإدراج</h3>
+          <h3 className="font-bold text-sm mb-2">المرحلة 3 - المعاينة والإدراج</h3>
+
           <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
-            <Stat label="📺 تلفزيون" value={counts.tv} />
-            <Stat label="💻 كمبيوتر" value={counts.computer} />
-            <Stat label="📱 تابلت" value={counts.tablet} />
-            <Stat label="📡 شبكة" value={counts.network} />
-            <Stat label="🏠 جهاز ذكي" value={counts.appliance} />
-            <Stat label="❌ متخطّى" value={counts.skipped} red />
+            <Stat label="تلفزيون" value={counts.tv} />
+            <Stat label="حاسوب" value={counts.computer} />
+            <Stat label="جهاز لوحي" value={counts.tablet} />
+            <Stat label="شبكات" value={counts.network} />
+            <Stat label="جهاز منزلي" value={counts.appliance} />
+            <Stat label="متخطى" value={counts.skipped} red />
           </div>
 
           <button
@@ -260,14 +305,16 @@ export default function ImportExcelPage() {
             disabled={inserting}
             className="btn-primary disabled:opacity-50 mb-3"
           >
-            {inserting ? "⏳ جاري الإدراج..." : `✅ ادرج ${classified.filter((r) => !r.skip).length} صف`}
+            {inserting ? "جاري الإدراج..." : `أدرج ${insertableCount} صف`}
           </button>
 
           {insertResult && (
             <div className="bg-state-success/10 border border-state-success/30 rounded-xl p-3 mb-3 text-state-success text-sm">
-              ✅ تم إدراج {insertResult.inserted} منتج (تم تجميع {insertResult.total_groups} مجموعة).
+              تم إدراج {insertResult.inserted} منتج، بعد تجميع {insertResult.total_groups} مجموعة.
               {insertResult.errors.length > 0 && (
-                <div className="mt-1 text-state-error text-xs">أخطاء: {insertResult.errors.join(", ")}</div>
+                <div className="mt-1 text-state-error text-xs">
+                  أخطاء: {insertResult.errors.join(", ")}
+                </div>
               )}
             </div>
           )}
@@ -276,52 +323,61 @@ export default function ImportExcelPage() {
             <table className="w-full text-[11px] text-right">
               <thead className="sticky top-0 bg-surface-card text-muted">
                 <tr>
-                  <th className="p-1.5">تخطّي</th>
+                  <th className="p-1.5">تخطي</th>
                   <th className="p-1.5">النوع</th>
-                  <th className="p-1.5">ماركة</th>
-                  <th className="p-1.5">اسم عربي</th>
+                  <th className="p-1.5">العلامة</th>
+                  <th className="p-1.5">الاسم العربي</th>
                   <th className="p-1.5">الموديل</th>
-                  <th className="p-1.5">نقد ₪</th>
-                  <th className="p-1.5">شهري ₪</th>
+                  <th className="p-1.5">النقد</th>
+                  <th className="p-1.5">الشهري</th>
                   <th className="p-1.5">المخزون</th>
                   <th className="p-1.5">سبب التخطي</th>
                 </tr>
               </thead>
+
               <tbody>
-                {classified.map((r, i) => (
+                {safeClassified.map((row, i) => (
                   <tr
-                    key={i}
+                    key={`${row.barcode || row.model || i}-${i}`}
                     className="border-t border-surface-border"
-                    style={{ opacity: r.skip ? 0.45 : 1 }}
+                    style={{ opacity: row.skip ? 0.45 : 1 }}
                   >
                     <td className="p-1.5">
                       <input
                         type="checkbox"
-                        checked={r.skip}
+                        checked={row.skip}
                         onChange={() => toggleSkip(i)}
                         className="w-4 h-4 cursor-pointer"
                       />
                     </td>
-                    <td className="p-1.5">{TYPE_LABEL[r.type] || r.type}</td>
-                    <td className="p-1.5">{r.brand}</td>
+                    <td className="p-1.5">{TYPE_LABEL[row.type] || row.type}</td>
+                    <td className="p-1.5">{row.brand}</td>
                     <td className="p-1.5">
                       <input
                         className="bg-transparent border-b border-transparent hover:border-surface-border focus:border-brand outline-none w-full"
-                        value={r.name_ar}
+                        value={row.name_ar}
                         onChange={(e) => updateRowField(i, "name_ar", e.target.value)}
                       />
                     </td>
                     <td className="p-1.5 font-mono text-[10px]" dir="ltr">
-                      {r.model || r.barcode}
+                      {row.model || row.barcode}
                     </td>
-                    <td className="p-1.5">₪{r.cash.toLocaleString()}</td>
+                    <td className="p-1.5">₪{toSafeNumber(row.cash).toLocaleString()}</td>
                     <td className="p-1.5 text-purple-300">
-                      {r.monthly > 0 ? `₪${r.monthly.toLocaleString()} × 36` : "—"}
+                      {toSafeNumber(row.monthly) > 0
+                        ? `₪${toSafeNumber(row.monthly).toLocaleString()} × 36`
+                        : "—"}
                     </td>
                     <td className="p-1.5">
-                      {r.stock === 999 ? <span className="text-state-info">بالطلب</span> : r.stock}
+                      {toSafeNumber(row.stock) === 999 ? (
+                        <span className="text-state-info">بالطلب</span>
+                      ) : (
+                        toSafeNumber(row.stock)
+                      )}
                     </td>
-                    <td className="p-1.5 text-state-warning text-[10px]">{r.skip_reason || ""}</td>
+                    <td className="p-1.5 text-state-warning text-[10px]">
+                      {row.skip_reason || ""}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -341,11 +397,16 @@ function Stat({ label, value, red }: { label: string; value: number; red?: boole
       className="rounded-xl p-2 text-center"
       style={{
         background: red ? "rgba(239,68,68,0.08)" : "rgba(16,185,129,0.08)",
-        border: red ? "1px solid rgba(239,68,68,0.2)" : "1px solid rgba(16,185,129,0.2)",
+        border: red
+          ? "1px solid rgba(239,68,68,0.2)"
+          : "1px solid rgba(16,185,129,0.2)",
       }}
     >
       <div className="text-[10px] text-muted">{label}</div>
-      <div className="font-bold text-lg" style={{ color: red ? "#ef4444" : "#10b981" }}>
+      <div
+        className="font-bold text-lg"
+        style={{ color: red ? "#ef4444" : "#10b981" }}
+      >
         {value}
       </div>
     </div>
