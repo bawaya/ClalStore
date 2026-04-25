@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState } from "react";
 import { useToast } from "@/lib/hooks";
 import { PageHeader, ToastContainer } from "@/components/admin/shared";
-import { csrfHeaders } from "@/lib/csrf-client";
+import { csrfHeaders, getCsrfToken } from "@/lib/csrf-client";
 
 interface RawRow {
   sheet: string;
@@ -74,7 +74,11 @@ export default function ImportExcelPage() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/admin/import-excel?step=parse", { method: "POST", body: fd });
+      const res = await fetch("/api/admin/import-excel?step=parse", {
+        method: "POST",
+        headers: { "x-csrf-token": getCsrfToken() },
+        body: fd,
+      });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "فشل القراءة");
       setRawRows(data.data.rows as RawRow[]);
