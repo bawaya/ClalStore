@@ -1,12 +1,7 @@
 "use client";
 
-// =====================================================
-// Generic storefront for non-mobile categories
-// (tv, computer, tablet, network).
-// Mirrors the UX of /store/smart-home with custom subkind chip filters.
-// =====================================================
-
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "./StoreHeader";
@@ -16,27 +11,32 @@ import { Footer } from "@/components/website/sections";
 import { ProductAssistantWidget } from "./ProductAssistantWidget";
 import type { Product } from "@/types/database";
 
-type SubkindMap = Record<string, { label: string; labelHe: string; icon: string }>;
+type SubkindMap = Record<
+  string,
+  { label: string; labelHe: string; icon: string }
+>;
 
 interface Props {
   products: Product[];
-  /** Page title (Arabic) */
   title: string;
   titleHe?: string;
   subtitle: string;
   subtitleHe?: string;
-  /** Top-right back link (defaults to /store) */
   backLabel?: string;
-  /** Subkind chip filters — null hides the row */
   subkindOptions?: SubkindMap | null;
   subkindRowLabel?: string;
-  /** Whether to show "حد أقصى للسعر" filter */
   showPriceFilter?: boolean;
-  /** Whether to show warranty filter */
   showWarrantyFilter?: boolean;
-  /** Whether to show screen size filter (TVs) */
   showScreenSizeFilter?: boolean;
   emptyIcon?: string;
+}
+
+function getFilterButtonClass(active: boolean) {
+  return `rounded-2xl border px-3 py-2 text-sm font-semibold transition-colors ${
+    active
+      ? "border-[#ff3351]/45 bg-[#ff3351]/10 text-white"
+      : "border-[#363640] bg-white/[0.02] text-[#d4d4dc] hover:border-[#ff3351]/35 hover:text-white"
+  }`;
 }
 
 export function CategoryStorefront({
@@ -55,233 +55,411 @@ export function CategoryStorefront({
 }: Props) {
   const scr = useScreen();
   const { t, lang } = useLang();
+  const searchParams = useSearchParams();
   const [brandCat, setBrandCat] = useState("all");
   const [search, setSearch] = useState("");
   const [kindSet, setKindSet] = useState<Set<string> | null>(null);
   const [maxPrice, setMaxPrice] = useState<number | "">("");
   const [minWarranty, setMinWarranty] = useState<number | "">("");
-  const [sizeRange, setSizeRange] = useState<"" | "small" | "med" | "large" | "xl">("");
+  const [sizeRange, setSizeRange] = useState<
+    "" | "small" | "med" | "large" | "xl"
+  >("");
+
+  useEffect(() => {
+    setSearch(searchParams.get("q") ?? "");
+  }, [searchParams]);
 
   const brands = useMemo(
-    () => [...new Set(products.map((p) => p.brand))].filter(Boolean).sort(),
+    () =>
+      [...new Set(products.map((product) => product.brand))]
+        .filter(Boolean)
+        .sort(),
     [products]
   );
 
   const subkindEntries = subkindOptions ? Object.entries(subkindOptions) : [];
 
-  const toggleKind = (k: string) => {
+  const toggleKind = (key: string) => {
     setKindSet((prev) => {
       const next = new Set(prev ?? []);
-      if (next.has(k)) next.delete(k);
-      else next.add(k);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next.size === 0 ? null : next;
     });
   };
 
   const filtered = useMemo(() => {
     let list = products;
-    if (brandCat !== "all") list = list.filter((p) => p.brand === brandCat);
-    if (kindSet && kindSet.size > 0) {
-      list = list.filter((p) => p.subkind && kindSet.has(p.subkind as string));
+
+    if (brandCat !== "all") {
+      list = list.filter((product) => product.brand === brandCat);
     }
+
+    if (kindSet && kindSet.size > 0) {
+      list = list.filter(
+        (product) => product.subkind && kindSet.has(product.subkind as string)
+      );
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
-        (p) =>
-          p.name_ar.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          (p.name_he && p.name_he.toLowerCase().includes(q)) ||
-          (p.model_number && p.model_number.toLowerCase().includes(q))
+        (product) =>
+          product.name_ar.toLowerCase().includes(q) ||
+          product.brand.toLowerCase().includes(q) ||
+          (product.name_he && product.name_he.toLowerCase().includes(q)) ||
+          (product.model_number &&
+            product.model_number.toLowerCase().includes(q))
       );
     }
+
     if (maxPrice !== "" && maxPrice > 0) {
-      list = list.filter((p) => p.price <= maxPrice);
+      list = list.filter((product) => product.price <= maxPrice);
     }
+
     if (minWarranty !== "" && minWarranty >= 0) {
-      list = list.filter((p) => (p.warranty_months ?? 0) >= minWarranty);
+      list = list.filter(
+        (product) => (product.warranty_months ?? 0) >= minWarranty
+      );
     }
+
     if (sizeRange) {
-      list = list.filter((p) => {
-        const sz = Number(p.specs?.screen_size_inch || 0);
-        if (!sz) return false;
-        if (sizeRange === "small") return sz < 50;
-        if (sizeRange === "med") return sz >= 50 && sz < 65;
-        if (sizeRange === "large") return sz >= 65 && sz < 75;
-        if (sizeRange === "xl") return sz >= 75;
+      list = list.filter((product) => {
+        const size = Number(product.specs?.screen_size_inch || 0);
+        if (!size) return false;
+        if (sizeRange === "small") return size < 50;
+        if (sizeRange === "med") return size >= 50 && size < 65;
+        if (sizeRange === "large") return size >= 65 && size < 75;
+        if (sizeRange === "xl") return size >= 75;
         return true;
       });
     }
+
     return list;
   }, [products, brandCat, kindSet, search, maxPrice, minWarranty, sizeRange]);
 
+  const intro =
+    lang === "he"
+      ? {
+          title: titleHe || title,
+          subtitle: subtitleHe || subtitle,
+          filterTitle: "סינון התוצאות",
+          filterSubtitle: "מותגים, תתי-קטגוריות וחיפוש ישיר",
+          toolbarTitle: "עמוד קטגוריה מסודר וברור",
+          toolbarText:
+            "אותו שקט חזותי, אותו מחיר מודגש, ואותה רשת כרטיסים שמתאימה לחנות מכשירים רשמית.",
+          searchTitle: "חיפוש",
+          brandTitle: "מותג",
+          categoryTitle: subkindRowLabel || "קטגוריה",
+          extraTitle: "מסננים נוספים",
+          foundPrefix: "מציג",
+          products: "מוצרים",
+          noResults: "לא נמצאו מוצרים מתאימים בקטגוריה הזו.",
+          maxPrice: "מחיר מקסימלי",
+          minWarranty: "אחריות מינימלית",
+          screenSize: "גודל מסך",
+        }
+      : {
+          title,
+          subtitle,
+          filterTitle: "تنقية النتائج",
+          filterSubtitle: "علامات، فئات فرعية، وبحث مباشر",
+          toolbarTitle: "صفحة قسم مرتبة وواضحة",
+          toolbarText:
+            "نفس الهدوء البصري، ونفس إبراز السعر، ونفس شبكة البطاقات التي تناسب متجر أجهزة رسمي.",
+          searchTitle: "البحث",
+          brandTitle: "العلامة",
+          categoryTitle: subkindRowLabel || "الفئة",
+          extraTitle: "فلاتر إضافية",
+          foundPrefix: "يعرض",
+          products: "منتجًا",
+          noResults: "لا توجد منتجات مطابقة داخل هذا القسم حاليًا.",
+          maxPrice: "أقصى سعر",
+          minWarranty: "أقل ضمان",
+          screenSize: "حجم الشاشة",
+        };
+
   return (
-    <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
+    <div
+      dir="rtl"
+      className="font-arabic min-h-screen bg-[#111114] text-white"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at top right, rgba(255,51,81,0.08), transparent 22%), radial-gradient(circle at left center, rgba(255,255,255,0.03), transparent 28%)",
+      }}
+    >
       <StoreHeader />
       <StickyCartBar />
 
-      <section
-        className="border-b border-surface-border"
-        style={{
-          background: "linear-gradient(135deg, rgba(6,182,212,0.12) 0%, rgba(196,16,64,0.08) 100%)",
-        }}
-      >
-        <div className="max-w-[1200px] mx-auto" style={{ padding: scr.mobile ? "20px 14px" : "28px 28px" }}>
-          <h1 className="font-black text-white mb-1" style={{ fontSize: scr.mobile ? 22 : 28 }}>
-            {lang === "he" && titleHe ? titleHe : title}
-          </h1>
-          <p className="text-muted text-sm max-w-xl leading-relaxed">
-            {lang === "he" && subtitleHe ? subtitleHe : subtitle}
-          </p>
-          <div className="flex flex-wrap gap-2 mt-4">
-            <a
-              href="/store"
-              className="chip text-xs border border-surface-border hover:border-brand/40 transition-colors"
-            >
-              ← {backLabel || t("nav.store")}
-            </a>
-          </div>
-        </div>
-      </section>
-
       <div
-        className="max-w-[1200px] mx-auto"
-        style={{ padding: scr.mobile ? "12px 14px 80px" : "20px 28px 100px" }}
+        className="mx-auto max-w-[1540px]"
+        style={{ padding: scr.mobile ? "16px 14px 84px" : "24px 24px 110px" }}
       >
-        <div className="mb-3">
-          <div className="glass-card-static flex items-center gap-2 rounded-xl" style={{ padding: scr.mobile ? "8px 12px" : "10px 16px" }}>
-            <span className="text-sm opacity-40">⌕</span>
-            <input
-              className="flex-1 bg-transparent border-none text-white outline-none"
-              style={{ fontSize: scr.mobile ? 12 : 14 }}
-              placeholder={lang === "he" ? "חיפוש לפי שם, מותג או דגם..." : "ابحث باسم المنتج، الماركة أو الموديل..."}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label={t("store.search")}
-            />
-            {search && (
-              <button type="button" onClick={() => setSearch("")} className="text-muted text-xs cursor-pointer">
-                ✕
-              </button>
+        <section className="mb-4 rounded-[30px] border border-[#2d2d35] bg-[linear-gradient(180deg,rgba(23,23,27,0.96),rgba(18,18,22,0.96))] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.28)] md:px-7 md:py-6">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
+            <div>
+              <span className="inline-flex rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 text-xs font-semibold text-[#ff8da0]">
+                {intro.categoryTitle}
+              </span>
+              <h1 className="mt-3 text-2xl font-black leading-tight md:text-[2.6rem]">
+                {intro.title}
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-8 text-[#b8b8c2] md:text-base">
+                {intro.subtitle}
+              </p>
+              <div className="mt-4">
+                <LinkBack
+                  href="/store"
+                  label={backLabel || t("nav.store")}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
+                <strong className="block text-xl font-black text-white">
+                  {filtered.length}
+                </strong>
+                <span className="text-sm text-[#b8b8c2]">
+                  {lang === "he" ? "תוצאות" : "نتيجة"}
+                </span>
+              </div>
+              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
+                <strong className="block text-xl font-black text-white">
+                  {brands.length}
+                </strong>
+                <span className="text-sm text-[#b8b8c2]">
+                  {lang === "he" ? "מותגים" : "علامات"}
+                </span>
+              </div>
+              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
+                <strong className="block text-xl font-black text-white">
+                  {kindSet?.size || subkindEntries.length || "—"}
+                </strong>
+                <span className="text-sm text-[#b8b8c2]">
+                  {subkindEntries.length > 0
+                    ? lang === "he"
+                      ? "תתי-קטגוריות"
+                      : "فئات فرعية"
+                    : lang === "he"
+                      ? "סינון"
+                      : "تصفية"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <aside className="self-start lg:sticky lg:top-[170px]">
+            <div className="overflow-hidden rounded-[26px] border border-[#32323b] bg-[linear-gradient(180deg,#17171b_0%,#111115_100%)] shadow-[0_24px_48px_rgba(0,0,0,0.3)]">
+              <div className="border-b border-[#282832] px-5 py-4">
+                <strong className="block text-lg font-black text-white">
+                  {intro.filterTitle}
+                </strong>
+                <span className="text-sm text-[#9b9ba6]">
+                  {intro.filterSubtitle}
+                </span>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <details open className="rounded-[20px] border border-[#2e2e37] bg-white/[0.02]">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-white">
+                    {intro.searchTitle}
+                  </summary>
+                  <div className="px-4 pb-4">
+                    <label className="flex min-h-[48px] items-center rounded-2xl border border-[#4f4f5a] bg-white/[0.03] px-3">
+                      <input
+                        className="w-full bg-transparent text-sm text-white outline-none placeholder:text-[#9c9ca8]"
+                        placeholder={
+                          lang === "he"
+                            ? "חיפוש לפי שם, מותג או דגם"
+                            : "ابحث حسب الاسم أو العلامة أو الموديل"
+                        }
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        aria-label={t("store.search")}
+                      />
+                    </label>
+                  </div>
+                </details>
+
+                {subkindEntries.length > 0 && (
+                  <details open className="rounded-[20px] border border-[#2e2e37] bg-white/[0.02]">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-white">
+                      {intro.categoryTitle}
+                    </summary>
+                    <div className="grid gap-2 px-4 pb-4">
+                      {subkindEntries.map(([key, meta]) => {
+                        const active = kindSet?.has(key) ?? false;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => toggleKind(key)}
+                            className={getFilterButtonClass(active)}
+                          >
+                            {meta.icon} {lang === "he" ? meta.labelHe : meta.label}
+                          </button>
+                        );
+                      })}
+
+                      {kindSet && (
+                        <button
+                          type="button"
+                          onClick={() => setKindSet(null)}
+                          className="text-sm font-bold text-[#ff91a3]"
+                        >
+                          {t("store.all")}
+                        </button>
+                      )}
+                    </div>
+                  </details>
+                )}
+
+                <details open className="rounded-[20px] border border-[#2e2e37] bg-white/[0.02]">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-white">
+                    {intro.brandTitle}
+                  </summary>
+                  <div className="grid gap-2 px-4 pb-4">
+                    <button
+                      type="button"
+                      onClick={() => setBrandCat("all")}
+                      className={getFilterButtonClass(brandCat === "all")}
+                    >
+                      {t("store.allBrands")}
+                    </button>
+                    {brands.map((brand) => (
+                      <button
+                        key={brand}
+                        type="button"
+                        onClick={() => setBrandCat(brand)}
+                        className={getFilterButtonClass(brandCat === brand)}
+                      >
+                        {brand}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+
+                {(showPriceFilter || showWarrantyFilter || showScreenSizeFilter) && (
+                  <details open className="rounded-[20px] border border-[#2e2e37] bg-white/[0.02]">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-white">
+                      {intro.extraTitle}
+                    </summary>
+                    <div className="grid gap-3 px-4 pb-4">
+                      {showScreenSizeFilter && (
+                        <label className="grid gap-2 text-sm text-[#d6d6dd]">
+                          <span>{intro.screenSize}</span>
+                          <select
+                            className="rounded-2xl border border-[#3a3a44] bg-[#17171b] px-3 py-2 text-sm text-white outline-none"
+                            value={sizeRange}
+                            onChange={(e) =>
+                              setSizeRange(e.target.value as typeof sizeRange)
+                            }
+                          >
+                            <option value="">—</option>
+                            <option value="small">حتى 49</option>
+                            <option value="med">50 - 64</option>
+                            <option value="large">65 - 74</option>
+                            <option value="xl">75+</option>
+                          </select>
+                        </label>
+                      )}
+
+                      {showPriceFilter && (
+                        <label className="grid gap-2 text-sm text-[#d6d6dd]">
+                          <span>{intro.maxPrice}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            dir="ltr"
+                            className="rounded-2xl border border-[#3a3a44] bg-[#17171b] px-3 py-2 text-sm text-white outline-none"
+                            value={maxPrice}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setMaxPrice(
+                                value === "" ? "" : Math.max(0, Number(value))
+                              );
+                            }}
+                          />
+                        </label>
+                      )}
+
+                      {showWarrantyFilter && (
+                        <label className="grid gap-2 text-sm text-[#d6d6dd]">
+                          <span>{intro.minWarranty}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={120}
+                            dir="ltr"
+                            className="rounded-2xl border border-[#3a3a44] bg-[#17171b] px-3 py-2 text-sm text-white outline-none"
+                            value={minWarranty}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setMinWarranty(
+                                value === "" ? "" : Math.max(0, Number(value))
+                              );
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </div>
+          </aside>
+
+          <div className="space-y-4">
+            <section className="rounded-[24px] border border-[#2f2f38] bg-[linear-gradient(180deg,#17171b_0%,#131318_100%)] px-5 py-4 shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div>
+                  <span className="inline-flex rounded-full border border-[#ff3351]/18 bg-[#ff3351]/08 px-3 py-1 text-xs font-semibold text-[#ff8297]">
+                    {intro.toolbarTitle}
+                  </span>
+                  <p className="mt-3 text-sm leading-8 text-[#b8b8c2]">
+                    {intro.toolbarText}
+                  </p>
+                </div>
+
+                <div className="rounded-[18px] border border-[#30303a] bg-white/[0.03] px-4 py-3 text-sm text-[#e7e7eb]">
+                  {intro.foundPrefix} {filtered.length} {intro.products}
+                </div>
+              </div>
+            </section>
+
+            {filtered.length === 0 ? (
+              <div className="rounded-[26px] border border-[#2f2f38] bg-[#17171b] px-6 py-14 text-center text-[#b8b8c2] shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
+                <div className="text-4xl">{emptyIcon}</div>
+                <div className="mt-3 text-sm">{intro.noResults}</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {filtered.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
             )}
           </div>
         </div>
-
-        {subkindEntries.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {subkindRowLabel && (
-              <span className="text-[10px] text-muted w-full md:w-auto md:me-2 py-1">{subkindRowLabel}</span>
-            )}
-            {subkindEntries.map(([key, meta]) => {
-              const on = kindSet?.has(key);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleKind(key)}
-                  className={`chip whitespace-nowrap text-[11px] ${on ? "chip-active" : ""}`}
-                >
-                  {meta.icon} {lang === "he" ? meta.labelHe : meta.label}
-                </button>
-              );
-            })}
-            {kindSet && (
-              <button type="button" onClick={() => setKindSet(null)} className="text-[10px] text-brand underline ms-1">
-                {t("store.all")}
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-1 mb-3 items-center">
-          <button
-            type="button"
-            onClick={() => setBrandCat("all")}
-            className={`chip whitespace-nowrap ${brandCat === "all" ? "chip-active" : ""}`}
-          >
-            {t("store.allBrands")}
-          </button>
-          {brands.map((b) => (
-            <button
-              key={b}
-              type="button"
-              onClick={() => setBrandCat(b)}
-              className={`chip whitespace-nowrap ${brandCat === b ? "chip-active" : ""}`}
-            >
-              {b}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2 mb-4 items-end">
-          {showScreenSizeFilter && (
-            <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted">{lang === "he" ? "גודל מסך (אינץ׳)" : "حجم الشاشة (بوصة)"}</span>
-              <select
-                className="input text-xs w-32"
-                value={sizeRange}
-                onChange={(e) => setSizeRange(e.target.value as typeof sizeRange)}
-              >
-                <option value="">— الكل —</option>
-                <option value="small">حتى 49</option>
-                <option value="med">50 - 64</option>
-                <option value="large">65 - 74</option>
-                <option value="xl">75 وأكثر</option>
-              </select>
-            </label>
-          )}
-          {showPriceFilter && (
-            <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted">{lang === "he" ? "מחיר מקסימלי ₪" : "أقصى سعر ₪"}</span>
-              <input
-                type="number"
-                min={0}
-                className="input text-xs w-28"
-                dir="ltr"
-                placeholder="₪"
-                value={maxPrice}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setMaxPrice(v === "" ? "" : Math.max(0, Number(v)));
-                }}
-              />
-            </label>
-          )}
-          {showWarrantyFilter && (
-            <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted">{lang === "he" ? "אחריות מינימום (חודשים)" : "ضمان لا يقل عن (شهر)"}</span>
-              <input
-                type="number"
-                min={0}
-                max={120}
-                className="input text-xs w-24"
-                dir="ltr"
-                value={minWarranty}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setMinWarranty(v === "" ? "" : Math.max(0, Number(v)));
-                }}
-              />
-            </label>
-          )}
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="text-center py-12 text-muted">
-            <div className="text-4xl mb-2">{emptyIcon}</div>
-            <div className="text-sm">{t("store.outOfStock")}</div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3.5">
-            {filtered.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        )}
       </div>
 
       <ProductAssistantWidget page="smart-home" />
 
       <Footer />
     </div>
+  );
+}
+
+function LinkBack({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      className="inline-flex min-h-[42px] items-center rounded-full border border-[#353540] bg-[#17171b] px-4 text-sm font-semibold text-[#d6d6dd] transition-colors hover:border-[#ff3351]/35 hover:text-white"
+    >
+      {label}
+    </a>
   );
 }

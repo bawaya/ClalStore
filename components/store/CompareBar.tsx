@@ -30,9 +30,9 @@ export function CompareBar() {
       dir="rtl"
       style={{
         bottom: scr.mobile ? 0 : 0,
-        background: "#18181b",
-        borderColor: "rgba(196,16,64,0.4)",
-        boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+        background: "linear-gradient(180deg, #17171b 0%, #111115 100%)",
+        borderColor: "rgba(255,51,81,0.22)",
+        boxShadow: "0 -18px 36px rgba(0,0,0,0.38)",
         paddingBottom: scr.mobile ? "env(safe-area-inset-bottom, 0px)" : 0,
       }}
     >
@@ -40,70 +40,66 @@ export function CompareBar() {
         className="max-w-[1200px] mx-auto"
         style={{ padding: scr.mobile ? "8px 12px" : "10px 24px" }}
       >
-        <div className={`flex ${scr.mobile && items.length >= 3 ? "flex-col gap-1.5" : "items-center justify-between gap-2"}`}>
-        {/* Right: Thumbnails */}
-        <div className="flex items-center gap-2 flex-1 overflow-x-auto">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="relative flex-shrink-0 bg-[#1a1a1e] rounded-lg border border-surface-border overflow-hidden"
-              style={{
-                width: scr.mobile ? 40 : 52,
-                height: scr.mobile ? 40 : 52,
-              }}
-            >
-              {item.image_url ? (
-                <Image
-                  src={item.image_url}
-                  alt={item.name_he || item.name_ar}
-                  fill
-                  className="object-contain p-1"
-                />
-              ) : (
-                <span className="flex items-center justify-center w-full h-full text-lg opacity-30">📱</span>
-              )}
-              <button
-                onClick={() => removeItem(item.id)}
-                className="absolute -top-0.5 -left-0.5 w-4 h-4 rounded-full bg-red-600 text-white border-0 cursor-pointer flex items-center justify-center"
-                style={{ fontSize: 8, lineHeight: 1 }}
-                aria-label="إزالة من المقارنة"
+        <div
+          className={`flex ${
+            scr.mobile && items.length >= 3
+              ? "flex-col gap-2"
+              : "items-center justify-between gap-3"
+          }`}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="relative flex-shrink-0 overflow-hidden rounded-[16px] border border-[#30303a] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_58%),#141419]"
+                style={{
+                  width: scr.mobile ? 42 : 56,
+                  height: scr.mobile ? 42 : 56,
+                }}
               >
-                ✕
-              </button>
-            </div>
-          ))}
-          <span
-            className="text-muted font-bold flex-shrink-0"
-            style={{ fontSize: scr.mobile ? 11 : 13 }}
-          >
-            {items.length}/4
-          </span>
-        </div>
+                {item.image_url ? (
+                  <Image
+                    src={item.image_url}
+                    alt={item.name_he || item.name_ar}
+                    fill
+                    className="object-contain p-1.5"
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-lg text-[#8f8f99]">
+                    📱
+                  </span>
+                )}
+                <button
+                  onClick={() => removeItem(item.id)}
+                  className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full border border-[#6a2232] bg-[#2a1016] text-[8px] text-[#ff8da0]"
+                  aria-label="إزالة من المقارنة"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <span
+              className="flex-shrink-0 text-sm font-bold text-[#b8b8c2]"
+              style={{ fontSize: scr.mobile ? 11 : 13 }}
+            >
+              {items.length}/4
+            </span>
+          </div>
 
-        {/* Left: Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={clearAll}
-            className="border border-surface-border bg-transparent text-muted rounded-lg cursor-pointer font-bold transition-colors hover:text-white"
-            style={{
-              fontSize: scr.mobile ? 10 : 12,
-              padding: scr.mobile ? "5px 10px" : "6px 14px",
-            }}
-          >
-            {t("compare.clearAll")}
-          </button>
-          <Link
-            href="/store/compare"
-            className="rounded-lg font-extrabold cursor-pointer transition-all text-white no-underline"
-            style={{
-              background: "#c41040",
-              fontSize: scr.mobile ? 11 : 13,
-              padding: scr.mobile ? "6px 14px" : "8px 20px",
-            }}
-          >
-            {t("compare.compare")} ({items.length})
-          </Link>
-        </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={clearAll}
+              className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-[#353540] bg-[#17171b] px-4 text-xs font-bold text-[#d6d6dd] transition-colors hover:border-[#ff3351]/35 hover:text-white"
+            >
+              {t("compare.clearAll")}
+            </button>
+            <Link
+              href="/store/compare"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-[#ff0e34] bg-[#ff0e34] px-5 text-xs font-extrabold text-white no-underline transition-colors hover:bg-[#df0d2f]"
+            >
+              {t("compare.compare")} ({items.length})
+            </Link>
+          </div>
         </div>
       </div>
     </div>

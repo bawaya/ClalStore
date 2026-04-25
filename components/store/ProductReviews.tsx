@@ -59,6 +59,14 @@ export function ProductReviews({ productId }: { productId: string }) {
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const shellClass =
+    "rounded-[28px] border border-[#33333c] bg-[linear-gradient(180deg,#1b1b20_0%,#131317_100%)] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.22)] md:px-6 md:py-6";
+  const softCardClass = "rounded-2xl border border-[#30303a] bg-white/[0.03]";
+  const labelClass = "mb-1.5 block text-xs font-bold text-[#8f8f99]";
+  const inputClass =
+    "w-full rounded-2xl border border-[#3a3a44] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-[#8f8f99] focus:border-[#ff3351]/45 focus:bg-white/[0.05]";
+  const primaryButtonClass =
+    "inline-flex min-h-[48px] items-center justify-center rounded-full border border-[#ff0e34] bg-[#ff0e34] px-5 text-sm font-bold text-white transition-colors hover:bg-[#df0d2f] disabled:cursor-not-allowed disabled:opacity-60";
 
   useEffect(() => {
     async function load() {
@@ -120,56 +128,72 @@ export function ProductReviews({ productId }: { productId: string }) {
   if (!enabled || loading) return null;
 
   return (
-    <div className="card mt-4 p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+    <div className={`${shellClass} mt-4`}>
+      <div className="mb-4 flex items-center justify-between gap-3">
         <button
           onClick={() => setShowForm(!showForm)}
-          className="btn-primary text-xs px-3 py-1.5 rounded-lg"
+          className={primaryButtonClass}
         >
-          ✍️ أضف تقييم
+          {showForm ? "إغلاق النموذج" : "أضف تقييم"}
         </button>
         <div className="text-right">
-          <h3 className="font-extrabold" style={{ fontSize: scr.mobile ? 13 : 16 }}>
-            ⭐ التقييمات ({count})
+          <h3 className="font-extrabold text-white" style={{ fontSize: scr.mobile ? 13 : 16 }}>
+            التقييمات ({count})
           </h3>
           {count > 0 && (
             <div className="flex items-center gap-1.5 justify-end">
               <Stars value={Math.round(avg)} mobile={scr.mobile} />
-              <span className="text-muted text-xs">{avg}/5</span>
+              <span className="text-xs text-[#b8b8c2]">{avg}/5</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Submit Form */}
       {showForm && (
-        <div className="bg-surface-elevated rounded-xl p-3 mb-3 space-y-2.5">
+        <div className={`${softCardClass} mb-4 space-y-3 p-4`}>
           <div className="text-right">
-            <label className="text-xs font-bold text-muted">التقييم</label>
+            <label className={labelClass}>التقييم</label>
             <Stars value={rating} onChange={setRating} mobile={scr.mobile} />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs font-bold text-muted">الاسم *</label>
-              <input className="input text-xs" value={name} onChange={(e) => setName(e.target.value)} placeholder="اسمك" dir="auto" />
+              <label className={labelClass}>الاسم *</label>
+              <input
+                className={inputClass}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="اسمك"
+                dir="auto"
+              />
             </div>
             <div>
-              <label className="text-xs font-bold text-muted">هاتف (اختياري)</label>
-              <input className="input text-xs" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="05X-XXXXXXX" dir="ltr" />
+              <label className={labelClass}>هاتف (اختياري)</label>
+              <input
+                className={inputClass}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="05X-XXXXXXX"
+                dir="ltr"
+              />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-muted">عنوان التقييم</label>
-            <input className="input text-xs" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ممتاز!" dir="auto" />
+            <label className={labelClass}>عنوان التقييم</label>
+            <input
+              className={inputClass}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="ممتاز!"
+              dir="auto"
+            />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-muted">التفاصيل</label>
+            <label className={labelClass}>التفاصيل</label>
             <textarea
-              className="input text-xs min-h-[60px] resize-y"
+              className={`${inputClass} min-h-[90px] resize-y`}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="شاركنا تجربتك..."
@@ -180,52 +204,58 @@ export function ProductReviews({ productId }: { productId: string }) {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="btn-primary w-full text-xs py-2 rounded-lg disabled:opacity-50"
+            className={`${primaryButtonClass} w-full`}
           >
-            {submitting ? "⏳ جاري الإرسال..." : "📤 إرسال التقييم"}
+            {submitting ? "جاري الإرسال..." : "إرسال التقييم"}
           </button>
         </div>
       )}
 
-      {/* Reviews List */}
       {reviews.length === 0 && !showForm && (
-        <p className="text-muted text-center text-xs py-4">لا توجد تقييمات بعد — كن أول من يقيّم!</p>
+        <p className="py-4 text-center text-xs text-[#b8b8c2]">
+          لا توجد تقييمات بعد، كن أول من يشارك رأيه.
+        </p>
       )}
 
       <div className="space-y-2.5">
         {reviews.map((r) => (
-          <div key={r.id} className="bg-surface-elevated rounded-xl p-3">
-            <div className="flex items-center justify-between mb-1">
+          <div key={r.id} className={`${softCardClass} p-4`}>
+            <div className="mb-1 flex items-center justify-between gap-3">
               <div className="flex items-center gap-1">
                 <Stars value={r.rating} mobile={scr.mobile} />
                 {r.verified_purchase && (
-                  <span className="text-state-success text-[9px] font-bold">✅ مشترٍ حقيقي</span>
+                  <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-300">
+                    مشترٍ حقيقي
+                  </span>
                 )}
               </div>
               <div className="text-right">
-                <span className="font-bold text-xs">{r.customer_name}</span>
-                <span className="text-muted text-[9px] me-2">
+                <span className="text-xs font-bold text-white">{r.customer_name}</span>
+                <span className="me-2 text-[9px] text-[#8f8f99]">
                   {new Date(r.created_at).toLocaleDateString("ar")}
                 </span>
               </div>
             </div>
-            {r.title && <div className="font-bold text-xs text-right mb-0.5">{r.title}</div>}
-            {r.body && <p className="text-muted text-xs text-right">{r.body}</p>}
+            {r.title && <div className="mb-0.5 text-right text-xs font-bold text-white">{r.title}</div>}
+            {r.body && <p className="text-right text-xs leading-7 text-[#b8b8c2]">{r.body}</p>}
             {r.admin_reply && (
-              <div className="mt-2 bg-surface-card rounded-lg p-2 border-r-2 border-brand">
-                <span className="text-brand text-[9px] font-bold">رد ClalMobile:</span>
-                <p className="text-xs text-right">{r.admin_reply}</p>
+              <div className="mt-3 rounded-2xl border border-[#ff3351]/18 bg-[#ff3351]/08 p-3 text-right">
+                <span className="text-[10px] font-bold text-[#ff8da0]">رد ClalMobile:</span>
+                <p className="mt-1 text-xs leading-7 text-[#f0f0f4]">{r.admin_reply}</p>
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {/* Toast */}
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`fixed bottom-5 left-1/2 -translate-x-1/2 card font-bold z-[999] shadow-2xl px-6 py-3 text-sm ${t.type === "error" ? "border-state-error text-state-error" : "border-state-success text-state-success"}`}
+          className={`fixed bottom-5 left-1/2 z-[999] -translate-x-1/2 rounded-2xl border px-6 py-3 text-sm font-bold shadow-2xl ${
+            t.type === "error"
+              ? "border-[#6a2232] bg-[#2a1016] text-[#ff8da0]"
+              : "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+          }`}
         >
           {t.message}
         </div>

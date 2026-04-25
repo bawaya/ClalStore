@@ -1,93 +1,131 @@
 "use client";
 
-import { useState, memo } from "react";
+import { memo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, Scale, Smartphone, Plug, Home, Truck, Camera, Battery, Cpu } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Heart,
+  Home,
+  Plug,
+  Scale,
+  ShieldCheck,
+  Smartphone,
+} from "lucide-react";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
 import { useCompare } from "@/lib/store/compare";
 import { useWishlist } from "@/lib/store/wishlist";
-import { calcDiscount, getProductName, getColorName, getDescription } from "@/lib/utils";
+import {
+  calcDiscount,
+  getColorName,
+  getDescription,
+  getProductName,
+} from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
 import { INSTALLMENTS_BY_TYPE } from "@/lib/constants";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
 
-/* ── variant helpers ── */
-function getActiveVariant(p: Product, storageIdx: number): ProductVariant | null {
-  const variants = p.variants || [];
+function getActiveVariant(
+  product: Product,
+  storageIdx: number
+): ProductVariant | null {
+  const variants = product.variants || [];
   if (variants.length === 0) return null;
-  const storage = p.storage_options || [];
-  const selLabel = storage[storageIdx];
-  return variants.find((v) => v.storage === selLabel) || variants[0] || null;
+  const storage = product.storage_options || [];
+  const selectedLabel = storage[storageIdx];
+  return variants.find((variant) => variant.storage === selectedLabel) || variants[0] || null;
 }
 
-function getDisplayPrice(p: Product, variant: ProductVariant | null): { price: number; old_price?: number } {
+function getDisplayPrice(
+  product: Product,
+  variant: ProductVariant | null
+): { price: number; old_price?: number } {
   if (variant) return { price: variant.price, old_price: variant.old_price };
-  return { price: p.price, old_price: p.old_price };
+  return { price: product.price, old_price: product.old_price };
 }
 
-function _getTotalStock(p: Product): number {
-  const variants = p.variants || [];
-  if (variants.length === 0) return p.stock;
-  return variants.reduce((sum, v) => sum + (v.stock ?? p.stock), 0);
-}
-
-/* ── warranty ribbon helpers ── */
-function getWarrantyKey(p: Product): string | null {
-  const w = p.specs?.warranty;
-  if (w) {
-    if (/3/.test(w)) return "store.warranty3";
-    if (/2|שנתיים|سنتين/.test(w)) return "store.warranty2";
+function getWarrantyKey(product: Product): string | null {
+  const warranty = product.specs?.warranty;
+  if (warranty) {
+    if (/3/.test(warranty)) return "store.warranty3";
+    if (/2|שנתיים|سنتين/.test(warranty)) return "store.warranty2";
     return "store.warrantyYear";
   }
-  if (p.type === "device") return "store.warranty2";
-  if (p.type === "appliance" && p.warranty_months && p.warranty_months >= 24) return "store.warranty2";
-  if (p.type === "appliance" && p.warranty_months && p.warranty_months >= 12) return "store.warrantyYear";
+  if (product.type === "device") return "store.warranty2";
+  if (
+    product.type === "appliance" &&
+    product.warranty_months &&
+    product.warranty_months >= 24
+  ) {
+    return "store.warranty2";
+  }
+  if (
+    product.type === "appliance" &&
+    product.warranty_months &&
+    product.warranty_months >= 12
+  ) {
+    return "store.warrantyYear";
+  }
   return null;
 }
 
-export const ProductCard = memo(function ProductCard({ product: p }: { product: Product }) {
+export const ProductCard = memo(function ProductCard({
+  product,
+}: {
+  product: Product;
+}) {
   const scr = useScreen();
   const { t, lang } = useLang();
   const addItem = useCart((s) => s.addItem);
   const addToCompare = useCompare((s) => s.addItem);
   const removeFromCompare = useCompare((s) => s.removeItem);
-  const inCompare = useCompare((s) => s.items.some((i) => i.id === p.id));
+  const inCompare = useCompare((s) => s.items.some((item) => item.id === product.id));
   const addToWishlist = useWishlist((s) => s.addItem);
   const removeFromWishlist = useWishlist((s) => s.removeItem);
-  const inWishlist = useWishlist((s) => s.items.some((i) => i.id === p.id));
-  const colors = (p.colors || []) as ProductColor[];
-  const storage = p.storage_options || [];
+  const inWishlist = useWishlist((s) => s.items.some((item) => item.id === product.id));
+  const colors = (product.colors || []) as ProductColor[];
+  const storage = product.storage_options || [];
   const [selColor, setSelColor] = useState(colors.length === 1 ? 0 : -1);
   const [selStorage, setSelStorage] = useState(storage.length <= 1 ? 0 : -1);
   const [wishAnim, setWishAnim] = useState(false);
   const [compareToast, setCompareToast] = useState("");
 
+  const activeVariant = getActiveVariant(product, selStorage < 0 ? 0 : selStorage);
+  const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(
+    product,
+    activeVariant
+  );
+  const discount = displayOldPrice
+    ? calcDiscount(displayPrice, displayOldPrice)
+    : 0;
+  const warrantyKey = getWarrantyKey(product);
   const needsColor = colors.length > 0 && selColor < 0;
   const needsStorage = storage.length > 1 && selStorage < 0;
   const selectionIncomplete = needsColor || needsStorage;
-
-  const activeVariant = getActiveVariant(p, selStorage < 0 ? 0 : selStorage);
-  const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
-  const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
-
-  const warrantyKey = getWarrantyKey(p);
+  const productName = getProductName(product, lang);
+  const description = getDescription(product, lang);
+  const activeColor = selColor >= 0 ? colors[selColor] : undefined;
+  const imageSrc = activeColor?.image || product.image_url || undefined;
+  const brandLogo = getBrandLogo(product.brand);
+  const stockVal = activeVariant?.stock ?? product.stock;
+  const months = INSTALLMENTS_BY_TYPE[product.type] || 0;
+  const monthly = activeVariant?.monthly_price;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (selectionIncomplete) return;
-    const activeColor = selColor >= 0 ? colors[selColor] : undefined;
     addItem({
-      productId: p.id,
-      name: p.name_ar,
-      name_he: p.name_he || undefined,
-      brand: p.brand,
-      type: p.type,
+      productId: product.id,
+      name: product.name_ar,
+      name_he: product.name_he || undefined,
+      brand: product.brand,
+      type: product.type,
       price: displayPrice,
-      image: (activeColor?.image) || p.image_url || undefined,
+      image: activeColor?.image || product.image_url || undefined,
       color: activeColor?.name_ar,
       color_he: activeColor?.name_he || undefined,
       storage: storage[selStorage],
@@ -98,13 +136,13 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
     e.preventDefault();
     e.stopPropagation();
     if (inCompare) {
-      removeFromCompare(p.id);
-    } else {
-      const ok = addToCompare(p);
-      if (!ok) {
-        setCompareToast(t("compare.maxReached"));
-        setTimeout(() => setCompareToast(""), 2000);
-      }
+      removeFromCompare(product.id);
+      return;
+    }
+    const ok = addToCompare(product);
+    if (!ok) {
+      setCompareToast(t("compare.maxReached"));
+      setTimeout(() => setCompareToast(""), 2000);
     }
   };
 
@@ -114,343 +152,214 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
     setWishAnim(true);
     setTimeout(() => setWishAnim(false), 300);
     if (inWishlist) {
-      removeFromWishlist(p.id);
+      removeFromWishlist(product.id);
     } else {
-      addToWishlist(p);
+      addToWishlist(product);
     }
   };
 
+  const stockLabel =
+    stockVal === 0
+      ? {
+          text: t("store.outOfStock"),
+          className: "text-[#ff8b8b]",
+          icon: <AlertTriangle size={13} />,
+        }
+      : stockVal <= 5
+        ? {
+            text:
+              lang === "he"
+                ? `נשארו ${stockVal} יחידות בלבד`
+                : `باقي ${stockVal} قطع فقط`,
+            className: "text-[#ffcc77]",
+            icon: <AlertTriangle size={13} />,
+          }
+        : {
+            text: t("store.inStock"),
+            className: "text-[#8fe0a8]",
+            icon: <CheckCircle2 size={13} />,
+          };
+
   return (
     <Link
-      href={`/store/product/${p.id}`}
-      className="glass-card overflow-hidden cursor-pointer relative group flex flex-col"
+      href={`/store/product/${product.id}`}
+      className="group relative flex h-full flex-col overflow-hidden rounded-[28px] border border-[#373740] bg-[linear-gradient(180deg,#25252a_0%,#1e1e24_100%)] shadow-[0_24px_48px_rgba(0,0,0,0.28)] transition-transform duration-200 hover:-translate-y-1"
     >
-      {/* ── Warranty / Promo Ribbon (top-right) ── */}
-      {warrantyKey && (
-        <div
-          className="absolute top-0 z-10 font-extrabold text-white text-center leading-tight"
-          style={{
-            insetInlineEnd: 0,
-            background: "#c41040",
-            fontSize: scr.mobile ? 8 : 10,
-            padding: scr.mobile ? "3px 8px" : "4px 12px",
-            borderRadius: "0 0 0 8px",
-          }}
+      <div className="pointer-events-none absolute left-0 right-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,51,81,0.16),transparent_70%)] opacity-70" />
+
+      <div className="absolute left-4 top-4 z-10 flex flex-col items-start gap-2">
+        {discount > 0 && (
+          <span className="rounded-full bg-[#ff0e34] px-2.5 py-1 text-[11px] font-black text-white">
+            -{discount}%
+          </span>
+        )}
+        {warrantyKey && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-2.5 py-1 text-[11px] font-bold text-[#ffd8de]">
+            <ShieldCheck size={12} />
+            {t(warrantyKey)}
+          </span>
+        )}
+      </div>
+
+      <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        <button
+          onClick={handleCompare}
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors ${
+            inCompare
+              ? "border-[#ff3351]/45 bg-[#ff3351]/10 text-white"
+              : "border-[#3a3a44] bg-black/10 text-[#d7d7de] hover:border-[#ff3351]/35 hover:text-white"
+          }`}
+          title={inCompare ? t("compare.inCompare") : t("compare.add")}
+          aria-label={inCompare ? t("compare.inCompare") : t("compare.add")}
         >
-          {t(warrantyKey)}
-        </div>
-      )}
+          <Scale size={16} />
+        </button>
 
-      {/* ── Discount badge (top-left) ── */}
-      {disc > 0 && (
-        <span
-          className="absolute z-10 text-white font-extrabold rounded-md"
-          style={{
-            background: "#c41040",
-            fontSize: scr.mobile ? 9 : 11,
-            padding: scr.mobile ? "2px 5px" : "3px 8px",
-            top: scr.mobile ? 32 : 36,
-            insetInlineStart: scr.mobile ? 6 : 8,
-          }}
+        <button
+          onClick={handleWishlist}
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all ${
+            inWishlist
+              ? "border-[#ff3351]/45 bg-[#ff3351]/10 text-[#ff92a3]"
+              : "border-[#3a3a44] bg-black/10 text-[#d7d7de] hover:border-[#ff3351]/35 hover:text-white"
+          }`}
+          style={{ transform: wishAnim ? "scale(1.12)" : "scale(1)" }}
+          title={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
+          aria-label={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
         >
-          -{disc}%
-        </span>
-      )}
+          <Heart size={16} {...(inWishlist ? { fill: "currentColor" } : {})} />
+        </button>
+      </div>
 
-      {/* ── Wishlist Heart (top-left corner) ── */}
-      <button
-        onClick={handleWishlist}
-        className={`glass-icon-btn absolute z-10 transition-all ${inWishlist ? "text-brand" : "text-white"}`}
-        title={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
-        aria-label={inWishlist ? t("wishlist.remove") : t("wishlist.add")}
-        style={{
-          top: scr.mobile ? 6 : 8,
-          insetInlineStart: scr.mobile ? 6 : 8,
-          transform: wishAnim ? "scale(1.3)" : "scale(1)",
-        }}
-      >
-        <Heart
-          size={scr.mobile ? 14 : 16}
-          {...(inWishlist ? { fill: "currentColor" } : {})}
-        />
-      </button>
-
-      {/* ── Compare toast ── */}
       {compareToast && (
-        <div
-          className="absolute z-20 left-1/2 -translate-x-1/2 bg-surface-card border border-surface-border text-white text-center rounded-lg shadow-lg font-bold"
-          style={{ bottom: scr.mobile ? 50 : 60, fontSize: scr.mobile ? 10 : 12, padding: "6px 14px", whiteSpace: "nowrap" }}
-        >
+        <div className="absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-full border border-[#363640] bg-[#121216] px-4 py-2 text-xs font-bold text-white shadow-lg">
           {compareToast}
         </div>
       )}
 
-      {/* ── Product Image ── */}
       <div
-        className="flex items-center justify-center overflow-hidden relative"
-        style={{ height: scr.mobile ? 180 : 230 }}
+        className="relative flex items-center justify-center overflow-hidden px-4 pt-16"
+        style={{ minHeight: scr.mobile ? 220 : 280 }}
       >
-        {(() => {
-          const colorImg = selColor >= 0 ? colors[selColor]?.image : undefined;
-          const imgSrc = colorImg || p.image_url;
-          return imgSrc ? (
-            <Image
-              src={imgSrc}
-              alt={getProductName(p, lang)}
-              fill
-              sizes="(max-width: 768px) 50vw, 25vw"
-              className="object-contain drop-shadow-lg p-3"
-              loading="lazy"
-            />
-          ) : (
-            <span className="flex items-center justify-center">
-              {p.type === "device" ? (
-                <Smartphone size={scr.mobile ? 32 : 48} className="opacity-15" />
-              ) : p.type === "appliance" ? (
-                <Home size={scr.mobile ? 32 : 48} className="opacity-15" />
-              ) : (
-                <Plug size={scr.mobile ? 32 : 48} className="opacity-15" />
-              )}
-            </span>
-          );
-        })()}
-
-        {/* Free shipping badge */}
-        {p.featured && (
-          <div
-            className="absolute font-bold text-white rounded-full flex items-center justify-center text-center leading-tight gap-0.5"
-            style={{
-              bottom: scr.mobile ? 4 : 8,
-              insetInlineStart: scr.mobile ? 4 : 8,
-              width: scr.mobile ? 44 : 56,
-              height: scr.mobile ? 44 : 56,
-              background: "linear-gradient(135deg, #c41040 0%, #ff3366 100%)",
-              fontSize: scr.mobile ? 7 : 8,
-              boxShadow: "0 2px 8px rgba(196,16,64,0.5)",
-              flexDirection: "column",
-            }}
-          >
-            <Truck size={scr.mobile ? 10 : 12} />
-            {t("store.freeShipping").split("\n").map((line, i) => (
-              <span key={i}>{line}{i === 0 && <br />}</span>
-            ))}
-          </div>
+        {imageSrc ? (
+          <Image
+            src={imageSrc}
+            alt={productName}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+            className="object-contain p-6 drop-shadow-[0_18px_22px_rgba(0,0,0,0.26)]"
+            loading="lazy"
+          />
+        ) : (
+          <span className="flex items-center justify-center text-white/20">
+            {product.type === "device" ? (
+              <Smartphone size={scr.mobile ? 48 : 64} />
+            ) : product.type === "appliance" ? (
+              <Home size={scr.mobile ? 48 : 64} />
+            ) : (
+              <Plug size={scr.mobile ? 48 : 64} />
+            )}
+          </span>
         )}
-
-        {/* ── Compare button (bottom-right of image) ── */}
-        <button
-          onClick={handleCompare}
-          className={`glass-icon-btn absolute z-10 ${inCompare ? "glass-icon-btn-active" : ""}`}
-          title={inCompare ? t("compare.inCompare") : t("compare.add")}
-          aria-label={inCompare ? t("compare.inCompare") : t("compare.add")}
-          style={{
-            bottom: scr.mobile ? 4 : 8,
-            insetInlineEnd: scr.mobile ? 4 : 8,
-          }}
-        >
-          <Scale size={scr.mobile ? 14 : 16} />
-        </button>
       </div>
 
-      {/* ── Info Section ── */}
-      <div
-        className="flex-1 flex flex-col"
-        style={{ padding: scr.mobile ? "10px 10px 12px" : "14px 16px 16px" }}
-      >
-        {/* Brand + Name */}
-        <div className="flex items-center gap-1.5 mb-0.5">
-          {getBrandLogo(p.brand) && (
+      <div className="flex flex-1 flex-col px-5 pb-5 pt-2">
+        <div className="mb-3 flex items-center gap-2 text-[#babac4]">
+          {brandLogo && (
             <Image
-              src={getBrandLogo(p.brand)!}
-              alt={p.brand}
-              width={scr.mobile ? 14 : 18}
-              height={scr.mobile ? 14 : 18}
+              src={brandLogo}
+              alt={product.brand}
+              width={18}
+              height={18}
               className="flex-shrink-0"
               loading="lazy"
             />
           )}
-          <span
-            className="text-[#a1a1aa] font-bold uppercase tracking-wide"
-            style={{ fontSize: scr.mobile ? 10 : 12 }}
-          >
-            {p.brand}
+          <span className="text-xs font-black uppercase tracking-[0.16em]">
+            {product.brand}
           </span>
         </div>
-        <div
-          className="font-extrabold text-white mb-1 leading-tight"
-          style={{ fontSize: scr.mobile ? 13 : 16 }}
-          dir="ltr"
+
+        <h2
+          className="min-h-[3.2rem] text-lg font-black leading-tight text-white md:text-[1.7rem]"
+          dir="auto"
         >
-          {getProductName(p, lang)}
-        </div>
+          {productName}
+        </h2>
 
-        {/* Description (subtitle) */}
-        {(() => {
-          const desc = getDescription(p, lang);
-          if (!desc) return null;
-          return (
-            <div
-              className="text-[#71717a] leading-snug mb-1.5"
-              style={{ fontSize: scr.mobile ? 9 : 11 }}
-            >
-              {desc.length > 60 ? desc.slice(0, 60) + "..." : desc}
-            </div>
-          );
-        })()}
+        {description && (
+          <p className="mt-3 min-h-[3.4rem] text-sm leading-7 text-[#b8b8c2]">
+            {description.length > 88 ? `${description.slice(0, 88)}...` : description}
+          </p>
+        )}
 
-        {/* ── Quick Specs Strip (devices only) ── */}
-        {p.type === "device" && p.specs && (() => {
-          const s = p.specs as Record<string, string>;
-          const items: { icon: React.ReactNode; val: string }[] = [];
-          if (s.screen) {
-            const m = s.screen.match(/([\d.]+)\s*inches?/i);
-            if (m) items.push({ icon: <Smartphone size={10} />, val: `${m[1]}"` });
-          }
-          if (s.camera) {
-            const m = s.camera.match(/([\d.]+)\s*MP/i);
-            if (m) items.push({ icon: <Camera size={10} />, val: `${m[1]}MP` });
-          }
-          if (s.battery) {
-            const m = s.battery.match(/([\d,]+)\s*mAh/i);
-            if (m) items.push({ icon: <Battery size={10} />, val: `${m[1]}` });
-          }
-          if (s.ram) items.push({ icon: <Cpu size={10} />, val: s.ram });
-          if (items.length === 0) return null;
-          return (
-            <div className="flex flex-wrap gap-x-2 gap-y-0.5 mb-1.5">
-              {items.map((it, i) => (
-                <span key={i} className="text-[#a1a1aa] font-semibold whitespace-nowrap inline-flex items-center gap-0.5" style={{ fontSize: scr.mobile ? 8 : 10 }}>
-                  {it.icon} {it.val}
-                </span>
-              ))}
-            </div>
-          );
-        })()}
-
-        {/* ── Price ── */}
-        <div className="flex items-baseline gap-1.5 mb-1 flex-wrap">
-          {storage.length > 1 && (
-            <span
-              className="text-[#a1a1aa] font-bold"
-              style={{ fontSize: scr.mobile ? 9 : 11 }}
-            >
-              {t("store2.startingFrom")}
-            </span>
-          )}
-          <span
-            className="font-black"
-            style={{
-              color: "#c41040",
-              fontSize: scr.mobile ? 18 : 22,
-            }}
-          >
-            ₪{displayPrice.toLocaleString()}
-          </span>
-          {displayOldPrice && (
-            <span
-              className="line-through text-[#52525b]"
-              style={{ fontSize: scr.mobile ? 10 : 13 }}
-            >
-              ₪{displayOldPrice.toLocaleString()}
-            </span>
-          )}
-        </div>
-        {(() => {
-          const months = INSTALLMENTS_BY_TYPE[p.type] || 0;
-          if (!months || displayPrice <= 0) return null;
-          const monthly = activeVariant?.monthly_price;
-          // Only show "× 36" line when admin has set an explicit monthly_price (long-term financed price).
-          // We never invent a price/36 fallback because that would misrepresent the installment cost.
-          if (!monthly) return null;
-          return (
-            <div className="mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-              <span className="text-[#a78bfa] font-semibold">
-                ₪{monthly.toLocaleString()} × {months}
+        <div className="mt-4">
+          <div className="flex items-end gap-2">
+            <strong className="text-[1.95rem] font-black leading-none text-[#ff3351] md:text-[2.2rem]">
+              ₪{displayPrice.toLocaleString()}
+            </strong>
+            {displayOldPrice && (
+              <span className="pb-1 text-sm text-[#777782] line-through">
+                ₪{displayOldPrice.toLocaleString()}
               </span>
-              <span className="text-[#a1a1aa] me-1" style={{ fontSize: scr.mobile ? 8 : 9 }}>{t("store2.monthly")}</span>
-            </div>
-          );
-        })()}
+            )}
+          </div>
 
-        {/* ── Stock indicator ── */}
-        {(() => {
-          const variantStock = activeVariant?.stock;
-          const stockVal = variantStock != null ? variantStock : p.stock;
-          if (stockVal === 0) return (
-            <div className="text-[#ef4444] font-bold mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-              ❌ {t("store.outOfStock")}
+          {monthly && months > 0 && (
+            <div className="mt-2 text-sm font-semibold text-[#ff9cb0]">
+              ₪{monthly.toLocaleString()} × {months}
+              <span className="mr-1 text-xs font-medium text-[#b8b8c2]">
+                {lang === "he" ? "לחודש" : "شهريًا"}
+              </span>
             </div>
-          );
-          if (stockVal <= 5) return (
-            <div className="text-[#f59e0b] font-bold mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-              ⚠️ {lang === "ar" ? `باقي ${stockVal} قطع فقط!` : `נשארו ${stockVal} יחידות בלבד!`}
-            </div>
-          );
-          return (
-            <div className="text-[#22c55e] font-bold mb-1.5" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-              ✅ {t("store.inStock")} ({stockVal})
-            </div>
-          );
-        })()}
+          )}
+        </div>
 
-        {/* ── Storage options (selectable pills) ── */}
         {storage.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-2">
-            {storage.map((s, i) => (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {storage.map((option, index) => (
               <button
-                key={s}
+                key={option}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setSelStorage(i);
+                  setSelStorage(index);
                 }}
-                className="cursor-pointer transition-all font-bold"
-                style={{
-                  fontSize: scr.mobile ? 9 : 11,
-                  padding: scr.mobile ? "3px 8px" : "4px 12px",
-                  borderRadius: 6,
-                  border:
-                    selStorage === i
-                      ? "1.5px solid #c41040"
-                      : "1.5px solid #3f3f46",
-                  background:
-                    selStorage === i
-                      ? "rgba(196,16,64,0.12)"
-                      : "transparent",
-                  color: selStorage === i ? "#c41040" : "#a1a1aa",
-                }}
+                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+                  selStorage === index
+                    ? "border-[#ff3351]/50 bg-[#ff3351]/10 text-white"
+                    : "border-[#53535e] bg-transparent text-[#d4d4dc] hover:border-[#ff3351]/35 hover:text-white"
+                }`}
               >
-                {s}
+                {option}
               </button>
             ))}
           </div>
         )}
 
-        {/* ── Color swatches ── */}
         {colors.length > 0 && (
-          <div className="flex gap-1.5 items-center mb-2">
-            {colors.slice(0, 6).map((c, i) => (
+          <div className="mt-4 flex items-center gap-2">
+            {colors.slice(0, 6).map((color, index) => (
               <button
-                key={c.hex}
+                key={`${color.hex}-${index}`}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setSelColor(i);
+                  setSelColor(index);
                 }}
-                title={getColorName(c, lang)}
-                aria-label={getColorName(c, lang)}
-                className="rounded-full cursor-pointer transition-all flex-shrink-0"
+                title={getColorName(color, lang)}
+                aria-label={getColorName(color, lang)}
+                className="rounded-full transition-all"
                 style={{
-                  width: scr.mobile ? 18 : 22,
-                  height: scr.mobile ? 18 : 22,
-                  background: c.hex,
+                  width: scr.mobile ? 20 : 22,
+                  height: scr.mobile ? 20 : 22,
+                  background: color.hex,
                   border:
-                    selColor === i
-                      ? "2.5px solid #c41040"
-                      : "2px solid #3f3f46",
+                    selColor === index
+                      ? "2px solid #ffffff"
+                      : "2px solid rgba(255,255,255,0.18)",
                   boxShadow:
-                    selColor === i
-                      ? "0 0 0 1.5px rgba(196,16,64,0.5)"
+                    selColor === index
+                      ? "0 0 0 2px rgba(255,51,81,0.55)"
                       : "none",
                 }}
               />
@@ -458,41 +367,41 @@ export const ProductCard = memo(function ProductCard({ product: p }: { product: 
           </div>
         )}
 
-        {/* ── Spacer ── */}
-        <div className="flex-1" />
-
-        {/* ── Selection hint ── */}
-        {selectionIncomplete && (
-          <div
-            className="text-center font-bold mb-1"
-            style={{
-              fontSize: scr.mobile ? 9 : 11,
-              color: "#f59e0b",
-            }}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5 text-xs font-semibold ${stockLabel.className}`}
           >
-            {needsColor && needsStorage
-              ? t("store.selectColorAndStorage")
-              : needsColor
-                ? t("store.selectColor")
-                : t("store.selectStorage")}
-          </div>
-        )}
+            {stockLabel.icon}
+            {stockLabel.text}
+          </span>
 
-        {/* ── Add to Cart button ── */}
-        <button
-          onClick={handleAddToCart}
-          disabled={selectionIncomplete}
-          className="w-full cursor-pointer transition-all active:scale-[0.97] font-extrabold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed border-brand bg-transparent text-brand hover:bg-brand/10"
-          style={{
-            borderWidth: "1.5px",
-            borderStyle: "solid",
-            padding: scr.mobile ? "7px 0" : "9px 0",
-            fontSize: scr.mobile ? 12 : 14,
-            marginTop: scr.mobile ? 4 : 6,
-          }}
-        >
-          {t("store.addToCart")}
-        </button>
+          {product.featured && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5 text-xs font-semibold text-[#d8d8df]">
+              <ShieldCheck size={13} />
+              {t("store.freeShipping")}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-auto pt-4">
+          {selectionIncomplete && (
+            <div className="mb-3 text-sm font-bold text-[#ffcc77]">
+              {needsColor && needsStorage
+                ? t("store.selectColorAndStorage")
+                : needsColor
+                  ? t("store.selectColor")
+                  : t("store.selectStorage")}
+            </div>
+          )}
+
+          <button
+            onClick={handleAddToCart}
+            disabled={selectionIncomplete || stockVal === 0}
+            className="w-full rounded-full border-2 border-[#ff0e34] px-4 py-3 text-sm font-black text-[#ff4b66] transition-colors hover:bg-[#ff0e34]/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {t("store.addToCart")}
+          </button>
+        </div>
       </div>
     </Link>
   );

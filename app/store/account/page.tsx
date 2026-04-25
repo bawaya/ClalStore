@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Footer } from "@/components/website/sections";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "@/components/store/StoreHeader";
@@ -87,37 +88,37 @@ const STATUS_CONFIG: Record<
   pending: {
     label_ar: "قيد الانتظار",
     label_he: "ממתין",
-    color: "text-amber-600 bg-amber-50",
+    color: "border border-amber-500/25 bg-amber-500/10 text-amber-300",
     icon: "⏳",
   },
   confirmed: {
     label_ar: "مؤكد",
     label_he: "מאושר",
-    color: "text-blue-600 bg-blue-50",
+    color: "border border-sky-500/25 bg-sky-500/10 text-sky-300",
     icon: "✅",
   },
   processing: {
     label_ar: "قيد التجهيز",
     label_he: "בעיבוד",
-    color: "text-purple-600 bg-purple-50",
+    color: "border border-violet-500/25 bg-violet-500/10 text-violet-300",
     icon: "📦",
   },
   shipped: {
     label_ar: "تم الشحن",
     label_he: "נשלח",
-    color: "text-indigo-600 bg-indigo-50",
+    color: "border border-indigo-500/25 bg-indigo-500/10 text-indigo-300",
     icon: "🚚",
   },
   delivered: {
     label_ar: "تم التوصيل",
     label_he: "נמסר",
-    color: "text-green-600 bg-green-50",
+    color: "border border-emerald-500/25 bg-emerald-500/10 text-emerald-300",
     icon: "✅",
   },
   cancelled: {
     label_ar: "ملغي",
     label_he: "בוטל",
-    color: "text-red-600 bg-red-50",
+    color: "border border-[#6a2232] bg-[#2a1016] text-[#ff8da0]",
     icon: "❌",
   },
 };
@@ -323,6 +324,53 @@ export default function AccountPage() {
   };
 
   const isMob = scr.mobile;
+  const panelS =
+    "rounded-[28px] border border-[#2f2f38] bg-[linear-gradient(180deg,#17171b_0%,#111115_100%)] shadow-[0_24px_48px_rgba(0,0,0,0.24)]";
+  const softPanelS = "rounded-[22px] border border-[#30303a] bg-white/[0.03]";
+  const accentBadgeClass =
+    "inline-flex rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 text-xs font-semibold text-[#ff8da0]";
+  const fieldLabelClass = "mb-1.5 block text-xs font-semibold text-[#8f8f99]";
+  const inputClass =
+    "w-full rounded-2xl border border-[#3a3a44] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-[#8f8f99] focus:border-[#ff3351]/45 focus:bg-white/[0.05]";
+  const readOnlyInputClass = `${inputClass} cursor-not-allowed opacity-70`;
+  const primaryButtonClass =
+    "inline-flex min-h-[52px] items-center justify-center rounded-full border border-[#ff0e34] bg-[#ff0e34] px-6 text-sm font-bold text-white transition-colors hover:bg-[#df0d2f] disabled:cursor-not-allowed disabled:opacity-60";
+  const secondaryButtonClass =
+    "inline-flex min-h-[48px] items-center justify-center rounded-full border border-[#353540] bg-[#17171b] px-5 text-sm font-bold text-[#d6d6dd] transition-colors hover:border-[#ff3351]/35 hover:text-white disabled:opacity-60";
+  const dangerGhostButtonClass =
+    "inline-flex min-h-[48px] items-center justify-center rounded-full border border-[#6a2232] bg-[#2a1016] px-5 text-sm font-bold text-[#ff8297] transition-colors hover:bg-[#34131d] disabled:opacity-60";
+  const successBoxClass =
+    "rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-300";
+  const infoBoxClass =
+    "rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-[11px] leading-relaxed text-sky-300";
+  const tabButtonClass = (active: boolean) =>
+    `flex-1 rounded-[20px] px-4 py-3 text-sm font-bold transition-colors ${
+      active
+        ? "border border-[#ff3351]/45 bg-[#ff3351]/10 text-white"
+        : "border border-transparent bg-transparent text-[#9d9daa] hover:border-[#30303a] hover:bg-white/[0.03] hover:text-white"
+    }`;
+  const accountCopy =
+    lang === "he"
+      ? {
+          badge: "אזור לקוח",
+          title: "החשבון שלי",
+          subtitle:
+            "כאן תמצאו את ההזמנות, פרטי החשבון והמועדפים שלכם מתוך ממשק כהה ורשמי שממשיך את שפת החנות.",
+          logout: "התנתק",
+          orders: "הזמנות",
+          wishlist: "מועדפים",
+          hotAccounts: "חשבונות HOT",
+        }
+      : {
+          badge: "منطقة العميل",
+          title: "حسابي",
+          subtitle:
+            "هنا تجد طلباتك وبياناتك ومفضلتك داخل نفس الواجهة الداكنة الرسمية التي اعتمدناها في المتجر.",
+          logout: "تسجيل خروج",
+          orders: "طلبات",
+          wishlist: "مفضلة",
+          hotAccounts: "حسابات HOT",
+        };
 
   const tabs: { key: TabKey; label_ar: string; label_he: string; icon: string }[] = [
     { key: "orders", label_ar: "طلباتي", label_he: "ההזמנות שלי", icon: "📦" },
@@ -335,42 +383,75 @@ export default function AccountPage() {
   return (
     <>
       <StoreHeader />
-      <main dir="rtl" className="min-h-screen bg-surface-bg px-4 pb-24 pt-20 text-white">
-        <div className="mx-auto max-w-4xl">
-          <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-black text-white">
-              {lang === "he" ? "החשבון שלי" : "حسابي"}
-            </h1>
+      <main
+        dir="rtl"
+        className="min-h-screen px-4 pb-24 pt-6 text-white"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at top right, rgba(255,51,81,0.08), transparent 18%), radial-gradient(circle at left center, rgba(255,255,255,0.03), transparent 28%)",
+          backgroundColor: "#111114",
+        }}
+      >
+        <div className="mx-auto max-w-5xl">
+          <div
+            className={`${panelS} mb-4 flex flex-col gap-4 px-5 py-5 md:flex-row md:items-end md:justify-between md:px-6`}
+          >
+            <div>
+              <span className={accentBadgeClass}>{accountCopy.badge}</span>
+              <h1 className="mt-3 text-2xl font-black text-white md:text-[2.3rem]">
+                {accountCopy.title}
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm leading-8 text-[#b8b8c2]">
+                {accountCopy.subtitle}
+              </p>
+            </div>
             <button
               onClick={handleLogout}
-              className="text-sm text-muted transition hover:text-state-error"
+              className={dangerGhostButtonClass}
             >
-              {lang === "he" ? "התנתק" : "تسجيل خروج"}
+              {accountCopy.logout}
             </button>
           </div>
 
           {customer?.name && (
-            <div className="mb-4">
-              <p className="text-muted">
-                {lang === "he" ? `שלום ${customer.name}` : `مرحباً ${customer.name}`} 👋
+            <div className={`${panelS} mb-4 px-5 py-4 md:px-6`}>
+              <p className="text-sm font-semibold text-[#d7d7dd]">
+                {lang === "he" ? `שלום ${customer.name}` : `مرحباً ${customer.name}`}
+              </p>
+              <p className="mt-1 text-xs leading-7 text-[#8f8f99]">
+                {lang === "he"
+                  ? "ניתן לעקוב אחר הזמנות, לעדכן פרטים ולנהל את המועדפים ממקום אחד."
+                  : "يمكنك من هنا متابعة الطلبات وتحديث بياناتك وإدارة المفضلة من مكان واحد."}
               </p>
               {customer.customer_code && (
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/10 px-3 py-1 text-xs font-bold text-brand">
-                  <span>🎟️</span>
-                  <span>{customer.customer_code}</span>
+                <div className="mt-3 inline-flex items-center rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 text-xs font-bold text-[#ff8da0]">
+                  {customer.customer_code}
                 </div>
               )}
             </div>
           )}
 
-          <div className="card mb-6 flex overflow-hidden rounded-xl">
+          <div className="mb-4 grid gap-3 md:grid-cols-3">
+            <div className={`${softPanelS} px-4 py-4`}>
+              <strong className="block text-xl font-black text-white">{orders.length}</strong>
+              <span className="text-sm text-[#b8b8c2]">{accountCopy.orders}</span>
+            </div>
+            <div className={`${softPanelS} px-4 py-4`}>
+              <strong className="block text-xl font-black text-white">{wishlist.items.length}</strong>
+              <span className="text-sm text-[#b8b8c2]">{accountCopy.wishlist}</span>
+            </div>
+            <div className={`${softPanelS} px-4 py-4`}>
+              <strong className="block text-xl font-black text-white">{hotAccounts.length}</strong>
+              <span className="text-sm text-[#b8b8c2]">{accountCopy.hotAccounts}</span>
+            </div>
+          </div>
+
+          <div className={`${panelS} mb-6 grid gap-2 p-2 md:grid-cols-3`}>
             {tabs.map((item) => (
               <button
                 key={item.key}
                 onClick={() => setTab(item.key)}
-                className={`flex-1 py-3 text-sm font-bold transition-all ${
-                  tab === item.key ? "bg-brand text-white" : "text-muted hover:bg-surface-elevated"
-                }`}
+                className={tabButtonClass(tab === item.key)}
               >
                 <span className="mr-1">{item.icon}</span>
                 {lang === "he" ? item.label_he : item.label_ar}
@@ -381,17 +462,20 @@ export default function AccountPage() {
           {tab === "orders" && (
             <div>
               {loadingOrders ? (
-                <div className="py-16 text-center text-muted">
+                <div className={`${panelS} py-16 text-center text-[#b8b8c2]`}>
                   <div className="mb-2 text-3xl">⏳</div>
                   {lang === "he" ? "טוען..." : "جاري التحميل..."}
                 </div>
               ) : orders.length === 0 ? (
-                <div className="card py-16 text-center" style={{ borderRadius: 16 }}>
+                <div className={`${panelS} py-16 text-center`}>
                   <div className="mb-4 text-5xl">📦</div>
-                  <p className="text-lg text-muted">
+                  <p className="text-lg text-[#b8b8c2]">
                     {lang === "he" ? "אין הזמנות עדיין" : "لا توجد طلبات بعد"}
                   </p>
-                  <button onClick={() => router.push("/store")} className="btn-primary mt-4">
+                  <button
+                    onClick={() => router.push("/store")}
+                    className={`${primaryButtonClass} mt-4`}
+                  >
                     {lang === "he" ? "התחל לקנות" : "ابدأ التسوق"}
                   </button>
                 </div>
@@ -402,7 +486,7 @@ export default function AccountPage() {
                     const isExpanded = expandedOrder === order.id;
 
                     return (
-                      <div key={order.id} className="card overflow-hidden rounded-xl">
+                      <div key={order.id} className={`${panelS} overflow-hidden`}>
                         <button
                           onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
                           className="flex w-full items-center justify-between p-4 text-right"
@@ -427,7 +511,7 @@ export default function AccountPage() {
                             </span>
                             <span className="text-sm font-bold text-white">₪{order.total}</span>
                             <span
-                              className={`text-muted transition-transform ${
+                              className={`text-[#8f8f99] transition-transform ${
                                 isExpanded ? "rotate-180" : ""
                               }`}
                             >
@@ -437,7 +521,7 @@ export default function AccountPage() {
                         </button>
 
                         {isExpanded && (
-                          <div className="border-t border-surface-border px-4 pb-4">
+                          <div className="border-t border-[#2d2d35] px-4 pb-4">
                             <div className="mt-3 space-y-2">
                               {order.items.map((item) => (
                                 <div
@@ -449,29 +533,29 @@ export default function AccountPage() {
                                       {item.product_name}
                                     </span>
                                     {item.color && (
-                                      <span className="mr-2 text-muted">({item.color})</span>
+                                      <span className="mr-2 text-[#8f8f99]">({item.color})</span>
                                     )}
                                     {item.storage && (
-                                      <span className="mr-1 text-muted">{item.storage}</span>
+                                      <span className="mr-1 text-[#8f8f99]">{item.storage}</span>
                                     )}
-                                    <span className="text-muted"> ×{item.quantity}</span>
+                                    <span className="text-[#8f8f99]"> ×{item.quantity}</span>
                                   </div>
-                                  <span className="font-medium text-brand">
+                                  <span className="font-medium text-[#ff667d]">
                                     ₪{item.price * item.quantity}
                                   </span>
                                 </div>
                               ))}
                             </div>
 
-                            <div className="mt-3 space-y-1 border-t border-surface-border pt-3 text-sm">
+                            <div className="mt-3 space-y-1 border-t border-[#2f2f38] pt-3 text-sm">
                               {order.discount_amount > 0 && (
-                                <div className="flex justify-between text-state-success">
+                                <div className="flex justify-between text-emerald-300">
                                   <span>{lang === "he" ? "הנחה" : "خصم"}</span>
                                   <span>-₪{order.discount_amount}</span>
                                 </div>
                               )}
                               {order.coupon_code && (
-                                <div className="flex justify-between text-xs text-muted">
+                                <div className="flex justify-between text-xs text-[#8f8f99]">
                                   <span>{lang === "he" ? "קופון" : "كوبون"}</span>
                                   <span>{order.coupon_code}</span>
                                 </div>
@@ -491,13 +575,13 @@ export default function AccountPage() {
                                 </span>
                               </div>
                               {order.shipping_city && (
-                                <div className="flex justify-between text-muted">
+                                <div className="flex justify-between text-[#b8b8c2]">
                                   <span>{lang === "he" ? "עיר" : "المدينة"}</span>
                                   <span>{order.shipping_city}</span>
                                 </div>
                               )}
                               {order.shipping_address && (
-                                <div className="flex justify-between text-xs text-dim">
+                                <div className="flex justify-between text-xs text-[#8f8f99]">
                                   <span>{lang === "he" ? "כתובת" : "العنوان"}</span>
                                   <span className="max-w-[200px] truncate">
                                     {order.shipping_address}
@@ -508,10 +592,10 @@ export default function AccountPage() {
 
                             {/* Cancellation status (already cancelled) */}
                             {order.status === "cancelled" && order.cancelled_at_customer && (
-                              <div className="mt-3 rounded-xl border border-state-error/30 bg-state-error/5 p-3 text-xs text-state-error">
+                              <div className="mt-3 rounded-2xl border border-[#6a2232] bg-[#2a1016] p-3 text-xs text-[#ff8da0]">
                                 ❌ {lang === "he" ? "הזמנה בוטלה על ידך" : "تم إلغاء الطلب من قبلك"}
                                 {order.cancellation_refund != null && (
-                                  <div className="mt-1 text-muted">
+                                  <div className="mt-1 text-[#b8b8c2]">
                                     {lang === "he" ? "החזר" : "المُعاد"}: ₪{order.cancellation_refund} •{" "}
                                     {lang === "he" ? "דמי ביטול" : "رسوم الإلغاء"}: ₪{order.cancellation_fee || 0}
                                   </div>
@@ -533,7 +617,7 @@ export default function AccountPage() {
                                     setCancelExtended(false);
                                     setCancelMsg("");
                                   }}
-                                  className="mt-3 w-full rounded-xl border border-state-error/40 bg-state-error/5 py-2 text-xs font-bold text-state-error hover:bg-state-error/10 transition-colors"
+                                  className="mt-3 w-full rounded-full border border-[#6a2232] bg-[#2a1016] py-2.5 text-xs font-bold text-[#ff8da0] transition-colors hover:bg-[#34131d]"
                                 >
                                   ↩️ {lang === "he"
                                     ? `בטל הזמנה (נותרו ${ccc.daysLeft} ימים)`
@@ -552,20 +636,20 @@ export default function AccountPage() {
           )}
 
           {tab === "profile" && (
-            <div className="card rounded-xl p-6">
+            <div className={`${panelS} p-6`}>
               {loadingProfile ? (
-                <div className="py-8 text-center text-muted">
+                <div className="py-8 text-center text-[#b8b8c2]">
                   {lang === "he" ? "טוען..." : "جاري التحميل..."}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-brand/20 bg-brand/5 p-4">
+                  <div className="rounded-[24px] border border-[#ff3351]/20 bg-[#ff3351]/08 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-right">
-                        <div className="text-xs font-semibold text-muted">
+                        <div className="text-xs font-semibold text-[#8f8f99]">
                           {lang === "he" ? "זהות הלקוח" : "هوية العميل"}
                         </div>
-                        <div className="mt-1 text-sm font-black text-brand" dir="ltr">
+                        <div className="mt-1 text-sm font-black text-[#ff667d]" dir="ltr">
                           {customer?.customer_code || (lang === "he" ? "לא קיים" : "لا يوجد بعد")}
                         </div>
                       </div>
@@ -573,12 +657,12 @@ export default function AccountPage() {
                     </div>
 
                     <div className="mt-4 border-t border-white/5 pt-4">
-                      <div className="mb-2 text-xs font-semibold text-muted">
+                      <div className="mb-2 text-xs font-semibold text-[#8f8f99]">
                         {lang === "he" ? "חשבונות HOT מקושרים" : "حسابات HOT المرتبطة"}
                       </div>
 
                       {hotAccounts.length === 0 ? (
-                        <div className="text-xs text-dim">
+                        <div className="text-xs text-[#8f8f99]">
                           {lang === "he"
                             ? "עדיין לא קושרו חשבונות HOT לחשבון זה."
                             : "لا توجد حسابات HOT مرتبطة بهذا الحساب بعد."}
@@ -588,7 +672,7 @@ export default function AccountPage() {
                           {hotAccounts.map((account) => (
                             <div
                               key={account.id}
-                              className="rounded-xl border border-white/5 bg-black/10 px-3 py-2 text-right"
+                              className="rounded-[20px] border border-[#30303a] bg-white/[0.03] px-3 py-3 text-right"
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="text-xs font-bold text-white">
@@ -603,12 +687,12 @@ export default function AccountPage() {
                                       {lang === "he" ? "ראשי" : "رئيسي"}
                                     </span>
                                   )}
-                                  <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand">
+                                    <span className="rounded-full bg-[#ff3351]/10 px-2 py-0.5 text-[10px] font-bold text-[#ff667d]">
                                     {account.status}
                                   </span>
                                 </div>
                               </div>
-                              <div className="mt-1 text-[11px] text-muted" dir="ltr">
+                              <div className="mt-1 text-[11px] text-[#b8b8c2]" dir="ltr">
                                 {[account.hot_mobile_id, account.hot_customer_code, account.line_phone]
                                   .filter(Boolean)
                                   .join(" • ")}
@@ -621,66 +705,66 @@ export default function AccountPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-muted">
+                    <label className={fieldLabelClass}>
                       {lang === "he" ? "טלפון" : "الهاتف"}
                     </label>
                     <input
                       type="text"
                       value={customer?.phone || ""}
                       readOnly
-                      className="input cursor-not-allowed opacity-60"
+                      className={readOnlyInputClass}
                       dir="ltr"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-muted">
+                    <label className={fieldLabelClass}>
                       {lang === "he" ? "שם" : "الاسم"}
                     </label>
                     <input
                       type="text"
                       value={formName}
                       onChange={(event) => setFormName(event.target.value)}
-                      className="input"
+                      className={inputClass}
                       placeholder={lang === "he" ? "הזן שם" : "أدخل اسمك"}
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-muted">
+                    <label className={fieldLabelClass}>
                       {lang === "he" ? "אימייל" : "البريد الإلكتروني"}
                     </label>
                     <input
                       type="email"
                       value={formEmail}
                       onChange={(event) => setFormEmail(event.target.value)}
-                      className="input"
+                      className={inputClass}
                       placeholder="example@email.com"
                       dir="ltr"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-muted">
+                    <label className={fieldLabelClass}>
                       {lang === "he" ? "עיר" : "المدينة"}
                     </label>
                     <input
                       type="text"
                       value={formCity}
                       onChange={(event) => setFormCity(event.target.value)}
-                      className="input"
+                      className={inputClass}
                       placeholder={lang === "he" ? "הזן עיר" : "أدخل المدينة"}
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-muted">
+                    <label className={fieldLabelClass}>
                       {lang === "he" ? "כתובת" : "العنوان"}
                     </label>
                     <textarea
                       value={formAddress}
                       onChange={(event) => setFormAddress(event.target.value)}
-                      className="input resize-none"
+                      className={`${inputClass} resize-none`}
                       rows={2}
                       placeholder={lang === "he" ? "הזן כתובת" : "أدخل العنوان"}
                     />
@@ -689,7 +773,7 @@ export default function AccountPage() {
                   <button
                     onClick={handleSaveProfile}
                     disabled={savingProfile}
-                    className="btn-primary w-full disabled:opacity-50"
+                    className={`${primaryButtonClass} w-full`}
                   >
                     {savingProfile
                       ? lang === "he"
@@ -704,8 +788,8 @@ export default function AccountPage() {
                     <p
                       className={`text-center text-sm font-medium ${
                         profileMsg.includes("نجاح") || profileMsg.includes("הצלחה")
-                          ? "text-state-success"
-                          : "text-state-error"
+                          ? "text-emerald-400"
+                          : "text-[#ff8297]"
                       }`}
                     >
                       {profileMsg}
@@ -719,14 +803,14 @@ export default function AccountPage() {
           {tab === "wishlist" && (
             <div>
               {wishlist.items.length === 0 ? (
-                <div className="card py-16 text-center">
+                <div className={`${panelS} py-16 text-center`}>
                   <div className="mb-4 text-5xl">🤍</div>
-                  <p className="text-lg text-muted">
+                  <p className="text-lg text-[#b8b8c2]">
                     {lang === "he" ? "אין מועדפים עדיין" : "لا توجد منتجات مفضلة"}
                   </p>
                   <button
                     onClick={() => router.push("/store")}
-                    className="btn-primary mt-4 rounded-xl px-6 py-2 text-sm"
+                    className={`${primaryButtonClass} mt-4`}
                   >
                     {lang === "he" ? "גלה מוצרים" : "تصفح المنتجات"}
                   </button>
@@ -734,19 +818,19 @@ export default function AccountPage() {
               ) : (
                 <>
                   <div className="mb-4 flex items-center justify-between">
-                    <p className="text-sm text-muted">
+                    <p className="text-sm text-[#b8b8c2]">
                       {wishlist.items.length} {lang === "he" ? "מוצרים" : "منتج"}
                     </p>
                     <div className="flex gap-2">
                       <button
                         onClick={handleAddAllWishlistToCart}
-                        className="btn-primary rounded-lg px-3 py-1.5 text-xs"
+                        className={primaryButtonClass}
                       >
                         {lang === "he" ? "הוסף הכל לסל" : "أضف الكل للسلة"}
                       </button>
                       <button
                         onClick={() => wishlist.clearAll()}
-                        className="rounded-lg bg-state-error/10 px-3 py-1.5 text-xs font-medium text-state-error"
+                        className={dangerGhostButtonClass}
                       >
                         {lang === "he" ? "נקה הכל" : "مسح الكل"}
                       </button>
@@ -755,8 +839,8 @@ export default function AccountPage() {
 
                   <div className={`grid gap-3 ${isMob ? "grid-cols-2" : "grid-cols-3"}`}>
                     {wishlist.items.map((item) => (
-                      <div key={item.id} className="card group relative overflow-hidden rounded-xl">
-                        <div className="relative aspect-square bg-surface-elevated">
+                      <div key={item.id} className={`${panelS} group relative overflow-hidden`}>
+                        <div className="relative aspect-square border-b border-[#2a2a31] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_58%),#141419]">
                           {item.image_url ? (
                             <Image
                               src={item.image_url}
@@ -765,27 +849,27 @@ export default function AccountPage() {
                               className="object-contain p-2"
                             />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-4xl text-dim">
+                            <div className="flex h-full w-full items-center justify-center text-4xl text-[#8f8f99]">
                               📱
                             </div>
                           )}
                           <button
                             onClick={() => wishlist.removeItem(item.id)}
-                            className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-state-error/10 text-sm text-state-error transition hover:bg-state-error/20"
+                            className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-[#6a2232] bg-[#2a1016] text-sm text-[#ff8297] transition hover:bg-[#34131d]"
                           >
                             ✕
                           </button>
                         </div>
 
                         <div className="p-3">
-                          <p className="text-xs text-muted">{item.brand}</p>
+                          <p className="text-xs text-[#b8b8c2]">{item.brand}</p>
                           <p className="line-clamp-1 text-sm font-bold text-white">
                             {lang === "he" ? item.name_he : item.name_ar}
                           </p>
                           <div className="mt-2 flex items-center justify-between">
-                            <span className="text-sm font-bold text-brand">₪{item.price}</span>
+                            <span className="text-sm font-bold text-[#ff667d]">₪{item.price}</span>
                             {item.old_price && item.old_price > item.price && (
-                              <span className="text-xs text-dim line-through">
+                              <span className="text-xs text-[#8f8f99] line-through">
                                 ₪{item.old_price}
                               </span>
                             )}
@@ -801,7 +885,7 @@ export default function AccountPage() {
                                 type: item.type,
                               })
                             }
-                            className="btn-primary mt-2 w-full rounded-lg py-2 text-xs"
+                            className={`${primaryButtonClass} mt-2 w-full`}
                           >
                             {lang === "he" ? "הוסף לסל" : "أضف للسلة"}
                           </button>
@@ -824,26 +908,26 @@ export default function AccountPage() {
           onClick={() => !cancelSubmitting && setCancelOrder(null)}
         >
           <div
-            className="card w-full max-w-md rounded-2xl bg-surface-card p-5"
+            className={`${panelS} w-full max-w-md p-5`}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-black text-white mb-1">
+            <h3 className="mb-1 text-lg font-black text-white">
               ↩️ {lang === "he" ? "ביטול הזמנה" : "إلغاء الطلب"}
             </h3>
-            <p className="text-xs text-muted mb-3">
+            <p className="mb-3 text-xs text-[#b8b8c2]">
               {lang === "he"
                 ? `הזמנה ${cancelOrder.id} • ₪${cancelOrder.total}`
                 : `طلب ${cancelOrder.id} • ₪${cancelOrder.total}`}
             </p>
 
-            <label className="block mb-3">
-              <span className="text-xs text-muted mb-1 block">
+            <label className="mb-3 block">
+              <span className={fieldLabelClass}>
                 {lang === "he" ? "סיבת הביטול *" : "سبب الإلغاء *"}
               </span>
               <select
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value as typeof cancelReason)}
-                className="input w-full"
+                className={inputClass}
                 disabled={cancelSubmitting}
               >
                 <option value="changed_mind">{lang === "he" ? "שיניתי את דעתי" : "غيّرت رأيي"}</option>
@@ -854,20 +938,20 @@ export default function AccountPage() {
               </select>
             </label>
 
-            <label className="block mb-3">
-              <span className="text-xs text-muted mb-1 block">
+            <label className="mb-3 block">
+              <span className={fieldLabelClass}>
                 {lang === "he" ? "הערות (אופציונלי)" : "ملاحظات (اختياري)"}
               </span>
               <textarea
                 value={cancelNotes}
                 onChange={(e) => setCancelNotes(e.target.value)}
-                className="input w-full min-h-[60px] resize-y"
+                className={`${inputClass} min-h-[60px] resize-y`}
                 disabled={cancelSubmitting}
                 maxLength={500}
               />
             </label>
 
-            <label className="flex items-start gap-2 mb-3 cursor-pointer rounded-xl border border-surface-border bg-surface-elevated p-2.5">
+            <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-2xl border border-[#30303a] bg-white/[0.03] p-3">
               <input
                 type="checkbox"
                 checked={cancelExtended}
@@ -875,21 +959,21 @@ export default function AccountPage() {
                 disabled={cancelSubmitting}
                 className="mt-0.5 w-4 h-4 accent-[#c41040]"
               />
-              <span className="text-[11px] text-muted leading-relaxed">
+              <span className="text-[11px] leading-relaxed text-[#b8b8c2]">
                 {lang === "he"
                   ? "אני אזרח/ית 65+, אדם עם מוגבלות, או עולה חדש (5 שנים מתעודת עולה) — חלון מורחב של 4 חודשים."
                   : "أنا فوق 65 سنة، أو من ذوي الإعاقة، أو مهاجر جديد (خلال 5 سنوات من شهادة العولة) — فترة ممتدة 4 شهور."}
               </span>
             </label>
 
-            <div className="rounded-xl bg-state-info/5 border border-state-info/20 p-2.5 mb-3 text-[11px] text-state-info leading-relaxed">
+            <div className={`${infoBoxClass} mb-3`}>
               ℹ️ {lang === "he"
                 ? "בכל סיבה שאינה פגם — דמי ביטול של 5% או ₪100, הנמוך מביניהם. במקרה של מוצר פגום — ללא דמי ביטול."
                 : "لأي سبب غير العيب — رسوم إلغاء 5% أو ₪100 (الأقل). للمنتج المعيب — بدون رسوم."}
             </div>
 
             {cancelMsg && (
-              <div className="rounded-xl bg-state-success/10 border border-state-success/30 p-2.5 mb-3 text-xs text-state-success">
+              <div className={`${successBoxClass} mb-3`}>
                 {cancelMsg}
               </div>
             )}
@@ -899,7 +983,7 @@ export default function AccountPage() {
                 type="button"
                 onClick={() => setCancelOrder(null)}
                 disabled={cancelSubmitting}
-                className="flex-1 rounded-xl border border-surface-border bg-surface-elevated py-2.5 text-sm font-bold text-white"
+                className={`${secondaryButtonClass} flex-1`}
               >
                 {lang === "he" ? "ביטול" : "تراجع"}
               </button>
@@ -907,7 +991,7 @@ export default function AccountPage() {
                 type="button"
                 onClick={submitCancel}
                 disabled={cancelSubmitting}
-                className="flex-1 rounded-xl border-2 border-state-error bg-state-error py-2.5 text-sm font-bold text-white disabled:opacity-50"
+                className={`${primaryButtonClass} flex-1`}
               >
                 {cancelSubmitting
                   ? "⏳ ..."
@@ -919,6 +1003,7 @@ export default function AccountPage() {
           </div>
         </div>
       )}
+      <Footer />
     </>
   );
 }

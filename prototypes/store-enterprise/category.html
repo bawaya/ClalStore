@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>نموذج المتجر الاحترافي - قسم الهواتف</title>
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body data-page="category">
+    <div class="prototype-shell">
+      <header class="site-header" id="site-header"></header>
+      <main>
+        <section class="hero hero-category">
+          <div class="hero-copy">
+            <span class="eyebrow">قسم موحد القالب</span>
+            <h1>الهواتف</h1>
+            <p>
+              في هذا النموذج تظهر الهواتف وحدها داخل شبكة تصفح متجانسة، بينما
+              تبقى الباقات والإكسسوارات في المواضع التكاملية فقط.
+            </p>
+          </div>
+          <div class="hero-side-panel">
+            <div class="compact-card">
+              <span class="compact-label">الترتيب الافتراضي</span>
+              <strong>الأكثر مبيعًا</strong>
+              <p>ثم الموصى به، ثم السعر، ثم الأحدث.</p>
+            </div>
+            <div class="compact-card">
+              <span class="compact-label">المنع الصارم</span>
+              <strong>لا خلط مع الشبكات أو الأجهزة المنزلية</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="section section-tight">
+          <div class="subnav-strip" id="phone-subcategories"></div>
+        </section>
+
+        <section class="section category-workspace">
+          <aside class="filter-panel">
+            <div class="filter-panel__header">
+              <span class="eyebrow">أدوات التصفية</span>
+              <h2>تصفية تخدم القسم</h2>
+            </div>
+            <div class="filter-group">
+              <h3>الفئة السعرية</h3>
+              <div class="pill-set">
+                <button class="pill is-active">الأكثر طلبًا</button>
+                <button class="pill">حتى 2000</button>
+                <button class="pill">2000 إلى 3500</button>
+                <button class="pill">3500 فأكثر</button>
+              </div>
+            </div>
+            <div class="filter-group">
+              <h3>العلامة</h3>
+              <div class="pill-set" id="phone-brands"></div>
+            </div>
+            <div class="filter-group">
+              <h3>سبب الشراء</h3>
+              <div class="reason-list">
+                <span>كاميرا قوية</span>
+                <span>بطارية ممتازة</span>
+                <span>أداء رائد</span>
+                <span>قيمة عالية</span>
+              </div>
+            </div>
+            <div class="filter-note">
+              التصفية هنا جزء من القرار داخل القسم، وليست بديلًا عن تقسيم المتجر.
+            </div>
+          </aside>
+
+          <div class="catalog-panel">
+            <div class="catalog-toolbar">
+              <div>
+                <span class="eyebrow">عرض القسم</span>
+                <h2>أفضل اختيارات الهواتف</h2>
+              </div>
+              <div class="toolbar-actions">
+                <button class="toolbar-chip is-active">الأكثر مبيعًا</button>
+                <button class="toolbar-chip">موصى به</button>
+                <button class="toolbar-chip">الأعلى سعرًا</button>
+              </div>
+            </div>
+
+            <div class="catalog-overview" id="category-overview"></div>
+
+            <div class="featured-ribbon">
+              <div>
+                <span class="eyebrow">شريط إرشادي</span>
+                <strong>أقسام المنتجات الكبيرة لا تختلط هنا.</strong>
+              </div>
+              <p>
+                الإكسسوارات والباقات تظهر لاحقًا كوحدات تكاملية، لا داخل شبكة
+                الهواتف نفسها.
+              </p>
+            </div>
+
+            <div class="product-grid" id="category-products"></div>
+          </div>
+        </section>
+
+        <section class="section tier-section">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">ترتيب يساعد القرار</span>
+              <h2>مسارات اختيار سريعة</h2>
+            </div>
+            <p>التصفح هنا يبدأ من احتياج العميل، لا من فوضى كل المنتجات.</p>
+          </div>
+          <div class="tier-grid">
+            <article class="tier-card">
+              <span class="tier-card__tag">قيمة ذكية</span>
+              <h3>اقتصادي قوي</h3>
+              <p>للعميل الذي يريد هاتفًا جيدًا بسعر منضبط.</p>
+            </article>
+            <article class="tier-card">
+              <span class="tier-card__tag">الأكثر حركة</span>
+              <h3>متوازن يومي</h3>
+              <p>للشريحة الأكبر التي تقارن بين الأداء والسعر.</p>
+            </article>
+            <article class="tier-card">
+              <span class="tier-card__tag">صورة راقية</span>
+              <h3>رائد مميز</h3>
+              <p>للعميل الذي يريد شاشة وكاميرا وأداء بأعلى مستوى.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section accessory-bridge">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">الخلط المسموح فقط</span>
+              <h2>ملحقات مناسبة لهذا القسم</h2>
+            </div>
+            <p>تظهر هنا بصفتها امتدادًا منطقيًا لشراء الهاتف، لا كمنافسة عليه.</p>
+          </div>
+          <div class="bundle-grid" id="category-accessories"></div>
+        </section>
+      </main>
+      <footer class="site-footer" id="site-footer"></footer>
+    </div>
+    <script src="./assets/catalog.js"></script>
+    <script src="./assets/app.js"></script>
+  </body>
+</html>

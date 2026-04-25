@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ShieldCheck,
+  Smartphone,
+} from "lucide-react";
 import { useScreen, useToast } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
-import { calcDiscount, getProductName, getColorName } from "@/lib/utils";
+import { calcDiscount, getColorName, getProductName } from "@/lib/utils";
 import { getBrandLogo } from "@/lib/brand-logos";
-import { trackAddToCart, trackViewProduct } from "@/components/shared/Analytics";
+import {
+  trackAddToCart,
+  trackViewProduct,
+} from "@/components/shared/Analytics";
 import { StoreHeader } from "./StoreHeader";
 import { StickyCartBar } from "./StickyCartBar";
 import { ProductCard } from "./ProductCard";
@@ -16,33 +25,71 @@ import { Footer } from "@/components/website/sections";
 import { ToastContainer } from "@/components/ui/Toast";
 import { ProductAssistantWidget } from "./ProductAssistantWidget";
 import { APPLIANCE_KINDS, INSTALLMENTS_BY_TYPE } from "@/lib/constants";
-import type { Product, ProductColor, ProductVariant, ProductVariantKind } from "@/types/database";
+import type {
+  Product,
+  ProductColor,
+  ProductVariant,
+  ProductVariantKind,
+} from "@/types/database";
 
-/* ── variant helpers ── */
-function getActiveVariant(p: Product, storageIdx: number): ProductVariant | null {
-  const variants = p.variants || [];
+function getActiveVariant(
+  product: Product,
+  storageIdx: number
+): ProductVariant | null {
+  const variants = product.variants || [];
   if (variants.length === 0) return null;
-  const storage = p.storage_options || [];
-  const selLabel = storage[storageIdx];
-  return variants.find((v) => v.storage === selLabel) || variants[0] || null;
+  const storage = product.storage_options || [];
+  const selectedLabel = storage[storageIdx];
+  return variants.find((variant) => variant.storage === selectedLabel) || variants[0] || null;
 }
 
-function getDisplayPrice(p: Product, variant: ProductVariant | null): { price: number; old_price?: number } {
+function getDisplayPrice(
+  product: Product,
+  variant: ProductVariant | null
+): { price: number; old_price?: number } {
   if (variant) return { price: variant.price, old_price: variant.old_price };
-  return { price: p.price, old_price: p.old_price };
+  return { price: product.price, old_price: product.old_price };
 }
 
-function getVariantStock(p: Product, variant: ProductVariant | null): number {
+function getVariantStock(
+  product: Product,
+  variant: ProductVariant | null
+): number {
   if (variant && variant.stock !== undefined && variant.stock !== null) {
     if (variant.stock > 0) return variant.stock;
-    if (p.stock > 0) return p.stock;
+    if (product.stock > 0) return product.stock;
     return 0;
   }
-  return p.stock;
+  return product.stock;
+}
+
+function getWarrantyKey(product: Product): string | null {
+  const warranty = product.specs?.warranty;
+  if (warranty) {
+    if (/3/.test(warranty)) return "store.warranty3";
+    if (/2|שנתיים|سنتين/.test(warranty)) return "store.warranty2";
+    return "store.warrantyYear";
+  }
+  if (product.type === "device") return "store.warranty2";
+  if (
+    product.type === "appliance" &&
+    product.warranty_months &&
+    product.warranty_months >= 24
+  ) {
+    return "store.warranty2";
+  }
+  if (
+    product.type === "appliance" &&
+    product.warranty_months &&
+    product.warranty_months >= 12
+  ) {
+    return "store.warrantyYear";
+  }
+  return null;
 }
 
 export function ProductDetailClient({
-  product: p,
+  product,
   related,
 }: {
   product: Product;
@@ -52,62 +99,62 @@ export function ProductDetailClient({
   const { t, lang } = useLang();
   const addItem = useCart((s) => s.addItem);
   const { toasts, show } = useToast();
-  const colors0 = (p.colors || []) as ProductColor[];
-  const storage0 = p.storage_options || [];
+  const colors0 = (product.colors || []) as ProductColor[];
+  const storage0 = product.storage_options || [];
   const [selColor, setSelColor] = useState(colors0.length === 1 ? 0 : -1);
   const [selStorage, setSelStorage] = useState(storage0.length <= 1 ? 0 : -1);
   const [selImage, setSelImage] = useState(0);
 
-  const colors = (p.colors || []) as ProductColor[];
-  const storage = p.storage_options || [];
-  const specs = (p.specs || {}) as Record<string, string>;
-
-  const activeVariant = getActiveVariant(p, selStorage < 0 ? 0 : selStorage);
-  const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(p, activeVariant);
-  const variantStock = getVariantStock(p, activeVariant);
-  const disc = displayOldPrice ? calcDiscount(displayPrice, displayOldPrice) : 0;
-
-  const productName = getProductName(p, lang);
+  const colors = (product.colors || []) as ProductColor[];
+  const storage = product.storage_options || [];
+  const specs = (product.specs || {}) as Record<string, string>;
+  const activeVariant = getActiveVariant(product, selStorage < 0 ? 0 : selStorage);
+  const { price: displayPrice, old_price: displayOldPrice } = getDisplayPrice(
+    product,
+    activeVariant
+  );
+  const variantStock = getVariantStock(product, activeVariant);
+  const discount = displayOldPrice
+    ? calcDiscount(displayPrice, displayOldPrice)
+    : 0;
+  const productName = getProductName(product, lang);
   const activeColor = selColor >= 0 ? colors[selColor] : undefined;
   const colorName = activeColor ? getColorName(activeColor, lang) : undefined;
-
   const needsColor = colors.length > 0 && selColor < 0;
   const needsStorage = storage.length > 1 && selStorage < 0;
   const selectionIncomplete = needsColor || needsStorage;
+  const warrantyKey = getWarrantyKey(product);
+  const months = INSTALLMENTS_BY_TYPE[product.type] || 0;
+  const monthly = activeVariant?.monthly_price;
+  const brandLogo = getBrandLogo(product.brand);
 
   const allImages: string[] = [];
-  if (p.image_url) allImages.push(p.image_url);
-  if (p.gallery?.length) allImages.push(...p.gallery.filter(Boolean));
-  colors.forEach((c) => { if (c.image && !allImages.includes(c.image)) allImages.push(c.image); });
-
-  const handleColorSelect = (i: number) => {
-    setSelColor(i);
-    const cImg = colors[i]?.image;
-    if (cImg) {
-      const idx = allImages.indexOf(cImg);
-      if (idx >= 0) setSelImage(idx);
+  if (product.image_url) allImages.push(product.image_url);
+  if (product.gallery?.length) allImages.push(...product.gallery.filter(Boolean));
+  colors.forEach((color) => {
+    if (color.image && !allImages.includes(color.image)) {
+      allImages.push(color.image);
     }
-  };
+  });
 
-  const specLabels: Record<string, string> = {
-    screen: t("detail.screen"), camera: t("detail.camera"), front_camera: t("detail.frontCamera"), battery: t("detail.battery"),
-    cpu: t("detail.cpu"), ram: t("detail.ram"), weight: t("detail.weight"),
-    os: t("detail.os"), waterproof: t("detail.waterproof"), sim: "SIM",
-    network: t("detail.network"), charging: t("detail.charging"),
-    bluetooth: "Bluetooth", usb: "USB", nfc: "NFC", gps: t("detail.gps"),
-    sensors: t("detail.sensors"), dimensions: t("detail.dimensions"),
+  const handleColorSelect = (index: number) => {
+    setSelColor(index);
+    const selectedImage = colors[index]?.image;
+    if (!selectedImage) return;
+    const imageIndex = allImages.indexOf(selectedImage);
+    if (imageIndex >= 0) setSelImage(imageIndex);
   };
 
   const handleAdd = () => {
-    if (selectionIncomplete) return;
+    if (selectionIncomplete || variantStock === 0) return;
     addItem({
-      productId: p.id,
-      name: p.name_ar,
-      name_he: p.name_he || undefined,
-      brand: p.brand,
-      type: p.type,
+      productId: product.id,
+      name: product.name_ar,
+      name_he: product.name_he || undefined,
+      brand: product.brand,
+      type: product.type,
       price: displayPrice,
-      image: (activeColor?.image) || p.image_url || undefined,
+      image: activeColor?.image || product.image_url || undefined,
       color: activeColor?.name_ar,
       color_he: activeColor?.name_he || undefined,
       storage: storage[selStorage],
@@ -117,303 +164,439 @@ export function ProductDetailClient({
   };
 
   useEffect(() => {
-    trackViewProduct(productName, p.price);
-  }, [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    trackViewProduct(productName, product.price);
+  }, [productName, product.price]);
+
+  const specLabels: Record<string, string> = {
+    screen: t("detail.screen"),
+    camera: t("detail.camera"),
+    front_camera: t("detail.frontCamera"),
+    battery: t("detail.battery"),
+    cpu: t("detail.cpu"),
+    ram: t("detail.ram"),
+    weight: t("detail.weight"),
+    os: t("detail.os"),
+    waterproof: t("detail.waterproof"),
+    sim: "SIM",
+    network: t("detail.network"),
+    charging: t("detail.charging"),
+    bluetooth: "Bluetooth",
+    usb: "USB",
+    nfc: "NFC",
+    gps: t("detail.gps"),
+    sensors: t("detail.sensors"),
+    dimensions: t("detail.dimensions"),
+  };
+
+  const stockTone =
+    variantStock === 0
+      ? {
+          className: "text-[#ff9494]",
+          icon: <AlertTriangle size={14} />,
+          text: t("store.outOfStock"),
+        }
+      : variantStock <= 5
+        ? {
+            className: "text-[#ffd282]",
+            icon: <AlertTriangle size={14} />,
+            text:
+              lang === "he"
+                ? `נשארו ${variantStock} יחידות בלבד`
+                : `باقي ${variantStock} قطع فقط`,
+          }
+        : {
+            className: "text-[#95e4ab]",
+            icon: <CheckCircle2 size={14} />,
+            text: t("store.inStock"),
+          };
+
+  const detailCopy =
+    lang === "he"
+      ? {
+          breadcrumb: "החנות / פרטי מוצר",
+          gallery: "גלריית המוצר",
+          summary: "כל פרטי הבחירה והמפרט במקום אחד",
+          trustOne: "אחריות רשמית",
+          trustTwo: "מחיר ברור",
+          trustThree: "התאמה למלאי",
+          chooseColor: "בחירת צבע",
+          chooseStorage:
+            product.type === "appliance" &&
+            (product.variant_kind as ProductVariantKind | undefined) === "model"
+              ? t("detail.variantModel")
+              : t("detail.storage"),
+          specsTitle: t("detail.specs"),
+          descriptionTitle: t("detail.description"),
+          relatedTitle: t("detail.similar"),
+        }
+      : {
+          breadcrumb: "المتجر / تفاصيل المنتج",
+          gallery: "معرض المنتج",
+          summary: "كل عناصر القرار في مكان واحد",
+          trustOne: "ضمان رسمي",
+          trustTwo: "سعر واضح",
+          trustThree: "مطابقة للمخزون",
+          chooseColor: "اختيار اللون",
+          chooseStorage:
+            product.type === "appliance" &&
+            (product.variant_kind as ProductVariantKind | undefined) === "model"
+              ? t("detail.variantModel")
+              : t("detail.storage"),
+          specsTitle: t("detail.specs"),
+          descriptionTitle: t("detail.description"),
+          relatedTitle: t("detail.similar"),
+        };
 
   return (
-    <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
+    <div
+      dir="rtl"
+      className="font-arabic min-h-screen bg-[#111114] text-white"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at top right, rgba(255,51,81,0.08), transparent 22%), radial-gradient(circle at left center, rgba(255,255,255,0.03), transparent 28%)",
+      }}
+    >
       <StoreHeader showBack />
       <StickyCartBar />
 
       <div
-        className="max-w-[900px] mx-auto"
-        style={{ padding: scr.mobile ? "12px 14px 30px" : "20px 28px 40px" }}
+        className="mx-auto max-w-[1540px]"
+        style={{ padding: scr.mobile ? "16px 14px 36px" : "24px 24px 48px" }}
       >
-        <div style={{ display: scr.mobile ? "block" : "flex", gap: 28 }}>
-          {/* Image Gallery */}
-          <div className="flex-shrink-0" style={{ width: scr.mobile ? "100%" : 380, marginBottom: scr.mobile ? 12 : 0 }}>
-            {/* Main Image */}
-            <div
-              className="glass-elevated flex items-center justify-center relative"
-              style={{
-                width: "100%",
-                height: scr.mobile ? 260 : 380,
-              }}
-            >
-              {allImages.length > 0 ? (
-                <Image src={allImages[selImage] || allImages[0]} alt={productName} fill sizes="(max-width: 768px) 100vw, 380px" className="object-contain drop-shadow-lg p-4" priority />
-              ) : (
-                <span className="opacity-15" style={{ fontSize: scr.mobile ? 60 : 90 }}>
-                  {p.type === "device" ? "📱" : p.type === "appliance" ? "🏠" : "🔌"}
-                </span>
-              )}
-            </div>
-
-            {/* Thumbnails */}
-            {allImages.length > 1 && (
-              <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "thin" }}>
-                {allImages.map((img, i) => (
-                  <button
-                    key={img}
-                    onClick={() => setSelImage(i)}
-                    className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-all border-0 glass-elevated relative"
-                    style={{
-                      width: scr.mobile ? 48 : 60,
-                      height: scr.mobile ? 48 : 60,
-                      outline: selImage === i ? "2px solid #c41040" : "1px solid #333",
-                      opacity: selImage === i ? 1 : 0.6,
-                    }}
-                  >
-                    <Image src={img} alt={`صورة المنتج ${i + 1}`} fill sizes="60px" className="object-contain" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1.5">
-              {p.featured && (
-                <span className="badge" style={{ background: "rgba(196,16,64,0.15)", color: "#c41040" }}>
-                  {t("store.bestSeller")}
-                </span>
-              )}
-              <div className="flex items-center gap-1.5">
-                {getBrandLogo(p.brand) && (
-                  <Image src={getBrandLogo(p.brand)!} alt={p.brand} width={scr.mobile ? 18 : 22} height={scr.mobile ? 18 : 22} loading="lazy" />
-                )}
-                <span className="text-white font-extrabold uppercase tracking-wide" style={{ fontSize: scr.mobile ? 14 : 16 }}>{p.brand}</span>
-              </div>
-            </div>
-
-            <h1 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 28 }} dir="ltr">
-              {productName}
-            </h1>
-
-            {/* Price */}
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="font-black text-brand" style={{ fontSize: scr.mobile ? 24 : 32 }}>
-                ₪{displayPrice.toLocaleString()}
-              </span>
-              {displayOldPrice && (
-                <>
-                  <span className="text-dim line-through" style={{ fontSize: scr.mobile ? 14 : 16 }}>
-                    ₪{displayOldPrice.toLocaleString()}
-                  </span>
-                  <span className="badge bg-state-error/15 text-state-error">-{disc}%</span>
-                </>
-              )}
-            </div>
-            {/* Cash price tag — eligible for cash or up to 18 interest-free installments */}
-            {displayPrice > 0 && (INSTALLMENTS_BY_TYPE[p.type] || 0) > 0 && (
-              <div className="mb-1 text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-                💵 {lang === "he" ? "מזומן או עד 18 תשלומים ללא ריבית" : "نقد أو حتى 18 قسط بدون فوائد"}
-              </div>
-            )}
-            {/* Long-term financed installment — only when admin set monthly_price explicitly */}
-            {displayPrice > 0 && activeVariant?.monthly_price && (INSTALLMENTS_BY_TYPE[p.type] || 0) > 0 && (
-              <div className="mb-4" style={{ fontSize: scr.mobile ? 12 : 14 }}>
-                <span className="text-[#a78bfa] font-bold">
-                  أو ₪{activeVariant.monthly_price.toLocaleString()} × {INSTALLMENTS_BY_TYPE[p.type]}
-                </span>
-                <span className="text-muted me-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>{t("store2.monthlyInstallment")}</span>
-              </div>
-            )}
-
-            {/* Type info */}
-            {p.type === "device" && (
-              <div className="glass-elevated rounded-button p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                <span className="text-state-info">{t("detail.deviceNote")}</span>
-              </div>
-            )}
-            {p.type === "accessory" && (
-              <div className="glass-elevated rounded-button p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                <span className="text-state-success">{t("detail.accessoryNote")}</span>
-              </div>
-            )}
-            {p.type === "appliance" && (
-              <div className="glass-elevated rounded-button p-2 mb-3" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                <span className="text-cyan-300/90">{t("detail.applianceNote")}</span>
-              </div>
-            )}
-
-            {(p.type === "appliance" || p.type === "tv" || p.type === "computer" || p.type === "tablet" || p.type === "network") &&
-              ((p.warranty_months != null && p.warranty_months > 0) || p.model_number || p.appliance_kind) && (
-              <div className="flex flex-wrap gap-2 mb-3 text-[11px] text-muted">
-                {p.warranty_months != null && p.warranty_months > 0 && (
-                  <span className="badge bg-surface-elevated">
-                    {t("detail.warranty")}: {p.warranty_months} {lang === "he" ? "חודשים" : "شهر"}
-                  </span>
-                )}
-                {p.model_number && (
-                  <span className="badge bg-surface-elevated" dir="ltr">
-                    {t("detail.modelNumber")}: {p.model_number}
-                  </span>
-                )}
-                {p.appliance_kind && APPLIANCE_KINDS[p.appliance_kind as keyof typeof APPLIANCE_KINDS] && (
-                  <span className="badge bg-surface-elevated">
-                    {APPLIANCE_KINDS[p.appliance_kind as keyof typeof APPLIANCE_KINDS].icon}{" "}
-                    {lang === "he"
-                      ? APPLIANCE_KINDS[p.appliance_kind as keyof typeof APPLIANCE_KINDS].labelHe
-                      : APPLIANCE_KINDS[p.appliance_kind as keyof typeof APPLIANCE_KINDS].label}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Colors */}
-            {colors.length > 0 && (
-              <div className="mb-3">
-                <div className="text-muted mb-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-                  {t("detail.color")} {colorName}
-                </div>
-                <div className="flex gap-1.5">
-                  {colors.map((c, i) => (
-                    <button
-                      key={`${c.hex}-${i}`}
-                      type="button"
-                      onClick={() => handleColorSelect(i)}
-                      aria-pressed={selColor === i}
-                      aria-label={`${t("detail.color")}: ${getColorName(c, lang)}`}
-                      className="rounded-full cursor-pointer transition-all"
-                      style={{
-                        width: scr.mobile ? 28 : 36,
-                        height: scr.mobile ? 28 : 36,
-                        background: c.hex,
-                        border: selColor === i ? "3px solid #c41040" : "2px solid #333",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Storage / model options (hidden for color_only with no options) */}
-            {storage.length > 0 && (
-              <div className="mb-4">
-                <div className="text-muted mb-1.5" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-                  {p.type === "appliance" && (p.variant_kind as ProductVariantKind | undefined) === "model"
-                    ? t("detail.variantModel")
-                    : t("detail.storage")}
-                </div>
-                <div className="flex gap-1">
-                  {storage.map((s, i) => (
-                    <button
-                      key={`${s}-${i}`}
-                      type="button"
-                      onClick={() => setSelStorage(i)}
-                      aria-pressed={selStorage === i}
-                      aria-label={`${t("detail.storage")}: ${s}`}
-                      className={`chip ${selStorage === i ? "chip-active" : ""}`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Stock */}
-            {variantStock > 0 && variantStock <= 5 && (
-              <div className="text-state-warning mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                {t("detail.lowStock").replace("{n}", String(variantStock))}
-              </div>
-            )}
-            {variantStock === 0 && (
-              <div className="text-state-error mb-2" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                {t("store.outOfStock")}
-              </div>
-            )}
-
-            {/* Add to cart */}
-            {selectionIncomplete && (
+        <section className="mb-4 rounded-[30px] border border-[#2d2d35] bg-[linear-gradient(180deg,rgba(23,23,27,0.96),rgba(18,18,22,0.96))] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.28)] md:px-7 md:py-6">
+          <span className="inline-flex rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 text-xs font-semibold text-[#ff8da0]">
+            {detailCopy.breadcrumb}
+          </span>
+          <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(400px,520px)_minmax(0,1fr)]">
+            <div className="overflow-hidden rounded-[28px] border border-[#33333c] bg-[linear-gradient(180deg,#1d1d22_0%,#131317_100%)] shadow-[0_24px_48px_rgba(0,0,0,0.26)]">
               <div
-                className="glass-elevated rounded-button text-center font-bold mb-2"
-                style={{
-                  fontSize: scr.mobile ? 11 : 13,
-                  color: "#f59e0b",
-                  padding: scr.mobile ? "8px 12px" : "10px 16px",
-                }}
+                className="relative flex items-center justify-center overflow-hidden"
+                style={{ minHeight: scr.mobile ? 300 : 520 }}
               >
-                {needsColor && needsStorage
-                  ? t("store.selectColorAndStorage")
-                  : needsColor
-                    ? t("store.selectColor")
-                    : t("store.selectStorage")}
+                <div className="pointer-events-none absolute left-0 right-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(255,51,81,0.16),transparent_70%)]" />
+                {allImages.length > 0 ? (
+                  <Image
+                    src={allImages[selImage] || allImages[0]}
+                    alt={productName}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 520px"
+                    className="object-contain p-8 drop-shadow-[0_24px_28px_rgba(0,0,0,0.24)]"
+                    priority
+                  />
+                ) : (
+                  <span className="text-white/20">
+                    <Smartphone size={scr.mobile ? 72 : 96} />
+                  </span>
+                )}
               </div>
-            )}
-            <button
-              onClick={handleAdd}
-              disabled={variantStock === 0 || selectionIncomplete}
-              className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ fontSize: scr.mobile ? 14 : 16, padding: "14px 20px" }}
-            >
-              {variantStock === 0 ? t("detail.unavailable") : `🛒 ${t("store.addToCart")}`}
-            </button>
-          </div>
-        </div>
 
-        {/* Specs */}
+              <div className="border-t border-[#2b2b34] px-4 py-4">
+                <div className="mb-3 text-sm font-semibold text-[#d7d7df]">
+                  {detailCopy.gallery}
+                </div>
+                {allImages.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {allImages.map((image, index) => (
+                      <button
+                        key={`${image}-${index}`}
+                        onClick={() => setSelImage(index)}
+                        className={`relative h-[64px] w-[64px] flex-shrink-0 overflow-hidden rounded-2xl border ${
+                          selImage === index
+                            ? "border-[#ff3351]/55 bg-[#ff3351]/10"
+                            : "border-[#3a3a44] bg-[#18181d]"
+                        }`}
+                      >
+                        <Image
+                          src={image}
+                          alt={`${productName} ${index + 1}`}
+                          fill
+                          sizes="64px"
+                          className="object-contain p-2"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-[#33333c] bg-[linear-gradient(180deg,#1d1d22_0%,#131317_100%)] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.26)] md:px-6 md:py-6">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                {product.featured && (
+                  <span className="rounded-full bg-[#ff0e34] px-3 py-1 text-xs font-black text-white">
+                    {t("store.bestSeller")}
+                  </span>
+                )}
+                {discount > 0 && (
+                  <span className="rounded-full border border-[#ff3351]/15 bg-[#ff3351]/10 px-3 py-1 text-xs font-black text-[#ffd7de]">
+                    -{discount}%
+                  </span>
+                )}
+                {warrantyKey && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#ff3351]/15 bg-[#ff3351]/10 px-3 py-1 text-xs font-black text-[#ffd7de]">
+                    <ShieldCheck size={13} />
+                    {t(warrantyKey)}
+                  </span>
+                )}
+              </div>
+
+              <div className="mb-3 flex items-center gap-2 text-[#c4c4cc]">
+                {brandLogo && (
+                  <Image
+                    src={brandLogo}
+                    alt={product.brand}
+                    width={22}
+                    height={22}
+                    loading="lazy"
+                  />
+                )}
+                <span className="text-sm font-black uppercase tracking-[0.18em]">
+                  {product.brand}
+                </span>
+              </div>
+
+              <h1
+                className="text-2xl font-black leading-tight text-white md:text-[2.5rem]"
+                dir="auto"
+              >
+                {productName}
+              </h1>
+
+              <p className="mt-3 text-sm leading-8 text-[#b8b8c2] md:text-base">
+                {detailCopy.summary}
+              </p>
+
+              <div className="mt-5">
+                <div className="flex flex-wrap items-end gap-3">
+                  <strong className="text-[2.1rem] font-black leading-none text-[#ff3351] md:text-[3rem]">
+                    ₪{displayPrice.toLocaleString()}
+                  </strong>
+                  {displayOldPrice && (
+                    <span className="pb-1 text-base text-[#7a7a84] line-through">
+                      ₪{displayOldPrice.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+
+                {monthly && months > 0 && (
+                  <div className="mt-2 text-sm font-semibold text-[#ff9eb1]">
+                    ₪{monthly.toLocaleString()} × {months}
+                    <span className="mr-1 text-xs font-medium text-[#b8b8c2]">
+                      {lang === "he" ? "לחודש" : "شهريًا"}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <span className="rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5 text-xs font-semibold text-[#d7d7de]">
+                  {detailCopy.trustOne}
+                </span>
+                <span className="rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5 text-xs font-semibold text-[#d7d7de]">
+                  {detailCopy.trustTwo}
+                </span>
+                <span className="rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5 text-xs font-semibold text-[#d7d7de]">
+                  {detailCopy.trustThree}
+                </span>
+              </div>
+
+              {(product.type === "appliance" ||
+                product.type === "tv" ||
+                product.type === "computer" ||
+                product.type === "tablet" ||
+                product.type === "network") &&
+                ((product.warranty_months != null && product.warranty_months > 0) ||
+                  product.model_number ||
+                  product.appliance_kind) && (
+                  <div className="mt-5 flex flex-wrap gap-2 text-xs text-[#d7d7de]">
+                    {product.warranty_months != null &&
+                      product.warranty_months > 0 && (
+                        <span className="rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5">
+                          {t("detail.warranty")}: {product.warranty_months}{" "}
+                          {lang === "he" ? "חודש" : "شهر"}
+                        </span>
+                      )}
+                    {product.model_number && (
+                      <span
+                        className="rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5"
+                        dir="ltr"
+                      >
+                        {t("detail.modelNumber")}: {product.model_number}
+                      </span>
+                    )}
+                    {product.appliance_kind &&
+                      APPLIANCE_KINDS[
+                        product.appliance_kind as keyof typeof APPLIANCE_KINDS
+                      ] && (
+                        <span className="rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5">
+                          {
+                            APPLIANCE_KINDS[
+                              product.appliance_kind as keyof typeof APPLIANCE_KINDS
+                            ].icon
+                          }{" "}
+                          {lang === "he"
+                            ? APPLIANCE_KINDS[
+                                product.appliance_kind as keyof typeof APPLIANCE_KINDS
+                              ].labelHe
+                            : APPLIANCE_KINDS[
+                                product.appliance_kind as keyof typeof APPLIANCE_KINDS
+                              ].label}
+                        </span>
+                      )}
+                  </div>
+                )}
+
+              {colors.length > 0 && (
+                <div className="mt-6">
+                  <div className="mb-2 text-sm font-semibold text-[#d7d7de]">
+                    {detailCopy.chooseColor}
+                    {colorName ? `: ${colorName}` : ""}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {colors.map((color, index) => (
+                      <button
+                        key={`${color.hex}-${index}`}
+                        type="button"
+                        onClick={() => handleColorSelect(index)}
+                        aria-pressed={selColor === index}
+                        aria-label={`${detailCopy.chooseColor}: ${getColorName(
+                          color,
+                          lang
+                        )}`}
+                        className="rounded-full transition-all"
+                        style={{
+                          width: scr.mobile ? 30 : 34,
+                          height: scr.mobile ? 30 : 34,
+                          background: color.hex,
+                          border:
+                            selColor === index
+                              ? "2px solid #ffffff"
+                              : "2px solid rgba(255,255,255,0.18)",
+                          boxShadow:
+                            selColor === index
+                              ? "0 0 0 2px rgba(255,51,81,0.55)"
+                              : "none",
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {storage.length > 0 && (
+                <div className="mt-6">
+                  <div className="mb-2 text-sm font-semibold text-[#d7d7de]">
+                    {detailCopy.chooseStorage}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {storage.map((option, index) => (
+                      <button
+                        key={`${option}-${index}`}
+                        type="button"
+                        onClick={() => setSelStorage(index)}
+                        aria-pressed={selStorage === index}
+                        className={`rounded-2xl border px-3 py-2 text-sm font-bold transition-colors ${
+                          selStorage === index
+                            ? "border-[#ff3351]/45 bg-[#ff3351]/10 text-white"
+                            : "border-[#53535e] bg-transparent text-[#d4d4dc] hover:border-[#ff3351]/35 hover:text-white"
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-wrap gap-2">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border border-[#3a3a44] bg-black/10 px-3 py-1.5 text-xs font-semibold ${stockTone.className}`}
+                >
+                  {stockTone.icon}
+                  {stockTone.text}
+                </span>
+              </div>
+
+              {selectionIncomplete && (
+                <div className="mt-5 rounded-2xl border border-[#4c3d1f] bg-[#2b2412] px-4 py-3 text-sm font-bold text-[#ffcf79]">
+                  {needsColor && needsStorage
+                    ? t("store.selectColorAndStorage")
+                    : needsColor
+                      ? t("store.selectColor")
+                      : t("store.selectStorage")}
+                </div>
+              )}
+
+              <button
+                onClick={handleAdd}
+                disabled={variantStock === 0 || selectionIncomplete}
+                className="mt-5 w-full rounded-full border-2 border-[#ff0e34] px-4 py-4 text-sm font-black text-[#ff4c67] transition-colors hover:bg-[#ff0e34]/10 disabled:cursor-not-allowed disabled:opacity-40 md:text-base"
+              >
+                {variantStock === 0
+                  ? t("detail.unavailable")
+                  : t("store.addToCart")}
+              </button>
+            </div>
+          </div>
+        </section>
+
         {Object.keys(specs).length > 0 && (
-          <div className="glass-card-static mt-4 p-4" style={{ marginTop: scr.mobile ? 12 : 24 }}>
-            <h3 className="font-extrabold mb-2.5 text-right" style={{ fontSize: scr.mobile ? 12 : 16 }}>
-              {t("detail.specs")}
-            </h3>
-            <div
-              className="grid gap-1.5"
-              style={{ gridTemplateColumns: scr.mobile ? "1fr" : "1fr 1fr" }}
-            >
+          <section className="mb-4 rounded-[28px] border border-[#33333c] bg-[linear-gradient(180deg,#1b1b20_0%,#131317_100%)] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.22)] md:px-6 md:py-6">
+            <h2 className="text-xl font-black text-white">
+              {detailCopy.specsTitle}
+            </h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
               {Object.entries(specs)
-                .filter(([, v]) => v)
-                .map(([k, v]) => (
-                  <div key={k} className="flex justify-between p-2 glass-elevated rounded-button">
-                    <span className="font-semibold" style={{ fontSize: scr.mobile ? 11 : 13 }}>{v}</span>
-                    <span className="text-muted" style={{ fontSize: scr.mobile ? 10 : 12 }}>
-                      {specLabels[k] || k}
+                .filter(([, value]) => value)
+                .map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-2xl border border-[#30303a] bg-white/[0.03] px-4 py-3"
+                  >
+                    <span className="text-sm font-semibold text-white">
+                      {value}
+                    </span>
+                    <span className="text-sm text-[#a5a5af]">
+                      {specLabels[key] || key}
                     </span>
                   </div>
                 ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Description */}
-        {((lang === "he" && p.description_he) || p.description_ar) && (
-          <div className="glass-card-static mt-4 p-4">
-            <h3 className="font-extrabold mb-2 text-right" style={{ fontSize: scr.mobile ? 12 : 16 }}>
-              {t("detail.description")}
-            </h3>
-            <p className="text-muted leading-relaxed text-right" style={{ fontSize: scr.mobile ? 11 : 13 }}>
-              {lang === "he" ? (p.description_he || p.description_ar) : p.description_ar}
+        {((lang === "he" && product.description_he) || product.description_ar) && (
+          <section className="mb-4 rounded-[28px] border border-[#33333c] bg-[linear-gradient(180deg,#1b1b20_0%,#131317_100%)] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.22)] md:px-6 md:py-6">
+            <h2 className="text-xl font-black text-white">
+              {detailCopy.descriptionTitle}
+            </h2>
+            <p className="mt-4 text-sm leading-8 text-[#b8b8c2] md:text-base">
+              {lang === "he"
+                ? product.description_he || product.description_ar
+                : product.description_ar}
             </p>
-          </div>
+          </section>
         )}
 
-        {/* Reviews */}
-        <ProductReviews productId={p.id} />
+        <ProductReviews productId={product.id} />
 
-        {/* Related */}
         {related.length > 0 && (
-          <div style={{ marginTop: scr.mobile ? 20 : 32 }}>
-            <h3 className="font-extrabold text-center mb-3" style={{ fontSize: scr.mobile ? 14 : 18 }}>
-              {t("detail.similar")}
-            </h3>
-            <div
-              className="grid gap-2"
-              style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr" }}
-            >
-              {related.map((r) => (
-                <ProductCard key={r.id} product={r} />
+          <section className="mt-6">
+            <h2 className="mb-4 text-center text-xl font-black text-white md:text-2xl">
+              {detailCopy.relatedTitle}
+            </h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {related.map((item) => (
+                <ProductCard key={item.id} product={item} />
               ))}
             </div>
-          </div>
+          </section>
         )}
       </div>
 
       <ToastContainer toasts={toasts} />
 
-      <ProductAssistantWidget page="product" product={p} />
+      <ProductAssistantWidget page="product" product={product} />
 
       <Footer />
     </div>

@@ -1,24 +1,20 @@
-// =====================================================
-// ClalMobile — Compare Page
-// Side-by-side product comparison table (2-4 products)
-// =====================================================
-
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { useCompare } from "@/lib/store/compare";
-import { useCart } from "@/lib/store/cart";
+import Link from "next/link";
+import { Footer } from "@/components/website/sections";
+import { StoreHeader } from "@/components/store/StoreHeader";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
-import { StoreHeader } from "@/components/store/StoreHeader";
-import { getProductName, getColorName } from "@/lib/utils";
+import { useCart } from "@/lib/store/cart";
+import { useCompare } from "@/lib/store/compare";
+import { getColorName, getProductName } from "@/lib/utils";
 
 export default function ComparePage() {
   const scr = useScreen();
   const { t, lang } = useLang();
   const { items, removeItem, clearAll } = useCompare();
-  const addToCart = useCart((s) => s.addItem);
+  const addToCart = useCart((state) => state.addItem);
 
   const handleAddToCart = (item: (typeof items)[0]) => {
     addToCart({
@@ -37,17 +33,14 @@ export default function ComparePage() {
     navigator.clipboard.writeText(url).catch(() => {});
   };
 
-  // Find min price for green highlight
-  const minPrice = items.length > 0 ? Math.min(...items.map((i) => i.price)) : 0;
+  const minPrice = items.length > 0 ? Math.min(...items.map((item) => item.price)) : 0;
 
-  // Collect all spec keys
   const specKeys = new Set<string>();
   items.forEach((item) => {
-    Object.keys(item.specs || {}).forEach((k) => specKeys.add(k));
+    Object.keys(item.specs || {}).forEach((key) => specKeys.add(key));
   });
   const specKeyList = Array.from(specKeys);
 
-  // Spec label mapping
   const specLabels: Record<string, string> = {
     screen: t("detail.screen"),
     camera: t("detail.camera"),
@@ -70,249 +63,370 @@ export default function ComparePage() {
     color: lang === "ar" ? "الألوان" : "צבעים",
   };
 
-  if (items.length === 0) {
-    return (
-      <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
-        <StoreHeader showBack />
-        <div className="max-w-[1200px] mx-auto text-center" style={{ padding: scr.mobile ? "60px 16px" : "100px 24px" }}>
-          <div style={{ fontSize: scr.mobile ? 48 : 64 }} className="mb-4">⚖️</div>
-          <h2 className="font-black mb-2" style={{ fontSize: scr.mobile ? 18 : 24 }}>
-            {t("compare.emptyTitle")}
-          </h2>
-          <p className="text-muted mb-6" style={{ fontSize: scr.mobile ? 12 : 14 }}>
-            {t("compare.emptyDesc")}
-          </p>
-          <Link
-            href="/store"
-            className="btn-primary inline-block"
-            style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "10px 24px" : "12px 32px" }}
-          >
-            {t("store.goToStore")}
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const intro =
+    lang === "he"
+      ? {
+          badge: "השוואה חכמה",
+          title: "טבלת השוואה מסודרת להחלטה מהירה",
+          subtitle:
+            "השוו בין מפרט, זמינות, נפחי אחסון ומחירים מתוך תצוגה אחת ברורה ונטולת עומס.",
+          count: "מוצרים מושווים",
+          hint: "המחיר הנמוך מסומן בירוק",
+          share: t("compare.share"),
+          clear: t("compare.clearAll"),
+          product: t("compare.product"),
+          availability: "זמינות",
+          remove: t("compare.remove"),
+        }
+      : {
+          badge: "مقارنة ذكية",
+          title: "جدول مقارنة منظم لاتخاذ القرار بسرعة",
+          subtitle:
+            "قارن بين المواصفات والتخزين والتوفر والسعر من شاشة واحدة واضحة ومن دون تشويش بصري.",
+          count: "منتجات قيد المقارنة",
+          hint: "أقل سعر يظهر باللون الأخضر",
+          share: t("compare.share"),
+          clear: t("compare.clearAll"),
+          product: t("compare.product"),
+          availability: "التوفر",
+          remove: t("compare.remove"),
+        };
 
   return (
-    <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
+    <div
+      dir="rtl"
+      className="font-arabic min-h-screen bg-[#111114] text-white"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at top right, rgba(255,51,81,0.08), transparent 18%), radial-gradient(circle at left center, rgba(255,255,255,0.03), transparent 26%)",
+      }}
+    >
       <StoreHeader showBack />
+
       <div
-        className="max-w-[1200px] mx-auto"
-        style={{ padding: scr.mobile ? "16px 10px 100px" : "32px 24px 60px" }}
+        className="mx-auto max-w-[1540px]"
+        style={{ padding: scr.mobile ? "16px 14px 80px" : "24px 24px 110px" }}
       >
-        {/* Title + actions */}
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h1 className="font-black" style={{ fontSize: scr.mobile ? 18 : 26 }}>
-            ⚖️ {t("compare.title")} ({items.length})
-          </h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleShare}
-              className="border border-surface-border bg-transparent text-muted rounded-lg cursor-pointer font-bold hover:text-white transition-colors"
-              style={{ fontSize: scr.mobile ? 10 : 12, padding: "5px 12px" }}
-            >
-              📤 {t("compare.share")}
-            </button>
-            <button
-              onClick={clearAll}
-              className="border border-surface-border bg-transparent text-muted rounded-lg cursor-pointer font-bold hover:text-white transition-colors"
-              style={{ fontSize: scr.mobile ? 10 : 12, padding: "5px 12px" }}
-            >
-              🗑 {t("compare.clearAll")}
-            </button>
+        <section className="mb-5 rounded-[30px] border border-[#2d2d35] bg-[linear-gradient(180deg,rgba(23,23,27,0.96),rgba(18,18,22,0.96))] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.28)] md:px-7 md:py-6">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div>
+              <span className="inline-flex rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 text-xs font-semibold text-[#ff8da0]">
+                {intro.badge}
+              </span>
+              <h1 className="mt-3 text-2xl font-black leading-tight md:text-[2.4rem]">
+                {intro.title}
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-8 text-[#b8b8c2] md:text-base">
+                {intro.subtitle}
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
+                <strong className="block text-xl font-black text-white">{items.length}</strong>
+                <span className="text-sm text-[#b8b8c2]">{intro.count}</span>
+              </div>
+              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
+                <strong className="block text-xl font-black text-white">
+                  {items.length > 0 ? `₪${minPrice.toLocaleString()}` : "—"}
+                </strong>
+                <span className="text-sm text-[#b8b8c2]">{intro.hint}</span>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* Comparison Table — horizontal scroll on mobile */}
-        <div className="overflow-x-auto rounded-xl border border-surface-border">
-          <table className="w-full border-collapse" style={{ minWidth: scr.mobile ? items.length * 160 : "auto" }}>
-            {/* Product images row */}
-            <thead>
-              <tr className="bg-surface-card">
-                <th
-                  className="text-right text-muted font-bold border-b border-surface-border"
-                  style={{ padding: scr.mobile ? "10px 8px" : "14px 16px", fontSize: scr.mobile ? 11 : 13, width: scr.mobile ? 80 : 140 }}
-                >
-                  {t("compare.product")}
-                </th>
-                {items.map((item) => (
-                  <th
-                    key={item.id}
-                    className="text-center border-b border-surface-border border-r"
-                    style={{ padding: scr.mobile ? 8 : 12 }}
+        {items.length === 0 ? (
+          <section className="rounded-[30px] border border-[#2d2d35] bg-[linear-gradient(180deg,#17171b_0%,#111115_100%)] px-6 py-16 text-center shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
+            <div className="text-5xl">⚖</div>
+            <h2 className="mt-4 text-xl font-black text-white md:text-2xl">
+              {t("compare.emptyTitle")}
+            </h2>
+            <p className="mt-3 text-sm leading-8 text-[#b8b8c2] md:text-base">
+              {t("compare.emptyDesc")}
+            </p>
+            <Link
+              href="/store"
+              className="mt-5 inline-flex min-h-[52px] items-center justify-center rounded-full border border-[#ff0e34] bg-[#ff0e34] px-6 text-sm font-bold text-white transition-colors hover:bg-[#df0d2f]"
+            >
+              {t("store.goToStore")}
+            </Link>
+          </section>
+        ) : (
+          <>
+            <section className="mb-4 rounded-[26px] border border-[#2f2f38] bg-[linear-gradient(180deg,#17171b_0%,#131318_100%)] px-5 py-4 shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className="inline-flex rounded-full border border-[#ff3351]/18 bg-[#ff3351]/10 px-3 py-1 text-xs font-semibold text-[#ff8da0]">
+                    {lang === "he" ? "פעולות מהירות" : "أدوات سريعة"}
+                  </span>
+                  <p className="mt-3 text-sm leading-8 text-[#b8b8c2]">
+                    {lang === "he"
+                      ? "טבלת ההשוואה שומרת על אותו סגנון כהה ורשמי של החנות, עם מיקוד במפרט ובמחיר."
+                      : "جدول المقارنة يحافظ على نفس الروح الداكنة الرسمية للمتجر مع تركيز مباشر على المواصفات والسعر."}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-[#ff0e34] px-5 text-sm font-bold text-[#ff6b82] transition-colors hover:bg-[#ff0e34]/10"
                   >
-                    <div className="flex flex-col items-center gap-1">
-                      <div
-                        className="relative bg-[#1a1a1e] rounded-lg flex items-center justify-center overflow-hidden mx-auto"
-                        style={{ width: scr.mobile ? 80 : 120, height: scr.mobile ? 80 : 120 }}
+                    {intro.share}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearAll}
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-[#353540] bg-[#17171b] px-5 text-sm font-bold text-[#d6d6dd] transition-colors hover:border-[#ff3351]/35 hover:text-white"
+                  >
+                    {intro.clear}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <div className="overflow-x-auto rounded-[28px] border border-[#2f2f38] bg-[linear-gradient(180deg,#17171b_0%,#121216_100%)] shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
+              <table
+                className="w-full border-collapse"
+                style={{ minWidth: scr.mobile ? items.length * 210 : "auto" }}
+              >
+                <thead>
+                  <tr className="border-b border-[#2a2a32] bg-white/[0.02]">
+                    <th
+                      className="text-right text-sm font-bold text-[#8f8f99]"
+                      style={{
+                        padding: scr.mobile ? "14px 12px" : "18px 20px",
+                        width: scr.mobile ? 100 : 180,
+                      }}
+                    >
+                      {intro.product}
+                    </th>
+                    {items.map((item) => (
+                      <th
+                        key={item.id}
+                        className="border-r border-[#2a2a32] text-center"
+                        style={{ padding: scr.mobile ? 12 : 16 }}
                       >
-                        {item.image_url ? (
-                          <Image src={item.image_url} alt={getProductName(item, lang)} fill className="object-contain p-1" />
-                        ) : (
-                          <span className="opacity-20 text-3xl">📱</span>
-                        )}
-                      </div>
-                      <div className="font-extrabold text-white" style={{ fontSize: scr.mobile ? 11 : 14 }} dir="ltr">
-                        {getProductName(item, lang)}
-                      </div>
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
+                        <div className="flex flex-col items-center gap-3">
+                          <div
+                            className="relative overflow-hidden rounded-[24px] border border-[#31313a] bg-[#1a1a20]"
+                            style={{
+                              width: scr.mobile ? 110 : 140,
+                              height: scr.mobile ? 110 : 140,
+                            }}
+                          >
+                            {item.image_url ? (
+                              <Image
+                                src={item.image_url}
+                                alt={getProductName(item, lang)}
+                                fill
+                                className="object-contain p-3"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-4xl text-white/15">
+                                📱
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-sm font-black text-white md:text-base">
+                            {getProductName(item, lang)}
+                          </div>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
 
-            <tbody>
-              {/* Brand */}
-              <tr>
-                <td className="text-right text-muted font-bold border-b border-surface-border" style={{ padding: scr.mobile ? "8px" : "10px 16px", fontSize: scr.mobile ? 10 : 12 }}>
-                  {lang === "ar" ? "الماركة" : "מותג"}
-                </td>
-                {items.map((item) => (
-                  <td key={item.id} className="text-center border-b border-surface-border border-r font-bold" style={{ padding: scr.mobile ? 6 : 10, fontSize: scr.mobile ? 11 : 13 }}>
-                    {item.brand}
-                  </td>
-                ))}
-              </tr>
-
-              {/* Type */}
-              <tr className="bg-surface-card/50">
-                <td className="text-right text-muted font-bold border-b border-surface-border" style={{ padding: scr.mobile ? "8px" : "10px 16px", fontSize: scr.mobile ? 10 : 12 }}>
-                  {lang === "ar" ? "النوع" : "סוג"}
-                </td>
-                {items.map((item) => (
-                  <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 6 : 10, fontSize: scr.mobile ? 11 : 13 }}>
-                    {item.type === "device" ? (lang === "ar" ? "📱 جهاز" : "📱 מכשיר") : (lang === "ar" ? "🔌 إكسسوار" : "🔌 אביזר")}
-                  </td>
-                ))}
-              </tr>
-
-              {/* Price */}
-              <tr>
-                <td className="text-right text-muted font-bold border-b border-surface-border" style={{ padding: scr.mobile ? "8px" : "10px 16px", fontSize: scr.mobile ? 10 : 12 }}>
-                  {lang === "ar" ? "السعر" : "מחיר"}
-                </td>
-                {items.map((item) => (
-                  <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 6 : 10 }}>
-                    <span
-                      className="font-black"
-                      style={{
-                        fontSize: scr.mobile ? 14 : 18,
-                        color: item.price === minPrice && items.length > 1 ? "#10b981" : "#c41040",
-                      }}
-                    >
-                      ₪{item.price.toLocaleString()}
-                    </span>
-                    {item.old_price && (
-                      <span className="line-through text-[#52525b] mr-1" style={{ fontSize: scr.mobile ? 9 : 11 }}>
-                        ₪{item.old_price.toLocaleString()}
-                      </span>
-                    )}
-                  </td>
-                ))}
-              </tr>
-
-              {/* Storage */}
-              <tr className="bg-surface-card/50">
-                <td className="text-right text-muted font-bold border-b border-surface-border" style={{ padding: scr.mobile ? "8px" : "10px 16px", fontSize: scr.mobile ? 10 : 12 }}>
-                  {t("detail.storage")}
-                </td>
-                {items.map((item) => (
-                  <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 6 : 10, fontSize: scr.mobile ? 10 : 12 }}>
-                    {item.storage_options?.length > 0 ? item.storage_options.join(" / ") : "—"}
-                  </td>
-                ))}
-              </tr>
-
-              {/* Colors */}
-              <tr>
-                <td className="text-right text-muted font-bold border-b border-surface-border" style={{ padding: scr.mobile ? "8px" : "10px 16px", fontSize: scr.mobile ? 10 : 12 }}>
-                  {lang === "ar" ? "الألوان" : "צבעים"}
-                </td>
-                {items.map((item) => (
-                  <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 6 : 10 }}>
-                    <div className="flex justify-center gap-1 flex-wrap">
-                      {(item.colors || []).slice(0, 5).map((c: any, i: number) => (
-                        <span key={i} className="inline-block rounded-full border border-surface-border" style={{ width: 16, height: 16, background: c?.hex || "#888" }} title={getColorName(c, lang)} />
-                      ))}
-                      {(!item.colors || item.colors.length === 0) && <span className="text-muted">—</span>}
-                    </div>
-                  </td>
-                ))}
-              </tr>
-
-              {/* Specs rows */}
-              {specKeyList.map((key, idx) => (
-                <tr key={key} className={idx % 2 === 0 ? "bg-surface-card/50" : ""}>
-                  <td className="text-right text-muted font-bold border-b border-surface-border" style={{ padding: scr.mobile ? "8px" : "10px 16px", fontSize: scr.mobile ? 10 : 12 }}>
-                    {specLabels[key] || key}
-                  </td>
-                  {items.map((item) => (
-                    <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 6 : 10, fontSize: scr.mobile ? 10 : 12 }}>
-                      {item.specs?.[key] || "—"}
+                <tbody>
+                  <tr>
+                    <td className="border-b border-[#2a2a32] px-5 py-4 text-sm font-bold text-[#8f8f99]">
+                      {lang === "ar" ? "الماركة" : "מותג"}
                     </td>
+                    {items.map((item) => (
+                      <td
+                        key={item.id}
+                        className="border-b border-r border-[#2a2a32] px-4 py-4 text-center text-sm font-bold text-white"
+                      >
+                        {item.brand}
+                      </td>
+                    ))}
+                  </tr>
+
+                  <tr className="bg-white/[0.02]">
+                    <td className="border-b border-[#2a2a32] px-5 py-4 text-sm font-bold text-[#8f8f99]">
+                      {lang === "ar" ? "النوع" : "סוג"}
+                    </td>
+                    {items.map((item) => (
+                      <td
+                        key={item.id}
+                        className="border-b border-r border-[#2a2a32] px-4 py-4 text-center text-sm text-[#d9d9df]"
+                      >
+                        {item.type === "device"
+                          ? lang === "ar"
+                            ? "جهاز"
+                            : "מכשיר"
+                          : lang === "ar"
+                            ? "إكسسوار"
+                            : "אביזר"}
+                      </td>
+                    ))}
+                  </tr>
+
+                  <tr>
+                    <td className="border-b border-[#2a2a32] px-5 py-4 text-sm font-bold text-[#8f8f99]">
+                      {lang === "ar" ? "السعر" : "מחיר"}
+                    </td>
+                    {items.map((item) => (
+                      <td
+                        key={item.id}
+                        className="border-b border-r border-[#2a2a32] px-4 py-4 text-center"
+                      >
+                        <div
+                          className="text-lg font-black md:text-2xl"
+                          style={{
+                            color:
+                              item.price === minPrice && items.length > 1
+                                ? "#8ce2ae"
+                                : "#ff3351",
+                          }}
+                        >
+                          ₪{item.price.toLocaleString()}
+                        </div>
+                        {item.old_price && (
+                          <div className="mt-1 text-xs text-[#6f6f7a] line-through">
+                            ₪{item.old_price.toLocaleString()}
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+
+                  <tr className="bg-white/[0.02]">
+                    <td className="border-b border-[#2a2a32] px-5 py-4 text-sm font-bold text-[#8f8f99]">
+                      {t("detail.storage")}
+                    </td>
+                    {items.map((item) => (
+                      <td
+                        key={item.id}
+                        className="border-b border-r border-[#2a2a32] px-4 py-4 text-center text-sm text-[#d9d9df]"
+                      >
+                        {item.storage_options?.length > 0
+                          ? item.storage_options.join(" / ")
+                          : "—"}
+                      </td>
+                    ))}
+                  </tr>
+
+                  <tr>
+                    <td className="border-b border-[#2a2a32] px-5 py-4 text-sm font-bold text-[#8f8f99]">
+                      {lang === "ar" ? "الألوان" : "צבעים"}
+                    </td>
+                    {items.map((item) => (
+                      <td
+                        key={item.id}
+                        className="border-b border-r border-[#2a2a32] px-4 py-4 text-center"
+                      >
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {(item.colors || []).slice(0, 5).map((color, index) => (
+                            <span
+                              key={`${item.id}-color-${index}`}
+                              className="inline-block rounded-full border border-[#393943]"
+                              style={{
+                                width: 18,
+                                height: 18,
+                                background: color?.hex || "#888",
+                              }}
+                              title={getColorName(color, lang)}
+                            />
+                          ))}
+                          {(!item.colors || item.colors.length === 0) && (
+                            <span className="text-sm text-[#8f8f99]">—</span>
+                          )}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+
+                  {specKeyList.map((key, index) => (
+                    <tr key={key} className={index % 2 === 0 ? "bg-white/[0.02]" : ""}>
+                      <td className="border-b border-[#2a2a32] px-5 py-4 text-sm font-bold text-[#8f8f99]">
+                        {specLabels[key] || key}
+                      </td>
+                      {items.map((item) => (
+                        <td
+                          key={`${item.id}-${key}`}
+                          className="border-b border-r border-[#2a2a32] px-4 py-4 text-center text-sm text-[#d9d9df]"
+                        >
+                          {item.specs?.[key] || "—"}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
 
-              {/* Availability */}
-              <tr>
-                <td className="text-right text-muted font-bold border-b border-surface-border" style={{ padding: scr.mobile ? "8px" : "10px 16px", fontSize: scr.mobile ? 10 : 12 }}>
-                  {lang === "ar" ? "التوفر" : "זמינות"}
-                </td>
-                {items.map((item) => (
-                  <td key={item.id} className="text-center border-b border-surface-border border-r font-bold" style={{ padding: scr.mobile ? 6 : 10, fontSize: scr.mobile ? 11 : 13 }}>
-                    {item.stock > 0 ? (
-                      <span style={{ color: "#10b981" }}>✅ {lang === "ar" ? "متوفر" : "זמין"}</span>
-                    ) : (
-                      <span style={{ color: "#ef4444" }}>❌ {t("store.outOfStock")}</span>
-                    )}
-                  </td>
-                ))}
-              </tr>
+                  <tr>
+                    <td className="border-b border-[#2a2a32] px-5 py-4 text-sm font-bold text-[#8f8f99]">
+                      {intro.availability}
+                    </td>
+                    {items.map((item) => (
+                      <td
+                        key={`stock-${item.id}`}
+                        className="border-b border-r border-[#2a2a32] px-4 py-4 text-center text-sm font-bold"
+                      >
+                        {item.stock > 0 ? (
+                          <span className="text-[#8ce2ae]">
+                            {lang === "ar" ? "متوفر" : "זמין"}
+                          </span>
+                        ) : (
+                          <span className="text-[#ff8297]">{t("store.outOfStock")}</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
 
-              {/* Add to cart row */}
-              <tr className="bg-surface-card/50">
-                <td className="text-right text-muted font-bold border-b border-surface-border" style={{ padding: scr.mobile ? "8px" : "10px 16px", fontSize: scr.mobile ? 10 : 12 }}>
-                </td>
-                {items.map((item) => (
-                  <td key={item.id} className="text-center border-b border-surface-border border-r" style={{ padding: scr.mobile ? 8 : 12 }}>
-                    <button
-                      onClick={() => handleAddToCart(item)}
-                      className="w-full cursor-pointer font-extrabold rounded-lg transition-all active:scale-[0.97]"
-                      style={{
-                        border: "1.5px solid #c41040",
-                        background: "transparent",
-                        color: "#c41040",
-                        padding: scr.mobile ? "6px 0" : "8px 0",
-                        fontSize: scr.mobile ? 10 : 12,
-                      }}
-                    >
-                      🛒 {t("store.addToCart")}
-                    </button>
-                  </td>
-                ))}
-              </tr>
+                  <tr className="bg-white/[0.02]">
+                    <td className="border-b border-[#2a2a32] px-5 py-4 text-sm font-bold text-[#8f8f99]" />
+                    {items.map((item) => (
+                      <td
+                        key={`action-${item.id}`}
+                        className="border-b border-r border-[#2a2a32] px-4 py-4 text-center"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleAddToCart(item)}
+                          className="inline-flex min-h-[46px] w-full items-center justify-center rounded-full border border-[#ff0e34] px-4 text-sm font-bold text-[#ff6b82] transition-colors hover:bg-[#ff0e34]/10"
+                        >
+                          {t("store.addToCart")}
+                        </button>
+                      </td>
+                    ))}
+                  </tr>
 
-              {/* Remove row */}
-              <tr>
-                <td className="text-right" style={{ padding: scr.mobile ? "8px" : "10px 16px" }}></td>
-                {items.map((item) => (
-                  <td key={item.id} className="text-center border-r" style={{ padding: scr.mobile ? 8 : 12 }}>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-muted cursor-pointer bg-transparent border-0 font-bold hover:text-red-400 transition-colors"
-                      style={{ fontSize: scr.mobile ? 10 : 12 }}
-                    >
-                      ❌ {t("compare.remove")}
-                    </button>
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                  <tr>
+                    <td className="px-5 py-4 text-sm font-bold text-[#8f8f99]" />
+                    {items.map((item) => (
+                      <td
+                        key={`remove-${item.id}`}
+                        className="border-r border-[#2a2a32] px-4 py-4 text-center"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="text-sm font-bold text-[#8f8f99] transition-colors hover:text-[#ff8297]"
+                        >
+                          {intro.remove}
+                        </button>
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
+
+      <Footer />
     </div>
   );
 }

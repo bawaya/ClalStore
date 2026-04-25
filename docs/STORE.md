@@ -6,6 +6,8 @@ The store is a **mobile-first, bilingual (Arabic + Hebrew), RTL** Next.js App Ro
 
 ---
 
+> Visual direction reference: see [STORE-THEME.md](./STORE-THEME.md).
+
 ## Table of contents
 
 1. [Overview](#1-overview)

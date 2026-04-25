@@ -48,7 +48,6 @@ function rtlFriendly(s: string): string {
 /** Legacy ASCII fallback — used only when Cairo font isn't available. */
 function asciiSafe(value: string | null | undefined): string {
   if (!value) return "";
-  // eslint-disable-next-line no-control-regex
   return String(value).replace(/[^\x20-\x7E]/g, "?").trim();
 }
 

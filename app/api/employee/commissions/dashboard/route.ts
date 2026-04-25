@@ -59,7 +59,6 @@ export async function GET(req: NextRequest) {
     // Helper to conditionally apply the employee filter to a query.
     // `any` is necessary because Supabase's query builder type narrows
     // after each call and we don't want to enumerate all possible types.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const scopeToEmployee = <T extends { eq: (col: string, val: string) => any }>(
       q: T,
       col: string,

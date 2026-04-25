@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 import { fontVariables } from "@/app/fonts";
 import { CookieConsent } from "@/components/shared/CookieConsent";
@@ -16,7 +16,6 @@ export const metadata: Metadata = {
     apple: "/icons/apple-touch-icon.svg",
     shortcut: "/icons/favicon.svg",
   },
-  themeColor: "#c41040",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -30,6 +29,10 @@ export const metadata: Metadata = {
     locale: "ar_IL",
     type: "website",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#c41040",
 };
 
 export default async function RootLayout({

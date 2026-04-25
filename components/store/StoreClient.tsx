@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import { useSearchParams } from "next/navigation";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "./StoreHeader";
@@ -10,18 +17,119 @@ import { ProductCard } from "./ProductCard";
 import { LinePlans } from "./LinePlans";
 import { ReviewsSection } from "./ReviewsSection";
 import { Footer } from "@/components/website/sections";
-import type { Product, Hero, LinePlan } from "@/types/database";
+import type { Hero, LinePlan, Product } from "@/types/database";
 
-// Fallback products when DB is empty (development)
 const FALLBACK_PRODUCTS: Product[] = [
-  { id: "d1", type: "device", brand: "Samsung", name_ar: "Galaxy S25 Ultra", name_he: "", price: 4298, old_price: undefined, cost: 3200, stock: 10, sold: 45, image_url: undefined, gallery: [], colors: [{ hex: "#1a1a2e", name_ar: "أسود", name_he: "" }, { hex: "#c0c0c0", name_ar: "فضي", name_he: "" }], storage_options: ["512GB", "256GB"], variants: [], specs: { screen: '6.9"', camera: "200MP", battery: "5000mAh", cpu: "SD 8 Elite", ram: "12GB" }, active: true, featured: true, created_at: "", updated_at: "" },
-  { id: "d2", type: "device", brand: "Apple", name_ar: "iPhone 17", name_he: "", price: 3598, old_price: undefined, cost: 2800, stock: 8, sold: 32, image_url: undefined, gallery: [], colors: [{ hex: "#5a6a7a", name_ar: "أزرق", name_he: "" }, { hex: "#d8a0c8", name_ar: "وردي", name_he: "" }], storage_options: ["512GB", "256GB"], variants: [], specs: { screen: '6.3"', camera: "48MP", battery: "4500mAh", cpu: "A19", ram: "8GB" }, active: true, featured: true, created_at: "", updated_at: "" },
-  { id: "d3", type: "device", brand: "Samsung", name_ar: "Z Flip 6", name_he: "", price: 1890, old_price: 3449, cost: 1500, stock: 3, sold: 18, image_url: undefined, gallery: [], colors: [{ hex: "#3a3a4a", name_ar: "أسود", name_he: "" }], storage_options: ["256GB"], variants: [], specs: { screen: '6.7"', camera: "50MP", battery: "4000mAh" }, active: true, featured: false, created_at: "", updated_at: "" },
-  { id: "d4", type: "device", brand: "Xiaomi", name_ar: "14T Pro", name_he: "", price: 2499, old_price: 2899, cost: 1800, stock: 6, sold: 12, image_url: undefined, gallery: [], colors: [{ hex: "#1a1a2e", name_ar: "أسود", name_he: "" }], storage_options: ["512GB", "256GB"], variants: [], specs: { screen: '6.67"', camera: "50MP", battery: "5000mAh" }, active: true, featured: false, created_at: "", updated_at: "" },
-  { id: "a1", type: "accessory", brand: "Samsung", name_ar: "Buds 3 Pro", name_he: "", price: 899, old_price: 999, cost: 500, stock: 20, sold: 28, image_url: undefined, gallery: [], colors: [], storage_options: [], variants: [], specs: {}, active: true, featured: false, created_at: "", updated_at: "" },
-  { id: "a2", type: "accessory", brand: "Apple", name_ar: "AirPods Pro 2", name_he: "", price: 999, old_price: undefined, cost: 650, stock: 15, sold: 35, image_url: undefined, gallery: [], colors: [], storage_options: [], variants: [], specs: {}, active: true, featured: true, created_at: "", updated_at: "" },
-  { id: "a3", type: "accessory", brand: "Samsung", name_ar: "شاحن 45W", name_he: "", price: 149, old_price: undefined, cost: 60, stock: 50, sold: 80, image_url: undefined, gallery: [], colors: [], storage_options: [], variants: [], specs: {}, active: true, featured: false, created_at: "", updated_at: "" },
-  { id: "a4", type: "accessory", brand: "Apple", name_ar: "كفر MagSafe", name_he: "", price: 199, old_price: 249, cost: 80, stock: 30, sold: 22, image_url: undefined, gallery: [], colors: [], storage_options: [], variants: [], specs: {}, active: true, featured: false, created_at: "", updated_at: "" },
+  {
+    id: "d1",
+    type: "device",
+    brand: "Samsung",
+    name_ar: "Galaxy S25 Ultra",
+    name_he: "",
+    price: 4298,
+    old_price: undefined,
+    cost: 3200,
+    stock: 10,
+    sold: 45,
+    image_url: undefined,
+    gallery: [],
+    colors: [
+      { hex: "#1a1a2e", name_ar: "أسود", name_he: "" },
+      { hex: "#c0c0c0", name_ar: "فضي", name_he: "" },
+    ],
+    storage_options: ["512GB", "256GB"],
+    variants: [],
+    specs: {
+      screen: '6.9"',
+      camera: "200MP",
+      battery: "5000mAh",
+      cpu: "SD 8 Elite",
+      ram: "12GB",
+    },
+    active: true,
+    featured: true,
+    created_at: "",
+    updated_at: "",
+  },
+  {
+    id: "d2",
+    type: "device",
+    brand: "Apple",
+    name_ar: "iPhone 17",
+    name_he: "",
+    price: 3598,
+    old_price: undefined,
+    cost: 2800,
+    stock: 8,
+    sold: 32,
+    image_url: undefined,
+    gallery: [],
+    colors: [
+      { hex: "#5a6a7a", name_ar: "أزرق", name_he: "" },
+      { hex: "#f1c3d8", name_ar: "وردي", name_he: "" },
+    ],
+    storage_options: ["512GB", "256GB"],
+    variants: [],
+    specs: {
+      screen: '6.3"',
+      camera: "48MP",
+      battery: "4500mAh",
+      cpu: "A19",
+      ram: "8GB",
+    },
+    active: true,
+    featured: true,
+    created_at: "",
+    updated_at: "",
+  },
+  {
+    id: "d3",
+    type: "device",
+    brand: "Xiaomi",
+    name_ar: "14T Pro",
+    name_he: "",
+    price: 2499,
+    old_price: 2899,
+    cost: 1800,
+    stock: 6,
+    sold: 12,
+    image_url: undefined,
+    gallery: [],
+    colors: [{ hex: "#1a1a2e", name_ar: "أسود", name_he: "" }],
+    storage_options: ["512GB", "256GB"],
+    variants: [],
+    specs: {
+      screen: '6.67"',
+      camera: "50MP",
+      battery: "5000mAh",
+    },
+    active: true,
+    featured: false,
+    created_at: "",
+    updated_at: "",
+  },
+  {
+    id: "a1",
+    type: "accessory",
+    brand: "Apple",
+    name_ar: "AirPods Pro 2",
+    name_he: "",
+    price: 999,
+    old_price: undefined,
+    cost: 650,
+    stock: 15,
+    sold: 35,
+    image_url: undefined,
+    gallery: [],
+    colors: [],
+    storage_options: [],
+    variants: [],
+    specs: {},
+    active: true,
+    featured: true,
+    created_at: "",
+    updated_at: "",
+  },
 ];
 
 interface Props {
@@ -30,49 +138,74 @@ interface Props {
   linePlans: LinePlan[];
 }
 
+function getFilterButtonClass(active: boolean) {
+  return `rounded-2xl border px-3 py-2 text-sm font-semibold transition-colors ${
+    active
+      ? "border-[#ff3351]/45 bg-[#ff3351]/10 text-white"
+      : "border-[#363640] bg-white/[0.02] text-[#d4d4dc] hover:border-[#ff3351]/35 hover:text-white"
+  }`;
+}
+
 export function StoreClient({ products, heroes, linePlans }: Props) {
   const scr = useScreen();
-  const { t } = useLang();
-  const [typeCat, setTypeCat] = useState("all");
+  const searchParams = useSearchParams();
+  const { t, lang } = useLang();
+  const [typeCat, setTypeCat] = useState<"device" | "accessory">("device");
   const [brandCat, setBrandCat] = useState("all");
   const [search, setSearch] = useState("");
   const [smartSearching, setSmartSearching] = useState(false);
   const [smartResults, setSmartResults] = useState<Product[] | null>(null);
   const [smartSuggestion, setSmartSuggestion] = useState("");
 
-  // Never show FALLBACK_PRODUCTS in production — their fake IDs (d1, d2…) cause 404s on click.
-  // Fallback exists only for local development against an empty DB.
-  const items =
-    products.length > 0
-      ? products
-      : process.env.NODE_ENV === "production"
-        ? []
-        : FALLBACK_PRODUCTS;
-
-  const brands = useMemo(
-    () => [...new Set(items.map((p) => p.brand))],
-    [items]
+  const items = useMemo(
+    () =>
+      products.length > 0
+        ? products
+        : process.env.NODE_ENV === "production"
+          ? []
+          : FALLBACK_PRODUCTS,
+    [products]
   );
 
-  // Check if query is "smart" (3+ words or has smart keywords)
+  useEffect(() => {
+    const q = searchParams.get("q") ?? "";
+    setSearch(q);
+    if (!q) {
+      setSmartResults(null);
+      setSmartSuggestion("");
+    }
+  }, [searchParams]);
+
   const isSmartQuery = useCallback((q: string): boolean => {
-    const words = q.trim().split(/\s+/);
+    const words = q.trim().split(/\s+/).filter(Boolean);
     if (words.length >= 3) return true;
     const smartWords = [
-      "تحت", "فوق", "أحسن", "أرخص", "أفضل", "أغلى", "أقوى",
-      "كاميرا", "بطارية", "شاشة", "مقاوم",
-      "under", "over", "best", "cheap", "camera", "battery",
+      "تحت",
+      "فوق",
+      "أفضل",
+      "أرخص",
+      "أقوى",
+      "كاميرا",
+      "بطارية",
+      "شاشة",
+      "under",
+      "over",
+      "best",
+      "cheap",
+      "camera",
+      "battery",
     ];
-    return smartWords.some((w) => q.toLowerCase().includes(w));
+    return smartWords.some((word) => q.toLowerCase().includes(word));
   }, []);
 
-  // Smart search handler
   const handleSmartSearch = useCallback(async () => {
     if (!search.trim() || smartSearching) return;
     setSmartSearching(true);
     setSmartSuggestion("");
     try {
-      const res = await fetch(`/api/store/smart-search?q=${encodeURIComponent(search.trim())}`);
+      const res = await fetch(
+        `/api/store/smart-search?q=${encodeURIComponent(search.trim())}`
+      );
       const data = await res.json();
       if (data.success) {
         setSmartResults(data.products || []);
@@ -84,191 +217,358 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
     setSmartSearching(false);
   }, [search, smartSearching]);
 
-  // Handle search input keydown
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+  const handleSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && isSmartQuery(search)) {
       e.preventDefault();
-      handleSmartSearch();
+      void handleSmartSearch();
     }
   };
 
-  // Clear smart search
   const clearSmartSearch = () => {
     setSmartResults(null);
     setSmartSuggestion("");
     setSearch("");
   };
 
+  const typeLabels = {
+    device: lang === "he" ? "סמארטפונים" : "الهواتف",
+    accessory: lang === "he" ? "אביזרים" : "الإكسسوارات",
+  };
+
+  const brands = useMemo(
+    () =>
+      [
+        ...new Set(
+          items
+            .filter((product) => product.type === typeCat)
+            .map((product) => product.brand)
+        ),
+      ].sort(),
+    [items, typeCat]
+  );
+
   const filtered = useMemo(() => {
-    // If smart search results exist, show them
     if (smartResults !== null) return smartResults;
 
-    let list = items;
-    // Type filter: "all" shows devices only; accessories only via their tab
-    if (typeCat === "accessory") list = list.filter((p) => p.type === "accessory");
-    else list = list.filter((p) => p.type === "device");
-    // Brand filter
-    if (brandCat !== "all") list = list.filter((p) => p.brand === brandCat);
-    // Search (local — for short queries)
+    let list = items.filter((product) => product.type === typeCat);
+
+    if (brandCat !== "all") {
+      list = list.filter((product) => product.brand === brandCat);
+    }
+
     if (search.trim() && !isSmartQuery(search)) {
       const q = search.toLowerCase();
       list = list.filter(
-        (p) =>
-          p.name_ar.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          (p.name_he && p.name_he.toLowerCase().includes(q))
+        (product) =>
+          product.name_ar.toLowerCase().includes(q) ||
+          product.brand.toLowerCase().includes(q) ||
+          (product.name_he && product.name_he.toLowerCase().includes(q))
       );
     }
-    // Products come pre-sorted from server (admin sort rules applied in getProducts).
-    // Preserve server order by using original index as tiebreaker after filtering.
-    const indexMap = new Map(items.map((p, idx) => [p.id, idx]));
-    list = [...list].sort((a, b) => (indexMap.get(a.id) ?? 999) - (indexMap.get(b.id) ?? 999));
-    return list;
+
+    const indexMap = new Map(items.map((product, idx) => [product.id, idx]));
+    return [...list].sort(
+      (a, b) => (indexMap.get(a.id) ?? 999) - (indexMap.get(b.id) ?? 999)
+    );
   }, [items, typeCat, brandCat, search, smartResults, isSmartQuery]);
 
-  const typeCategories = [
-    { key: "all", label: t("store.all") },
-    { key: "device", label: t("store.devices") },
-    { key: "accessory", label: t("store.accessories") },
-  ];
+  useEffect(() => {
+    setBrandCat("all");
+  }, [typeCat]);
+
+  const intro =
+    lang === "he"
+      ? {
+          title: "ממשק חנות כהה ומסודר שמוביל את העין למוצר ולמחיר",
+          subtitle:
+            "העמוד הזה בנוי בסגנון חנויות המכשירים הרשמיות: ראש ברור, סינון ישיר, כרטיסי מוצר נקיים ומעט הדגשות אדומות.",
+          results: "תוצאות מוצגות",
+          filterTitle: "סינון התוצאות",
+          filterSubtitle: "חיפוש ישיר, מותגים וסוגי מוצרים",
+          typeTitle: "סוג מוצר",
+          brandTitle: "מותג",
+          hintsTitle: "חיפושים מהירים",
+          toolbarTitle: "מראה חנות מסודר ורשמי",
+          toolbarText:
+            "המוצר מופיע ראשון, אחר כך המחיר, ואז ההחלטה. בלי זוהר מיותר ובלי עומס חזותי.",
+          smartLabel: "חיפוש חכם",
+          clear: "ניקוי",
+          foundPrefix: "מציג",
+          noResults: "לא נמצאו מוצרים תואמים כרגע.",
+        }
+      : {
+          title: "واجهة متجر داكنة ومنظمة تقود العين إلى المنتج والسعر",
+          subtitle:
+            "هذه الصفحة مبنية بروح متاجر الأجهزة الرسمية: رأس واضح، تصفية مباشرة، بطاقات مرتبة، ولمسات حمراء محدودة بدل الضجيج البصري.",
+          results: "نتيجة ظاهرة",
+          filterTitle: "تنقية النتائج",
+          filterSubtitle: "بحث مباشر، العلامات، ونوع المنتج",
+          typeTitle: "نوع المنتج",
+          brandTitle: "العلامة",
+          hintsTitle: "اقتراحات سريعة",
+          toolbarTitle: "ترتيب متجر رسمي وواضح",
+          toolbarText:
+            "المنتج يظهر أولًا، ثم السعر، ثم القرار. من دون لمعات مزعجة أو ازدحام غير ضروري.",
+          smartLabel: "بحث ذكي",
+          clear: "مسح",
+          foundPrefix: "يعرض",
+          noResults: "لا توجد منتجات مطابقة حاليًا.",
+        };
+
+  const quickHints =
+    lang === "he"
+      ? [
+          "המכשיר הטוב ביותר עד 3000",
+          "אביזרי iPhone",
+          "מכשיר עם סוללה חזקה",
+        ]
+      : [
+          "أفضل هاتف تحت 3000",
+          "إكسسوارات iPhone",
+          "هاتف ببطارية قوية",
+        ];
 
   return (
-    <div dir="rtl" className="font-arabic bg-surface-bg text-white min-h-screen">
+    <div
+      dir="rtl"
+      className="font-arabic min-h-screen bg-[#111114] text-white"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at top right, rgba(255,51,81,0.08), transparent 22%), radial-gradient(circle at left center, rgba(255,255,255,0.03), transparent 28%)",
+      }}
+    >
       <StoreHeader />
       <StickyCartBar />
       <HeroCarousel heroes={heroes} />
 
       <div
-        className="max-w-[1200px] mx-auto"
-        style={{ padding: scr.mobile ? "12px 14px 80px" : "20px 28px 100px" }}
+        className="mx-auto max-w-[1540px]"
+        style={{ padding: scr.mobile ? "16px 14px 84px" : "24px 24px 110px" }}
       >
-        {/* Search */}
-        <div className="mb-3" style={{ marginBottom: scr.mobile ? 12 : 20 }}>
-          <div className="flex gap-1.5">
-            <div className={`flex-1 flex items-center gap-1.5 rounded-xl ${
-              isSmartQuery(search) ? "glass-brand-glow" : "glass-card-static"
-            }`}
-              style={{ padding: scr.mobile ? "8px 12px" : "10px 16px" }}>
-              <span className="text-sm opacity-30">{isSmartQuery(search) ? "✨" : "⌕"}</span>
-              <input
-                className="flex-1 bg-transparent border-none text-white outline-none"
-                style={{ fontSize: scr.mobile ? 12 : 14 }}
-                placeholder="ابحث... أو اكتب مثلاً: أحسن هاتف تحت 3000"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); if (smartResults) setSmartResults(null); }}
-                onKeyDown={handleSearchKeyDown}
-                aria-label="البحث عن منتجات"
-              />
-              {smartSearching && (
-                <span className="text-purple-400 text-xs animate-pulse">🧠</span>
-              )}
-              {search && (
-                <button onClick={smartResults ? clearSmartSearch : () => setSearch("")} className="text-muted text-xs cursor-pointer" aria-label="مسح البحث">✕</button>
-              )}
+        <section className="mb-4 rounded-[30px] border border-[#2d2d35] bg-[linear-gradient(180deg,rgba(23,23,27,0.96),rgba(18,18,22,0.96))] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.28)] md:px-7 md:py-6">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
+            <div>
+              <span className="inline-flex rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 text-xs font-semibold text-[#ff8da0]">
+                {typeLabels[typeCat]}
+              </span>
+              <h1 className="mt-3 text-2xl font-black leading-tight md:text-[2.6rem]">
+                {intro.title}
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-8 text-[#b8b8c2] md:text-base">
+                {intro.subtitle}
+              </p>
             </div>
-            {isSmartQuery(search) && !smartSearching && (
-              <button
-                onClick={handleSmartSearch}
-                className="px-3 rounded-xl text-xs font-medium text-white"
-                style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)" }}
-              >
-                ✨ بحث ذكي
-              </button>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
+                <strong className="block text-xl font-black text-white">
+                  {filtered.length}
+                </strong>
+                <span className="text-sm text-[#b8b8c2]">{intro.results}</span>
+              </div>
+              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
+                <strong className="block text-xl font-black text-white">
+                  {brands.length}
+                </strong>
+                <span className="text-sm text-[#b8b8c2]">
+                  {lang === "he" ? "מותגים" : "علامات متاحة"}
+                </span>
+              </div>
+              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
+                <strong className="block text-xl font-black text-white">
+                  {smartResults !== null
+                    ? lang === "he"
+                      ? "חכם"
+                      : "ذكي"
+                    : lang === "he"
+                      ? "ישיר"
+                      : "مباشر"}
+                </strong>
+                <span className="text-sm text-[#b8b8c2]">
+                  {lang === "he" ? "מסלול החיפוש" : "مسار البحث"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <aside className="self-start lg:sticky lg:top-[170px]">
+            <div className="overflow-hidden rounded-[26px] border border-[#32323b] bg-[linear-gradient(180deg,#17171b_0%,#111115_100%)] shadow-[0_24px_48px_rgba(0,0,0,0.3)]">
+              <div className="border-b border-[#282832] px-5 py-4">
+                <strong className="block text-lg font-black text-white">
+                  {intro.filterTitle}
+                </strong>
+                <span className="text-sm text-[#9b9ba6]">
+                  {intro.filterSubtitle}
+                </span>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <details open className="rounded-[20px] border border-[#2e2e37] bg-white/[0.02]">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-white">
+                    {lang === "he" ? "חיפוש" : "البحث"}
+                  </summary>
+                  <div className="space-y-3 px-4 pb-4">
+                    <label className="flex min-h-[48px] items-center rounded-2xl border border-[#4f4f5a] bg-white/[0.03] px-3">
+                      <input
+                        className="w-full bg-transparent text-sm text-white outline-none placeholder:text-[#9c9ca8]"
+                        placeholder={
+                          lang === "he"
+                            ? "חיפוש בשם, מותג או דגם"
+                            : "ابحث باسم المنتج أو العلامة"
+                        }
+                        value={search}
+                        onChange={(e) => {
+                          setSearch(e.target.value);
+                          if (smartResults) setSmartResults(null);
+                        }}
+                        onKeyDown={handleSearchKeyDown}
+                        aria-label={t("store.search")}
+                      />
+                    </label>
+
+                    {isSmartQuery(search) && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSmartSearch()}
+                        disabled={smartSearching}
+                        className="w-full rounded-full border border-[#ff0e34] px-4 py-2 text-sm font-bold text-[#ff6b82] transition-colors hover:bg-[#ff0e34]/10 disabled:opacity-50"
+                      >
+                        {smartSearching
+                          ? lang === "he"
+                            ? "מחפש..."
+                            : "جارٍ البحث..."
+                          : intro.smartLabel}
+                      </button>
+                    )}
+
+                    {smartResults !== null && (
+                      <div className="rounded-2xl border border-[#ff3351]/20 bg-[#ff3351]/10 px-4 py-3 text-sm text-[#ffd5dc]">
+                        <div>{smartSuggestion || `${filtered.length}`}</div>
+                        <button
+                          type="button"
+                          onClick={clearSmartSearch}
+                          className="mt-2 text-xs font-bold text-[#ff9fb0]"
+                        >
+                          {intro.clear}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </details>
+
+                <details open className="rounded-[20px] border border-[#2e2e37] bg-white/[0.02]">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-white">
+                    {intro.typeTitle}
+                  </summary>
+                  <div className="grid gap-2 px-4 pb-4">
+                    <button
+                      type="button"
+                      onClick={() => setTypeCat("device")}
+                      className={getFilterButtonClass(typeCat === "device")}
+                    >
+                      {typeLabels.device}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTypeCat("accessory")}
+                      className={getFilterButtonClass(typeCat === "accessory")}
+                    >
+                      {typeLabels.accessory}
+                    </button>
+                  </div>
+                </details>
+
+                <details open className="rounded-[20px] border border-[#2e2e37] bg-white/[0.02]">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-white">
+                    {intro.brandTitle}
+                  </summary>
+                  <div className="grid gap-2 px-4 pb-4">
+                    <button
+                      type="button"
+                      onClick={() => setBrandCat("all")}
+                      className={getFilterButtonClass(brandCat === "all")}
+                    >
+                      {t("store.allBrands")}
+                    </button>
+                    {brands.map((brand) => (
+                      <button
+                        key={brand}
+                        type="button"
+                        onClick={() => setBrandCat(brand)}
+                        className={getFilterButtonClass(brandCat === brand)}
+                      >
+                        {brand}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+
+                {!search && smartResults === null && (
+                  <details open className="rounded-[20px] border border-[#2e2e37] bg-white/[0.02]">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-white">
+                      {intro.hintsTitle}
+                    </summary>
+                    <div className="grid gap-2 px-4 pb-4">
+                      {quickHints.map((hint) => (
+                        <button
+                          key={hint}
+                          type="button"
+                          onClick={() => setSearch(hint)}
+                          className="rounded-2xl border border-[#363640] bg-white/[0.02] px-3 py-2 text-right text-sm text-[#d9d9df] transition-colors hover:border-[#ff3351]/35 hover:text-white"
+                        >
+                          {hint}
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </div>
+          </aside>
+
+          <div className="space-y-4">
+            <section className="rounded-[24px] border border-[#2f2f38] bg-[linear-gradient(180deg,#17171b_0%,#131318_100%)] px-5 py-4 shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div>
+                  <span className="inline-flex rounded-full border border-[#ff3351]/18 bg-[#ff3351]/08 px-3 py-1 text-xs font-semibold text-[#ff8297]">
+                    {intro.toolbarTitle}
+                  </span>
+                  <p className="mt-3 text-sm leading-8 text-[#b8b8c2]">
+                    {intro.toolbarText}
+                  </p>
+                </div>
+
+                <div className="rounded-[18px] border border-[#30303a] bg-white/[0.03] px-4 py-3 text-sm text-[#e7e7eb]">
+                  {intro.foundPrefix} {filtered.length}{" "}
+                  {lang === "he" ? "מוצרים" : "منتجًا"}
+                </div>
+              </div>
+            </section>
+
+            {filtered.length === 0 ? (
+              <div className="rounded-[26px] border border-[#2f2f38] bg-[#17171b] px-6 py-14 text-center text-[#b8b8c2] shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
+                <div className="text-4xl">🔍</div>
+                <div className="mt-3 text-sm">{intro.noResults}</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {filtered.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
             )}
           </div>
-
-          {/* Smart search suggestion hints */}
-          {!search && !smartResults && (
-            <div className="flex gap-1.5 mt-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-              {["أحسن هاتف سامسونج", "هاتف تحت 2000", "إكسسوارات iPhone", "هاتف بطارية قوية"].map((hint) => (
-                <button
-                  key={hint}
-                  onClick={() => { setSearch(hint); }}
-                  className="glass whitespace-nowrap text-[11px] px-2.5 py-1 rounded-lg text-purple-300/70 hover:bg-purple-500/10 transition-colors cursor-pointer"
-                >
-                  ✨ {hint}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Smart search results banner */}
-          {smartResults !== null && (
-            <div className="glass-elevated flex items-center justify-between mt-2 px-3 py-2 rounded-lg">
-              <span className="text-xs text-purple-300">
-                ✨ {smartSuggestion || `وجدنا ${smartResults.length} منتج`}
-              </span>
-              <button onClick={clearSmartSearch} className="text-[10px] text-purple-400 hover:text-white cursor-pointer">
-                ✕ مسح
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* Type filter */}
-        <div
-          className="flex gap-1 mb-2 overflow-x-auto"
-          role="tablist"
-          aria-label="نوع المنتج"
-          style={{ flexWrap: scr.desktop ? "wrap" : "nowrap" }}
-        >
-          {typeCategories.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => setTypeCat(c.key)}
-              role="tab"
-              aria-selected={typeCat === c.key}
-              className={`chip whitespace-nowrap ${typeCat === c.key ? "chip-active" : ""}`}
-            >
-              {c.label}
-            </button>
-          ))}
+        <div className="mt-6">
+          <LinePlans plans={linePlans} />
         </div>
 
-        {/* Brand filter */}
-        <div
-          className="flex gap-1 mb-3 overflow-x-auto"
-          style={{
-            marginBottom: scr.mobile ? 12 : 20,
-            flexWrap: scr.desktop ? "wrap" : "nowrap",
-          }}
-        >
-          <button
-            onClick={() => setBrandCat("all")}
-            className={`chip whitespace-nowrap ${brandCat === "all" ? "chip-active" : ""}`}
-          >
-            {t("store.allBrands")}
-          </button>
-          {brands.map((b) => (
-            <button
-              key={b}
-              onClick={() => setBrandCat(b)}
-              className={`chip whitespace-nowrap ${brandCat === b ? "chip-active" : ""}`}
-            >
-              {b}
-            </button>
-          ))}
+        <div className="mt-6">
+          <ReviewsSection />
         </div>
-
-        {/* Products grid */}
-        {filtered.length === 0 ? (
-          <div className="text-center py-12 text-muted">
-            <div className="text-4xl mb-2">🔍</div>
-            <div className="text-sm">{t("store.outOfStock")}</div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3.5">
-            {filtered.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        )}
-
-        {/* Reviews */}
-        <ReviewsSection />
-
-        {/* Lines */}
-        <LinePlans plans={linePlans} />
       </div>
 
       <Footer />
