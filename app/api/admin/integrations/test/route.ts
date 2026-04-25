@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
+import { normalizeGeminiModel } from "@/lib/ai/gemini";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 import { resolveIntegrationConfigForRequest } from "@/lib/integrations/secrets";
 
@@ -152,7 +153,7 @@ const TESTS: Record<string, (config: Record<string, any>, provider?: string) => 
 
     if (provider === "Google Gemini") {
       const apiKey = cfg.api_key;
-      const model = cfg.model || "gemini-1.5-flash-latest";
+      const model = normalizeGeminiModel(cfg.model || "gemini-1.5-flash-latest");
       if (!apiKey) return { ok: false, message: "مفتاح Google Gemini API مفقود" };
 
       try {

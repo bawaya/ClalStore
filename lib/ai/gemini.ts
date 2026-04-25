@@ -8,9 +8,38 @@ import type { ClaudeRequest, ClaudeResponse } from "./claude";
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const MODEL = "gemini-1.5-flash-latest";
 
+const GEMINI_MODEL_ALIASES: Record<string, string> = {
+  "gemini 2.5 pro": "gemini-2.5-pro",
+  "gemini 2.5 flash": "gemini-2.5-flash",
+  "gemini 2.5 flash lite": "gemini-2.5-flash-lite",
+  "gemini 1.5 pro": "gemini-1.5-pro",
+  "gemini 1.5 flash": "gemini-1.5-flash",
+};
+
+export function normalizeGeminiModel(model?: string | null): string {
+  const raw = String(model || "").trim();
+  if (!raw) return MODEL;
+
+  const stripped = raw.replace(/^models\//i, "").trim();
+  const aliasKey = stripped.toLowerCase();
+  if (GEMINI_MODEL_ALIASES[aliasKey]) {
+    return GEMINI_MODEL_ALIASES[aliasKey];
+  }
+
+  if (/^gemini[\w.-]+$/i.test(stripped)) {
+    return stripped;
+  }
+
+  return stripped
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9._-]/g, "")
+    .replace(/-+/g, "-");
+}
+
 export async function callGemini(req: ClaudeRequest): Promise<ClaudeResponse | null> {
   const apiKey = req.apiKey || process.env.GEMINI_API_KEY;
-  const model = req.model || MODEL;
+  const model = normalizeGeminiModel(req.model || MODEL);
   if (!apiKey) {
     console.error("[AI] No Gemini API key provided");
     return null;

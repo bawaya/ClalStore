@@ -308,7 +308,11 @@ export async function prepareIntegrationConfigForUpdate(params: {
     }
 
     if (!hasIntegrationVaultKey()) {
-      throw new Error("INTEGRATIONS_MASTER_KEY is required to save integration secrets securely");
+      console.warn(
+        `INTEGRATIONS_MASTER_KEY is missing â€” saving ${integration.type}.${key} in legacy integration.config until the vault key is configured`
+      );
+      publicConfig[key] = value;
+      continue;
     }
 
     secretsToUpsert.push({ secretKey: key, value });
