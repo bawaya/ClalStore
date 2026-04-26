@@ -13,6 +13,7 @@ Then:
 - [API-REFERENCE.md](./API-REFERENCE.md) — every HTTP route (129+)
 - [DATABASE.md](./DATABASE.md) — schema, RLS, triggers, migrations
 - [TESTING.md](./TESTING.md) — six-layer testing strategy
+- [TESTING-EXECUTION-PLAN.md](./TESTING-EXECUTION-PLAN.md) — execution truth, live-safe protocol, manifest + cleanup plan
 - [SECURITY.md](./SECURITY.md) — RLS, CSRF, auth, payments
 
 ### 🛠️ I'm on-call / ops
@@ -64,6 +65,7 @@ Don't open a GitHub issue — see [../SECURITY.md](../SECURITY.md) for private d
 | [PWA.md](./PWA.md) | 711 | Unified employee PWA — dashboard, commissions, calculator, corrections, activity, announcements |
 | [BOT.md](./BOT.md) | 542 | WhatsApp bot engine, intent handling, safety rails, handoff, WebChat |
 | [TESTING.md](./TESTING.md) | 519 | Six-layer strategy, coverage targets, 2967 tests / 181 files |
+| [TESTING-EXECUTION-PLAN.md](./TESTING-EXECUTION-PLAN.md) | 0 | Reference execution plan for full-flow validation, live-safe runs, manifest tracking, and cleanup |
 | [SECURITY.md](./SECURITY.md) | 265 | Trust model, auth, RLS, CSRF, webhook signatures, rate limits, secrets rotation |
 | [OPERATIONS.md](./OPERATIONS.md) | 296 | Deployment flow, rollback, secret rotation, migration apply, monitoring dashboards |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | 515 | Cloudflare Workers + OpenNext build pipeline, env vars, 14+ GitHub workflows |

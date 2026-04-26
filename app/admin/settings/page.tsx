@@ -896,6 +896,7 @@ export default function SettingsPage() {
 
       const res = await fetch("/api/admin/upload-logo", {
         method: "POST",
+        headers: csrfHeaders(),
         body: fd,
       });
 
@@ -921,7 +922,7 @@ export default function SettingsPage() {
     try {
       await fetch("/api/admin/upload-logo", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ url: logoUrl }),
       });
       setStoreDraft((prev) => ({ ...prev, logo_url: "" }));
