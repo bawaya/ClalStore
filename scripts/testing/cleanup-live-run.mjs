@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import process from "node:process";
 import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
@@ -158,6 +159,10 @@ await updateCleanupReport(manifestPath, {
 
 console.log(`تمت محاولة تنظيف ${results.length} أثر/آثار من الجولة ${manifest.runId}.`);
 console.log(`نجاح: ${results.length - failed} | فشل: ${failed}${dryRun ? " | الوضع: dry-run" : ""}`);
+
+if (!dryRun && failed === 0) {
+  await fs.unlink(manifestPath).catch(() => {});
+}
 
 if (failed > 0) {
   process.exitCode = 1;

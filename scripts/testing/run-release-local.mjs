@@ -125,6 +125,22 @@ async function getIntegrationRow(supabase, type) {
   return data || null;
 }
 
+const RESTORED_INTEGRATION_TYPES = [
+  "ai_chat",
+  "ai_admin",
+  "email",
+  "whatsapp",
+  "sms",
+  "payment",
+  "payment_upay",
+  "image_enhance",
+  "device_data",
+  "stock_images",
+  "storage",
+  "push_notifications",
+  "webhook_security",
+];
+
 const runId = process.env.TEST_RUN_ID || "";
 const localReleasePort = await getFreePort();
 const LOCAL_RELEASE_BASE_URL = `http://127.0.0.1:${localReleasePort}`;
@@ -167,23 +183,15 @@ await recordArtifact(manifestPath, {
   row: logoRow,
 });
 
-const aiChatIntegration = await getIntegrationRow(supabase, "ai_chat");
-if (aiChatIntegration) {
-  await recordArtifact(manifestPath, {
-    kind: "row_upsert_restore",
-    table: "integrations",
-    onConflict: "id",
-    row: aiChatIntegration,
-  });
-}
+for (const type of RESTORED_INTEGRATION_TYPES) {
+  const integrationRow = await getIntegrationRow(supabase, type);
+  if (!integrationRow) continue;
 
-const emailIntegration = await getIntegrationRow(supabase, "email");
-if (emailIntegration) {
   await recordArtifact(manifestPath, {
     kind: "row_upsert_restore",
     table: "integrations",
     onConflict: "id",
-    row: emailIntegration,
+    row: integrationRow,
   });
 }
 
