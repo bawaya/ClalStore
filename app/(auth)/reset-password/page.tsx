@@ -25,6 +25,8 @@ import Link from "next/link";
 import { Logo } from "@/components/shared/Logo";
 
 export default function ResetPasswordPage() {
+  const newPasswordInputId = "reset-password-new";
+  const confirmPasswordInputId = "reset-password-confirm";
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -172,10 +174,11 @@ export default function ResetPasswordPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-[#71717a] text-xs font-semibold mb-1">
+            <label htmlFor={newPasswordInputId} className="block text-[#71717a] text-xs font-semibold mb-1">
               كلمة المرور الجديدة
             </label>
             <input
+              id={newPasswordInputId}
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -189,10 +192,11 @@ export default function ResetPasswordPage() {
           </div>
 
           <div>
-            <label className="block text-[#71717a] text-xs font-semibold mb-1">
+            <label htmlFor={confirmPasswordInputId} className="block text-[#71717a] text-xs font-semibold mb-1">
               تأكيد كلمة المرور
             </label>
             <input
+              id={confirmPasswordInputId}
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

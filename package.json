@@ -21,6 +21,7 @@
     "test:coverage": "vitest run --coverage",
     "test:live:prepare": "node scripts/testing/prepare-live-run.mjs",
     "test:live:cleanup": "node scripts/testing/cleanup-live-run.mjs",
+    "test:release:local": "npm run build && node scripts/testing/run-release-local.mjs",
     "db:migrate": "npx supabase db push",
     "db:seed": "tsx supabase/seed/index.ts",
     "db:reset": "npx supabase db reset",

@@ -5,6 +5,8 @@ import { Logo } from "@/components/shared/Logo";
 import { csrfHeaders } from "@/lib/csrf-client";
 
 export default function ChangePasswordPage() {
+  const newPasswordInputId = "change-password-new";
+  const confirmPasswordInputId = "change-password-confirm";
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,22 +17,19 @@ export default function ChangePasswordPage() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const { requireBrowserSupabase } = await import("@/lib/supabase");
-        const supabase = requireBrowserSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
+        const res = await fetch("/api/auth/password-status", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
 
-        if (!user) {
+        if (res.status === 401) {
           window.location.href = "/login";
           return;
         }
 
-        const { data: profile } = await supabase
-          .from("users")
-          .select("must_change_password")
-          .eq("auth_id", user.id)
-          .single();
+        if (!res.ok) {
+          throw new Error(data.error || "تعذر التحقق من حالة كلمة المرور");
+        }
 
-        if (!profile?.must_change_password) {
+        if (!data.mustChangePassword) {
           // User doesn't need to change password, redirect to dashboard
           window.location.href = "/crm";
           return;
@@ -106,10 +105,11 @@ export default function ChangePasswordPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-[#71717a] text-xs font-semibold mb-1">
+            <label htmlFor={newPasswordInputId} className="block text-[#71717a] text-xs font-semibold mb-1">
               كلمة المرور الجديدة
             </label>
             <input
+              id={newPasswordInputId}
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -122,10 +122,11 @@ export default function ChangePasswordPage() {
           </div>
 
           <div>
-            <label className="block text-[#71717a] text-xs font-semibold mb-1">
+            <label htmlFor={confirmPasswordInputId} className="block text-[#71717a] text-xs font-semibold mb-1">
               تأكيد كلمة المرور
             </label>
             <input
+              id={confirmPasswordInputId}
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

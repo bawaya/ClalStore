@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useScreen, useToast } from "@/lib/hooks";
-import { csrfHeaders } from "@/lib/csrf-client";
+import { csrfHeaders, getCsrfToken } from "@/lib/csrf-client";
 import { useAdminSettings } from "@/lib/admin/hooks";
 import {
   ErrorBanner,
@@ -896,7 +896,7 @@ export default function SettingsPage() {
 
       const res = await fetch("/api/admin/upload-logo", {
         method: "POST",
-        headers: csrfHeaders(),
+        headers: { "x-csrf-token": getCsrfToken() },
         body: fd,
       });
 

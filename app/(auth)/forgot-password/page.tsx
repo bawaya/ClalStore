@@ -25,6 +25,7 @@ import Link from "next/link";
 import { Logo } from "@/components/shared/Logo";
 
 export default function ForgotPasswordPage() {
+  const emailInputId = "forgot-password-email";
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -112,10 +113,11 @@ export default function ForgotPasswordPage() {
             </p>
 
             <div>
-              <label className="block text-[#71717a] text-xs font-semibold mb-1">
+              <label htmlFor={emailInputId} className="block text-[#71717a] text-xs font-semibold mb-1">
                 البريد الإلكتروني
               </label>
               <input
+                id={emailInputId}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

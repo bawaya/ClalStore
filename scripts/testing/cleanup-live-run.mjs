@@ -1,10 +1,14 @@
 import process from "node:process";
+import nextEnv from "@next/env";
 import { createClient } from "@supabase/supabase-js";
 import {
   normalizeManifestPath,
   readManifest,
   updateCleanupReport,
 } from "./manifest-utils.mjs";
+
+const { loadEnvConfig } = nextEnv;
+loadEnvConfig(process.cwd());
 
 function getArg(name) {
   const index = process.argv.indexOf(name);
@@ -89,6 +93,17 @@ async function cleanupArtifact(supabase, artifact) {
       const { error } = await supabase.storage.from(bucket).remove([path]);
       if (error) throw error;
       return `removed storage url ${bucket}/${path}`;
+    }
+
+    case "auth_user_delete": {
+      const { error } = await supabase.auth.admin.deleteUser(artifact.userId);
+      if (error) {
+        if (/user not found/i.test(error.message || "")) {
+          return `auth user already absent ${artifact.userId}`;
+        }
+        throw error;
+      }
+      return `deleted auth user ${artifact.userId}`;
     }
 
     case "note":

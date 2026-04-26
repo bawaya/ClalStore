@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Logo } from "@/components/shared/Logo";
 
 export default function LoginPage() {
+  const emailInputId = "login-email";
+  const passwordInputId = "login-password";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,18 +37,17 @@ export default function LoginPage() {
 
       // Check if user must change password
       if (data?.user) {
-        const { requireBrowserSupabase } = await import("@/lib/supabase");
-        const supabase = requireBrowserSupabase();
-        const { data: profile } = await supabase
-          .from("users")
-          .select("must_change_password, temp_password_expires_at")
-          .eq("auth_id", data.user.id)
-          .single();
+        const statusRes = await fetch("/api/auth/password-status", { cache: "no-store" });
+        const statusJson = await statusRes.json().catch(() => ({}));
 
-        if (profile?.must_change_password) {
+        if (!statusRes.ok) {
+          throw new Error(statusJson.error || "تعذر التحقق من حالة كلمة المرور");
+        }
+
+        if (statusJson.mustChangePassword) {
           // Check if temp password has expired
-          if (profile.temp_password_expires_at) {
-            const expiresAt = new Date(profile.temp_password_expires_at);
+          if (statusJson.tempPasswordExpiresAt) {
+            const expiresAt = new Date(statusJson.tempPasswordExpiresAt);
             if (expiresAt < new Date()) {
               setError("كلمة المرور المؤقتة انتهت صلاحيتها. تواصل مع المدير لإعادة تعيينها.");
               const { signOut } = await import("@/lib/auth");
@@ -82,10 +83,11 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-[#71717a] text-xs font-semibold mb-1">
+            <label htmlFor={emailInputId} className="block text-[#71717a] text-xs font-semibold mb-1">
               البريد الإلكتروني
             </label>
             <input
+              id={emailInputId}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -98,7 +100,7 @@ export default function LoginPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-[#71717a] text-xs font-semibold">
+              <label htmlFor={passwordInputId} className="block text-[#71717a] text-xs font-semibold">
                 كلمة المرور
               </label>
               <Link
@@ -109,6 +111,7 @@ export default function LoginPage() {
               </Link>
             </div>
             <input
+              id={passwordInputId}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
