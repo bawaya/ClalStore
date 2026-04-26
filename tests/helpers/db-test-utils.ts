@@ -7,7 +7,10 @@
  *
  * DO NOT import this from unit or integration tests — only from tests/staging/.
  */
+import dotenv from "dotenv";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+
+dotenv.config({ path: ".env.local" });
 
 export const TEST_PREFIX = "TEST_";
 

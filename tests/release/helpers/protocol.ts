@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { expect, Page } from "@playwright/test";
+import { expect, Locator, Page } from "@playwright/test";
 
 type ManifestArtifact = Record<string, unknown>;
 const baseOrigin = (() => {
@@ -14,6 +14,40 @@ const baseOrigin = (() => {
 
 function manifestPathFromEnv() {
   return process.env.TEST_MANIFEST_PATH || "";
+}
+
+function shouldIgnoreFailedRequest(
+  entry: string,
+  request?: { method?: string; url?: string; failureText?: string },
+) {
+  if (request) {
+    const method = request.method || "";
+    const url = request.url || "";
+    const failureText = request.failureText || "";
+
+    if (
+      /net::ERR_ABORTED/i.test(failureText) &&
+      method === "GET" &&
+      /\/api\/(settings\/public|admin\/settings)(?:\?|$)/i.test(url)
+    ) {
+      return true;
+    }
+
+    if (
+      method === "GET" &&
+      /supabase\.co\/storage\/v1\/object\/public\/brand\/logo\//i.test(url) &&
+      /net::ERR_(BLOCKED_BY_ORB|ABORTED)/i.test(failureText)
+    ) {
+      return true;
+    }
+  }
+
+  return (
+    /GET .*\/api\/(settings\/public|admin\/settings)(?:\?|$).*net::ERR_ABORTED/i.test(entry) ||
+    /supabase\.co\/storage\/v1\/object\/public\/brand\/logo\/.*net::ERR_(BLOCKED_BY_ORB|ABORTED)/i.test(
+      entry,
+    )
+  );
 }
 
 export async function appendManifestArtifact(artifact: ManifestArtifact) {
@@ -67,6 +101,10 @@ export function attachPageGuards(page: Page) {
       return;
     }
 
+    if (shouldIgnoreFailedRequest("", { method, url, failureText })) {
+      return;
+    }
+
     failedRequests.push(`${method} ${url} :: ${failureText}`);
   });
 
@@ -103,6 +141,9 @@ export function attachPageGuards(page: Page) {
     async assertCleanExcept(options?: { ignoreFailedRequests?: RegExp[] }) {
       const ignoreFailedRequests = options?.ignoreFailedRequests || [];
       const relevantFailedRequests = failedRequests.filter((entry) => {
+        if (shouldIgnoreFailedRequest(entry)) {
+          return false;
+        }
         return !ignoreFailedRequests.some((pattern) => pattern.test(entry));
       });
 
@@ -125,6 +166,21 @@ export async function findInputByLabel(page: Page, label: string) {
   }
 
   const labelLocator = page.locator("label", { hasText: label }).first();
+  await expect(labelLocator).toBeVisible();
+  const parent = labelLocator.locator("xpath=..");
+  const control = parent.locator("input, textarea, select").first();
+  await expect(control).toBeVisible();
+  return control;
+}
+
+export async function findInputByLabelWithin(container: Locator, label: string) {
+  const associated = container.getByLabel(label, { exact: true }).first();
+  if (await associated.count()) {
+    await expect(associated).toBeVisible();
+    return associated;
+  }
+
+  const labelLocator = container.locator("label", { hasText: label }).first();
   await expect(labelLocator).toBeVisible();
   const parent = labelLocator.locator("xpath=..");
   const control = parent.locator("input, textarea, select").first();

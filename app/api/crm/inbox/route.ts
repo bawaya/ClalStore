@@ -26,7 +26,6 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
     const offset = (page - 1) * limit;
 
-    // Build query
     let query = supabase
       .from("inbox_conversations")
       .select("*", { count: "exact" })
@@ -41,11 +40,10 @@ export async function GET(req: NextRequest) {
       query = query.eq("assigned_to", assigned);
     }
     if (search) {
-      // Sanitize search input — escape special PostgREST characters
       const cleanSearch = search.replace(/[%_\\]/g, "").slice(0, 100);
       if (cleanSearch) {
         query = query.or(
-          `customer_name.ilike.%${cleanSearch}%,customer_phone.ilike.%${cleanSearch}%,last_message_text.ilike.%${cleanSearch}%`
+          `customer_name.ilike.%${cleanSearch}%,customer_phone.ilike.%${cleanSearch}%,last_message_text.ilike.%${cleanSearch}%`,
         );
       }
     }
@@ -59,65 +57,79 @@ export async function GET(req: NextRequest) {
       return apiError("فشل في جلب المحادثات", 500);
     }
 
-    // If label filter, pre-filter by conversation IDs from junction table
     let filteredConvs = conversations || [];
     if (label) {
-      // For label filtering, we need to re-query with the right IDs for correct pagination
       const { data: labelConvs } = await supabase
         .from("inbox_conversation_labels")
         .select("conversation_id")
         .eq("label_id", label);
-      const labelConvIds = (labelConvs || []).map((l: any) => l.conversation_id);
+
+      const labelConvIds = (labelConvs || []).map((row: any) => row.conversation_id);
       if (labelConvIds.length === 0) {
-        return apiSuccess({ conversations: [], total: 0, stats: { total_conversations: 0, active: 0, waiting: 0, bot: 0, resolved_today: 0, messages_today: 0, unread_total: 0 } });
+        return apiSuccess({
+          conversations: [],
+          total: 0,
+          stats: {
+            total_conversations: 0,
+            active: 0,
+            waiting: 0,
+            bot: 0,
+            resolved_today: 0,
+            messages_today: 0,
+            unread_total: 0,
+          },
+        });
       }
-      filteredConvs = filteredConvs.filter((c: any) => labelConvIds.includes(c.id));
+
+      filteredConvs = filteredConvs.filter((conv: any) => labelConvIds.includes(conv.id));
     }
 
-    // Get labels for all conversations
-    const convIds = filteredConvs.map((c: any) => c.id);
-    let labelsMap: Record<string, any[]> = {};
+    const convIds = filteredConvs.map((conv: any) => conv.id);
+    const labelsMap: Record<string, any[]> = {};
     if (convIds.length > 0) {
       const { data: convLabels } = await supabase
         .from("inbox_conversation_labels")
         .select("conversation_id, label_id")
         .in("conversation_id", convIds);
-      const labelIds = [...new Set((convLabels || []).map((cl: any) => cl.label_id))];
+
+      const labelIds = [...new Set((convLabels || []).map((row: any) => row.label_id))];
       if (labelIds.length > 0) {
         const { data: labels } = await supabase
           .from("inbox_labels")
           .select("*")
           .in("id", labelIds);
+
         const labelMap: Record<string, any> = {};
-        (labels || []).forEach((l: any) => { labelMap[l.id] = l; });
-        (convLabels || []).forEach((cl: any) => {
-          if (!labelsMap[cl.conversation_id]) labelsMap[cl.conversation_id] = [];
-          if (labelMap[cl.label_id]) labelsMap[cl.conversation_id].push(labelMap[cl.label_id]);
+        (labels || []).forEach((labelRow: any) => {
+          labelMap[labelRow.id] = labelRow;
+        });
+
+        (convLabels || []).forEach((row: any) => {
+          if (!labelsMap[row.conversation_id]) labelsMap[row.conversation_id] = [];
+          if (labelMap[row.label_id]) labelsMap[row.conversation_id].push(labelMap[row.label_id]);
         });
       }
     }
 
-    // Get assigned user names
-    const assignedIds = [...new Set(filteredConvs.map((c: any) => c.assigned_to).filter(Boolean))];
-    let usersMap: Record<string, { id: string; name: string }> = {};
+    const assignedIds = [...new Set(filteredConvs.map((conv: any) => conv.assigned_to).filter(Boolean))];
+    const usersMap: Record<string, { id: string; name: string }> = {};
     if (assignedIds.length > 0) {
       const { data: users } = await supabase
         .from("users")
-        .select("id, full_name, email")
+        .select("id, name, email")
         .in("id", assignedIds);
-      (users || []).forEach((u: any) => {
-        usersMap[u.id] = { id: u.id, name: u.full_name || u.email || "موظف" };
+
+      (users || []).forEach((userRow: any) => {
+        usersMap[userRow.id] = { id: userRow.id, name: userRow.name || userRow.email || "موظف" };
       });
     }
 
-    // Enrich with labels + assigned_user
-    const enriched = filteredConvs.map((c: any) => ({
-      ...c,
-      labels: labelsMap[c.id] || [],
-      assigned_user: c.assigned_to ? usersMap[c.assigned_to] || null : null,
+    const enriched = filteredConvs.map((conv: any) => ({
+      ...conv,
+      labels: labelsMap[conv.id] || [],
+      assigned_user: conv.assigned_to ? usersMap[conv.assigned_to] || null : null,
     }));
 
-    // Stats — use count queries instead of loading all conversations
     const [totalRes, activeRes, waitingRes, botRes, unreadRes] = await Promise.all([
       supabase.from("inbox_conversations").select("id", { count: "exact", head: true }),
       supabase.from("inbox_conversations").select("id", { count: "exact", head: true }).eq("status", "active"),
@@ -125,6 +137,7 @@ export async function GET(req: NextRequest) {
       supabase.from("inbox_conversations").select("id", { count: "exact", head: true }).eq("status", "bot"),
       supabase.from("inbox_conversations").select("unread_count").gt("unread_count", 0),
     ]);
+
     const stats = {
       total_conversations: totalRes.count || 0,
       active: activeRes.count || 0,
@@ -132,7 +145,10 @@ export async function GET(req: NextRequest) {
       bot: botRes.count || 0,
       resolved_today: 0,
       messages_today: 0,
-      unread_total: (unreadRes.data || []).reduce((sum: number, c: { unread_count: number }) => sum + (c.unread_count || 0), 0),
+      unread_total: (unreadRes.data || []).reduce(
+        (sum: number, conv: { unread_count: number }) => sum + (conv.unread_count || 0),
+        0,
+      ),
     };
 
     return apiSuccess({ conversations: enriched, total: count || 0, stats });

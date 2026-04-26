@@ -63,8 +63,7 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: true }),
       supabase
         .from("order_items")
-        .select("product_name, quantity, order_id, created_at")
-        .gte("created_at", thirtyDaysAgo)
+        .select("product_name, quantity, order_id")
         .limit(2000),
       supabase
         .from("customers")

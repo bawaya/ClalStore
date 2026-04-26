@@ -57,7 +57,7 @@ Four non-negotiables govern every test we write:
 - `tests/pages/` — Page components
 - `tests/layouts/` — Root/admin/crm/store layouts
 - `tests/middleware/` — `middleware.ts` behavior
-- `tests/db/` — Migration file sanity + RLS policy shape
+- `tests/db/` — Migration file sanity + RLS policy shape + schema contracts between migrations/types/source queries
 - `tests/i18n/` — `ar.json` / `he.json` key parity
 - `tests/types/` — TypeScript type assertions
 

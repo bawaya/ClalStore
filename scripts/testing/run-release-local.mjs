@@ -119,6 +119,12 @@ async function getSettingRow(supabase, key) {
   return data || { key, value: "", type: "string" };
 }
 
+async function getIntegrationRow(supabase, type) {
+  const { data, error } = await supabase.from("integrations").select("*").eq("type", type).maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 const runId = process.env.TEST_RUN_ID || "";
 const localReleasePort = await getFreePort();
 const LOCAL_RELEASE_BASE_URL = `http://127.0.0.1:${localReleasePort}`;
@@ -160,6 +166,26 @@ await recordArtifact(manifestPath, {
   onConflict: "key",
   row: logoRow,
 });
+
+const aiChatIntegration = await getIntegrationRow(supabase, "ai_chat");
+if (aiChatIntegration) {
+  await recordArtifact(manifestPath, {
+    kind: "row_upsert_restore",
+    table: "integrations",
+    onConflict: "id",
+    row: aiChatIntegration,
+  });
+}
+
+const emailIntegration = await getIntegrationRow(supabase, "email");
+if (emailIntegration) {
+  await recordArtifact(manifestPath, {
+    kind: "row_upsert_restore",
+    table: "integrations",
+    onConflict: "id",
+    row: emailIntegration,
+  });
+}
 
 const allowLogoUpload = process.env.SKIP_LOGO_UPLOAD === "1" ? false : true;
 

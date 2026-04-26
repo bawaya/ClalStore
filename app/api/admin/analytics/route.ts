@@ -31,12 +31,12 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: true }),
       supabase
         .from("bot_analytics")
-        .select("date, conversations, messages, handoffs, csat_avg, store_clicks")
+        .select("date, total_conversations, total_messages, handoffs, avg_csat, store_clicks")
         .gte("date", since.split("T")[0])
         .order("date", { ascending: true }),
       supabase
         .from("bot_analytics")
-        .select("date, conversations, messages, handoffs, csat_avg, store_clicks")
+        .select("date, total_conversations, total_messages, handoffs, avg_csat, store_clicks")
         .gte("date", prevSince.split("T")[0])
         .lt("date", since.split("T")[0])
         .order("date", { ascending: true }),
@@ -83,16 +83,16 @@ export async function GET(req: NextRequest) {
     let _prevCsatCount = 0;
 
     for (const d of botDays) {
-      totalConversations += d.conversations || 0;
+      totalConversations += d.total_conversations || 0;
       totalHandoffs += d.handoffs || 0;
       totalStoreClicks += d.store_clicks || 0;
-      if (d.csat_avg) { csatSum += d.csat_avg; csatCount++; }
+      if (d.avg_csat) { csatSum += d.avg_csat; csatCount++; }
     }
     for (const d of prevBotDays) {
-      prevConversations += d.conversations || 0;
+      prevConversations += d.total_conversations || 0;
       prevHandoffs += d.handoffs || 0;
       _prevStoreClicks += d.store_clicks || 0;
-      if (d.csat_avg) { _prevCsatSum += d.csat_avg; _prevCsatCount++; }
+      if (d.avg_csat) { _prevCsatSum += d.avg_csat; _prevCsatCount++; }
     }
 
     const prevRevenue = prevOrders.reduce((s: number, o: any) => s + (Number(o.total) || 0), 0);

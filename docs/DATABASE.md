@@ -2,7 +2,7 @@
 
 > Full reference for the ClalMobile Supabase (PostgreSQL 17) schema — tables, relationships, RLS, triggers, RPCs, and migration order.
 >
-> The **single source of truth** for every table shape is `types/database.ts`. Adding a column means updating that file first.
+> The **row-shape source of truth** is `types/database.ts`, but a schema change is not complete until the SQL migration, the TypeScript type, and the schema-contract checks move together. See `docs/DATABASE-CONSISTENCY.md`.
 
 ## Table of Contents
 
@@ -349,6 +349,7 @@ New tables that back the unified Sales PWA's employee-facing features (`/employe
 | Table | Purpose |
 |-------|---------|
 | `integrations` | Provider config per category (payment / email / sms / whatsapp / storage / analytics / ai_chat / ai_admin / image_processing / device_specs / image_search / push_notifications) — stores `provider` name + `config` JSONB + `status`; drives the Integration Hub at runtime |
+| `integration_secrets` | Encrypted vault for sensitive integration credentials (`api_key`, webhook secrets, auth tokens) keyed by `integration_id + secret_key`; only server-side service-role code may read or write it |
 | `rate_limits` | Persistent rate-limit counters (key, count, reset_at) shared across serverless instances |
 
 ### Audit & RBAC

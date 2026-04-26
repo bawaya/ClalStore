@@ -9,9 +9,9 @@ import type {
   Product, Order, OrderItem, OrderNote, OrderStatusHistory,
   Customer, CustomerNote, CustomerHotAccount, CustomerOTP,
   AppUser, Category, Coupon, Deal, Hero, LinePlan, Setting,
-  WebsiteContent, SubPage, Integration, EmailTemplate,
-  InboxConversation, InboxMessage, InboxLabel, InboxNote,
-  InboxTemplate, InboxQuickReply,
+  WebsiteContent, SubPage, Integration, IntegrationSecret, EmailTemplate,
+  InboxConversation, InboxMessage, InboxLabel, InboxConversationLabel, InboxNote,
+  InboxTemplate, InboxQuickReply, InboxEvent,
   BotConversation, BotMessage, BotTemplate, BotPolicy,
   BotAnalytics, BotHandoff,
   CommissionSale, CommissionEmployee, CommissionSanction,
@@ -56,7 +56,10 @@ export function makeOrder(o: Partial<Order> = {}): Order {
     shipping_city: "חיפה", shipping_address: "רחוב 1",
     customer_notes: undefined, internal_notes: undefined,
     assigned_to: undefined, created_by_id: undefined, created_by_name: undefined,
-    deal_id: undefined, commission_synced: false,
+    deal_id: undefined, commission_synced: false, deleted_at: null,
+    excluded_from_sync: false, cancelled_at_customer: null, cancelled_by: null,
+    cancellation_reason: null, cancellation_fee: null, cancellation_refund: null,
+    extended_cancel_window: false,
     created_at: now(), updated_at: now(), ...o,
   };
 }
@@ -88,7 +91,7 @@ export function makeCustomer(o: Partial<Customer> = {}): Customer {
     tags: ["vip"], source: "store", assigned_to: undefined,
     created_by_id: undefined, created_by_name: undefined,
     gender: undefined, preferred_language: "ar", notes: undefined,
-    auth_token: undefined, auth_token_expires_at: undefined, last_login: undefined,
+    auth_token: undefined, auth_token_expires_at: null, last_login: undefined,
     created_at: now(), updated_at: now(), ...o,
   };
 }
@@ -117,7 +120,8 @@ export function makeUser(o: Partial<AppUser> = {}): AppUser {
   return {
     id: uuid(), auth_id: uuid(), name: "Admin User", email: "admin@test.com",
     phone: "0501234567", role: "super_admin", avatar_url: undefined,
-    status: "active", last_login_at: now(), created_at: now(), ...o,
+    status: "active", must_change_password: false, temp_password_expires_at: null,
+    invited_by: null, invited_at: null, last_login_at: now(), created_at: now(), ...o,
   };
 }
 
@@ -176,6 +180,13 @@ export function makeIntegration(o: Partial<Integration> = {}): Integration {
   return { id: uuid(), type: "whatsapp", provider: "ycloud", config: { api_key: "test" }, status: "active", last_synced_at: undefined, ...o };
 }
 
+export function makeIntegrationSecret(o: Partial<IntegrationSecret> = {}): IntegrationSecret {
+  return {
+    id: uuid(), integration_id: uuid(), secret_key: "api_key", encrypted_value: "enc_test_value",
+    value_hint: "****1234", key_version: 1, created_at: now(), updated_at: now(), updated_by: null, ...o,
+  };
+}
+
 export function makeEmailTemplate(o: Partial<EmailTemplate> = {}): EmailTemplate {
   return { id: uuid(), slug: "order_confirmed", name_ar: "تأكيد", subject_ar: "طلبك", subject_he: "ההזמנה", body_html_ar: "<p>شكرا</p>", body_html_he: "<p>תודה</p>", variables: ["orderId"], active: true, created_at: now(), ...o };
 }
@@ -210,6 +221,10 @@ export function makeInboxLabel(o: Partial<InboxLabel> = {}): InboxLabel {
   return { id: uuid(), name: "VIP", color: "#FFD700", description: null, sort_order: 0, created_at: now(), ...o };
 }
 
+export function makeInboxConversationLabel(o: Partial<InboxConversationLabel> = {}): InboxConversationLabel {
+  return { conversation_id: uuid(), label_id: uuid(), ...o };
+}
+
 export function makeInboxNote(o: Partial<InboxNote> = {}): InboxNote {
   return { id: uuid(), conversation_id: uuid(), author_id: uuid(), author_name: "Admin", content: "Note text", created_at: now(), ...o };
 }
@@ -223,6 +238,14 @@ export function makeInboxQuickReply(o: Partial<InboxQuickReply> = {}): InboxQuic
 }
 
 // ───── Bot ─────
+
+export function makeInboxEvent(o: Partial<InboxEvent> = {}): InboxEvent {
+  return {
+    id: uuid(), conversation_id: uuid(), event_type: "status_changed",
+    actor_id: uuid(), actor_name: "Admin", old_value: "active", new_value: "resolved",
+    created_at: now(), ...o,
+  };
+}
 
 export function makeBotConversation(o: Partial<BotConversation> = {}): BotConversation {
   return {
@@ -266,7 +289,8 @@ export function makeCommissionSale(o: Partial<CommissionSale> = {}): CommissionS
     package_price: 59, multiplier: 1, has_valid_hk: true,
     loyalty_status: null, loyalty_start_date: null,
     device_name: null, device_sale_amount: 0, commission_amount: 45,
-    contract_commission: undefined, employee_id: null, employee_name: null,
+    contract_commission: undefined, rate_snapshot: null, source_sales_doc_id: null,
+    source_pipeline_deal_id: null, employee_id: null, employee_name: null,
     notes: null, deleted_at: null, created_at: now(), updated_at: now(), ...o,
   };
 }
@@ -364,7 +388,8 @@ export function makeSalesDoc(o: Partial<SalesDoc> = {}): SalesDoc {
     sale_date: now().split("T")[0], total_amount: 3499, currency: "ILS", source: "pwa",
     created_by: uuid(), submitted_at: null, verified_at: null, rejected_at: null,
     synced_at: null, rejection_reason: null, notes: null, device_client_id: null,
-    idempotency_key: null, created_at: now(), updated_at: now(), deleted_at: null, ...o,
+    idempotency_key: null, cancelled_at: null, cancelled_by: null, cancellation_reason: null,
+    created_at: now(), updated_at: now(), deleted_at: null, ...o,
   };
 }
 

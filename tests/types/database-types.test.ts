@@ -10,6 +10,7 @@ import {
   makeCustomer, makeCustomerNote, makeCustomerHotAccount, makeCustomerOTP,
   makeUser, makeCategory, makeCoupon, makeDeal, makeHero, makeLinePlan,
   makeSetting, makeWebsiteContent, makeSubPage, makeIntegration, makeEmailTemplate,
+  makeIntegrationSecret,
   makeInboxConversation, makeInboxMessage, makeInboxLabel, makeInboxNote,
   makeInboxTemplate, makeInboxQuickReply,
   makeBotConversation, makeBotMessage, makeBotTemplate, makeBotPolicy,
@@ -159,6 +160,10 @@ describe("database type factories", () => {
       expect(u.email).toBeDefined();
       expect(u.role).toBe("super_admin");
       expect(u.status).toBe("active");
+      expect(u.must_change_password).toBe(false);
+      expect(u).toHaveProperty("temp_password_expires_at");
+      expect(u).toHaveProperty("invited_by");
+      expect(u).toHaveProperty("invited_at");
     });
   });
 
@@ -243,6 +248,16 @@ describe("database type factories", () => {
       const i = makeIntegration();
       expect(i.type).toBe("whatsapp");
       expect(i.status).toBe("active");
+    });
+  });
+
+  describe("IntegrationSecret", () => {
+    it("creates a valid IntegrationSecret", () => {
+      const s = makeIntegrationSecret();
+      expect(s.integration_id).toBeDefined();
+      expect(s.secret_key).toBe("api_key");
+      expect(s.encrypted_value).toBeDefined();
+      expect(typeof s.key_version).toBe("number");
     });
   });
 
@@ -365,8 +380,12 @@ describe("database type factories", () => {
       const s = makeCommissionSale();
       expect(typeof s.id).toBe("number");
       expect(s.sale_type).toBe("line");
+      expect(s.source).toBe("manual");
       expect(typeof s.package_price).toBe("number");
       expect(typeof s.commission_amount).toBe("number");
+      expect(s).toHaveProperty("rate_snapshot");
+      expect(s).toHaveProperty("source_sales_doc_id");
+      expect(s).toHaveProperty("source_pipeline_deal_id");
     });
   });
 
@@ -528,6 +547,9 @@ describe("database type factories", () => {
       expect(typeof d.id).toBe("number");
       expect(d.status).toBe("draft");
       expect(d.sale_type).toBe("device");
+      expect(d).toHaveProperty("cancelled_at");
+      expect(d).toHaveProperty("cancelled_by");
+      expect(d).toHaveProperty("cancellation_reason");
     });
   });
 

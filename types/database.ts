@@ -78,6 +78,16 @@ export type Database = {
         Update: Partial<Omit<EmailTemplate, "id">>;
         Relationships: [];
       };
+      sub_pages: {
+        Row: SubPage;
+        Insert: Omit<SubPage, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<SubPage, "id">>;
+        Relationships: [];
+      };
       settings: {
         Row: Setting;
         Insert: Setting;
@@ -98,6 +108,21 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Omit<IntegrationSecret, "id" | "integration_id" | "created_at">>;
+        Relationships: [];
+      };
+      ai_usage: {
+        Row: AiUsage;
+        Insert: Omit<AiUsage, "id" | "total_tokens" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<AiUsage, "id" | "total_tokens">>;
+        Relationships: [];
+      };
+      rate_limits: {
+        Row: RateLimit;
+        Insert: RateLimit;
+        Update: Partial<RateLimit>;
         Relationships: [];
       };
       users: {
@@ -134,6 +159,77 @@ export type Database = {
         Row: Category;
         Insert: Omit<Category, "id" | "created_at">;
         Update: Partial<Omit<Category, "id">>;
+        Relationships: [];
+      };
+      inbox_conversations: {
+        Row: InboxConversation;
+        Insert: Omit<InboxConversation, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<InboxConversation, "id">>;
+        Relationships: [];
+      };
+      inbox_messages: {
+        Row: InboxMessage;
+        Insert: Omit<InboxMessage, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<InboxMessage, "id">>;
+        Relationships: [];
+      };
+      inbox_labels: {
+        Row: InboxLabel;
+        Insert: Omit<InboxLabel, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<InboxLabel, "id">>;
+        Relationships: [];
+      };
+      inbox_conversation_labels: {
+        Row: InboxConversationLabel;
+        Insert: InboxConversationLabel;
+        Update: Partial<InboxConversationLabel>;
+        Relationships: [];
+      };
+      inbox_notes: {
+        Row: InboxNote;
+        Insert: Omit<InboxNote, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<InboxNote, "id">>;
+        Relationships: [];
+      };
+      inbox_templates: {
+        Row: InboxTemplate;
+        Insert: Omit<InboxTemplate, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<InboxTemplate, "id">>;
+        Relationships: [];
+      };
+      inbox_quick_replies: {
+        Row: InboxQuickReply;
+        Insert: Omit<InboxQuickReply, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<InboxQuickReply, "id">>;
+        Relationships: [];
+      };
+      inbox_events: {
+        Row: InboxEvent;
+        Insert: Omit<InboxEvent, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<InboxEvent, "id">>;
         Relationships: [];
       };
       bot_conversations: {
@@ -232,6 +328,24 @@ export type Database = {
         Update: Partial<Omit<LoyaltyTransaction, "id">>;
         Relationships: [];
       };
+      consent_log: {
+        Row: ConsentLog;
+        Insert: Omit<ConsentLog, "id" | "created_at"> & {
+          id?: number;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ConsentLog, "id">>;
+        Relationships: [];
+      };
+      data_export_requests: {
+        Row: DataExportRequest;
+        Insert: Omit<DataExportRequest, "id" | "requested_at"> & {
+          id?: string;
+          requested_at?: string;
+        };
+        Update: Partial<Omit<DataExportRequest, "id">>;
+        Relationships: [];
+      };
       commission_sales: {
         Row: CommissionSale;
         Insert: Omit<CommissionSale, "id" | "created_at" | "updated_at">;
@@ -296,6 +410,43 @@ export type Database = {
         Row: SalesDocSyncQueue;
         Insert: Omit<SalesDocSyncQueue, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<SalesDocSyncQueue, "id">>;
+        Relationships: [];
+      };
+      sales_requests: {
+        Row: SalesRequest;
+        Insert: Omit<SalesRequest, "id" | "created_at" | "updated_at"> & {
+          id?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<SalesRequest, "id" | "created_at">>;
+        Relationships: [];
+      };
+      sales_request_devices: {
+        Row: SalesRequestDevice;
+        Insert: Omit<SalesRequestDevice, "id" | "monthly_installment" | "created_at"> & {
+          id?: number;
+          created_at?: string;
+        };
+        Update: Partial<Omit<SalesRequestDevice, "id" | "monthly_installment">>;
+        Relationships: [];
+      };
+      sales_request_packages: {
+        Row: SalesRequestPackage;
+        Insert: Omit<SalesRequestPackage, "id" | "created_at"> & {
+          id?: number;
+          created_at?: string;
+        };
+        Update: Partial<Omit<SalesRequestPackage, "id">>;
+        Relationships: [];
+      };
+      sales_request_events: {
+        Row: SalesRequestEvent;
+        Insert: Omit<SalesRequestEvent, "id" | "created_at"> & {
+          id?: number;
+          created_at?: string;
+        };
+        Update: Partial<Omit<SalesRequestEvent, "id">>;
         Relationships: [];
       };
       commission_correction_requests: {
@@ -454,7 +605,7 @@ export type WebsiteContent = {
 
 export type Order = {
   id: string;              // CLM-XXXXX
-  customer_id: string;
+  customer_id: string | null;
   status: string;          // OrderStatus
   source: string;          // OrderSource
   items_total: number;
@@ -473,6 +624,14 @@ export type Order = {
   created_by_name?: string;
   deal_id?: string;
   commission_synced?: boolean;
+  deleted_at?: string | null;
+  excluded_from_sync?: boolean;
+  cancelled_at_customer?: string | null;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
+  cancellation_fee?: number | null;
+  cancellation_refund?: number | null;
+  extended_cancel_window?: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -534,7 +693,7 @@ export type Customer = {
   preferred_language?: string;
   notes?: string;
   auth_token?: string;
-  auth_token_expires_at?: string;
+  auth_token_expires_at?: string | null;
   last_login?: string;
   // Consent flags (Israeli Privacy Protection Law — Amendment 13)
   consent_essential?: boolean;
@@ -689,6 +848,10 @@ export type AppUser = {
   role: string;            // UserRole
   avatar_url?: string;
   status: "active" | "suspended";
+  must_change_password: boolean;
+  temp_password_expires_at?: string | null;
+  invited_by?: string | null;
+  invited_at?: string | null;
   last_login_at?: string;
   created_at: string;
 }
@@ -799,8 +962,26 @@ export type BotAnalytics = {
   store_clicks: number;
   top_intents: Record<string, number>;
   top_products: Record<string, number>;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export type AiUsage = {
+  id: string;
+  feature: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  duration_ms: number;
+  model: string;
+  conversation_id: string | null;
   created_at: string;
-  updated_at: string;
+}
+
+export type RateLimit = {
+  key: string;
+  count: number;
+  reset_at: string;
 }
 
 // ===== Feature Tables (Season 6) =====
@@ -950,6 +1131,11 @@ export type InboxLabel = {
   created_at: string;
 }
 
+export type InboxConversationLabel = {
+  conversation_id: string;
+  label_id: string;
+}
+
 export type InboxNote = {
   id: string;
   conversation_id: string;
@@ -982,6 +1168,17 @@ export type InboxQuickReply = {
   usage_count: number;
   sort_order: number;
   is_active: boolean;
+  created_at: string;
+}
+
+export type InboxEvent = {
+  id: string;
+  conversation_id: string | null;
+  event_type: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
   created_at: string;
 }
 
@@ -1087,7 +1284,7 @@ export type CommissionSale = {
   user_id?: string | null;
   sale_date: string;
   sale_type: CommissionSaleType;
-  source: "manual" | "auto_sync" | "csv_import";
+  source: "manual" | "auto_sync" | "csv_import" | "sales_doc" | "pipeline" | "order";
   order_id?: string | null;
   customer_id?: string | null;
   customer_hot_account_id?: string | null;
@@ -1107,6 +1304,9 @@ export type CommissionSale = {
   device_sale_amount: number;
   commission_amount: number;
   contract_commission?: number;
+  rate_snapshot?: Record<string, unknown> | null;
+  source_sales_doc_id?: number | null;
+  source_pipeline_deal_id?: string | null;
   employee_id?: string | null;
   employee_name?: string | null;
   notes?: string | null;
@@ -1189,7 +1389,7 @@ export type SalesDoc = {
   customer_id?: string | null;
   order_id?: string | null;
   sale_type: "line" | "device" | "mixed";
-  status: "draft" | "submitted" | "verified" | "rejected" | "synced_to_commissions";
+  status: "draft" | "submitted" | "verified" | "rejected" | "synced_to_commissions" | "cancelled";
   sale_date?: string | null;
   total_amount: number;
   currency: string;
@@ -1203,6 +1403,9 @@ export type SalesDoc = {
   notes?: string | null;
   device_client_id?: string | null;
   idempotency_key?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -1255,8 +1458,83 @@ export type SalesDocSyncQueue = {
   attempts: number;
   last_error?: string | null;
   next_retry_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export type SalesRequestStatus =
+  | "draft"
+  | "pending"
+  | "needs_info"
+  | "approved"
+  | "rejected";
+
+export type SalesRequest = {
+  id: number;
+  employee_id: string;
+  status: SalesRequestStatus;
+  customer_name: string;
+  customer_id_number: string;
+  contact_number: string;
+  delivery_address: string;
+  locality_name: string | null;
+  bank_name: string;
+  bank_code: string | null;
+  bank_branch: string;
+  bank_account: string;
+  total_devices_amount: number;
+  total_packages_monthly: number;
+  total_lines_count: number;
+  total_devices_count: number;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  review_note: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+}
+
+export type SalesRequestDevice = {
+  id: number;
+  request_id: number;
+  device_name: string;
+  total_price: number;
+  installments_count: number;
+  monthly_installment: number;
+  position: number;
+  created_at: string;
+}
+
+export type SalesRequestPackage = {
+  id: number;
+  request_id: number;
+  package_name: string;
+  monthly_price: number;
+  lines_count: number;
+  position: number;
+  created_at: string;
+}
+
+export type SalesRequestEventType =
+  | "created"
+  | "submitted"
+  | "info_requested"
+  | "info_provided"
+  | "approved"
+  | "rejected"
+  | "edited"
+  | "deleted";
+
+export type SalesRequestEvent = {
+  id: number;
+  request_id: number;
+  event_type: SalesRequestEventType;
+  actor_id: string | null;
+  actor_role: string | null;
+  message: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 }
 
 // ===== Unified Employee PWA (migration 20260418000006) =====
@@ -1288,6 +1566,37 @@ export type CommissionCorrectionRequest = {
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type ConsentLogSource =
+  | "cookie_banner"
+  | "account_settings"
+  | "checkout"
+  | "withdraw"
+  | "system";
+
+export type ConsentLog = {
+  id: number;
+  created_at: string;
+  visitor_id: string;
+  customer_id: string | null;
+  source: ConsentLogSource;
+  essential: boolean | null;
+  functional: boolean | null;
+  analytics: boolean | null;
+  advertising: boolean | null;
+  privacy_version: string | null;
+  user_agent: string | null;
+  ip_hash: string | null;
+}
+
+export type DataExportRequest = {
+  id: string;
+  customer_id: string;
+  requested_at: string;
+  delivered_at: string | null;
+  download_url: string | null;
+  expires_at: string | null;
 }
 
 export type AnnouncementPriority = "low" | "normal" | "high" | "urgent";

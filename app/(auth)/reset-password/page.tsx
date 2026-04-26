@@ -43,6 +43,18 @@ export default function ResetPasswordPage() {
 
     (async () => {
       try {
+        const hash = window.location.hash || "";
+        const hasRecoveryToken =
+          /access_token=/i.test(hash) || /type=recovery/i.test(hash) || /refresh_token=/i.test(hash);
+
+        if (!hasRecoveryToken) {
+          if (!cancelled) {
+            setNoSession(true);
+            setReady(true);
+          }
+          return;
+        }
+
         const { requireBrowserSupabase } = await import("@/lib/supabase");
         const supabase = requireBrowserSupabase();
 

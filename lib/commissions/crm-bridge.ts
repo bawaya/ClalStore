@@ -74,7 +74,7 @@ export async function getUnifiedEmployees(): Promise<UnifiedEmployee[]> {
   if (!db) return [];
 
   const [{ data: users }, { data: cemp }] = await Promise.all([
-    db.from("users").select("id, name, role, is_active").eq("is_active", true).order("name"),
+    db.from("users").select("id, name, role, status").eq("status", "active").order("name"),
     db.from("commission_employees").select("id, name, user_id, token, role, active").eq("active", true).order("name"),
   ]);
 
@@ -121,7 +121,7 @@ export async function getUnifiedEmployees(): Promise<UnifiedEmployee[]> {
         commission_employee_id: null,
         token: null,
         role: u.role || "viewer",
-        active: u.is_active !== false,
+        active: u.status === "active",
       });
     }
   }

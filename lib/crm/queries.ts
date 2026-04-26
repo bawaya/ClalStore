@@ -213,26 +213,28 @@ export async function deleteOrderCompletely(orderId: string, userName: string) {
     .eq("id", orderId);
   if (delErr) throw delErr;
 
-  // Recalculate customer KPIs excluding soft-deleted orders
-  const { data: remaining } = await s
-    .from("orders")
-    .select("total, status, created_at")
-    .eq("customer_id", order.customer_id)
-    .is("deleted_at", null);
-  const rows: OrderTotalRow[] = remaining || [];
-  const nonRejected = rows.filter((r) => r.status !== "rejected");
-  const billable = rows.filter((r) => !["rejected", "new"].includes(r.status));
-  const totalSpent = billable.reduce((sum: number, r) => sum + Number(r.total || 0), 0);
-  const avg = billable.length > 0 ? totalSpent / billable.length : 0;
-  const last = rows.length > 0
-    ? rows.map((r) => r.created_at).sort().at(-1) || null
-    : null;
-  await s.from("customers").update({
-    total_orders: nonRejected.length,
-    total_spent: totalSpent,
-    avg_order_value: avg,
-    last_order_at: last,
-  }).eq("id", order.customer_id);
+  if (order.customer_id) {
+    // Recalculate customer KPIs excluding soft-deleted orders
+    const { data: remaining } = await s
+      .from("orders")
+      .select("total, status, created_at")
+      .eq("customer_id", order.customer_id)
+      .is("deleted_at", null);
+    const rows: OrderTotalRow[] = remaining || [];
+    const nonRejected = rows.filter((r) => r.status !== "rejected");
+    const billable = rows.filter((r) => !["rejected", "new"].includes(r.status));
+    const totalSpent = billable.reduce((sum: number, r) => sum + Number(r.total || 0), 0);
+    const avg = billable.length > 0 ? totalSpent / billable.length : 0;
+    const last = rows.length > 0
+      ? rows.map((r) => r.created_at).sort().at(-1) || null
+      : null;
+    await s.from("customers").update({
+      total_orders: nonRejected.length,
+      total_spent: totalSpent,
+      avg_order_value: avg,
+      last_order_at: last,
+    }).eq("id", order.customer_id);
+  }
 
   await s.from("audit_log").insert({
     user_name: userName,
@@ -325,7 +327,7 @@ export async function deleteDeal(id: string) {
 // ===== Users =====
 export async function getCRMUsers() {
   const s = db();
-  const { data: users } = await s.from("users").select("id, auth_id, name, email, phone, role, status, is_active, avatar_url, created_at").order("created_at").limit(500);
+  const { data: users } = await s.from("users").select("id, auth_id, name, email, phone, role, status, avatar_url, created_at").order("created_at").limit(500);
   const list: AppUser[] = users || [];
   if (list.length === 0) return [];
 

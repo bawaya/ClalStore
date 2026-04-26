@@ -21,6 +21,14 @@ async function loginToAdminSettings(page: Parameters<typeof test>[0]["page"]) {
   await page.waitForURL(/\/admin\/settings/, { timeout: 30_000 });
 }
 
+async function acceptCookiesIfPresent(page: Parameters<typeof test>[0]["page"]) {
+  const acceptButton = page.getByRole("button", { name: /قبول الكل/ }).first();
+  if (await acceptButton.isVisible().catch(() => false)) {
+    await acceptButton.click();
+    await expect(acceptButton).toHaveCount(0);
+  }
+}
+
 test.describe.configure({ mode: "serial" });
 
 test("نسيان كلمة المرور يعرض رسالة عامة من دون تسريب", async ({ page }) => {
@@ -69,6 +77,7 @@ test("إعدادات المتجر تسمح بحفظ وصف عربي مع تمه�
 
   const guards = attachPageGuards(page);
   await loginToAdminSettings(page);
+  await acceptCookiesIfPresent(page);
 
   const adminCrashHeading = page.getByRole("heading", { name: "حدث خطأ في لوحة التحكم" });
   if (await adminCrashHeading.isVisible().catch(() => false)) {
@@ -95,6 +104,7 @@ test("إعدادات المتجر تسمح بحفظ وصف عربي مع تمه�
   await taglineInput.blur();
   await saveResponse;
   await page.reload();
+  await acceptCookiesIfPresent(page);
 
   const refreshedInput = await findInputByLabel(page, "الوصف العربي");
   await expect(refreshedInput).toHaveValue(nextValue);
@@ -151,6 +161,117 @@ test("إعدادات المتجر تسمح بحفظ وصف عربي مع تمه�
     title: "store-settings-save",
     status: "verified_local_browser",
     message: "تم تسجيل الدخول إداريًا وحفظ الوصف العربي وإعادة تحميل الصفحة للتحقق من بقاء القيمة.",
+  });
+
+  await page.route("**/api/admin/integrations/test", async (route) => {
+    const body = route.request().postDataJSON?.() || {};
+    const provider = typeof body.provider === "string" && body.provider.trim() ? body.provider : "integration";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        message: `اختبار واجهة آمن ناجح: ${provider}`,
+      }),
+    });
+  });
+
+  await page.getByRole("button", { name: "التكاملات" }).click();
+
+  const aiSettingsTitle = page.getByText(/إعدادات (Google Gemini|Anthropic Claude)/).first();
+  const aiSettingsPanel = aiSettingsTitle.locator(
+    "xpath=ancestor::div[count(.//input) >= 2 and .//button[normalize-space()='اختبار'] and .//button[normalize-space()='حفظ الإعدادات']][1]",
+  );
+  await expect(aiSettingsPanel).toBeVisible();
+  await aiSettingsPanel.scrollIntoViewIfNeeded();
+  await expect(aiSettingsTitle).toBeVisible();
+
+  const apiKeyInput = aiSettingsPanel.locator("input:visible").first();
+  const modelInput = aiSettingsPanel.locator("input:visible").nth(1);
+  await expect(apiKeyInput).toBeVisible();
+  await expect(modelInput).toBeVisible();
+  const currentModel = await modelInput.inputValue();
+  const apiKeyMaskedValue = await apiKeyInput.inputValue();
+
+  expect(currentModel.trim().length).toBeGreaterThan(0);
+  expect(apiKeyMaskedValue.trim().length).toBeGreaterThan(0);
+
+  await aiSettingsPanel.getByRole("button", { name: "اختبار" }).click();
+  await expect(aiSettingsPanel.getByText(/اختبار واجهة آمن ناجح:/)).toBeVisible();
+
+  const integrationSaveResponse = page.waitForResponse((response) => {
+    return (
+      response.url().includes("/api/admin/settings") &&
+      response.request().method() === "PUT" &&
+      response.status() === 200
+    );
+  });
+
+  await aiSettingsPanel.getByRole("button", { name: "حفظ الإعدادات" }).click();
+  await integrationSaveResponse;
+
+  await page.reload();
+  await acceptCookiesIfPresent(page);
+  await page.getByRole("button", { name: "التكاملات" }).click();
+
+  const refreshedAiSettingsTitle = page.getByText(/إعدادات (Google Gemini|Anthropic Claude)/).first();
+  const refreshedAiSettingsPanel = refreshedAiSettingsTitle.locator(
+    "xpath=ancestor::div[count(.//input) >= 2 and .//button[normalize-space()='اختبار'] and .//button[normalize-space()='حفظ الإعدادات']][1]",
+  );
+  await expect(refreshedAiSettingsPanel).toBeVisible();
+  await refreshedAiSettingsPanel.scrollIntoViewIfNeeded();
+  await expect(refreshedAiSettingsTitle).toBeVisible();
+  const refreshedApiKeyInput = refreshedAiSettingsPanel.locator("input:visible").first();
+  const refreshedModelInput = refreshedAiSettingsPanel.locator("input:visible").nth(1);
+  await expect(refreshedApiKeyInput).toBeVisible();
+  await expect(refreshedModelInput).toBeVisible();
+
+  await expect(refreshedModelInput).toHaveValue(currentModel);
+  expect((await refreshedApiKeyInput.inputValue()).trim().length).toBeGreaterThan(0);
+
+  await appendManifestArtifact({
+    kind: "note",
+    title: "ai-integration-ui-save-safe",
+    status: "verified_local_browser",
+    message:
+      "تم فحص بطاقة ذكاء التكاملات محليًا: حفظ القيم الحالية مع بقاء المفاتيح الحساسة مقنّعة، واختبار زر التحقق عبر mock آمن دون أي اتصال خارجي حقيقي أو إرسال رسائل.",
+  });
+
+  const emailSettingsTitle = page.getByText(/إعدادات (Resend|SendGrid)/).first();
+  const emailSettingsPanel = emailSettingsTitle.locator(
+    "xpath=ancestor::div[count(.//input) >= 2 and .//button[normalize-space()='اختبار'] and .//button[normalize-space()='حفظ الإعدادات']][1]",
+  );
+  await expect(emailSettingsPanel).toBeVisible();
+  await emailSettingsPanel.scrollIntoViewIfNeeded();
+  await expect(emailSettingsTitle).toBeVisible();
+
+  const emailApiKeyInput = emailSettingsPanel.locator("input:visible").first();
+  const fromEmailInput = emailSettingsPanel.locator("input:visible").nth(1);
+  await expect(emailApiKeyInput).toBeVisible();
+  await expect(fromEmailInput).toBeVisible();
+  expect((await emailApiKeyInput.inputValue()).trim().length).toBeGreaterThan(0);
+  expect((await fromEmailInput.inputValue()).trim().length).toBeGreaterThan(0);
+
+  await emailSettingsPanel.getByRole("button", { name: "اختبار" }).click();
+  await expect(emailSettingsPanel.getByText(/اختبار واجهة آمن ناجح:/)).toBeVisible();
+
+  const emailSaveResponse = page.waitForResponse((response) => {
+    return (
+      response.url().includes("/api/admin/settings") &&
+      response.request().method() === "PUT" &&
+      response.status() === 200
+    );
+  });
+
+  await emailSettingsPanel.getByRole("button", { name: "حفظ الإعدادات" }).click();
+  await emailSaveResponse;
+
+  await appendManifestArtifact({
+    kind: "note",
+    title: "email-integration-ui-save-safe",
+    status: "verified_local_browser",
+    message:
+      "تم فحص بطاقة البريد محليًا مع mock لزر الاختبار، وتأكدنا من الحفظ من دون إطلاق أي رسائل حقيقية أو اتصال خارجي مرسل.",
   });
 
   const guardSnapshot = guards.snapshot();
