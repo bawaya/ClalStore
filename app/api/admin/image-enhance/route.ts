@@ -40,10 +40,6 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
-    if (!process.env.REMOVEBG_API_KEY) {
-      return apiError("REMOVEBG_API_KEY not configured", 500);
-    }
-
     const contentType = req.headers.get("content-type") || "";
 
     let resultBuffer: ArrayBuffer;

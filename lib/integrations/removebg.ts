@@ -4,6 +4,8 @@
 // Returns PNG with transparent background
 // =====================================================
 
+import { getIntegrationConfig } from "@/lib/integrations/hub";
+
 const REMOVEBG_API = "https://api.remove.bg/v1.0/removebg";
 
 interface RemoveBgResult {
@@ -13,12 +15,17 @@ interface RemoveBgResult {
   height: number;
 }
 
+async function getRemoveBgKey(): Promise<string> {
+  const cfg = await getIntegrationConfig("image_enhance");
+  return String(cfg.api_key || process.env.REMOVEBG_API_KEY || "").trim();
+}
+
 /**
  * Remove background from an image URL
  * Uses binary response mode (simpler, more reliable on Edge)
  */
 export async function removeBackground(imageUrl: string): Promise<RemoveBgResult> {
-  const apiKey = process.env.REMOVEBG_API_KEY;
+  const apiKey = await getRemoveBgKey();
   if (!apiKey) throw new Error("REMOVEBG_API_KEY not configured");
 
   // Use form-data with binary response — most reliable on Edge runtime
@@ -66,7 +73,7 @@ export async function removeBackgroundFromBuffer(
   buffer: ArrayBuffer,
   contentType: string
 ): Promise<RemoveBgResult> {
-  const apiKey = process.env.REMOVEBG_API_KEY;
+  const apiKey = await getRemoveBgKey();
   if (!apiKey) throw new Error("REMOVEBG_API_KEY not configured");
 
   const blob = new Blob([buffer], { type: contentType });

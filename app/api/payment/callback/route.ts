@@ -11,16 +11,20 @@ import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { verifyWebhookSignature } from "@/lib/webhook-verify";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
+    const webhookCfg = await getIntegrationConfig("webhook_security");
 
     // HMAC signature verification (additional layer before IPN check)
     const webhookSignature =
       req.headers.get("x-signature") ||
       req.headers.get("x-webhook-signature");
-    const paymentWebhookSecret = process.env.PAYMENT_WEBHOOK_SECRET;
+    const paymentWebhookSecret = String(
+      webhookCfg.payment_webhook_secret || process.env.PAYMENT_WEBHOOK_SECRET || ""
+    ).trim();
 
     if (webhookSignature && paymentWebhookSecret) {
       const valid = await verifyWebhookSignature(rawBody, webhookSignature, paymentWebhookSecret);

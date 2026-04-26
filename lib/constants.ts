@@ -118,8 +118,13 @@ export const INTEGRATION_TYPES = {
   payment_upay: { label: "الدفع — فلسطين والعالم", icon: "💳", providers: ["UPay"] as readonly string[] },
   email: { label: "Email", icon: "📧", providers: ["Resend", "SendGrid"] as readonly string[] },
   ai_chat: { label: "ذكاء اصطناعي (بوت + بحث)", icon: "🤖", providers: ["Anthropic Claude"] as readonly string[] },
+  ai_admin: { label: "ذكاء الإدارة", icon: "🧠", providers: ["OpenAI"] as readonly string[] },
+  image_enhance: { label: "تحسين الصور", icon: "🖼️", providers: ["Remove.bg"] as readonly string[] },
+  device_data: { label: "بيانات الأجهزة", icon: "📱", providers: ["MobileAPI.dev"] as readonly string[] },
+  stock_images: { label: "الصور الإضافية", icon: "🗂️", providers: ["Pexels"] as readonly string[] },
   storage: { label: "تخزين الصور", icon: "☁️", providers: ["Cloudflare R2"] as readonly string[] },
   push_notifications: { label: "إشعارات Push", icon: "🔔", providers: ["Web Push (VAPID)"] as readonly string[] },
+  webhook_security: { label: "أسرار Webhook", icon: "🛡️", providers: ["Internal Webhooks"] as readonly string[] },
 } as const;
 
 (INTEGRATION_TYPES.ai_chat.providers as unknown as string[]).push("Google Gemini");

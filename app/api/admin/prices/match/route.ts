@@ -4,6 +4,7 @@ import { createAdminSupabase } from '@/lib/supabase';
 import type { Product } from '@/types/database';
 import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { getAdminOpenAIRuntime } from "@/lib/ai/openai-admin";
 
 type AiParsedRow = {
   deviceName: string;
@@ -18,7 +19,7 @@ type AiParsedRow = {
 };
 
 const OPENAI_API = 'https://api.openai.com/v1/chat/completions';
-const MODEL = 'gpt-4o-mini';
+const DEFAULT_MODEL = 'gpt-4o-mini';
 
 function inferBrand(brandRaw: string, deviceName: string): string {
   if (brandRaw?.trim()) return brandRaw.trim();
@@ -68,12 +69,11 @@ export async function POST(req: NextRequest) {
       v: (p.variants || []).map((v) => v.storage),
     }));
 
-    const apiKey =
-      process.env.OPENAI_API_KEY_PRICES ||
-      process.env.OPENAI_API_KEY_ADMIN ||
-      process.env.OPENAI_API_KEY ||
-      '';
+    const runtime = await getAdminOpenAIRuntime("pricing");
+    const apiKey = runtime?.apiKey || "";
+    const model = runtime?.model || DEFAULT_MODEL;
     steps.push('key=' + !!apiKey);
+    steps.push('model=' + model);
     if (!apiKey) {
       return apiError('No OpenAI API key', 500);
     }
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
     steps.push('calling OpenAI');
 
     const openAiBody = JSON.stringify({
-      model: MODEL,
+      model,
       temperature: 0.1,
       max_tokens: 12000,
       messages: [

@@ -135,6 +135,80 @@ async function testResend(cfg: Record<string, any>): Promise<TestResult> {
   }
 }
 
+async function testOpenAI(cfg: Record<string, any>): Promise<TestResult> {
+  const apiKey = String(cfg.api_key || "").trim();
+  if (!apiKey) return { ok: false, message: "مفتاح OpenAI API مفقود" };
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (res.ok) return { ok: true, message: "✅ OpenAI متصل بنجاح" };
+    if ([400, 401, 403].includes(res.status)) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, message: text || "مفتاح OpenAI غير صالح" };
+    }
+
+    return { ok: false, message: `OpenAI responded with ${res.status}` };
+  } catch (error: unknown) {
+    return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+  }
+}
+
+async function testMobileApi(cfg: Record<string, any>): Promise<TestResult> {
+  const apiKey = String(cfg.api_key || "").trim();
+  if (!apiKey) return { ok: false, message: "مفتاح MobileAPI.dev مفقود" };
+
+  try {
+    const params = new URLSearchParams({
+      key: apiKey,
+      name: "iPhone 16",
+      manufacturer: "Apple",
+    });
+    const res = await fetch(`https://api.mobileapi.dev/devices/search/?${params.toString()}`, {
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (res.ok) return { ok: true, message: "✅ MobileAPI.dev متصل بنجاح" };
+    if ([400, 401, 403].includes(res.status)) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, message: text || "مفتاح MobileAPI.dev غير صالح" };
+    }
+
+    return { ok: false, message: `MobileAPI.dev responded with ${res.status}` };
+  } catch (error: unknown) {
+    return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+  }
+}
+
+async function testPexels(cfg: Record<string, any>): Promise<TestResult> {
+  const apiKey = String(cfg.api_key || "").trim();
+  if (!apiKey) return { ok: false, message: "مفتاح Pexels API مفقود" };
+
+  try {
+    const res = await fetch("https://api.pexels.com/v1/search?query=phone&per_page=1", {
+      headers: { Authorization: apiKey },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (res.ok) return { ok: true, message: "✅ Pexels متصل بنجاح" };
+    if ([400, 401, 403].includes(res.status)) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, message: text || "مفتاح Pexels غير صالح" };
+    }
+
+    return { ok: false, message: `Pexels responded with ${res.status}` };
+  } catch (error: unknown) {
+    return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+  }
+}
+
 const TESTS: Record<string, (config: Record<string, any>, provider?: string) => Promise<TestResult>> = {
   payment: async (cfg, provider) => {
     if (provider && provider !== "רווחית (Rivhit)") {
@@ -152,6 +226,13 @@ const TESTS: Record<string, (config: Record<string, any>, provider?: string) => 
     if (provider === "Resend") return testResend(cfg);
     if (cfg.api_key && cfg.from_email) return testResend(cfg);
     return { ok: false, message: "اختر مزود البريد أولًا" };
+  },
+
+  ai_admin: async (cfg, provider) => {
+    if (provider && provider !== "OpenAI") {
+      return { ok: false, message: `مزود غير مدعوم: ${provider}` };
+    }
+    return testOpenAI(cfg);
   },
 
   whatsapp: async (cfg) => {
@@ -322,6 +403,29 @@ const TESTS: Record<string, (config: Record<string, any>, provider?: string) => 
     }
 
     return { ok: false, message: `مزود غير مدعوم: ${provider}` };
+  },
+  image_enhance: async (cfg) => {
+    if (!cfg.api_key) {
+      return { ok: false, message: "مفتاح Remove.bg API مفقود" };
+    }
+
+    return { ok: true, message: "✅ إعدادات Remove.bg محفوظة وجاهزة للتشغيل" };
+  },
+  device_data: async (cfg) => {
+    return testMobileApi(cfg);
+  },
+  stock_images: async (cfg) => {
+    return testPexels(cfg);
+  },
+  webhook_security: async (cfg) => {
+    if (!cfg.verify_token) {
+      return { ok: false, message: "Verify Token مطلوب على الأقل" };
+    }
+
+    return {
+      ok: true,
+      message: "✅ أسرار Webhook محفوظة. يمكن إضافة أسرار التوقيع حسب الحاجة.",
+    };
   },
 };
 

@@ -11,14 +11,17 @@ import { logBotInteraction } from "@/lib/bot/engine";
 import { createAdminSupabase } from "@/lib/supabase";
 import { verifyWebhookSignature } from "@/lib/webhook-verify";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
 // Webhook verification (yCloud sends GET to verify)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const token = searchParams.get("token") || searchParams.get("hub.verify_token");
   const challenge = searchParams.get("challenge") || searchParams.get("hub.challenge");
+  const webhookCfg = await getIntegrationConfig("webhook_security");
+  const verifyToken = String(webhookCfg.verify_token || process.env.WEBHOOK_VERIFY_TOKEN || "").trim();
 
-  if (token === process.env.WEBHOOK_VERIFY_TOKEN) {
+  if (token && verifyToken && token === verifyToken) {
     return new NextResponse(challenge || "OK", { status: 200 });
   }
 
@@ -145,9 +148,10 @@ async function saveToInbox(
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
+    const webhookCfg = await getIntegrationConfig("webhook_security");
 
     // HMAC signature verification (only when WEBHOOK_SECRET is explicitly set)
-    const webhookSecret = process.env.WEBHOOK_SECRET;
+    const webhookSecret = String(webhookCfg.webhook_secret || process.env.WEBHOOK_SECRET || "").trim();
 
     if (webhookSecret) {
       const signature =

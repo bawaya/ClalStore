@@ -5,8 +5,14 @@
 // Replaces GSMArena scraper with a proper API
 // =====================================================
 
+import { getIntegrationConfig } from "@/lib/integrations/hub";
+
 const API_BASE = "https://api.mobileapi.dev";
-const API_KEY = process.env.MOBILEAPI_KEY || "";
+
+async function getMobileApiKey(): Promise<string> {
+  const cfg = await getIntegrationConfig("device_data");
+  return String(cfg.api_key || process.env.MOBILEAPI_KEY || "").trim();
+}
 
 // ===== Comprehensive color mapping =====
 const COLORS: Record<string, { hex: string; ar: string; he: string }> = {
@@ -242,8 +248,11 @@ async function searchDevice(name: string, brand: string): Promise<MobileAPIDevic
  * Execute a single search request against MobileAPI
  */
 async function doSearch(searchName: string, manufacturer?: string): Promise<MobileAPIDevice | null> {
+  const apiKey = await getMobileApiKey();
+  if (!apiKey) return null;
+
   const params = new URLSearchParams({
-    key: API_KEY,
+    key: apiKey,
     name: searchName,
   });
   if (manufacturer) {
@@ -255,7 +264,7 @@ async function doSearch(searchName: string, manufacturer?: string): Promise<Mobi
   try {
     const res = await fetch(url, {
       headers: {
-        "Authorization": `Token ${API_KEY}`,
+        "Authorization": `Token ${apiKey}`,
         "Content-Type": "application/json",
       },
     });
@@ -313,12 +322,15 @@ async function doSearch(searchName: string, manufacturer?: string): Promise<Mobi
  * Fetch device images from MobileAPI.dev
  */
 async function fetchDeviceImages(deviceId: number): Promise<string[]> {
-  const url = `${API_BASE}/devices/${deviceId}/images/?key=${API_KEY}&limit=20`;
+  const apiKey = await getMobileApiKey();
+  if (!apiKey) return [];
+
+  const url = `${API_BASE}/devices/${deviceId}/images/?key=${apiKey}&limit=20`;
 
   try {
     const res = await fetch(url, {
       headers: {
-        "Authorization": `Token ${API_KEY}`,
+        "Authorization": `Token ${apiKey}`,
       },
     });
 

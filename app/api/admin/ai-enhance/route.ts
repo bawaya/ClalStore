@@ -6,18 +6,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
 import { requireAdmin } from "@/lib/admin/auth";
+import { getAdminOpenAIRuntime } from "@/lib/ai/openai-admin";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY_ADMIN || process.env.OPENAI_API_KEY || "";
-
-async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
+async function callOpenAI(
+  systemPrompt: string,
+  userPrompt: string,
+  runtime: { apiKey: string; model: string }
+): Promise<string> {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${runtime.apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: runtime.model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -41,7 +44,8 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
-    if (!OPENAI_API_KEY) {
+    const runtime = await getAdminOpenAIRuntime("general");
+    if (!runtime?.apiKey) {
       return apiError("OpenAI API key not configured", 500);
     }
 
@@ -90,7 +94,7 @@ ${specsText ? `المواصفات التفصيلية: ${specsText}` : "لا تو
 
 ترجم الاسم واكتب وصف تسويقي مفصّل وجذاب يذكر أهم المواصفات بأسلوب مشوّق (بالعربي والعبري). حدد النوع (device أو accessory). اعمل slug بالإنجليزي.`;
 
-    const raw = await callOpenAI(systemPrompt, userPrompt);
+    const raw = await callOpenAI(systemPrompt, userPrompt, runtime);
 
     // Parse JSON from response (handle markdown wrapping)
     let jsonStr = raw;

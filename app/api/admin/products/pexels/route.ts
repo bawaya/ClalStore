@@ -7,9 +7,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
 const PEXELS_API = "https://api.pexels.com/v1/search";
-function getPexelsKey() { return process.env.PEXELS_API_KEY || ""; }
+async function getPexelsKey() {
+  const cfg = await getIntegrationConfig("stock_images");
+  return String(cfg.api_key || process.env.PEXELS_API_KEY || "").trim();
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +29,11 @@ export async function POST(req: NextRequest) {
       return apiError("أدخل كلمة البحث", 400);
     }
 
+    const apiKey = await getPexelsKey();
+    if (!apiKey) {
+      return apiError("PEXELS_API_KEY not configured", 500);
+    }
+
     const params: Record<string, string> = {
       query: query.trim(),
       per_page: String(per_page || 12),
@@ -34,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     const url = `${PEXELS_API}?${new URLSearchParams(params)}`;
     const res = await fetch(url, {
-      headers: { Authorization: getPexelsKey() },
+      headers: { Authorization: apiKey },
     });
 
     if (!res.ok) {

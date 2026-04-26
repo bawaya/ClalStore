@@ -167,6 +167,61 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
       required: true,
     },
   ],
+  OpenAI: [
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "sk-proj-...",
+      required: true,
+    },
+    {
+      key: "pricing_api_key",
+      label: "Pricing API Key",
+      type: "password",
+      placeholder: "اتركه فارغًا لاستخدام نفس المفتاح",
+    },
+    {
+      key: "model",
+      label: "Model",
+      type: "text",
+      placeholder: "gpt-4o-mini",
+      required: true,
+    },
+    {
+      key: "pricing_model",
+      label: "Pricing Model",
+      type: "text",
+      placeholder: "gpt-4o-mini",
+    },
+  ],
+  "Remove.bg": [
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "Remove.bg API Key",
+      required: true,
+    },
+  ],
+  "MobileAPI.dev": [
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "MobileAPI.dev API Key",
+      required: true,
+    },
+  ],
+  Pexels: [
+    {
+      key: "api_key",
+      label: "API Key",
+      type: "password",
+      placeholder: "Pexels API Key",
+      required: true,
+    },
+  ],
   yCloud: [
     {
       key: "api_key",
@@ -294,6 +349,27 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
       placeholder: "mailto:info@clalmobile.com",
     },
   ],
+  "Internal Webhooks": [
+    {
+      key: "verify_token",
+      label: "Verify Token",
+      type: "password",
+      placeholder: "Webhook verify token",
+      required: true,
+    },
+    {
+      key: "webhook_secret",
+      label: "WhatsApp Signature Secret",
+      type: "password",
+      placeholder: "yCloud signature secret",
+    },
+    {
+      key: "payment_webhook_secret",
+      label: "Payment Signature Secret",
+      type: "password",
+      placeholder: "iCredit callback signature secret",
+    },
+  ],
 };
 
 const INTEGRATION_GROUPS = [
@@ -301,7 +377,7 @@ const INTEGRATION_GROUPS = [
     key: "communication",
     title: "التواصل والذكاء",
     description: "رسائل واتساب وSMS والبريد والمساعد الذكي في مكان واحد.",
-    types: ["whatsapp", "sms", "email", "ai_chat"],
+    types: ["whatsapp", "sms", "email", "ai_chat", "ai_admin"],
   },
   {
     key: "payments",
@@ -313,7 +389,13 @@ const INTEGRATION_GROUPS = [
     key: "infrastructure",
     title: "البنية والتوزيع",
     description: "تخزين الصور والإشعارات ومفاتيح التشغيل التي تخدم بقية المنظومة.",
-    types: ["storage", "push_notifications"],
+    types: ["push_notifications", "webhook_security"],
+  },
+  {
+    key: "media",
+    title: "الصور والبيانات",
+    description: "مصادر الصور وتحسينها واستكمال مواصفات الأجهزة من الخدمات الفعلية.",
+    types: ["image_enhance", "device_data", "stock_images", "storage"],
   },
 ] as const;
 
@@ -327,6 +409,14 @@ const INTEGRATION_NOTES: Record<string, string> = {
   storage: "يُستخدم حاليًا لرفع الصور المحسنة إلى Cloudflare R2 مع وجود رجوع احتياطي عند الحاجة.",
   push_notifications: "يغذي مفاتيح الاشتراك العام والإرسال من لوحة الإدارة.",
 };
+
+Object.assign(INTEGRATION_NOTES, {
+  ai_admin: "يغذي أدوات الإدارة المبنية على OpenAI مثل تحسين النصوص ومطابقة الأسعار.",
+  image_enhance: "هذا التكامل مسؤول عن إزالة الخلفية وتحسين صور الأجهزة داخل إدارة المنتجات.",
+  device_data: "يغذي الاستكمال التلقائي لمواصفات الهواتف والأجهزة من مزود بيانات خارجي.",
+  stock_images: "يستخدم لجلب صور إضافية مساعدة للمنتجات والألوان عند الحاجة.",
+  webhook_security: "هنا تدار مفاتيح التحقق وأسرار التوقيع لواتساب ونقاط الدفع العائدة.",
+});
 
 type StoreField = {
   key: string;

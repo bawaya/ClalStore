@@ -11,6 +11,7 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { validatePhone } from "@/lib/validators";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { hashSHA256 } from "@/lib/crypto";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
 function generateOTP(): string {
   const bytes = new Uint8Array(2);
@@ -38,14 +39,28 @@ function formatE164(phone: string): string {
 async function getTwilioConfig(): Promise<{
   accountSid: string; authToken: string; verifyServiceSid: string;
 } | null> {
-  // 1. Check env vars first (most reliable)
+  // 1. Check integration settings first
+  try {
+    const cfg = await getIntegrationConfig("sms");
+    if (cfg?.account_sid && cfg?.auth_token && cfg?.verify_service_sid) {
+      return {
+        accountSid: cfg.account_sid,
+        authToken: cfg.auth_token,
+        verifyServiceSid: cfg.verify_service_sid,
+      };
+    }
+  } catch {
+    // ignore and continue
+  }
+
+  // 2. Check env vars fallback
   const envSid = process.env.TWILIO_ACCOUNT_SID || "";
   const envToken = process.env.TWILIO_AUTH_TOKEN || "";
   const envVerify = process.env.TWILIO_VERIFY_SERVICE_SID || "";
   if (envSid && envToken && envVerify) {
     return { accountSid: envSid, authToken: envToken, verifyServiceSid: envVerify };
   }
-  // 2. Fallback: read from integrations DB (regardless of status)
+  // 3. Legacy fallback: read from integrations DB directly
   try {
     const db = createAdminSupabase();
     if (!db) return null;

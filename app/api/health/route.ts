@@ -7,6 +7,9 @@ import { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { getConfiguredAIRuntime } from "@/lib/ai/runtime";
 import { apiSuccess, apiError } from "@/lib/api-response";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
+
+const EMPTY_CONFIG: Record<string, any> = {};
 
 export async function GET(req: NextRequest) {
   // Bearer token auth for monitoring systems (no admin session required)
@@ -34,15 +37,35 @@ export async function GET(req: NextRequest) {
   const missingEnvs = requiredEnvs.filter((e) => !process.env[e]);
   checks.env = { ok: missingEnvs.length === 0 };
 
+  const [paymentCfg, emailCfg, whatsappCfg, smsCfg, imageCfg, storageCfg] = await Promise.all([
+    getIntegrationConfig("payment").catch(() => EMPTY_CONFIG),
+    getIntegrationConfig("email").catch(() => EMPTY_CONFIG),
+    getIntegrationConfig("whatsapp").catch(() => EMPTY_CONFIG),
+    getIntegrationConfig("sms").catch(() => EMPTY_CONFIG),
+    getIntegrationConfig("image_enhance").catch(() => EMPTY_CONFIG),
+    getIntegrationConfig("storage").catch(() => EMPTY_CONFIG),
+  ]);
+
   // 3. Payment provider
-  checks.payment = { ok: !!process.env.RIVHIT_API_KEY };
+  checks.payment = {
+    ok: !!(
+      paymentCfg.group_private_token ||
+      process.env.ICREDIT_GROUP_PRIVATE_TOKEN
+    ),
+  };
 
   // 4. Email provider
-  const hasEmail = !!(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY);
+  const hasEmail = !!(
+    emailCfg.api_key ||
+    process.env.RESEND_API_KEY ||
+    process.env.SENDGRID_API_KEY
+  );
   checks.email = { ok: hasEmail };
 
   // 5. WhatsApp provider
-  checks.whatsapp = { ok: !!process.env.YCLOUD_API_KEY };
+  checks.whatsapp = {
+    ok: !!(whatsappCfg.api_key || process.env.YCLOUD_API_KEY),
+  };
 
   // 5b. AI providers — unified via admin integration with env fallback
   try {
@@ -58,25 +81,22 @@ export async function GET(req: NextRequest) {
     checks.ai = { ok: false };
   }
 
-  // 6. SMS integration (DB)
-  try {
-    const { data: smsInteg } = await createAdminSupabase()
-      .from("integrations")
-      .select("config, status, provider")
-      .eq("type", "sms")
-      .single();
-    const cfg = smsInteg?.config as Record<string, any> || {};
-    checks.sms = {
-      ok: !!(smsInteg?.status === "active" && cfg.account_sid && cfg.verify_service_sid),
-    };
-  } catch (err: unknown) {
-    checks.sms = { ok: false };
-  }
+  // 6. SMS integration
+  checks.sms = {
+    ok: !!(
+      (smsCfg.account_sid && smsCfg.verify_service_sid) ||
+      (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_VERIFY_SERVICE_SID)
+    ),
+  };
 
   // 7. Image processing
-  const hasRemoveBg = !!process.env.REMOVEBG_API_KEY;
-  const hasR2 = !!(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_PUBLIC_URL);
+  const hasRemoveBg = !!(imageCfg.api_key || process.env.REMOVEBG_API_KEY);
+  const hasR2 = !!(
+    (storageCfg.account_id && storageCfg.access_key_id && storageCfg.public_url) ||
+    (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_PUBLIC_URL)
+  );
   checks.imageAI = { ok: hasRemoveBg };
+  checks.storage = { ok: hasR2 };
 
   const allOk = Object.values(checks).every((c) => c.ok);
   const criticalOk = checks.database?.ok && checks.env?.ok;

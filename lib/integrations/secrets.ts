@@ -9,6 +9,7 @@ export const INTEGRATION_SECRET_KEY_VERSION = 1;
 
 export const SENSITIVE_INTEGRATION_KEYS = new Set([
   "api_key",
+  "pricing_api_key",
   "auth_token",
   "secret_key",
   "secret_access_key",
@@ -19,6 +20,8 @@ export const SENSITIVE_INTEGRATION_KEYS = new Set([
   "project_token",
   "private_key",
   "group_private_token",
+  "webhook_secret",
+  "payment_webhook_secret",
   "token",
 ]);
 

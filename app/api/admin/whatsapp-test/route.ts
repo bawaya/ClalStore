@@ -3,13 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendWhatsAppText, sendWhatsAppTemplate } from "@/lib/bot/whatsapp";
 import { requireAdmin } from "@/lib/admin/auth";
 import { apiSuccess, apiError, errMsg } from "@/lib/api-response";
+import { getIntegrationConfig } from "@/lib/integrations/hub";
 
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
     const legacyAuth = req.headers.get("x-admin-key");
-    if (legacyAuth !== process.env.WEBHOOK_VERIFY_TOKEN) {
+    const [webhookCfg, whatsappCfg] = await Promise.all([
+      getIntegrationConfig("webhook_security"),
+      getIntegrationConfig("whatsapp"),
+    ]);
+    const verifyToken = String(webhookCfg.verify_token || process.env.WEBHOOK_VERIFY_TOKEN || "").trim();
+    if (!verifyToken || legacyAuth !== verifyToken) {
       return apiError("Unauthorized", 401);
     }
 
@@ -19,9 +25,15 @@ export async function POST(req: NextRequest) {
       return apiError("missing 'to' phone number", 400);
     }
 
-    const adminPhone = process.env.ADMIN_PERSONAL_PHONE || "(not set)";
-    const whatsappPhoneId = process.env.WHATSAPP_PHONE_ID || "(not set)";
-    const yCloudKey = process.env.YCLOUD_API_KEY ? "set" : "NOT SET";
+    const adminPhone =
+      whatsappCfg.admin_phone ||
+      process.env.ADMIN_PERSONAL_PHONE ||
+      "(not set)";
+    const whatsappPhoneId =
+      whatsappCfg.phone_id ||
+      process.env.WHATSAPP_PHONE_ID ||
+      "(not set)";
+    const yCloudKey = whatsappCfg.api_key || process.env.YCLOUD_API_KEY ? "set" : "NOT SET";
 
     const diagnostics = {
       ADMIN_PERSONAL_PHONE: adminPhone.slice(0, 6) + "***",

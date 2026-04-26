@@ -8,8 +8,7 @@ import { uploadImage } from "@/lib/storage";
 import { getIntegrationConfig } from "@/lib/integrations/hub";
 
 // R2 S3-compatible endpoint
-const R2_ENDPOINT = () => {
-  const accountId = process.env.R2_ACCOUNT_ID;
+const R2_ENDPOINT = (accountId: string) => {
   return accountId ? `https://${accountId}.r2.cloudflarestorage.com` : "";
 };
 
@@ -40,7 +39,7 @@ export async function uploadToR2(
       const objectKey = `products/${uniqueName}`;
 
       // Use S3-compatible PUT with AWS Signature V4
-      const url = `${R2_ENDPOINT()}/${bucket}/${objectKey}`;
+      const url = `${R2_ENDPOINT(accountId)}/${bucket}/${objectKey}`;
       const now = new Date();
       const dateStamp = now.toISOString().replace(/[-:T]/g, "").slice(0, 8);
       const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
