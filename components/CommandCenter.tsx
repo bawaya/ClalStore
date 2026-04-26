@@ -67,6 +67,10 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
   }, [apiConfig.token]);
 
   const base = apiConfig.baseUrl;
+  const shouldAutoFetch = useMemo(
+    () => Boolean(apiConfig.baseUrl.trim() || apiConfig.token.trim()),
+    [apiConfig.baseUrl, apiConfig.token],
+  );
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -92,7 +96,10 @@ export default function CommandCenter({ config: brandConfig }: { config?: Partia
     setLoading(false);
   }, [base, headers]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    if (!shouldAutoFetch) return;
+    fetchAll();
+  }, [fetchAll, shouldAutoFetch]);
 
   const updateTaskStatus = async (id: string, status: string) => {
     setTasks(p => p.map(t => t.id === id ? { ...t, status } : t));

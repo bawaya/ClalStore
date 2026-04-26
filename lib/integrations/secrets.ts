@@ -22,6 +22,7 @@ export const SENSITIVE_INTEGRATION_KEYS = new Set([
   "group_private_token",
   "webhook_secret",
   "payment_webhook_secret",
+  "resend_webhook_secret",
   "token",
 ]);
 

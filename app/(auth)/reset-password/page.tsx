@@ -41,15 +41,8 @@ export default function ResetPasswordPage() {
 
     (async () => {
       try {
-        const { getSupabase } = await import("@/lib/supabase");
-        const supabase = getSupabase();
-        if (!supabase) {
-          if (!cancelled) {
-            setError("خدمة المصادقة غير متوفرة");
-            setReady(true);
-          }
-          return;
-        }
+        const { requireBrowserSupabase } = await import("@/lib/supabase");
+        const supabase = requireBrowserSupabase();
 
         // Subscribe to auth events (PASSWORD_RECOVERY fires when the URL
         // hash is successfully consumed).
@@ -102,12 +95,8 @@ export default function ResetPasswordPage() {
     setError("");
 
     try {
-      const { getSupabase } = await import("@/lib/supabase");
-      const supabase = getSupabase();
-      if (!supabase) {
-        setError("خدمة المصادقة غير متوفرة");
-        return;
-      }
+      const { requireBrowserSupabase } = await import("@/lib/supabase");
+      const supabase = requireBrowserSupabase();
 
       const { error: updErr } = await supabase.auth.updateUser({
         password: newPassword,
@@ -124,8 +113,9 @@ export default function ResetPasswordPage() {
 
       // Redirect to login with a success flash
       window.location.href = "/login?reset=success";
-    } catch {
-      setError("خطأ في الاتصال");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "خطأ في الاتصال";
+      setError(message);
     } finally {
       setLoading(false);
     }

@@ -35,8 +35,8 @@ export default function LoginPage() {
 
       // Check if user must change password
       if (data?.user) {
-        const { getSupabase } = await import("@/lib/supabase");
-        const supabase = getSupabase();
+        const { requireBrowserSupabase } = await import("@/lib/supabase");
+        const supabase = requireBrowserSupabase();
         const { data: profile } = await supabase
           .from("users")
           .select("must_change_password, temp_password_expires_at")

@@ -15,8 +15,8 @@ export default function ChangePasswordPage() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const { getSupabase } = await import("@/lib/supabase");
-        const supabase = getSupabase();
+        const { requireBrowserSupabase } = await import("@/lib/supabase");
+        const supabase = requireBrowserSupabase();
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
@@ -35,8 +35,11 @@ export default function ChangePasswordPage() {
           window.location.href = "/crm";
           return;
         }
-      } catch {
-        window.location.href = "/login";
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "خدمة المصادقة غير متوفرة حالياً — حاول لاحقاً";
+        setError(message);
+        setChecking(false);
         return;
       }
       setChecking(false);

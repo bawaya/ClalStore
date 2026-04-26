@@ -9,15 +9,38 @@ import { createBrowserClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
+declare global {
+  interface Window {
+    __CLAL_PUBLIC_ENV__?: {
+      supabaseUrl?: string;
+      supabaseAnonKey?: string;
+    };
+  }
+}
+
+function getRuntimePublicEnv() {
+  if (typeof window === "undefined") {
+    return {
+      supabaseUrl: "",
+      supabaseAnonKey: "",
+    };
+  }
+
+  return window.__CLAL_PUBLIC_ENV__ || {
+    supabaseUrl: "",
+    supabaseAnonKey: "",
+  };
+}
+
 // Read env vars lazily — Cloudflare Workers may not have process.env at module init
 function getSupabaseUrl() {
-  return process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || getRuntimePublicEnv().supabaseUrl || "";
 }
 function getAnonKey() {
-  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || getRuntimePublicEnv().supabaseAnonKey || "";
 }
 function getServiceKey() {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 }
 
 type AnyClient = any;
@@ -79,4 +102,12 @@ export function getSupabase() {
     browserClient = createBrowserSupabase();
   }
   return browserClient;
+}
+
+export function requireBrowserSupabase() {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("خدمة المصادقة غير متوفرة حالياً — حاول لاحقاً");
+  }
+  return supabase;
 }

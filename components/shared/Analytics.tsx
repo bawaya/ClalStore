@@ -20,18 +20,35 @@ declare global {
 }
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { readConsent, type ConsentState } from "@/lib/consent";
 
 export function Analytics() {
+  const pathname = usePathname();
   const [gaId, setGaId] = useState("");
   const [pixelId, setPixelId] = useState("");
   const [analyticsConsent, setAnalyticsConsent] = useState(false);
   const [advertisingConsent, setAdvertisingConsent] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const shouldDisableTracking =
+    pathname === "/login" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname === "/change-password" ||
+    pathname === "/command-center" ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/crm") ||
+    pathname.startsWith("/sales-pwa") ||
+    pathname.startsWith("/m/");
 
   // 1. Load tracking IDs from settings (does NOT activate scripts)
   useEffect(() => {
+    if (shouldDisableTracking) {
+      setSettingsLoaded(true);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -48,8 +65,10 @@ export function Analytics() {
         if (!cancelled) setSettingsLoaded(true);
       }
     })();
-    return () => { cancelled = true; };
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldDisableTracking]);
 
   // 2. Subscribe to consent state. Scripts mount only when consent is true.
   useEffect(() => {
@@ -74,7 +93,7 @@ export function Analytics() {
     };
   }, []);
 
-  if (!settingsLoaded) return null;
+  if (shouldDisableTracking || !settingsLoaded) return null;
 
   return (
     <>

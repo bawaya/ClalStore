@@ -16,9 +16,18 @@ export interface AuthUser {
   avatar_url?: string;
 }
 
+function ensureAuthClient() {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("خدمة المصادقة غير متوفرة حالياً — حاول لاحقاً");
+  }
+  return supabase;
+}
+
 // ===== Get current session =====
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const supabase = getSupabase();
+  if (!supabase) return null;
 
   const {
     data: { user },
@@ -45,7 +54,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 // ===== Sign in =====
 export async function signIn(email: string, password: string) {
-  const supabase = getSupabase();
+  const supabase = ensureAuthClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -57,7 +66,7 @@ export async function signIn(email: string, password: string) {
 
 // ===== Sign out =====
 export async function signOut() {
-  const supabase = getSupabase();
+  const supabase = ensureAuthClient();
   await supabase.auth.signOut();
 }
 

@@ -369,6 +369,12 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
       type: "password",
       placeholder: "iCredit callback signature secret",
     },
+    {
+      key: "resend_webhook_secret",
+      label: "Resend Webhook Secret",
+      type: "password",
+      placeholder: "whsec_...",
+    },
   ],
 };
 
@@ -415,7 +421,7 @@ Object.assign(INTEGRATION_NOTES, {
   image_enhance: "هذا التكامل مسؤول عن إزالة الخلفية وتحسين صور الأجهزة داخل إدارة المنتجات.",
   device_data: "يغذي الاستكمال التلقائي لمواصفات الهواتف والأجهزة من مزود بيانات خارجي.",
   stock_images: "يستخدم لجلب صور إضافية مساعدة للمنتجات والألوان عند الحاجة.",
-  webhook_security: "هنا تدار مفاتيح التحقق وأسرار التوقيع لواتساب ونقاط الدفع العائدة.",
+  webhook_security: "هنا تدار مفاتيح التحقق وأسرار التوقيع لواتساب وResend ونقاط الدفع العائدة.",
 });
 
 type StoreField = {

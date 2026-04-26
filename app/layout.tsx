@@ -40,6 +40,11 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const publicRuntimeEnv = JSON.stringify({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+  }).replace(/</g, "\\u003c");
+
   return (
     <html
       lang="ar"
@@ -53,6 +58,12 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ClalMobile" />
+        <script
+          id="clal-public-env"
+          dangerouslySetInnerHTML={{
+            __html: `window.__CLAL_PUBLIC_ENV__ = ${publicRuntimeEnv};`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

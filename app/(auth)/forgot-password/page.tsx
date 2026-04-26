@@ -38,12 +38,8 @@ export default function ForgotPasswordPage() {
     setError("");
 
     try {
-      const { getSupabase } = await import("@/lib/supabase");
-      const supabase = getSupabase();
-      if (!supabase) {
-        setError("خدمة المصادقة غير متوفرة — حاول لاحقاً");
-        return;
-      }
+      const { requireBrowserSupabase } = await import("@/lib/supabase");
+      const supabase = requireBrowserSupabase();
 
       const origin =
         typeof window !== "undefined"
@@ -65,8 +61,9 @@ export default function ForgotPasswordPage() {
       }
 
       setSent(true);
-    } catch {
-      setError("خطأ في الاتصال. حاول مرة ثانية.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "خطأ في الاتصال. حاول مرة ثانية.";
+      setError(message);
     } finally {
       setLoading(false);
     }
