@@ -1196,10 +1196,16 @@ export default function CartPage() {
         style={{ padding: scr.mobile ? "14px 14px 36px" : "24px 24px 56px" }}
       >
         <StepBar />
-        {step === 0 && <CartStep />}
-        {step === 1 && <InfoStep />}
-        {step === 2 && <PayStep />}
-        {step === 3 && <ConfirmStep />}
+        {/* Render the step JSX inline rather than as <Component /> elements.
+         * Each step closure was being recreated on every parent re-render
+         * (state change → setInfo → re-render → new function reference →
+         * React remounts the subtree → input loses focus after every key).
+         * Calling the function directly returns plain JSX with no fresh
+         * component boundary, so inputs keep focus while the user types. */}
+        {step === 0 && CartStep()}
+        {step === 1 && InfoStep()}
+        {step === 2 && PayStep()}
+        {step === 3 && ConfirmStep()}
       </div>
 
       {toasts.map((toast) => (
