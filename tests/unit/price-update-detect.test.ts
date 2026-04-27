@@ -33,6 +33,25 @@ describe("detectColumns — header heuristics", () => {
     expect(out).toEqual({ name: 0, cash: 1, monthly: 2 });
   });
 
+  it("regression: phone-mode 3-column sheet still resolves to auto monthly", async () => {
+    // The old phone import contract was name + cash + monthly with monthly >= 0.
+    // This test pins down that detection on a real-world Hebrew phone sheet
+    // (name + מחיר + תשלום) keeps returning a positive monthly index, so the
+    // panel stays in "auto" installment_display mode and the storefront keeps
+    // showing ₪{monthly} × 36 like before.
+    const preview = [
+      ["שם המוצר", "מחיר", "תשלום חודשי"],
+      ["iPhone 15 Pro Max", 5400, 150],
+      ["Galaxy S24 Ultra", 4500, 125],
+      ["Pixel 9 Pro", 3800, 106],
+    ];
+    const out = await detectColumns(preview);
+    expect(out?.name).toBe(0);
+    expect(out?.cash).toBe(1);
+    // The critical assertion: monthly is detected (>=0), NOT -1.
+    expect(out?.monthly).toBe(2);
+  });
+
   it("recognises an English 2-column sheet (Product / Price)", async () => {
     const preview = [
       ["Product", "Price"],
