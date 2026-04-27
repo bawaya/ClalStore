@@ -104,7 +104,22 @@ const STATUS_COLOR: Record<RowStatus, string> = {
   "will-create": "text-blue-300",
 };
 
-export function PriceUpdatePanel() {
+export type PriceUpdateMode = "phones" | "accessories";
+
+interface PriceUpdatePanelProps {
+  /**
+   * "phones" expects a 3-column file (name + cash + monthly) and writes
+   *   installment_display="auto" so the storefront keeps the calculated
+   *   ₪{monthly} × N line.
+   * "accessories" expects a 2-column file (name + cash) and forces
+   *   installment_display="text" so the storefront shows
+   *   "حتى 18 قسط بدون فوائد" instead.
+   */
+  mode?: PriceUpdateMode;
+}
+
+export function PriceUpdatePanel({ mode = "phones" }: PriceUpdatePanelProps = {}) {
+  const isAccessoryMode = mode === "accessories";
   const { toasts, show } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -247,11 +262,14 @@ export function PriceUpdatePanel() {
           draft: r.newProductDraft!,
         };
       });
-      // 2-column files (no monthly column) flip products into the static
-      // "حتى 18 قسط بدون فوائد" display mode; 3-column files keep the legacy
-      // calculated installment line.
-      const installmentDisplay: "auto" | "text" =
-        detectedCols && detectedCols.monthly < 0 ? "text" : "auto";
+      // Accessory mode always flips products to the static "حتى 18 قسط بدون
+      // فوائد" line; phone mode follows the detected columns (text for 2-col,
+      // auto for 3-col) so existing 3-column phone files keep working.
+      const installmentDisplay: "auto" | "text" = isAccessoryMode
+        ? "text"
+        : detectedCols && detectedCols.monthly < 0
+          ? "text"
+          : "auto";
       const res = await fetch("/api/admin/price-update?step=apply", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders() },
@@ -315,9 +333,13 @@ export function PriceUpdatePanel() {
 
       {/* Step 1 — upload */}
       <div className="card mb-4" style={{ padding: 14 }}>
-        <h3 className="font-bold text-sm mb-2">المرحلة 1 — رفع ملف الأسعار</h3>
+        <h3 className="font-bold text-sm mb-2">
+          المرحلة 1 — رفع ملف الأسعار{isAccessoryMode ? " (اسم + سعر فقط)" : ""}
+        </h3>
         <p className="text-[11px] text-muted mb-2">
-          الملف يحتوي ٣ أعمدة على الأقل: اسم المنتج، السعر الكاش، القسط ×36. الأعمدة تُكتشف تلقائيًا بأي ترتيب وأي لغة (عربي/عبري/إنجليزي).
+          {isAccessoryMode
+            ? "الملف يحتوي عمودين: اسم المنتج والسعر الكلي. كل المنتجات في هذه الدفعة ستعرض النص \"حتى 18 قسط بدون فوائد\" في الكرت بدلاً من قيمة قسط محسوبة. الأعمدة تُكتشف تلقائيًا بأي لغة (عربي/عبري/إنجليزي)."
+            : "الملف يحتوي ٣ أعمدة على الأقل: اسم المنتج، السعر الكاش، القسط ×36. الأعمدة تُكتشف تلقائيًا بأي ترتيب وأي لغة (عربي/عبري/إنجليزي)."}
         </p>
         <div className="flex gap-2 items-center flex-wrap">
           <input type="file" accept=".xlsx,.xls" onChange={handleFile} className="text-xs" />

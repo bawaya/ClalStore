@@ -8,7 +8,7 @@ import { PageHeader, ToastContainer } from "@/components/admin/shared";
 import { csrfHeaders, getCsrfToken } from "@/lib/csrf-client";
 import { PriceUpdatePanel } from "./PriceUpdatePanel";
 
-type ImportMode = "create" | "update";
+type ImportMode = "create" | "update" | "update-accessories";
 
 interface RawRow {
   sheet: string;
@@ -241,11 +241,19 @@ export default function ImportExcelPage() {
           onClick={() => setMode("update")}
           className={mode === "update" ? "btn-primary text-xs" : "btn-ghost text-xs"}
         >
-          تحديث الأسعار
+          تحديث أسعار الموبايلات (مع قسط)
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("update-accessories")}
+          className={mode === "update-accessories" ? "btn-primary text-xs" : "btn-ghost text-xs"}
+        >
+          تحديث أسعار الإكسسوارات والأجهزة (سعر فقط)
         </button>
       </div>
 
-      {mode === "update" && <PriceUpdatePanel />}
+      {mode === "update" && <PriceUpdatePanel mode="phones" />}
+      {mode === "update-accessories" && <PriceUpdatePanel mode="accessories" />}
 
       {mode === "create" && (
       <>
