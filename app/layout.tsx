@@ -5,31 +5,42 @@ import { CookieConsent } from "@/components/shared/CookieConsent";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
 import { Analytics } from "@/components/shared/Analytics";
 import { Providers } from "@/components/shared/Providers";
+import { getCachedPublicSettings } from "@/lib/settings/public-cached";
 
-export const metadata: Metadata = {
-  title: "ClalMobile — وكيل رسمي لـ HOT Mobile",
-  description: "متجر إلكتروني لبيع أجهزة وإكسسوارات وباقات HOT Mobile. توصيل لكل إسرائيل.",
-  keywords: ["HOT Mobile", "ClalMobile", "أجهزة", "إكسسوارات", "باقات"],
-  manifest: "/manifest.json",
-  icons: {
-    icon: "/icons/favicon.svg",
-    apple: "/icons/apple-touch-icon.svg",
-    shortcut: "/icons/favicon.svg",
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "ClalMobile",
-  },
-  openGraph: {
-    title: "ClalMobile",
-    description: "وكيل رسمي لـ HOT Mobile",
-    url: "https://clalmobile.com",
-    siteName: "ClalMobile",
-    locale: "ar_IL",
-    type: "website",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getCachedPublicSettings().catch(() => ({} as Record<string, string>));
+  const logoUrl = settings.logo_url?.trim();
+  const storeName = settings.store_name?.trim() || "ClalMobile";
+
+  const icons = logoUrl
+    ? { icon: logoUrl, apple: logoUrl, shortcut: logoUrl }
+    : {
+        icon: "/icons/favicon.svg",
+        apple: "/icons/apple-touch-icon.svg",
+        shortcut: "/icons/favicon.svg",
+      };
+
+  return {
+    title: `${storeName} — وكيل رسمي لـ HOT Mobile`,
+    description: "متجر إلكتروني لبيع أجهزة وإكسسوارات وباقات HOT Mobile. توصيل لكل إسرائيل.",
+    keywords: ["HOT Mobile", "ClalMobile", "أجهزة", "إكسسوارات", "باقات"],
+    manifest: "/manifest.json",
+    icons,
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: storeName,
+    },
+    openGraph: {
+      title: storeName,
+      description: "وكيل رسمي لـ HOT Mobile",
+      url: "https://clalmobile.com",
+      siteName: storeName,
+      locale: "ar_IL",
+      type: "website",
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#c41040",
@@ -54,10 +65,6 @@ export default async function RootLayout({
       style={{ backgroundColor: "#09090b", colorScheme: "dark" }}
     >
       <head>
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="ClalMobile" />
         <script
           id="clal-public-env"
           dangerouslySetInnerHTML={{

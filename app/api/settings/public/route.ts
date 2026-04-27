@@ -21,6 +21,7 @@ export async function GET() {
     (data || []).forEach((s: any) => { map[s.key] = s.value; });
     const res = apiSuccess({ settings: map });
     res.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    res.headers.set("Cache-Tag", "public-settings");
     return res;
   } catch {
     return apiSuccess({ settings: {} });

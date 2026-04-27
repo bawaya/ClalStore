@@ -6,21 +6,32 @@ import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 import { Providers } from "@/components/shared/Providers";
 import { MobilePushInit } from "@/components/mobile/MobilePushInit";
+import { getCachedPublicSettings } from "@/lib/settings/public-cached";
 
-export const metadata: Metadata = {
-  title: "ClalMobile — صندوق الوارد",
-  description: "إدارة محادثات واتساب — ClalMobile",
-  manifest: "/m-manifest.json",
-  icons: {
-    icon: "/icons/favicon.svg",
-    apple: "/icons/apple-touch-icon.svg",
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "الوارد",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getCachedPublicSettings().catch(() => ({} as Record<string, string>));
+  const logoUrl = settings.logo_url?.trim();
+  const storeName = settings.store_name?.trim() || "ClalMobile";
+
+  const icons = logoUrl
+    ? { icon: logoUrl, apple: logoUrl }
+    : {
+        icon: "/icons/favicon.svg",
+        apple: "/icons/apple-touch-icon.svg",
+      };
+
+  return {
+    title: `${storeName} — صندوق الوارد`,
+    description: "إدارة محادثات واتساب — ClalMobile",
+    manifest: "/m-manifest.json",
+    icons,
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: "الوارد",
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#111114",

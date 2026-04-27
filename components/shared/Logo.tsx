@@ -70,7 +70,7 @@ export function Logo({ size = 36, showText = false, className = "", label, subti
       return;
     }
 
-    fetch("/api/settings/public")
+    fetch("/api/settings/public", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         const url = data.settings?.logo_url || "";

@@ -6,6 +6,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { uploadLogo, deleteLogo } from "@/lib/storage";
 import { updateSetting } from "@/lib/admin/queries";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -39,6 +40,9 @@ export async function POST(req: NextRequest) {
       console.error("Logo URL mismatch after save:", { saved: settings.logo_url, expected: url });
     }
 
+    revalidateTag("public-settings");
+    revalidatePath("/api/settings/public");
+
     return apiSuccess({ url });
   } catch (err: unknown) {
     console.error("Upload logo error:", err);
@@ -55,6 +59,9 @@ export async function DELETE(req: NextRequest) {
       await deleteLogo(url);
     }
     await updateSetting("logo_url", "");
+
+    revalidateTag("public-settings");
+    revalidatePath("/api/settings/public");
 
     return apiSuccess(null);
   } catch (err: unknown) {
