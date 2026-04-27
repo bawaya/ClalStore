@@ -1,6 +1,11 @@
-// Runs Postman collection folders L0–L7 in technical order (sequential, fail-fast).
-// Requires: `npm run dev` (or `npm start`) and optional env in postman/ClalMobile.local.postman_environment.json
-// Usage: node scripts/postman/run-layers.mjs
+// Runs Postman collection folders in technical order, fail-fast.
+// Each folder runs in its own newman invocation so we keep per-folder reporting,
+// while a shared --cookie-jar carries the admin session from Y-Auth-Setup
+// through to the admin/CRM/etc folders.
+//
+// Requires: `npm run dev` (or `npm start`) and an env file with the credentials
+// at postman/ClalMobile.local.postman_environment.json.
+// Usage:    node scripts/postman/run-layers.mjs
 import { spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -12,7 +17,7 @@ const collection = path.join(root, "postman/ClalMobile-API-Layers.postman_collec
 const env = path.join(root, "postman/ClalMobile.local.postman_environment.json");
 
 // Y-Auth-Setup runs first so its login response writes the Supabase auth cookies
-// into the shared jar; subsequent folders inherit the session.
+// into the shared jar; subsequent folders inherit the session via the jar.
 const FOLDERS = [
   "Y-Auth-Setup",
   "0-Smoke-Public",
@@ -28,8 +33,8 @@ const FOLDERS = [
 const cookieJar = path.join(root, "tmp/newman-cookies.jar");
 fs.mkdirSync(path.dirname(cookieJar), { recursive: true });
 // Start fresh with a valid empty tough-cookie jar so a stale session can't mask
-// login failures. Newman refuses to start if the path exists but isn't valid JSON,
-// and equally refuses if --cookie-jar is set but the file is missing.
+// login failures. Newman refuses to start if --cookie-jar points at a missing
+// path or invalid JSON.
 fs.writeFileSync(
   cookieJar,
   JSON.stringify({
@@ -40,8 +45,7 @@ fs.writeFileSync(
   }),
 );
 
-// Small delay between requests (optional; middleware skips generic api RL in development).
-const args = [
+const baseArgs = [
   "newman",
   "run",
   collection,
@@ -57,10 +61,9 @@ const args = [
   cookieJar,
 ];
 
-let failed = 0;
 for (const folder of FOLDERS) {
   console.log(`\n========== ${folder} ==========\n`);
-  const r = spawnSync("npx", [...args, "--folder", folder], {
+  const r = spawnSync("npx", [...baseArgs, "--folder", folder], {
     stdio: "inherit",
     shell: true,
     cwd: root,
@@ -71,4 +74,5 @@ for (const folder of FOLDERS) {
     process.exit(r.status ?? 1);
   }
 }
-console.log("\n[run-layers] All layers L0–L7 passed.\n");
+
+console.log("\n[run-layers] All folders passed.\n");

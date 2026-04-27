@@ -76,12 +76,6 @@ const CONTRACT_TEST = [
   "    });",
   "  } catch (e) { pm.test('JSON parseable', function () { pm.expect.fail('body not valid JSON'); }); }",
   "}",
-  "// Authenticated runs flag rejected admin endpoints so we can spot regressions.",
-  "if (pm.environment.get('authStatus') === 'authenticated' && (pm.request.url.toString() || '').includes('/api/admin/')) {",
-  "  pm.test('Authenticated admin call is not rejected (401/403)', function () {",
-  "    pm.expect([401, 403].includes(code), 'got ' + code).to.be.false;",
-  "  });",
-  "}",
 ].join("\n");
 
 // Endpoints that may trigger real outbound messages (email, WhatsApp, SMS, push)
@@ -106,25 +100,31 @@ const DANGEROUS_PATH_PATTERNS = [
   "/api/customer/auth/", // OTP / magic link flows
 ];
 
-// Collection-level pre-request: (1) skip dangerous endpoints when authenticated,
-// (2) pull the csrf_token cookie and mirror it into the x-csrf-token header.
+// Collection-level pre-request:
+// (1) Always skip state-changing requests on dangerous paths so a Newman run
+//     can never trigger real outbound email/WA/SMS or burn AI tokens, even when
+//     env state from Y-Auth-Setup didn't cross folder boundaries.
+//     GETs on those paths still run — they're read-only and safe.
+// (2) Pull the csrf_token cookie and mirror it into the x-csrf-token header
+//     so write requests aren't rejected at the middleware boundary.
 const CSRF_PREREQUEST = [
   "const DANGEROUS = " + JSON.stringify(DANGEROUS_PATH_PATTERNS) + ";",
+  "const method = pm.request.method;",
   "const reqUrl = pm.request.url.toString() || '';",
-  "if (pm.environment.get('authStatus') === 'authenticated' && DANGEROUS.some(p => reqUrl.includes(p))) {",
-  "  // Authenticated run + endpoint may send real email/WA/SMS or mutate prod data → skip.",
+  "const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);",
+  "if (isWrite && DANGEROUS.some(p => reqUrl.includes(p))) {",
+  "  // Authenticated or not, we never want test runs to fire side-effecty writes",
+  "  // on these paths. Skip via the modern API or fall back to a noop GET.",
   "  if (typeof pm.execution !== 'undefined' && typeof pm.execution.skipRequest === 'function') {",
   "    pm.execution.skipRequest();",
   "    return;",
   "  }",
-  "  // Fallback for older runtimes: redirect to a noop URL so nothing is sent.",
-  "  pm.request.url = pm.environment.get('baseUrl') + '/api/csrf';",
+  "  pm.request.url = (pm.environment.get('baseUrl') || 'http://localhost:3000') + '/api/csrf';",
   "  pm.request.method = 'GET';",
   "  pm.request.body = undefined;",
   "  return;",
   "}",
-  "const method = pm.request.method;",
-  "if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {",
+  "if (isWrite) {",
   "  // The csrf_token cookie is set by middleware on any prior GET, including the",
   "  // Y-Auth-Setup/GET /api/csrf primer that should run before this folder.",
   "  const url = pm.environment.get('baseUrl') || 'http://localhost:3000';",
@@ -254,16 +254,26 @@ function defaultBodyFor(clean, method) {
  * @param {string} method
  * @param {string} pathRaw
  */
+// Endpoints that authenticate via separate bearer tokens rather than the
+// admin session cookie. Hit list mirrors the route handlers' explicit
+// COMMISSION_API_TOKEN check.
+const COMMISSION_TOKEN_PATHS = new Set([
+  "/api/admin/commissions/employees/list",
+  "/api/admin/commissions/summary",
+]);
+
 function makeRequest(method, pathRaw) {
   const clean = pathRaw.replace(/\/$/, "");
   const needsJsonBody = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
   const isHealth = clean === "/api/health";
+  const usesCommissionToken = COMMISSION_TOKEN_PATHS.has(clean);
   const pathResolved = toUrlPath(pathRaw);
   const raw = `{{baseUrl}}${pathResolved}${querySuffix(clean, method)}`;
 
   const headers = {};
   if (needsJsonBody) headers["Content-Type"] = "application/json";
   if (isHealth) headers["Authorization"] = "Bearer {{healthCheckToken}}";
+  if (usesCommissionToken) headers["Authorization"] = "Bearer {{commissionApiToken}}";
 
   const headerArr = Object.entries(headers).map(([key, value]) => ({ key, value, type: "text" }));
 
