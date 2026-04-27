@@ -76,7 +76,135 @@ const CONTRACT_TEST = [
   "    });",
   "  } catch (e) { pm.test('JSON parseable', function () { pm.expect.fail('body not valid JSON'); }); }",
   "}",
+  "// Authenticated runs flag rejected admin endpoints so we can spot regressions.",
+  "if (pm.environment.get('authStatus') === 'authenticated' && (pm.request.url.toString() || '').includes('/api/admin/')) {",
+  "  pm.test('Authenticated admin call is not rejected (401/403)', function () {",
+  "    pm.expect([401, 403].includes(code), 'got ' + code).to.be.false;",
+  "  });",
+  "}",
 ].join("\n");
+
+// Endpoints that may trigger real outbound messages (email, WhatsApp, SMS, push)
+// or otherwise have non-reversible side effects. When authenticated, the
+// collection-level pre-request short-circuits these to keep test runs safe.
+const DANGEROUS_PATH_PATTERNS = [
+  "/api/admin/whatsapp-test",
+  "/api/admin/whatsapp-templates", // POST/PUT touches live template store
+  "/api/admin/contact-notify",
+  "/api/admin/integrations/test",
+  "/api/admin/announcements", // POST broadcasts to staff
+  "/api/admin/sales-requests/", // approve/reject/request-info notify
+  "/api/admin/sales-docs/", // verify/reject/cancel notify
+  "/api/admin/orders/create", // sends confirmation
+  "/api/admin/order", // PUT changes status → notify
+  "/api/admin/corrections/", // approve/reject notify
+  "/api/admin/reviews/generate", // burns AI tokens
+  "/api/email",
+  "/api/push/send",
+  "/api/push/subscribe",
+  "/api/auth/", // password change / customer auth flows
+  "/api/customer/auth/", // OTP / magic link flows
+];
+
+// Collection-level pre-request: (1) skip dangerous endpoints when authenticated,
+// (2) pull the csrf_token cookie and mirror it into the x-csrf-token header.
+const CSRF_PREREQUEST = [
+  "const DANGEROUS = " + JSON.stringify(DANGEROUS_PATH_PATTERNS) + ";",
+  "const reqUrl = pm.request.url.toString() || '';",
+  "if (pm.environment.get('authStatus') === 'authenticated' && DANGEROUS.some(p => reqUrl.includes(p))) {",
+  "  // Authenticated run + endpoint may send real email/WA/SMS or mutate prod data → skip.",
+  "  if (typeof pm.execution !== 'undefined' && typeof pm.execution.skipRequest === 'function') {",
+  "    pm.execution.skipRequest();",
+  "    return;",
+  "  }",
+  "  // Fallback for older runtimes: redirect to a noop URL so nothing is sent.",
+  "  pm.request.url = pm.environment.get('baseUrl') + '/api/csrf';",
+  "  pm.request.method = 'GET';",
+  "  pm.request.body = undefined;",
+  "  return;",
+  "}",
+  "const method = pm.request.method;",
+  "if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {",
+  "  // The csrf_token cookie is set by middleware on any prior GET, including the",
+  "  // Y-Auth-Setup/GET /api/csrf primer that should run before this folder.",
+  "  const url = pm.environment.get('baseUrl') || 'http://localhost:3000';",
+  "  const jar = pm.cookies.jar();",
+  "  jar.get(url, 'csrf_token', function (_err, value) {",
+  "    if (value) pm.request.headers.upsert({ key: 'x-csrf-token', value });",
+  "  });",
+  "}",
+].join("\n");
+
+// Folder built after the routes are scanned. Lives at "Y-Auth-Setup" so it sorts
+// just before the Z-Full-Inventory folder; runners should hit it first to seed
+// the CSRF cookie and the admin session for the cookie jar.
+function buildAuthSetupFolder() {
+  const csrfPrimer = {
+    name: "GET /api/csrf (seed CSRF cookie)",
+    request: {
+      method: "GET",
+      header: [],
+      url: "{{baseUrl}}/api/csrf",
+      description: "Hit before any state-changing request so the csrf_token cookie exists.",
+    },
+    event: [
+      {
+        listen: "test",
+        script: {
+          type: "text/javascript",
+          exec: [
+            "pm.test('csrf primer responds 200', function () {",
+            "  pm.expect(pm.response.code).to.equal(200);",
+            "});",
+          ],
+        },
+      },
+    ],
+  };
+
+  const adminLogin = {
+    name: "POST /api/test/admin-login (dev/staging only)",
+    request: {
+      method: "POST",
+      header: [
+        { key: "Content-Type", value: "application/json", type: "text" },
+      ],
+      url: "{{baseUrl}}/api/test/admin-login",
+      body: {
+        mode: "raw",
+        raw: JSON.stringify({ email: "{{adminEmail}}", password: "{{adminPassword}}" }, null, 2),
+      },
+      description:
+        "Signs in as the admin defined by adminEmail/adminPassword in the environment and writes the Supabase session cookies into the runner's jar. Disabled in production.",
+    },
+    event: [
+      {
+        listen: "test",
+        script: {
+          type: "text/javascript",
+          exec: [
+            "if (pm.response.code === 200) {",
+            "  pm.environment.set('authStatus', 'authenticated');",
+            "  pm.test('login succeeded', function () {",
+            "    pm.expect(pm.response.code).to.equal(200);",
+            "  });",
+            "} else {",
+            "  pm.environment.set('authStatus', 'unauthenticated');",
+            "  console.warn('admin-login failed (' + pm.response.code + ') — admin folders will likely return 401/403');",
+            "}",
+          ],
+        },
+      },
+    ],
+  };
+
+  return {
+    name: "Y-Auth-Setup",
+    description:
+      "Run me first. Seeds CSRF cookie and an admin session cookie via the dev-only test endpoint. Sets authStatus=authenticated when login succeeds; admin folders use that flag to upgrade their assertions.",
+    item: [csrfPrimer, adminLogin],
+  };
+}
 
 /**
  * @param {string} clean
@@ -217,6 +345,9 @@ folders.push({
   item: allItems,
 });
 
+// Insert auth setup folder right before Z-Full-Inventory so it runs first by name order.
+folders.splice(folders.length - 1, 0, buildAuthSetupFolder());
+
 const collection = {
   info: {
     name: "ClalMobile API — طبقات فحص (Layers QA)",
@@ -226,6 +357,14 @@ const collection = {
     version: { major: 1, minor: 0, patch: 0 },
   },
   item: folders,
+  // Collection-level pre-request runs before every request — used to attach the
+  // x-csrf-token header automatically when the cookie is present.
+  event: [
+    {
+      listen: "prerequest",
+      script: { type: "text/javascript", exec: CSRF_PREREQUEST.split("\n") },
+    },
+  ],
   variable: [{ key: "baseUrl", value: "http://localhost:3000", type: "string" }],
 };
 

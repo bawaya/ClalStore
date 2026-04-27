@@ -2,6 +2,7 @@
 // Requires: `npm run dev` (or `npm start`) and optional env in postman/ClalMobile.local.postman_environment.json
 // Usage: node scripts/postman/run-layers.mjs
 import { spawnSync } from "child_process";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -10,7 +11,10 @@ const root = path.join(__dirname, "../..");
 const collection = path.join(root, "postman/ClalMobile-API-Layers.postman_collection.json");
 const env = path.join(root, "postman/ClalMobile.local.postman_environment.json");
 
+// Y-Auth-Setup runs first so its login response writes the Supabase auth cookies
+// into the shared jar; subsequent folders inherit the session.
 const FOLDERS = [
+  "Y-Auth-Setup",
   "0-Smoke-Public",
   "1-Store-Read-Model",
   "2-Commerce-Messaging-Orders",
@@ -21,8 +25,37 @@ const FOLDERS = [
   "7-Integrations-Ops",
 ];
 
+const cookieJar = path.join(root, "tmp/newman-cookies.jar");
+fs.mkdirSync(path.dirname(cookieJar), { recursive: true });
+// Start fresh with a valid empty tough-cookie jar so a stale session can't mask
+// login failures. Newman refuses to start if the path exists but isn't valid JSON,
+// and equally refuses if --cookie-jar is set but the file is missing.
+fs.writeFileSync(
+  cookieJar,
+  JSON.stringify({
+    version: "tough-cookie@4.1.4",
+    storeType: "MemoryCookieStore",
+    rejectPublicSuffixes: true,
+    cookies: [],
+  }),
+);
+
 // Small delay between requests (optional; middleware skips generic api RL in development).
-const args = ["newman", "run", collection, "-e", env, "--delay-request", "100", "--color", "on"];
+const args = [
+  "newman",
+  "run",
+  collection,
+  "-e",
+  env,
+  "--delay-request",
+  "100",
+  "--color",
+  "on",
+  "--cookie-jar",
+  cookieJar,
+  "--export-cookie-jar",
+  cookieJar,
+];
 
 let failed = 0;
 for (const folder of FOLDERS) {
