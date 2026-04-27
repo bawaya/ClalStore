@@ -111,6 +111,28 @@ describe("scoreMatch", () => {
   it("scores zero for unrelated", () => {
     expect(scoreMatch("Roborock S8", sampleProducts[0])).toBe(0);
   });
+
+  it("matches exactly when Excel adds storage suffix and DB name has none", () => {
+    // Regression: "Samsung Galaxy S24 Ultra 256GB" must score 100 against
+    // "Samsung Galaxy S24 Ultra" (storage lives on variants, not in the name).
+    expect(scoreMatch("Samsung Galaxy S24 Ultra 256GB", sampleProducts[0])).toBe(100);
+  });
+
+  it("still scores high for unknown storage suffix", () => {
+    // A storage value not present in any variant should still match the base name strongly.
+    expect(scoreMatch("Samsung Galaxy S24 Ultra 999GB", sampleProducts[0])).toBeGreaterThanOrEqual(95);
+  });
+
+  it("disambiguates Pro Max vs Pro when Excel name carries storage", () => {
+    const products: ProductLite[] = [
+      { ...sampleProducts[0], id: "pro", name_ar: "Apple iPhone 17 Pro", name_he: "Apple iPhone 17 Pro", name_en: "Apple iPhone 17 Pro", brand: "Apple", price: 4000, cost: 2500, variants: [{ storage: "256GB", price: 4000 }] },
+      { ...sampleProducts[0], id: "promax", name_ar: "Apple iPhone 17 Pro Max", name_he: "Apple iPhone 17 Pro Max", name_en: "Apple iPhone 17 Pro Max", brand: "Apple", price: 5000, cost: 3000, variants: [{ storage: "256GB", price: 5000 }] },
+    ];
+    const proMaxScore = scoreMatch("iPhone 17 Pro Max 256GB", products[1]);
+    const proScore = scoreMatch("iPhone 17 Pro Max 256GB", products[0]);
+    expect(proMaxScore).toBeGreaterThan(proScore);
+    expect(proMaxScore).toBeGreaterThanOrEqual(95);
+  });
 });
 
 describe("findCandidates", () => {

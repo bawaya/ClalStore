@@ -122,10 +122,11 @@ function getInstallmentsFor(type: string | undefined | null): number {
 async function loadAllProducts(): Promise<ProductLite[]> {
   const supabase = createAdminSupabase();
   if (!supabase) return [];
+  // Match against ALL products, including inactive ones — inactive matches must still
+  // be found so we don't keep creating duplicates of disabled or pending-review products.
   const { data, error } = await supabase
     .from("products")
-    .select("id, name_ar, name_he, name_en, brand, model_number, price, cost, variants, type")
-    .eq("active", true);
+    .select("id, name_ar, name_he, name_en, brand, model_number, price, cost, variants, type");
   if (error) {
     console.error("loadAllProducts error:", error.message);
     return [];
@@ -217,7 +218,7 @@ async function handleMatch(req: NextRequest): Promise<NextResponse> {
   // Need product type → installments lookup. Fetch separately to avoid changing ProductLite.
   const supabase = createAdminSupabase();
   if (supabase) {
-    const { data } = await supabase.from("products").select("id, type").eq("active", true);
+    const { data } = await supabase.from("products").select("id, type");
     (data || []).forEach((p: Record<string, unknown>) => {
       productTypeById.set(String(p.id), String(p.type || ""));
     });

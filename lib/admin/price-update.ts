@@ -135,7 +135,15 @@ export function tokenize(name: string): string[] {
 
 /** Score how well an Excel name matches a product (0–100). */
 export function scoreMatch(excelName: string, product: ProductLite): number {
-  const exTokens = new Set(tokenize(excelName));
+  // Storage like "256GB" identifies a variant, not the product. Strip it before
+  // computing token overlap so "iPhone 17 Pro Max 256GB" matches the same way as
+  // "iPhone 17 Pro Max" against catalog names that don't bake storage into the name.
+  const excelStorage = extractStorage(excelName);
+  const excelBase = excelStorage
+    ? excelName.replace(STORAGE_RE, " ").replace(/\s+/g, " ").trim()
+    : excelName;
+
+  const exTokens = new Set(tokenize(excelBase));
   if (exTokens.size === 0) return 0;
 
   const candidates = [product.name_ar, product.name_he, product.name_en, product.model_number]
@@ -154,8 +162,8 @@ export function scoreMatch(excelName: string, product: ProductLite): number {
     const precision = intersection / cTokens.size;     // how much of product we used
     const score = Math.round((recall * 0.7 + precision * 0.3) * 100);
 
-    // Bonus for exact-after-normalization match
-    if (normalizeName(excelName) === normalizeName(candidate)) {
+    // Bonus for exact-after-normalization match (using the storage-stripped base)
+    if (normalizeName(excelBase) === normalizeName(candidate)) {
       best = Math.max(best, 100);
       continue;
     }
@@ -167,6 +175,17 @@ export function scoreMatch(excelName: string, product: ProductLite): number {
   const exNormalized = normalizeName(excelName);
   const brandNormalized = normalizeName(product.brand);
   if (brandNormalized && exNormalized.includes(brandNormalized)) {
+    best = Math.min(100, best + 5);
+  }
+
+  // Bonus when the Excel-mentioned storage matches one of the product's variants —
+  // confirms we're talking about the same family.
+  if (
+    excelStorage &&
+    product.variants.some(
+      (v) => normalizeName(v.storage) === normalizeName(excelStorage),
+    )
+  ) {
     best = Math.min(100, best + 5);
   }
 
