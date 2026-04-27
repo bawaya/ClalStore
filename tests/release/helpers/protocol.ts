@@ -74,7 +74,12 @@ export function attachPageGuards(page: Page) {
   const failedRequests: string[] = [];
 
   page.on("pageerror", (error) => {
-    pageErrors.push(error.message);
+    const urlHint = page.url() ? ` @ ${page.url()}` : "";
+    const stackHint =
+      typeof error.stack === "string" && error.stack.trim()
+        ? `\n${error.stack.trim()}`
+        : "";
+    pageErrors.push(`${error.message}${urlHint}${stackHint}`);
   });
 
   page.on("console", (msg) => {

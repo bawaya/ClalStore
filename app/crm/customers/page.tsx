@@ -126,6 +126,10 @@ export default function CustomersPage() {
     })),
   ];
 
+  if (loading) {
+    return <div className="text-center py-20 text-muted">⏳ جاري التحميل...</div>;
+  }
+
   return (
     <div>
       {/* Header */}
@@ -238,9 +242,7 @@ export default function CustomersPage() {
       )}
 
       {/* List */}
-      {loading ? (
-        <div className="text-center py-12 text-muted">⏳</div>
-      ) : customers.length === 0 ? (
+      {customers.length === 0 ? (
         <div className="text-center py-12 text-dim">
           <div className="text-3xl mb-2">👥</div>
           <div className="text-sm">لا يوجد زبائن</div>

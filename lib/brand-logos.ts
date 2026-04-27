@@ -19,7 +19,6 @@ const BRAND_LOGOS: Record<string, string> = {
   Nothing: "https://cdn.simpleicons.org/nothing/ffffff",
   JBL: "https://cdn.simpleicons.org/jbl/ffffff",
   Beats: "https://cdn.simpleicons.org/beats/ffffff",
-  Anker: "https://cdn.simpleicons.org/anker/ffffff",
 };
 
 export function getBrandLogo(brand: string): string | null {

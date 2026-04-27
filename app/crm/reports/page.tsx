@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function CRMReportsPage() {
-  const today = new Date().toISOString().split("T")[0];
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState("");
   const [reportType, setReportType] = useState<"daily" | "weekly">("daily");
   const [loading, setLoading] = useState(false);
   const [reportHtml, setReportHtml] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setSelectedDate(new Date().toISOString().split("T")[0]);
+  }, []);
 
   const loadReport = async () => {
     setLoading(true);
@@ -67,7 +70,7 @@ export default function CRMReportsPage() {
 
         <button
           onClick={loadReport}
-          disabled={loading}
+          disabled={loading || !selectedDate}
           className="btn-primary"
         >
           {loading ? "جاري التحميل..." : "عرض التقرير"}

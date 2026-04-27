@@ -428,6 +428,10 @@ export default function PipelinePage() {
     };
   }, [convertDeal]);
 
+  if (loading) {
+    return <div className="py-20 text-center text-muted">جاري تحميل بيانات الـ CRM...</div>;
+  }
+
   return (
     <div>
       <PageHeader title="פייפליין מכירות" onAdd={openNewDeal} addLabel="עסקה חדשה" />
