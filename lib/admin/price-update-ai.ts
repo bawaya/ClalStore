@@ -119,18 +119,24 @@ export async function detectColumns(
 ): Promise<DetectedColumns | null> {
   if (!preview.length || !preview[0]?.length) return null;
 
-  // Try heuristics first to save AI cost.
   const headers = (preview[0] || []).map((c) => String(c || "").toLowerCase());
-  const heuristic = detectColumnsHeuristic(headers);
-  if (heuristic) return heuristic;
+  const dataRows = preview.slice(1);
 
+  // 1. Header keyword heuristic (cheap, no AI).
+  const fromHeaders = detectColumnsHeuristic(headers);
+  if (fromHeaders) return fromHeaders;
+
+  // 2. Data-shape fallback: pick the column with the most text values as the
+  //    name, and the numeric column with the largest average as the cash.
+  //    Works even when headers are missing, abbreviated, or in an unfamiliar
+  //    spelling (e.g. "תאור" vs "תיאור").
+  const fromShape = detectColumnsByShape(headers.length, dataRows);
+  if (fromShape) return fromShape;
+
+  // 3. AI fallback as last resort.
   const sample = preview.slice(0, 3);
   const result = safeJson<DetectedColumns>(
-    await aiCall(
-      COLUMN_DETECT_SYSTEM,
-      JSON.stringify(sample),
-      300,
-    ),
+    await aiCall(COLUMN_DETECT_SYSTEM, JSON.stringify(sample), 300),
   );
   if (
     result &&
@@ -139,7 +145,6 @@ export async function detectColumns(
     Number.isInteger(result.monthly) &&
     result.name !== result.cash &&
     result.name !== result.monthly &&
-    // monthly may legitimately be -1 to signal "no monthly column"
     (result.monthly === -1 || result.cash !== result.monthly)
   ) {
     return result;
@@ -151,18 +156,97 @@ function detectColumnsHeuristic(headers: string[]): DetectedColumns | null {
   const find = (...needles: string[]) =>
     headers.findIndex((h) => needles.some((n) => h.includes(n)));
 
-  const name = find("name", "product", "اسم", "منتج", "שם", "מוצר", "תיאור", "desc");
+  const name = find(
+    "name", "product", "اسم", "منتج", "وصف", "תיאור", "תאור", "שם", "מוצר", "פריט", "desc",
+  );
   const monthly = find("monthly", "قسط", "חודשי", "תשלום", "month", "installment");
-  const cash = find("cash", "price", "كاش", "سعر", "מזומן", "מחיר", "total", "מחיר מקור");
+  const cash = find(
+    "cash", "price", "كاش", "سعر", "מזומן", "מחיר", "מקור", "total",
+  );
 
   if (name >= 0 && cash >= 0 && name !== cash) {
     if (monthly >= 0 && monthly !== cash && monthly !== name) {
       return { name, cash, monthly };
     }
-    // Two-column layout: only name + cash. Caller treats this as "text" mode.
     return { name, cash, monthly: -1 };
   }
   return null;
+}
+
+function detectColumnsByShape(numCols: number, rows: unknown[][]): DetectedColumns | null {
+  if (numCols < 2 || rows.length === 0) return null;
+
+  const textHits = new Array(numCols).fill(0);
+  const numHits = new Array(numCols).fill(0);
+  const numSum = new Array(numCols).fill(0);
+  const numCount = new Array(numCols).fill(0);
+
+  const sample = rows.slice(0, 10);
+  for (const row of sample) {
+    if (!row) continue;
+    for (let i = 0; i < numCols; i += 1) {
+      const v = row[i];
+      if (v == null || v === "") continue;
+      if (typeof v === "number" && Number.isFinite(v)) {
+        numHits[i] += 1;
+        numSum[i] += v;
+        numCount[i] += 1;
+        continue;
+      }
+      const s = String(v).trim();
+      const cleaned = s.replace(/[\d\s,.\-₪]/g, "");
+      if (cleaned.length === 0) {
+        const n = Number(s.replace(/,/g, "").replace(/[^\d.-]/g, ""));
+        if (Number.isFinite(n) && n > 0) {
+          numHits[i] += 1;
+          numSum[i] += n;
+          numCount[i] += 1;
+        }
+      } else {
+        textHits[i] += 1;
+      }
+    }
+  }
+
+  // Name: column with the most text values. Tie-breaker: lowest index.
+  let nameIdx = -1;
+  let bestText = 0;
+  for (let i = 0; i < numCols; i += 1) {
+    if (textHits[i] > bestText) {
+      bestText = textHits[i];
+      nameIdx = i;
+    }
+  }
+  if (nameIdx < 0 || bestText === 0) return null;
+
+  // Cash: numeric column with the largest average value (and a meaningful
+  // sample size). Falls back to any numeric column above ₪10.
+  const numericCols: Array<{ idx: number; avg: number }> = [];
+  for (let i = 0; i < numCols; i += 1) {
+    if (i === nameIdx) continue;
+    if (numCount[i] >= Math.max(1, Math.floor(sample.length / 3))) {
+      numericCols.push({ idx: i, avg: numSum[i] / numCount[i] });
+    }
+  }
+  if (numericCols.length === 0) return null;
+  numericCols.sort((a, b) => b.avg - a.avg);
+  const cashIdx = numericCols[0].idx;
+
+  // Monthly: a second numeric column whose average is roughly cash/N (5–95%
+  // of cash). When no such column exists, signal text-mode with -1.
+  let monthlyIdx = -1;
+  if (numericCols.length >= 2) {
+    const cashAvg = numericCols[0].avg;
+    for (let i = 1; i < numericCols.length; i += 1) {
+      const ratio = numericCols[i].avg / cashAvg;
+      if (ratio > 0.005 && ratio < 0.5) {
+        monthlyIdx = numericCols[i].idx;
+        break;
+      }
+    }
+  }
+
+  return { name: nameIdx, cash: cashIdx, monthly: monthlyIdx };
 }
 
 // =====================================================
