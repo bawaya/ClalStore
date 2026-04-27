@@ -247,10 +247,15 @@ export function PriceUpdatePanel() {
           draft: r.newProductDraft!,
         };
       });
+      // 2-column files (no monthly column) flip products into the static
+      // "حتى 18 قسط بدون فوائد" display mode; 3-column files keep the legacy
+      // calculated installment line.
+      const installmentDisplay: "auto" | "text" =
+        detectedCols && detectedCols.monthly < 0 ? "text" : "auto";
       const res = await fetch("/api/admin/price-update?step=apply", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders() },
-        body: JSON.stringify({ rows: payload }),
+        body: JSON.stringify({ rows: payload, installmentDisplay }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
@@ -327,7 +332,18 @@ export function PriceUpdatePanel() {
         </div>
         {detectedCols && parsedRows && (
           <div className="mt-3 text-[11px] text-muted">
-            تم اكتشاف الأعمدة (الاسم: {detectedCols.name}، السعر: {detectedCols.cash}، القسط: {detectedCols.monthly}) • {parsedRows.length} صف صالح.
+            {detectedCols.monthly >= 0 ? (
+              <>
+                تم اكتشاف الأعمدة (الاسم: {detectedCols.name}، السعر: {detectedCols.cash}، القسط: {detectedCols.monthly}) • {parsedRows.length} صف صالح.
+              </>
+            ) : (
+              <>
+                تم اكتشاف عمودين فقط (الاسم: {detectedCols.name}، السعر: {detectedCols.cash}) • {parsedRows.length} صف صالح.
+                <span className="block text-pink-300 font-semibold mt-1">
+                  ⚠ كل المنتجات في هذه الدفعة ستعرض النص "حتى 18 قسط بدون فوائد" بدلاً من قيمة القسط.
+                </span>
+              </>
+            )}
           </div>
         )}
       </div>

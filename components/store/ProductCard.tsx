@@ -304,13 +304,19 @@ export const ProductCard = memo(function ProductCard({
             )}
           </div>
 
-          {monthly && months > 0 && (
+          {product.installment_display === "text" ? (
             <div className="mt-2 text-sm font-semibold text-[#ff9cb0]">
-              ₪{monthly.toLocaleString()} × {months}
-              <span className="mr-1 text-xs font-medium text-[#b8b8c2]">
-                {lang === "he" ? "לחודש" : "شهريًا"}
-              </span>
+              {lang === "he" ? "עד 18 תשלומים ללא ריבית" : "حتى 18 قسط بدون فوائد"}
             </div>
+          ) : (
+            monthly && months > 0 && (
+              <div className="mt-2 text-sm font-semibold text-[#ff9cb0]">
+                ₪{monthly.toLocaleString()} × {months}
+                <span className="mr-1 text-xs font-medium text-[#b8b8c2]">
+                  {lang === "he" ? "לחודש" : "شهريًا"}
+                </span>
+              </div>
+            )
           )}
         </div>
 

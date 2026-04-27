@@ -570,6 +570,13 @@ export type Product = {
   variant_kind?: ProductVariantKind;
   appliance_kind?: ApplianceKind | null;
   subkind?: ProductSubkind | null;
+  /**
+   * Controls how the installment line renders on the product card.
+   *  - "auto" (default): show ₪{monthly_price} × N when monthly_price is set.
+   *  - "text":           show a static "حتى 18 قسط بدون فوائد" instead of a calculated value.
+   * Set to "text" when a product is imported via the 2-column (name + cash) price flow.
+   */
+  installment_display?: "auto" | "text";
   created_at: string;
   updated_at: string;
 }

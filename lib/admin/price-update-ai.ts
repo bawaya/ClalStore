@@ -101,15 +101,16 @@ function safeJson<T>(payload: string | null): T | null {
 export interface DetectedColumns {
   name: number;
   cash: number;
+  /** -1 when the file has only name + cash. UI/route uses this to switch into the "text" installment mode. */
   monthly: number;
 }
 
 const COLUMN_DETECT_SYSTEM = `You are given the first 3 rows of an Excel sheet. Identify which 0-indexed column holds:
 - "name": the product name
-- "cash": the total cash price (a positive number, usually ₪500–₪50000)
-- "monthly": the monthly installment value on a 36-month plan (a positive number, usually 5–95% of cash/36)
+- "cash": the total cash price (a positive number, usually ₪50–₪50000)
+- "monthly": the monthly installment value on an installment plan, OR -1 if no monthly column is present
 
-Headers may be in Arabic, Hebrew, or English. The "name" column is text. The "cash" and "monthly" columns are numbers; "cash" is always larger than "monthly".
+Headers may be in Arabic, Hebrew, or English. The "name" column is text. The "cash" column is the largest numeric value. "monthly" is OPTIONAL — many price lists only have name + cash. If only two columns are present (or you see no monthly-like column), return monthly = -1.
 
 Return ONLY a JSON object: {"name": <int>, "cash": <int>, "monthly": <int>}. No commentary.`;
 
@@ -137,8 +138,9 @@ export async function detectColumns(
     Number.isInteger(result.cash) &&
     Number.isInteger(result.monthly) &&
     result.name !== result.cash &&
-    result.cash !== result.monthly &&
-    result.name !== result.monthly
+    result.name !== result.monthly &&
+    // monthly may legitimately be -1 to signal "no monthly column"
+    (result.monthly === -1 || result.cash !== result.monthly)
   ) {
     return result;
   }
@@ -151,13 +153,14 @@ function detectColumnsHeuristic(headers: string[]): DetectedColumns | null {
 
   const name = find("name", "product", "اسم", "منتج", "שם", "מוצר", "תיאור", "desc");
   const monthly = find("monthly", "قسط", "חודשי", "תשלום", "month", "installment");
-  const cash =
-    find("cash", "price", "كاش", "سعر", "מזומן", "מחיר", "total") !== -1
-      ? find("cash", "price", "كاش", "سعر", "מזומן", "מחיר", "total")
-      : -1;
+  const cash = find("cash", "price", "كاش", "سعر", "מזומן", "מחיר", "total", "מחיר מקור");
 
-  if (name >= 0 && cash >= 0 && monthly >= 0 && name !== cash && cash !== monthly && name !== monthly) {
-    return { name, cash, monthly };
+  if (name >= 0 && cash >= 0 && name !== cash) {
+    if (monthly >= 0 && monthly !== cash && monthly !== name) {
+      return { name, cash, monthly };
+    }
+    // Two-column layout: only name + cash. Caller treats this as "text" mode.
+    return { name, cash, monthly: -1 };
   }
   return null;
 }

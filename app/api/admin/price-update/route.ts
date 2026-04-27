@@ -77,6 +77,13 @@ interface MatchResponse {
 }
 
 interface ApplyInput {
+  /**
+   * Per-batch installment display mode. Defaults to "auto" for backward
+   * compatibility with the original 3-column phone import. The 2-column flow
+   * (name + cash only) sends "text" so matched/created products render the
+   * "حتى 18 قسط بدون فوائد" line instead of a calculated monthly value.
+   */
+  installmentDisplay?: "auto" | "text";
   rows: Array<
     | {
         kind: "update";
@@ -181,6 +188,7 @@ async function handleParse(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const hasMonthly = detected.monthly >= 0;
   const rows: PriceRow[] = [];
   for (let i = 1; i < matrix.length; i += 1) {
     const row = matrix[i];
@@ -188,7 +196,7 @@ async function handleParse(req: NextRequest): Promise<NextResponse> {
     const name = row[detected.name] != null ? String(row[detected.name]).trim() : "";
     if (!name) continue;
     const cash = toSafeNumber(row[detected.cash]);
-    const monthly = toSafeNumber(row[detected.monthly]);
+    const monthly = hasMonthly ? toSafeNumber(row[detected.monthly]) : 0;
     if (cash <= 0 && monthly <= 0) continue;
     rows.push({ idx: rows.length, name, cash, monthly });
   }
@@ -364,6 +372,8 @@ async function handleApply(req: NextRequest, adminId: string): Promise<NextRespo
     return apiError("لا يوجد صفوف للتطبيق", 400);
   }
 
+  const installmentDisplay: "auto" | "text" =
+    body.installmentDisplay === "text" ? "text" : "auto";
   const batchId = randomUUID();
   const failed: ApplyResponse["failed"] = [];
   let updated = 0;
@@ -391,6 +401,7 @@ async function handleApply(req: NextRequest, adminId: string): Promise<NextRespo
           .update({
             price: Math.round(item.cash),
             variants: newVariants,
+            installment_display: installmentDisplay,
             updated_at: new Date().toISOString(),
           })
           .eq("id", item.productId);
@@ -453,6 +464,7 @@ async function handleApply(req: NextRequest, adminId: string): Promise<NextRespo
             variants: newVariants,
             specs: draft.specs || {},
             category_id: draft.category_id || null,
+            installment_display: installmentDisplay,
             active: false, // start hidden — admin reviews and toggles after adding images
             featured: false,
             warranty_months: draft.warranty_months,

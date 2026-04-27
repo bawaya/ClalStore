@@ -625,6 +625,13 @@ export function ProductForm({
                 <Toggle value={!!form.featured} onChange={(v) => setForm(prev => ({ ...prev, featured: v }))} />
                 <span className="text-xs text-muted">🔥 مميز</span>
               </label>
+              <label className="flex items-center gap-1.5 cursor-pointer" title="إذا فُعِّل، الكرت يعرض 'حتى 18 قسط بدون فوائد' بدل قيمة القسط.">
+                <Toggle
+                  value={form.installment_display === "text"}
+                  onChange={(v) => setForm(prev => ({ ...prev, installment_display: v ? "text" : "auto" }))}
+                />
+                <span className="text-xs text-muted">نص "حتى 18 قسط"</span>
+              </label>
             </div>
           </div>
         </div>

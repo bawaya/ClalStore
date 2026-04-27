@@ -267,4 +267,34 @@ describe("ProductCard", () => {
     render(<ProductCard product={withMonthly as any} />);
     expect(screen.getByText(/× 36/)).toBeInTheDocument();
   });
+
+  it("shows the static installment text when installment_display is 'text'", () => {
+    const textMode = {
+      ...baseProduct,
+      installment_display: "text",
+      storage_options: ["default"],
+      variants: [
+        { storage: "default", price: 1500, monthly_price: 80, stock: 5 },
+      ],
+    };
+    render(<ProductCard product={textMode as any} />);
+    // Even though monthly_price is set, the calculated line is suppressed in
+    // favour of the static text — so a "× 36" badge must NOT render.
+    expect(screen.queryByText(/× 36/)).not.toBeInTheDocument();
+    expect(screen.getByText(/حتى 18 قسط بدون فوائد/)).toBeInTheDocument();
+  });
+
+  it("falls back to calculated monthly when installment_display is 'auto' or missing", () => {
+    const autoMode = {
+      ...baseProduct,
+      installment_display: "auto",
+      storage_options: ["128GB"],
+      variants: [
+        { storage: "128GB", price: 3500, monthly_price: 97, stock: 10 },
+      ],
+    };
+    render(<ProductCard product={autoMode as any} />);
+    expect(screen.getByText(/× 36/)).toBeInTheDocument();
+    expect(screen.queryByText(/حتى 18 قسط بدون فوائد/)).not.toBeInTheDocument();
+  });
 });
