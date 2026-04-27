@@ -17,6 +17,14 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
+
+    // Reject non-multipart requests with a clear 400 instead of letting
+    // formData() throw a TypeError that surfaces as a generic 500.
+    const contentType = req.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+      return apiError("الطلب يجب أن يكون multipart/form-data", 400);
+    }
+
     const formData = await req.formData();
     const files = formData.getAll("file") as File[];
 

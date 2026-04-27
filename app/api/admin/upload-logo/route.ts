@@ -16,6 +16,12 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
+
+    const contentType = req.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+      return apiError("الطلب يجب أن يكون multipart/form-data", 400);
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
