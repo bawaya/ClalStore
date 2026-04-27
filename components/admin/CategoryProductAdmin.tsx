@@ -102,7 +102,7 @@ export function CategoryProductAdmin({
     bulkRemove,
     pagination,
     setPage,
-  } = useAdminApi<Product>({ endpoint: `/api/admin/products?type=${type}`, paginate: { limit: 20 } });
+  } = useAdminApi<Product>({ endpoint: `/api/admin/products?type=${type}`, paginate: { limit: 100 } });
 
   const EMPTY: Partial<Product> = {
     type,
@@ -740,16 +740,6 @@ export function CategoryProductAdmin({
                                 dir="ltr"
                               />
                             </div>
-                            <div>
-                              <div className="text-muted text-[8px] text-right">التكلفة ₪</div>
-                              <input
-                                className="input text-xs"
-                                type="number"
-                                value={v.cost || ""}
-                                onChange={(e) => updateVariant(i, "cost", Number(e.target.value))}
-                                dir="ltr"
-                              />
-                            </div>
                           </div>
                         </div>
                       ))
@@ -799,26 +789,15 @@ export function CategoryProductAdmin({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <FormField label="سعر النقد ₪" required>
-                <input
-                  className="input"
-                  type="number"
-                  value={form.price || ""}
-                  onChange={(e) => setForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
-                  dir="ltr"
-                />
-              </FormField>
-              <FormField label="التكلفة ₪" required>
-                <input
-                  className="input"
-                  type="number"
-                  value={form.cost || ""}
-                  onChange={(e) => setForm((prev) => ({ ...prev, cost: Number(e.target.value) }))}
-                  dir="ltr"
-                />
-              </FormField>
-            </div>
+            <FormField label="سعر النقد ₪" required>
+              <input
+                className="input"
+                type="number"
+                value={form.price || ""}
+                onChange={(e) => setForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
+                dir="ltr"
+              />
+            </FormField>
             <FormField label="المخزون (999 = متوفر بالطلب)">
               <input
                 className="input"

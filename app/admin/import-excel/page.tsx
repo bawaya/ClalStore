@@ -98,7 +98,6 @@ export default function ImportExcelPage() {
     hot_duplicates: number;
     sheets: string[];
   } | null>(null);
-  const [costRatio, setCostRatio] = useState(0.65);
   const [insertResult, setInsertResult] = useState<{
     inserted: number;
     total_groups: number;
@@ -146,7 +145,7 @@ export default function ImportExcelPage() {
       const res = await fetch("/api/admin/import-excel?step=classify", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders() },
-        body: JSON.stringify({ rows: rawRows, costRatio }),
+        body: JSON.stringify({ rows: rawRows }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "فشل التصنيف");
@@ -285,20 +284,6 @@ export default function ImportExcelPage() {
           </p>
 
           <div className="flex gap-3 items-center mb-2 flex-wrap">
-            <label className="flex items-center gap-1 text-xs">
-              <span className="text-muted">نسبة التكلفة من النقد:</span>
-              <input
-                type="number"
-                min={0.1}
-                max={0.95}
-                step={0.05}
-                value={costRatio}
-                onChange={(e) => setCostRatio(Number(e.target.value))}
-                className="input text-xs w-20"
-                dir="ltr"
-              />
-            </label>
-
             <button
               type="button"
               onClick={doClassify}

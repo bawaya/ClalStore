@@ -427,7 +427,7 @@ async function handleApply(req: NextRequest, adminId: string): Promise<NextRespo
             storage: storageLabel,
             price: Math.round(item.cash),
             monthly_price: item.monthly > 0 ? Math.round(item.monthly) : undefined,
-            cost: Math.round(item.cash * 0.65),
+            cost: 0,
             stock: 0,
           },
         ];
@@ -443,7 +443,7 @@ async function handleApply(req: NextRequest, adminId: string): Promise<NextRespo
             description_ar: draft.description_ar || null,
             description_he: draft.description_he || null,
             price: Math.round(item.cash),
-            cost: Math.round(item.cash * 0.65),
+            cost: 0,
             stock: 0,
             sold: 0,
             image_url: null,

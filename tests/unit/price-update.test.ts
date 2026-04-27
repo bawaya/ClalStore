@@ -202,11 +202,6 @@ describe("runValidations", () => {
     expect(warnings.find((w) => w.code === "monthly_mismatch")).toBeDefined();
   });
 
-  it("flags below-cost", () => {
-    const warnings = runValidations({ idx: 0, name: "x", cash: 2500, monthly: 70 }, product);
-    expect(warnings.find((w) => w.code === "below_cost")).toBeDefined();
-  });
-
   it("passes clean row", () => {
     // 125 × 36 = 4500 = cash → no monthly mismatch; cash equals existing → no delta; cash > cost
     const warnings = runValidations({ idx: 0, name: "x", cash: 4500, monthly: 125 }, product);

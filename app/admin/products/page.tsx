@@ -9,7 +9,6 @@ import { useAdminApi } from "@/lib/admin/hooks";
 import { PageHeader, Modal, FormField, Toggle, ConfirmDialog, EmptyState, ErrorBanner, ToastContainer } from "@/components/admin/shared";
 import { IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import { PRODUCT_TYPES } from "@/lib/constants";
-import { calcMargin } from "@/lib/utils";
 import { aiEnhanceProduct, translateProductName, detectProductType, findDuplicates } from "@/lib/admin/ai-tools";
 import type { Product, ProductColor, ProductVariant } from "@/types/database";
 import { csrfHeaders, getCsrfToken } from "@/lib/csrf-client";
@@ -24,7 +23,7 @@ export default function ProductsPage() {
   const scr = useScreen();
   const { toasts, show } = useToast();
   // Mobile admin: only devices + accessories. Appliances have their own /admin/appliances page.
-  const { data: products, loading, error, clearError, create, update, remove, bulkRemove, pagination, setPage } = useAdminApi<Product>({ endpoint: "/api/admin/products?types=device,accessory", paginate: { limit: 20 } });
+  const { data: products, loading, error, clearError, create, update, remove, bulkRemove, pagination, setPage } = useAdminApi<Product>({ endpoint: "/api/admin/products?types=device,accessory", paginate: { limit: 100 } });
 
   const [modal, setModal] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -789,9 +788,6 @@ export default function ProductsPage() {
     setDistributing(false);
   };
 
-  const margin = form.price && form.cost ? calcMargin(Number(form.price), Number(form.cost)) : 0;
-  const profit = (Number(form.price) || 0) - (Number(form.cost) || 0);
-
   if (loading) return <div className="text-center py-20 text-muted">⏳ جاري التحميل...</div>;
 
   return (
@@ -935,10 +931,6 @@ export default function ProductsPage() {
                   <span>مخزون: {p.stock === 0 ? <span className="text-state-error">نفذ</span> : p.stock <= 5 ? <span className="text-state-warning">{p.stock}</span> : p.stock}</span>
                   <span>•</span>
                   <span>بيع: {p.sold}</span>
-                  {p.type === "accessory" && <>
-                    <span>•</span>
-                    <span>هامش: {calcMargin(Number(p.price), Number(p.cost))}%</span>
-                  </>}
                 </div>
               </div>
 
@@ -1474,10 +1466,6 @@ export default function ProductsPage() {
                           <input className="input text-xs" type="number" value={v.old_price || ""} onChange={(e) => updateVariant(i, "old_price", Number(e.target.value) || undefined)} placeholder="0" dir="ltr" />
                         </div>
                         <div>
-                          <div className="text-muted text-[8px] text-right mb-0.5">التكلفة ₪</div>
-                          <input className="input text-xs" type="number" value={v.cost || ""} onChange={(e) => updateVariant(i, "cost", Number(e.target.value))} placeholder="0" dir="ltr" />
-                        </div>
-                        <div>
                           <div className="text-muted text-[8px] text-right mb-0.5">المخزون</div>
                           <input className="input text-xs" type="number" value={v.stock ?? ""} onChange={(e) => updateVariant(i, "stock", Number(e.target.value))} placeholder="0" dir="ltr" />
                         </div>
@@ -1490,45 +1478,15 @@ export default function ProductsPage() {
           </div>
 
           <div className="flex-1">
-            {/* Price fields for devices (simple) */}
-            {form.type === "device" && (
+            {/* Price fields */}
+            {(form.type === "device" || form.type === "accessory") && (
               <div className="card mb-3" style={{ padding: scr.mobile ? 10 : 14 }}>
-                <div className="flex gap-2 mb-1.5">
-                  <FormField label="سعر البيع ₪" required>
-                    <input className="input" type="number" value={form.price || ""} onChange={(e) => setForm(prev => ({ ...prev, price: Number(e.target.value) }))} placeholder="0" dir="ltr" />
-                  </FormField>
-                  <FormField label="التكلفة ₪" required>
-                    <input className="input" type="number" value={form.cost || ""} onChange={(e) => setForm(prev => ({ ...prev, cost: Number(e.target.value) }))} placeholder="0" dir="ltr" />
-                  </FormField>
-                </div>
+                <FormField label="سعر البيع ₪" required>
+                  <input className="input" type="number" value={form.price || ""} onChange={(e) => setForm(prev => ({ ...prev, price: Number(e.target.value) }))} placeholder="0" dir="ltr" />
+                </FormField>
                 <FormField label="سعر قبل الخصم ₪ (اختياري)">
                   <input className="input" type="number" value={form.old_price || ""} onChange={(e) => setForm(prev => ({ ...prev, old_price: Number(e.target.value) || undefined }))} placeholder="0" dir="ltr" />
                 </FormField>
-              </div>
-            )}
-            {/* Margin Calculator - accessories only */}
-            {form.type === "accessory" && (
-              <div className="card mb-3" style={{ padding: scr.mobile ? 10 : 14, background: "rgba(196,16,64,0.04)", borderColor: "rgba(196,16,64,0.15)" }}>
-                <div className="font-bold text-right mb-2" style={{ fontSize: scr.mobile ? 10 : 12 }}>💰 حاسبة الهامش</div>
-                <div className="flex gap-2 mb-1.5">
-                  <FormField label="سعر البيع ₪" required>
-                    <input className="input" type="number" value={form.price || ""} onChange={(e) => setForm(prev => ({ ...prev, price: Number(e.target.value) }))} placeholder="0" dir="ltr" />
-                  </FormField>
-                  <FormField label="التكلفة ₪" required>
-                    <input className="input" type="number" value={form.cost || ""} onChange={(e) => setForm(prev => ({ ...prev, cost: Number(e.target.value) }))} placeholder="0" dir="ltr" />
-                  </FormField>
-                </div>
-                <FormField label="سعر قبل الخصم ₪ (اختياري)">
-                  <input className="input" type="number" value={form.old_price || ""} onChange={(e) => setForm(prev => ({ ...prev, old_price: Number(e.target.value) || undefined }))} placeholder="0" dir="ltr" />
-                </FormField>
-                <div className="flex justify-between mt-1">
-                  <span style={{ fontSize: 11, color: margin >= 30 ? "#22c55e" : margin >= 15 ? "#eab308" : "#ef4444" }}>
-                    الهامش: {margin}%
-                  </span>
-                  <span style={{ fontSize: 11, color: profit > 0 ? "#22c55e" : "#ef4444" }}>
-                    الربح: ₪{profit}
-                  </span>
-                </div>
               </div>
             )}
 

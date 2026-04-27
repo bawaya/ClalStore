@@ -3,7 +3,6 @@
 import { useScreen } from "@/lib/hooks";
 import { Toggle, EmptyState } from "@/components/admin/shared";
 import { PRODUCT_TYPES } from "@/lib/constants";
-import { calcMargin } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
 interface ProductTableProps {
@@ -86,10 +85,6 @@ export function ProductTable({
               <span>مخزون: {p.stock === 0 ? <span className="text-state-error">نفذ</span> : p.stock <= 5 ? <span className="text-state-warning">{p.stock}</span> : p.stock}</span>
               <span>•</span>
               <span>بيع: {p.sold}</span>
-              {p.type === "accessory" && <>
-                <span>•</span>
-                <span>هامش: {calcMargin(Number(p.price), Number(p.cost))}%</span>
-              </>}
             </div>
           </div>
 

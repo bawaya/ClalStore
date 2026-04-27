@@ -46,7 +46,7 @@ export interface MatchCandidate {
 
 export interface PriceWarning {
   level: "yellow" | "red";
-  code: "delta_high" | "monthly_mismatch" | "below_cost" | "zero_price" | "zero_monthly";
+  code: "delta_high" | "monthly_mismatch" | "zero_price" | "zero_monthly";
   message: string;
 }
 
@@ -286,14 +286,6 @@ export function runValidations(
         message: `${dir} ${Math.round(delta * 100)}% عن السعر الحالي ₪${product.price.toLocaleString()}`,
       });
     }
-  }
-
-  if (product && product.cost > 0 && row.cash > 0 && row.cash < product.cost) {
-    warnings.push({
-      level: "red",
-      code: "below_cost",
-      message: `السعر ₪${row.cash.toLocaleString()} أقل من التكلفة ₪${product.cost.toLocaleString()} (بيع بخسارة)`,
-    });
   }
 
   return warnings;

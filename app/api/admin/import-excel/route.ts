@@ -320,7 +320,6 @@ async function handleClassify(req: NextRequest) {
     return apiError("لا يوجد صفوف للتصنيف", 400);
   }
 
-  const costRatio = Math.min(0.95, Math.max(0.1, body.costRatio ?? 0.65));
   const out: ClassifiedRow[] = [];
   const batchSize = 12;
 
@@ -344,8 +343,9 @@ async function handleClassify(req: NextRequest) {
       const stock = toSafeNumber(raw.stock);
       const monthly = toSafeNumber(raw.monthly);
       const cash = toSafeNumber(raw.cash);
-      const cost =
-        ai.cost && ai.cost > 0 ? Number(ai.cost) : Math.round(cash * costRatio);
+      // Cost is not used in this commission-based business model — kept at 0
+      // so margin/profit displays in the admin stay neutral.
+      const cost = 0;
 
       out.push({
         barcode: raw.barcode,
@@ -412,7 +412,7 @@ async function handleInsert(req: NextRequest) {
         toSafeNumber(member.monthly) > 0
           ? Math.round(toSafeNumber(member.monthly))
           : undefined,
-      cost: Math.round(member.cost),
+      cost: 0,
       stock: Math.max(0, Math.round(toSafeNumber(member.stock))),
     }));
 
@@ -427,7 +427,7 @@ async function handleInsert(req: NextRequest) {
       name_he: head.name_he,
       name_en: head.name_en || undefined,
       price: minPrice,
-      cost: Math.round(head.cost),
+      cost: 0,
       stock: variants.reduce((sum, variant) => sum + variant.stock, 0),
       sold: 0,
       image_url: undefined,
