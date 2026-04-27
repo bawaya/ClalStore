@@ -6,6 +6,9 @@ import { useState } from "react";
 import { useToast } from "@/lib/hooks";
 import { PageHeader, ToastContainer } from "@/components/admin/shared";
 import { csrfHeaders, getCsrfToken } from "@/lib/csrf-client";
+import { PriceUpdatePanel } from "./PriceUpdatePanel";
+
+type ImportMode = "create" | "update";
 
 interface RawRow {
   sheet: string;
@@ -80,6 +83,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function ImportExcelPage() {
+  const [mode, setMode] = useState<ImportMode>("create");
   const { toasts, show } = useToast();
 
   const [file, setFile] = useState<File | null>(null);
@@ -223,8 +227,29 @@ export default function ImportExcelPage() {
 
   return (
     <div>
-      <PageHeader title="استيراد منتجات من Excel" />
+      <PageHeader title="استيراد من Excel" />
 
+      <div className="card mb-4 flex gap-2 flex-wrap" style={{ padding: 8 }}>
+        <button
+          type="button"
+          onClick={() => setMode("create")}
+          className={mode === "create" ? "btn-primary text-xs" : "btn-ghost text-xs"}
+        >
+          استيراد منتجات جديدة
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("update")}
+          className={mode === "update" ? "btn-primary text-xs" : "btn-ghost text-xs"}
+        >
+          تحديث الأسعار
+        </button>
+      </div>
+
+      {mode === "update" && <PriceUpdatePanel />}
+
+      {mode === "create" && (
+      <>
       <div className="card mb-4" style={{ padding: 14 }}>
         <h3 className="font-bold text-sm mb-2">المرحلة 1 - رفع الملف</h3>
         <p className="text-[11px] text-muted mb-2">
@@ -384,6 +409,9 @@ export default function ImportExcelPage() {
             </table>
           </div>
         </div>
+      )}
+
+      </>
       )}
 
       <ToastContainer toasts={toasts} />

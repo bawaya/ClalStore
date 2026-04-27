@@ -1,0 +1,231 @@
+import { describe, it, expect } from "vitest";
+import {
+  applyPriceToVariants,
+  classifyMatchStatus,
+  extractStorage,
+  findCandidates,
+  normalizeName,
+  runValidations,
+  scoreMatch,
+  tokenize,
+  type ProductLite,
+} from "@/lib/admin/price-update";
+
+const sampleProducts: ProductLite[] = [
+  {
+    id: "p1",
+    name_ar: "Samsung Galaxy S24 Ultra",
+    name_he: "Samsung Galaxy S24 Ultra",
+    name_en: "Samsung Galaxy S24 Ultra",
+    brand: "Samsung",
+    model_number: "SM-S928",
+    price: 4500,
+    cost: 3000,
+    variants: [
+      { storage: "256GB", price: 4500, monthly_price: 125 },
+      { storage: "512GB", price: 4900, monthly_price: 136 },
+    ],
+  },
+  {
+    id: "p2",
+    name_ar: "Apple iPhone 15 Pro Max",
+    name_he: "אייפון 15 פרו מקס",
+    name_en: "iPhone 15 Pro Max",
+    brand: "Apple",
+    model_number: "A2849",
+    price: 5200,
+    cost: 3500,
+    variants: [{ storage: "256GB", price: 5200, monthly_price: 144 }],
+  },
+  {
+    id: "p3",
+    name_ar: "Samsung Galaxy A55",
+    name_he: "Samsung Galaxy A55",
+    name_en: "Samsung Galaxy A55",
+    brand: "Samsung",
+    model_number: "SM-A556",
+    price: 1500,
+    cost: 1000,
+    variants: [{ storage: "128GB", price: 1500, monthly_price: 42 }],
+  },
+];
+
+describe("normalizeName", () => {
+  it("lowercases and strips diacritics", () => {
+    expect(normalizeName("Galaxy S24 ULTRA")).toBe("galaxy s24 ultra");
+  });
+
+  it("folds Arabic brand names to Latin", () => {
+    expect(normalizeName("سامسونج جالكسي S24")).toContain("samsung");
+    expect(normalizeName("سامسونج جالكسي S24")).toContain("galaxy");
+  });
+
+  it("folds Hebrew brand names", () => {
+    expect(normalizeName("אייפון 15")).toContain("iphone");
+  });
+
+  it("collapses whitespace", () => {
+    expect(normalizeName("  Galaxy   S24    ")).toBe("galaxy s24");
+  });
+});
+
+describe("extractStorage", () => {
+  it("extracts GB storage", () => {
+    expect(extractStorage("Galaxy S24 256GB")).toBe("256GB");
+  });
+
+  it("extracts TB storage", () => {
+    expect(extractStorage("iPhone 15 Pro Max 1TB")).toBe("1TB");
+  });
+
+  it("returns null when missing", () => {
+    expect(extractStorage("Galaxy S24")).toBeNull();
+  });
+});
+
+describe("tokenize", () => {
+  it("splits on spaces and special chars", () => {
+    expect(tokenize("Galaxy-S24/Ultra")).toEqual(["galaxy", "s24", "ultra"]);
+  });
+
+  it("drops 1-char tokens", () => {
+    expect(tokenize("a Galaxy b")).toEqual(["galaxy"]);
+  });
+});
+
+describe("scoreMatch", () => {
+  it("scores 100 for exact name match", () => {
+    expect(scoreMatch("Samsung Galaxy S24 Ultra", sampleProducts[0])).toBe(100);
+  });
+
+  it("scores high for Arabic name with brand", () => {
+    const score = scoreMatch("سامسونج Galaxy S24 Ultra", sampleProducts[0]);
+    expect(score).toBeGreaterThanOrEqual(80);
+  });
+
+  it("scores lower for partial match", () => {
+    const score = scoreMatch("Galaxy A55", sampleProducts[0]);
+    expect(score).toBeLessThan(80);
+  });
+
+  it("scores zero for unrelated", () => {
+    expect(scoreMatch("Roborock S8", sampleProducts[0])).toBe(0);
+  });
+});
+
+describe("findCandidates", () => {
+  it("returns top match first", () => {
+    const candidates = findCandidates("Galaxy S24 Ultra", sampleProducts);
+    expect(candidates[0].productId).toBe("p1");
+  });
+
+  it("disambiguates by brand", () => {
+    // "Galaxy" alone matches p1 and p3 (both Samsung Galaxy); top should still be the Galaxy result.
+    const candidates = findCandidates("Galaxy A55", sampleProducts);
+    expect(candidates[0].productId).toBe("p3");
+  });
+
+  it("returns empty for no match", () => {
+    expect(findCandidates("XXXX", sampleProducts)).toHaveLength(0);
+  });
+});
+
+describe("classifyMatchStatus", () => {
+  it("returns exact for 100", () => {
+    expect(classifyMatchStatus([{ productId: "x", productName: "n", brand: "b", score: 100, reason: "" }])).toBe("exact");
+  });
+
+  it("returns ambiguous when top two scores are within 5", () => {
+    const status = classifyMatchStatus([
+      { productId: "a", productName: "n1", brand: "b", score: 80, reason: "" },
+      { productId: "b", productName: "n2", brand: "b", score: 78, reason: "" },
+    ]);
+    expect(status).toBe("ambiguous");
+  });
+
+  it("returns high when top score is clear winner", () => {
+    const status = classifyMatchStatus([
+      { productId: "a", productName: "n1", brand: "b", score: 90, reason: "" },
+      { productId: "b", productName: "n2", brand: "b", score: 50, reason: "" },
+    ]);
+    expect(status).toBe("high");
+  });
+
+  it("returns low for borderline", () => {
+    const status = classifyMatchStatus([
+      { productId: "a", productName: "n1", brand: "b", score: 65, reason: "" },
+    ]);
+    expect(status).toBe("low");
+  });
+
+  it("returns none when empty or below threshold", () => {
+    expect(classifyMatchStatus([])).toBe("none");
+    expect(
+      classifyMatchStatus([{ productId: "a", productName: "n", brand: "b", score: 30, reason: "" }]),
+    ).toBe("none");
+  });
+});
+
+describe("runValidations", () => {
+  const product = sampleProducts[0]; // price 4500, cost 3000
+
+  it("flags large delta", () => {
+    const warnings = runValidations({ idx: 0, name: "x", cash: 2000, monthly: 56 }, product);
+    expect(warnings.find((w) => w.code === "delta_high")).toBeDefined();
+  });
+
+  it("flags monthly mismatch", () => {
+    // 50 × 36 = 1800 ≠ 4500 → mismatch >5%
+    const warnings = runValidations({ idx: 0, name: "x", cash: 4500, monthly: 50 }, product);
+    expect(warnings.find((w) => w.code === "monthly_mismatch")).toBeDefined();
+  });
+
+  it("flags below-cost", () => {
+    const warnings = runValidations({ idx: 0, name: "x", cash: 2500, monthly: 70 }, product);
+    expect(warnings.find((w) => w.code === "below_cost")).toBeDefined();
+  });
+
+  it("passes clean row", () => {
+    // 125 × 36 = 4500 = cash → no monthly mismatch; cash equals existing → no delta; cash > cost
+    const warnings = runValidations({ idx: 0, name: "x", cash: 4500, monthly: 125 }, product);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("flags zero cash", () => {
+    const warnings = runValidations({ idx: 0, name: "x", cash: 0, monthly: 0 }, product);
+    expect(warnings.find((w) => w.code === "zero_price")).toBeDefined();
+  });
+});
+
+describe("applyPriceToVariants", () => {
+  it("updates all variants with same cash + monthly", () => {
+    const variants = [
+      { storage: "128GB", price: 1000, monthly_price: 30 },
+      { storage: "256GB", price: 1200, monthly_price: 35 },
+    ];
+    const out = applyPriceToVariants(variants, 1500, 42);
+    expect(out).toHaveLength(2);
+    expect(out[0].price).toBe(1500);
+    expect(out[1].price).toBe(1500);
+    expect(out[0].monthly_price).toBe(42);
+    expect(out[1].monthly_price).toBe(42);
+  });
+
+  it("preserves storage and other fields", () => {
+    const variants = [{ storage: "128GB", price: 1000, monthly_price: 30, stock: 5, cost: 700 }];
+    const out = applyPriceToVariants(variants, 1500, 42);
+    expect(out[0].storage).toBe("128GB");
+    expect(out[0].stock).toBe(5);
+    expect(out[0].cost).toBe(700);
+  });
+
+  it("clears monthly_price when monthly is zero", () => {
+    const variants = [{ storage: "128GB", price: 1000, monthly_price: 30 }];
+    const out = applyPriceToVariants(variants, 1500, 0);
+    expect(out[0].monthly_price).toBeUndefined();
+  });
+
+  it("returns empty for no variants", () => {
+    expect(applyPriceToVariants([], 1000, 30)).toEqual([]);
+  });
+});
