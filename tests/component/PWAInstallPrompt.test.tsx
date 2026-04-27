@@ -179,6 +179,30 @@ describe("PWAInstallPrompt", () => {
     expect(screen.getByText("C")).toBeInTheDocument();
   });
 
+  it("does not re-show banner after dismissal even when beforeinstallprompt fires again", () => {
+    render(<PWAInstallPrompt />);
+
+    const calls = addEventListenerSpy.mock.calls.filter(
+      (call: any) => call[0] === "beforeinstallprompt",
+    );
+    const handler = calls[0][1] as EventListener;
+    const fire = () => {
+      const ev = new Event("beforeinstallprompt");
+      Object.assign(ev, { preventDefault: vi.fn() });
+      act(() => handler(ev));
+    };
+
+    fire();
+    expect(screen.getByText("pwa.installTitle")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("close"));
+    expect(screen.queryByText("pwa.installTitle")).not.toBeInTheDocument();
+
+    // Simulate Chrome firing the event again later in the same session
+    fire();
+    expect(screen.queryByText("pwa.installTitle")).not.toBeInTheDocument();
+  });
+
   it("shows iOS guide when install clicked on iOS without deferred prompt", async () => {
     // Simulate iOS
     Object.defineProperty(navigator, "userAgent", {

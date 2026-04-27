@@ -87,8 +87,10 @@ export function PWAInstallPrompt() {
 
     if (isStandalone || localStorage.getItem("pwa_installed")) return;
 
-    // Only show once per session
-    if (sessionStorage.getItem("pwa_dismissed")) return;
+    // Re-read fresh from sessionStorage on every potential trigger so a dismissal
+    // mid-session also blocks repeat fires of beforeinstallprompt or the iOS timer.
+    const wasDismissed = () => sessionStorage.getItem("pwa_dismissed") === "1";
+    if (wasDismissed()) return;
 
     // Detect iOS
     const iosCheck = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
@@ -97,6 +99,7 @@ export function PWAInstallPrompt() {
     // Listen for beforeinstallprompt (Chrome/Edge/Samsung)
     const handler = (e: Event) => {
       e.preventDefault();
+      if (wasDismissed()) return;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowBanner(true);
     };
@@ -113,7 +116,10 @@ export function PWAInstallPrompt() {
 
     // Show iOS banner after 5 seconds
     if (iosCheck) {
-      const timer = setTimeout(() => setShowBanner(true), 5000);
+      const timer = setTimeout(() => {
+        if (wasDismissed()) return;
+        setShowBanner(true);
+      }, 5000);
       return () => {
         clearTimeout(timer);
         window.removeEventListener("beforeinstallprompt", handler);
