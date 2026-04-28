@@ -41,6 +41,23 @@ vi.mock("@/lib/ai/claude", () => ({
   })),
 }));
 
+// smart-search now goes through callConfiguredAI from @/lib/ai/runtime
+// (provider-agnostic), so mirror the Claude mock there too.
+vi.mock("@/lib/ai/runtime", () => ({
+  callConfiguredAI: vi.fn(async () => ({
+    text: "",
+    json: {
+      type: "device",
+      brands: ["Apple"],
+      max_price: 5000,
+      sort: "price_asc",
+      keywords: ["iPhone"],
+    },
+    tokens: { input: 100, output: 50 },
+    duration: 200,
+  })),
+}));
+
 vi.mock("@/lib/ai/usage-tracker", () => ({
   trackAIUsage: vi.fn(),
 }));

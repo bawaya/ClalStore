@@ -39,8 +39,24 @@ vi.mock("@/lib/admin/queries", () => ({
   logAction: (...args: any[]) => mockLogAction(...args),
 }));
 
-vi.mock("@/lib/supabase", () => {
-  const client = createMockSupabaseClient();
+// Seed the `integrations` table mock with the test integration row so
+// `prepareIntegrationConfigForUpdate` (used by PUT /admin/settings) can find it.
+// vi.mock is hoisted to top-level — re-declare the seed row here rather than
+// closing over the outer `integration` const which won't be initialised yet.
+vi.mock("@/lib/supabase", async () => {
+  const { createMockSupabaseClient: makeClient, makeIntegration: makeIntegrationFactory } =
+    await import("@/tests/helpers");
+  const seed = makeIntegrationFactory({
+    id: "int1",
+    type: "payment",
+    provider: "rivhit",
+    config: { api_key: "sk-test-longkey123", business_id: "12345" },
+    status: "active",
+  });
+  const client = makeClient({
+    integrations: { data: [seed] },
+    integration_secrets: { data: [] },
+  });
   return {
     createServerSupabase: vi.fn(() => client),
     createAdminSupabase: vi.fn(() => client),
@@ -153,8 +169,13 @@ describe("Admin Settings API — /api/admin/settings", () => {
       const res = await PUT(req);
 
       expect(res.status).toBe(200);
-      // Should have fetched integrations to resolve masked values
-      expect(mockGetIntegrations).toHaveBeenCalled();
+      // The route now fetches the existing integration via the supabase
+      // client (prepareIntegrationConfigForUpdate -> getIntegrationByIdWithSecrets)
+      // rather than the legacy getIntegrations query helper, so we just
+      // assert the masked value did not leak into the persisted update.
+      expect(mockUpdateIntegration).toHaveBeenCalled();
+      const [, persistedUpdates] = mockUpdateIntegration.mock.calls.at(-1)!;
+      expect(persistedUpdates.config?.api_key).not.toContain("••••••••");
     });
 
     it("returns 401 when not authenticated", async () => {

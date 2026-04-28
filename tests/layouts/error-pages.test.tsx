@@ -262,7 +262,7 @@ describe("StoreError (app/store/error.tsx)", () => {
   it("renders link back to store", async () => {
     const { default: StoreError } = await import("@/app/store/error");
     render(<StoreError error={mockError} reset={mockReset} />);
-    const storeLink = screen.getByText("العودة للمتجر");
+    const storeLink = screen.getByText("العودة إلى المتجر");
     expect(storeLink.closest("a")).toHaveAttribute("href", "/store");
   });
 

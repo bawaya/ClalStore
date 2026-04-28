@@ -75,16 +75,16 @@ describe("CartPage", () => {
 
   it("shows empty cart message when no items", () => {
     render(<CartPage />);
-    expect(screen.getByText("السلة فاضية")).toBeInTheDocument();
+    expect(screen.getByText("السلة فارغة")).toBeInTheDocument();
   });
 
   it("renders the step bar", () => {
     render(<CartPage />);
-    // Multiple "السلة" may appear (step bar + heading); check at least one
+    // checkoutSteps = ["السلة", "البيانات", "الدفع", "التأكيد"]
     expect(screen.getAllByText(/السلة/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/المعلومات/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/البيانات/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/الدفع/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/تأكيد/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/التأكيد/).length).toBeGreaterThan(0);
   });
 
   it("has RTL direction", () => {

@@ -150,22 +150,24 @@ describe("Store Loading (app/store/loading.tsx)", () => {
   it("renders header skeleton", async () => {
     const { default: StoreLoading } = await import("@/app/store/loading");
     const { container } = render(<StoreLoading />);
-    // Header skeleton bar
-    const header = container.querySelector(".h-16");
+    // Header skeleton bar (top bar uses h-24 in the redesigned shell).
+    const header = container.querySelector(".h-24");
     expect(header).toBeTruthy();
   });
 
   it("renders hero skeleton", async () => {
     const { default: StoreLoading } = await import("@/app/store/loading");
     const { container } = render(<StoreLoading />);
-    const hero = container.querySelector(".h-64");
+    // Hero placeholder is the 10-row tall block in the rounded card section.
+    const hero = container.querySelector(".h-10");
     expect(hero).toBeTruthy();
   });
 
   it("renders product grid skeleton (8 items)", async () => {
     const { default: StoreLoading } = await import("@/app/store/loading");
     const { container } = render(<StoreLoading />);
-    const productCards = container.querySelectorAll(".aspect-square");
+    // Each product card uses an aspect-[4/4.2] image placeholder.
+    const productCards = container.querySelectorAll(".aspect-\\[4\\/4\\.2\\]");
     expect(productCards.length).toBe(8);
   });
 

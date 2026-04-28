@@ -198,7 +198,8 @@ describe("ProductDetailClient", () => {
       ],
     };
     render(<ProductDetailClient product={withColors as any} related={[]} />);
-    expect(screen.getByText("detail.color", { exact: false })).toBeInTheDocument();
+    // Component now uses literal Arabic "اختيار اللون" instead of a translation key.
+    expect(screen.getByText(/اختيار اللون/)).toBeInTheDocument();
   });
 
   it("shows storage selection when storage options exist", () => {
@@ -229,15 +230,19 @@ describe("ProductDetailClient", () => {
     expect(addBtn).toBeDisabled();
   });
 
-  it("shows device note for device products", () => {
+  it("shows two-year warranty badge for device products", () => {
+    // Device products auto-resolve to a 2-year warranty key in the warranty badge.
     render(<ProductDetailClient product={baseProduct as any} related={[]} />);
-    expect(screen.getByText("detail.deviceNote")).toBeInTheDocument();
+    expect(screen.getByText("store.warranty2")).toBeInTheDocument();
   });
 
-  it("shows accessory note for accessory products", () => {
+  it("does not auto-render a warranty badge for accessory products", () => {
+    // Accessory products without explicit warranty info produce no warranty badge.
     const accessory = { ...baseProduct, type: "accessory" };
     render(<ProductDetailClient product={accessory as any} related={[]} />);
-    expect(screen.getByText("detail.accessoryNote")).toBeInTheDocument();
+    expect(screen.queryByText("store.warranty2")).not.toBeInTheDocument();
+    expect(screen.queryByText("store.warrantyYear")).not.toBeInTheDocument();
+    expect(screen.queryByText("store.warranty3")).not.toBeInTheDocument();
   });
 
   it("renders mobile layout", () => {

@@ -50,7 +50,14 @@ function createFileFormDataRequest(files: { name: string; type: string; size: nu
       }) as any,
   );
 
-  const req = createMockRequest({ method: "POST" });
+  // The route now rejects non-multipart requests with 400, so the helper
+  // must include the canonical content-type header.
+  const req = createMockRequest({
+    method: "POST",
+    headers: {
+      "content-type": "multipart/form-data; boundary=----WebKitFormBoundaryTest",
+    },
+  });
   const formData = {
     getAll: vi.fn().mockReturnValue(fileObjects),
     get: vi.fn().mockReturnValue(fileObjects[0] || null),
@@ -102,7 +109,10 @@ describe("Admin Upload API — /api/admin/upload", () => {
     });
 
     it("returns 400 when no files provided", async () => {
-      const req = createMockRequest({ method: "POST" });
+      const req = createMockRequest({
+        method: "POST",
+        headers: { "content-type": "multipart/form-data; boundary=----WebKitFormBoundaryTest" },
+      });
       const formData = { getAll: vi.fn().mockReturnValue([]) };
       req.formData = vi.fn().mockResolvedValue(formData);
 

@@ -30,7 +30,7 @@ const mockHeroes: Hero[] = [
     title_he: "מבצעי קיץ",
     subtitle_ar: "خصومات حتى 40%",
     subtitle_he: "הנחות עד 40%",
-    image_url: "",
+    image_url: "https://example.com/hero1.jpg",
     link_url: "",
     cta_text_ar: "تسوّق الآن",
     cta_text_he: "קנה עכשיו",
@@ -67,12 +67,13 @@ describe("HeroCarousel", () => {
 
   it("renders without crashing", () => {
     render(<HeroCarousel heroes={mockHeroes} />);
-    expect(screen.getByText("عروض الصيف")).toBeInTheDocument();
+    expect(screen.getAllByText("عروض الصيف").length).toBeGreaterThan(0);
   });
 
   it("displays first hero title and subtitle", () => {
     render(<HeroCarousel heroes={mockHeroes} />);
-    expect(screen.getByText("عروض الصيف")).toBeInTheDocument();
+    // Title appears twice (heading + image-overlay caption); subtitle once.
+    expect(screen.getAllByText("عروض الصيف").length).toBeGreaterThan(0);
     expect(screen.getByText("خصومات حتى 40%")).toBeInTheDocument();
   });
 
@@ -96,47 +97,48 @@ describe("HeroCarousel", () => {
 
   it("shows dot indicators for multiple heroes", () => {
     render(<HeroCarousel heroes={mockHeroes} />);
-    const dots = screen.getAllByLabelText(/Slide/);
-    expect(dots.length).toBe(2);
+    // Dots use numeric aria-labels: "1", "2".
+    expect(screen.getByLabelText("1")).toBeInTheDocument();
+    expect(screen.getByLabelText("2")).toBeInTheDocument();
   });
 
   it("changes slide when dot is clicked", () => {
     render(<HeroCarousel heroes={mockHeroes} />);
-    const dot2 = screen.getByLabelText("Slide 2");
+    const dot2 = screen.getByLabelText("2");
     fireEvent.click(dot2);
-    expect(screen.getByText("iPhone 17 وصل!")).toBeInTheDocument();
+    expect(screen.getAllByText("iPhone 17 وصل!").length).toBeGreaterThan(0);
     expect(screen.getAllByText("اطلب الآن").length).toBeGreaterThan(0);
   });
 
-  it("auto-advances after 4 seconds", () => {
+  it("auto-advances after 5 seconds", () => {
     render(<HeroCarousel heroes={mockHeroes} />);
-    expect(screen.getByText("عروض الصيف")).toBeInTheDocument();
+    expect(screen.getAllByText("عروض الصيف").length).toBeGreaterThan(0);
     act(() => {
-      vi.advanceTimersByTime(4100);
+      vi.advanceTimersByTime(5100);
     });
-    expect(screen.getByText("iPhone 17 وصل!")).toBeInTheDocument();
+    expect(screen.getAllByText("iPhone 17 وصل!").length).toBeGreaterThan(0);
   });
 
   it("wraps around after last slide", () => {
     render(<HeroCarousel heroes={mockHeroes} />);
     act(() => {
-      vi.advanceTimersByTime(4100);
+      vi.advanceTimersByTime(5100);
     });
-    expect(screen.getByText("iPhone 17 وصل!")).toBeInTheDocument();
+    expect(screen.getAllByText("iPhone 17 وصل!").length).toBeGreaterThan(0);
     act(() => {
-      vi.advanceTimersByTime(4100);
+      vi.advanceTimersByTime(5100);
     });
-    expect(screen.getByText("عروض الصيف")).toBeInTheDocument();
+    expect(screen.getAllByText("عروض الصيف").length).toBeGreaterThan(0);
   });
 
   it("does not show dots for single hero", () => {
     render(<HeroCarousel heroes={[mockHeroes[0]]} />);
-    expect(screen.queryByLabelText("Slide 1")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("1")).not.toBeInTheDocument();
   });
 
   it("shows hero image when image_url exists", () => {
     render(<HeroCarousel heroes={mockHeroes} />);
-    fireEvent.click(screen.getByLabelText("Slide 2"));
+    fireEvent.click(screen.getByLabelText("2"));
     const img = screen.getByAltText("iPhone 17 وصل!");
     expect(img).toBeInTheDocument();
   });
@@ -144,6 +146,6 @@ describe("HeroCarousel", () => {
   it("renders mobile view", () => {
     mockUseScreen.mockReturnValue({ mobile: true, tablet: false, desktop: false, width: 375 });
     render(<HeroCarousel heroes={mockHeroes} />);
-    expect(screen.getByText("عروض الصيف")).toBeInTheDocument();
+    expect(screen.getAllByText("عروض الصيف").length).toBeGreaterThan(0);
   });
 });

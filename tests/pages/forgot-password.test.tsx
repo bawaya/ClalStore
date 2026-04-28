@@ -25,11 +25,15 @@ vi.mock("@/components/shared/Logo", () => ({
 }));
 
 const resetPasswordForEmail = vi.fn();
-vi.mock("@/lib/supabase", () => ({
-  getSupabase: vi.fn(() => ({
-    auth: { resetPasswordForEmail },
-  })),
-}));
+// Page now does a dynamic `import("@/lib/supabase").requireBrowserSupabase()`,
+// so expose both `requireBrowserSupabase` and the legacy `getSupabase` export.
+vi.mock("@/lib/supabase", () => {
+  const client = { auth: { resetPasswordForEmail } };
+  return {
+    requireBrowserSupabase: vi.fn(() => client),
+    getSupabase: vi.fn(() => client),
+  };
+});
 
 import ForgotPasswordPage from "@/app/(auth)/forgot-password/page";
 

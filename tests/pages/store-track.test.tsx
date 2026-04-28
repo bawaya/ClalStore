@@ -34,7 +34,13 @@ describe("TrackPage", () => {
 
   it("renders the page title", () => {
     render(<TrackPage />);
-    expect(screen.getByText("تتبع الطلب")).toBeInTheDocument();
+    // Heading uses an explanatory full sentence, badge uses "تتبع الطلبات".
+    expect(
+      screen.getByRole("heading", {
+        name: "افحص حالة طلبك من شاشة واحدة واضحة",
+      })
+    ).toBeInTheDocument();
+    expect(screen.getByText("تتبع الطلبات")).toBeInTheDocument();
   });
 
   it("renders the order ID input", () => {

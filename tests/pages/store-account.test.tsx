@@ -93,7 +93,8 @@ describe("AccountPage", () => {
     render(<AccountPage />);
     expect(screen.getByText(/طلباتي/)).toBeInTheDocument();
     expect(screen.getByText(/معلوماتي/)).toBeInTheDocument();
-    expect(screen.getByText(/المفضلة/)).toBeInTheDocument();
+    // "المفضلة" appears multiple times (tab + summary card); verify at least one.
+    expect(screen.getAllByText(/المفضلة/).length).toBeGreaterThan(0);
   });
 
   it("renders logout button", () => {

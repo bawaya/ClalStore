@@ -155,6 +155,15 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      price_change_log: {
+        Row: PriceChangeLogEntry;
+        Insert: Omit<PriceChangeLogEntry, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<PriceChangeLogEntry, "id" | "created_at">>;
+        Relationships: [];
+      };
       categories: {
         Row: Category;
         Insert: Omit<Category, "id" | "created_at">;
@@ -925,6 +934,28 @@ export type AuditEntry = {
   entity_id?: string;
   details?: Record<string, any>;
   ip_address?: string;
+  created_at: string;
+}
+
+// Per-row audit trail for the /admin/import-excel "تحديث الأسعار" tool.
+// Used by app/api/admin/price-update/route.ts to support per-batch revert.
+// See supabase/migrations/20260427000001_price_change_log.sql for the canonical
+// column definitions; numeric columns come back as `string | null` from the
+// supabase-js JSON wire format, and `*_variants` mirror the products.variants
+// JSONB shape.
+export type PriceChangeLogEntry = {
+  id: string;
+  batch_id: string;
+  product_id: string;
+  action: "update" | "insert" | "revert";
+  old_price?: string | number | null;
+  new_price?: string | number | null;
+  old_monthly?: string | number | null;
+  new_monthly?: string | number | null;
+  old_variants?: any[] | null;
+  new_variants?: any[] | null;
+  admin_id?: string | null;
+  reverted_at?: string | null;
   created_at: string;
 }
 

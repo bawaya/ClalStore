@@ -37,14 +37,16 @@ describe("AuthPage (Customer OTP Login)", () => {
 
   it("renders the continue button", () => {
     render(<AuthPage />);
-    expect(screen.getByText("auth.continue")).toBeInTheDocument();
+    // Default lang ar uses literal "متابعة" (copy.continue) for the phone-step button.
+    expect(screen.getByRole("button", { name: "متابعة" })).toBeInTheDocument();
   });
 
   it("renders the progress indicator", () => {
-    const { container } = render(<AuthPage />);
-    // 3 step indicators (circles)
-    const stepCircles = container.querySelectorAll(".rounded-full");
-    expect(stepCircles.length).toBeGreaterThanOrEqual(3);
+    render(<AuthPage />);
+    // Three step cards with Arabic captions: phone, channel, code.
+    expect(screen.getByText("الهاتف")).toBeInTheDocument();
+    expect(screen.getByText("القناة")).toBeInTheDocument();
+    expect(screen.getByText("الرمز")).toBeInTheDocument();
   });
 
   it("renders store header", () => {

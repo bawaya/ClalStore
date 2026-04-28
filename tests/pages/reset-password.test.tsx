@@ -30,13 +30,40 @@ const onAuthStateChange = vi.fn((_cb: unknown) => ({
   subscription: { unsubscribe: vi.fn() },
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  getSupabase: vi.fn(() => ({
-    auth: { getSession, updateUser, onAuthStateChange },
-  })),
-}));
+// Page now does a dynamic import of `@/lib/supabase` and calls
+// `requireBrowserSupabase()`. Expose both names so any future ordering of
+// imports still works.
+vi.mock("@/lib/supabase", () => {
+  const client = { auth: { getSession, updateUser, onAuthStateChange } };
+  return {
+    requireBrowserSupabase: vi.fn(() => client),
+    getSupabase: vi.fn(() => client),
+  };
+});
 
 import ResetPasswordPage from "@/app/(auth)/reset-password/page";
+
+// Helper: pretend Supabase landed us on the page with a recovery token in
+// the URL hash. The page's effect bails out early without it.
+function setRecoveryHash() {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    writable: true,
+    value: {
+      ...window.location,
+      hash: "#access_token=tok&type=recovery&refresh_token=r",
+      href: "/reset-password",
+    },
+  });
+}
+
+function clearRecoveryHash() {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    writable: true,
+    value: { ...window.location, hash: "", href: "/reset-password" },
+  });
+}
 
 describe("ResetPasswordPage", () => {
   beforeEach(() => {
@@ -47,6 +74,7 @@ describe("ResetPasswordPage", () => {
     onAuthStateChange.mockImplementation(() => ({
       subscription: { unsubscribe: vi.fn() },
     }));
+    clearRecoveryHash();
   });
 
   it("shows 'invalid link' when no recovery session is present", async () => {
@@ -75,6 +103,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it("shows the password form when recovery session exists", async () => {
+    setRecoveryHash();
     getSession.mockResolvedValue({
       data: { session: { access_token: "tok", user: { id: "u1" } } },
     });
@@ -85,6 +114,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it("enforces password strength rules (min 8, uppercase, number, match)", async () => {
+    setRecoveryHash();
     getSession.mockResolvedValue({
       data: { session: { access_token: "tok" } },
     });
@@ -123,14 +153,15 @@ describe("ResetPasswordPage", () => {
   });
 
   it("calls supabase.auth.updateUser on submit and redirects on success", async () => {
+    setRecoveryHash();
     getSession.mockResolvedValue({
       data: { session: { access_token: "tok" } },
     });
     updateUser.mockResolvedValue({ error: null });
 
-    // Intercept navigation
+    // Intercept navigation. Keep the recovery hash so the effect proceeds.
     delete (window as any).location;
-    (window as any).location = { href: "" };
+    (window as any).location = { href: "", hash: "#access_token=tok&type=recovery" };
 
     render(<ResetPasswordPage />);
     await waitFor(() =>
@@ -151,6 +182,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it("shows 'link expired' error for expired recovery tokens", async () => {
+    setRecoveryHash();
     getSession.mockResolvedValue({
       data: { session: { access_token: "tok" } },
     });
@@ -174,6 +206,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it("subscribes to PASSWORD_RECOVERY auth event", async () => {
+    setRecoveryHash();
     getSession.mockResolvedValue({ data: { session: null } });
     render(<ResetPasswordPage />);
     await waitFor(() => {
@@ -186,6 +219,7 @@ describe("ResetPasswordPage", () => {
   // module-level caching in @supabase/ssr to keep stale state into the
   // next render and return `{session: truthy}` unexpectedly.
   it("shows loader while checking session", () => {
+    setRecoveryHash();
     getSession.mockReturnValue(new Promise(() => {})); // never resolves
     render(<ResetPasswordPage />);
     expect(screen.getByText("جاري التحقق...")).toBeInTheDocument();

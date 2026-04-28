@@ -40,6 +40,20 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (auth instanceof NextResponse) return auth;
 
+    // Fail fast with a clear 500 when Remove.bg credentials are unavailable.
+    // The library also throws when the key is missing, but doing the check
+    // here avoids running through download + buffer detection just to fail.
+    // (The integration may also store a key in the integrations table — only
+    // use the env-var fast-path when there is no DB-backed config either.)
+    if (!process.env.REMOVEBG_API_KEY) {
+      const { getIntegrationConfig } = await import("@/lib/integrations/hub");
+      const cfg = await getIntegrationConfig("image_enhance").catch(() => ({} as Record<string, unknown>));
+      const apiKey = String((cfg as { api_key?: unknown }).api_key || "").trim();
+      if (!apiKey) {
+        return apiError("REMOVEBG_API_KEY not configured", 500);
+      }
+    }
+
     const contentType = req.headers.get("content-type") || "";
 
     let resultBuffer: ArrayBuffer;

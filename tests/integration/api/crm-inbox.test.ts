@@ -80,6 +80,35 @@ vi.mock("@/lib/ai/claude", () => ({
   cleanAlternatingMessages: vi.fn((msgs: any) => msgs),
 }));
 
+// The CRM inbox AI routes now go through callConfiguredAI from @/lib/ai/runtime
+// which transparently picks the configured provider (Claude/Gemini/etc.).
+// Mock it with the same shape so the routes get a usable response.
+vi.mock("@/lib/ai/runtime", () => ({
+  callConfiguredAI: vi.fn().mockResolvedValue({
+    text: "Mock AI response",
+    json: {
+      sentiment: "positive",
+      confidence: 0.9,
+      reason: "happy",
+      summary: "Customer wants iPhone",
+      products: ["iPhone"],
+      status: "inquiring",
+      action_required: "Send quote",
+      priority: "normal",
+      language: "ar",
+      labels: [{ name: "VIP", is_existing: true }],
+      recommendations: [{ id: "prod1", reason: "Best match" }],
+    },
+    tokens: { input: 100, output: 50 },
+    duration: 500,
+  }),
+  resolveAdminAIConfig: vi.fn().mockResolvedValue({
+    provider: "anthropic",
+    apiKey: "test-key",
+    model: "claude-sonnet-4-20250514",
+  }),
+}));
+
 vi.mock("@/lib/ai/usage-tracker", () => ({
   trackAIUsage: vi.fn(),
 }));

@@ -54,69 +54,90 @@ describe("AdminShell", () => {
 
   it("shows navigation items on desktop sidebar", () => {
     render(<AdminShell><div>Content</div></AdminShell>);
-    expect(screen.getByText("المنتجات")).toBeInTheDocument();
-    expect(screen.getByText("كوبونات")).toBeInTheDocument();
-    expect(screen.getByText("بنرات")).toBeInTheDocument();
-    expect(screen.getByText("إعدادات")).toBeInTheDocument();
+    // Each nav label appears once in the sidebar nav (the active-summary header
+    // shows a different label by default since pathname is /admin → "نظرة عامة").
+    expect(screen.getByText("الهواتف والإكسسوارات")).toBeInTheDocument();
+    expect(screen.getByText("الكوبونات")).toBeInTheDocument();
+    expect(screen.getByText("صور الهيرو والبنرات")).toBeInTheDocument();
+    expect(screen.getByText("الإعدادات")).toBeInTheDocument();
   });
 
   it("highlights the active navigation item", () => {
     mockPathname = "/admin/products";
     render(<AdminShell><div>Content</div></AdminShell>);
-    const productsLink = screen.getByText("المنتجات").closest("a");
-    expect(productsLink?.style.fontWeight).toBe("700");
+    // The label appears in two spots when active (summary header + nav link); the link is the <a>.
+    const productsLinks = screen.getAllByText("الهواتف والإكسسوارات");
+    const productsLink = productsLinks
+      .map((node) => node.closest("a"))
+      .find((node): node is HTMLAnchorElement => Boolean(node));
+    expect(productsLink).toBeDefined();
+    // Active item gets a brand-tinted gradient background. The browser normalizes
+    // the rgba spacing so we just look for the brand RGB triplet.
+    const bg = productsLink?.style.background || "";
+    expect(bg).toMatch(/196,\s*16,\s*64/);
   });
 
   it("renders sidebar layout on desktop", () => {
     const { container } = render(<AdminShell><div>Content</div></AdminShell>);
     const sidebar = container.querySelector("aside");
     expect(sidebar).toBeInTheDocument();
-    expect(sidebar).toHaveClass("w-56");
+    expect(sidebar).toHaveClass("w-[21rem]");
   });
 
-  it("renders bottom tabs on mobile", () => {
+  it("renders mobile top bar with menu button", () => {
     mockUseScreen.mockReturnValue({ mobile: true, tablet: false, desktop: false, width: 375 });
     render(<AdminShell><div>Content</div></AdminShell>);
-    const nav = screen.getByRole("navigation");
-    expect(nav).toBeInTheDocument();
-    expect(nav).toHaveClass("fixed");
+    const menuButton = screen.getByRole("button", { name: "فتح القائمة" });
+    expect(menuButton).toBeInTheDocument();
   });
 
-  it("shows top bar on mobile", () => {
+  it("shows admin label on mobile top bar", () => {
     mockUseScreen.mockReturnValue({ mobile: true, tablet: false, desktop: false, width: 375 });
     render(<AdminShell><div>Content</div></AdminShell>);
-    expect(screen.getByText("لوحة الإدارة")).toBeInTheDocument();
+    expect(screen.getAllByTestId("logo").length).toBeGreaterThan(0);
   });
 
   it("shows store and CRM links on desktop sidebar", () => {
     render(<AdminShell><div>Content</div></AdminShell>);
-    expect(screen.getByText(/المتجر/)).toBeInTheDocument();
-    expect(screen.getByText(/CRM/)).toBeInTheDocument();
+    // Sidebar footer has two links to /store and /crm.
+    const storeLinks = screen.getAllByRole("link", { name: /المتجر/ });
+    expect(storeLinks.length).toBeGreaterThan(0);
+    const crmLinks = screen.getAllByRole("link", { name: /العلاقات/ });
+    expect(crmLinks.length).toBeGreaterThan(0);
   });
 
   it("links to store from sidebar", () => {
     render(<AdminShell><div>Content</div></AdminShell>);
-    const storeLink = screen.getByText(/المتجر/).closest("a");
-    expect(storeLink).toHaveAttribute("href", "/store");
+    const storeLinks = screen
+      .getAllByRole("link", { name: /المتجر/ })
+      .filter((link) => link.getAttribute("href") === "/store");
+    expect(storeLinks.length).toBeGreaterThan(0);
   });
 
   it("links to CRM from sidebar", () => {
     render(<AdminShell><div>Content</div></AdminShell>);
-    const crmLink = screen.getByText(/CRM/).closest("a");
-    expect(crmLink).toHaveAttribute("href", "/crm");
+    const crmLinks = screen
+      .getAllByRole("link", { name: /العلاقات/ })
+      .filter((link) => link.getAttribute("href") === "/crm");
+    expect(crmLinks.length).toBeGreaterThan(0);
   });
 
   it("uses correct active detection for nested paths", () => {
-    mockPathname = "/admin/commissions/analytics";
+    mockPathname = "/admin/commissions/corrections";
     render(<AdminShell><div>Content</div></AdminShell>);
-    const commissionsLink = screen.getByText("עמלות").closest("a");
-    expect(commissionsLink?.style.fontWeight).toBe("700");
+    const correctionsLinks = screen.getAllByText("طلبات التصحيح");
+    const correctionsLink = correctionsLinks
+      .map((node) => node.closest("a"))
+      .find((node): node is HTMLAnchorElement => Boolean(node));
+    expect(correctionsLink).toBeDefined();
+    const bg = correctionsLink?.style.background || "";
+    expect(bg).toMatch(/196,\s*16,\s*64/);
   });
 
-  it("renders all nav items on mobile", () => {
+  it("renders mobile shortcuts row", () => {
     mockUseScreen.mockReturnValue({ mobile: true, tablet: false, desktop: false, width: 375 });
     render(<AdminShell><div>Content</div></AdminShell>);
-    expect(screen.getByText("المنتجات")).toBeInTheDocument();
-    expect(screen.getByText("إعدادات")).toBeInTheDocument();
+    // Mobile shortcut chips include "الهواتف والإكسسوارات" (products) by default.
+    expect(screen.getByText("الهواتف والإكسسوارات")).toBeInTheDocument();
   });
 });

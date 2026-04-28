@@ -30,8 +30,24 @@ vi.mock("@/lib/admin/queries", () => ({
   getIntegrations: (...args: any[]) => mockGetIntegrations(...args),
 }));
 
-vi.mock("@/lib/supabase", () => {
-  const client = createMockSupabaseClient();
+// Seed the integrations table mock so resolveIntegrationConfigForRequest can
+// resolve masked values back to the stored config for the integration test
+// route's masked-value assertion. The provider name must match the route's
+// expected canonical label "רווחית (Rivhit)" for the payment branch.
+vi.mock("@/lib/supabase", async () => {
+  const { createMockSupabaseClient: makeClient, makeIntegration: makeIntegrationFactory } =
+    await import("@/tests/helpers");
+  const seed = makeIntegrationFactory({
+    id: "int1",
+    type: "payment",
+    provider: "רווחית (Rivhit)",
+    config: { api_key: "riv-key-123", business_id: "12345", group_private_token: "stored-token" },
+    status: "active",
+  });
+  const client = makeClient({
+    integrations: { data: [seed] },
+    integration_secrets: { data: [] },
+  });
   return {
     createServerSupabase: vi.fn(() => client),
     createAdminSupabase: vi.fn(() => client),
@@ -63,14 +79,18 @@ describe("Admin Integrations Test API — /api/admin/integrations/test", () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ status: 1, payment_url: "https://pay.test" }),
+        // Rivhit considers the request successful when Status is 0 or a URL
+        // is returned in the response body.
+        json: async () => ({ Status: 0, URL: "https://pay.test" }),
       });
 
       const req = createMockRequest({
         method: "POST",
         body: {
           type: "payment",
-          config: { api_key: "riv-key-123", business_id: "12345" },
+          // Route reads `group_private_token` (not `api_key`) for the iCredit
+          // (Rivhit) connection test.
+          config: { group_private_token: "riv-token-123", business_id: "12345" },
         },
       });
       const res = await POST(req);
@@ -87,7 +107,10 @@ describe("Admin Integrations Test API — /api/admin/integrations/test", () => {
       const req = createMockRequest({
         method: "POST",
         body: {
+          // The route now requires the explicit provider name to pick the
+          // correct upstream call (SendGrid vs Resend).
           type: "email",
+          provider: "SendGrid",
           config: { api_key: "SG.test-key" },
         },
       });
@@ -199,21 +222,30 @@ describe("Admin Integrations Test API — /api/admin/integrations/test", () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ status: 1, payment_url: "https://pay.test" }),
+        json: async () => ({ Status: 0, URL: "https://pay.test" }),
       });
 
       const req = createMockRequest({
         method: "POST",
         body: {
           type: "payment",
-          config: { api_key: "••••••••k123", business_id: "12345" },
+          config: {
+            // Send a masked sensitive value alongside non-sensitive fields.
+            // The route should use resolveIntegrationConfigForRequest to
+            // resolve the masked group_private_token from the seeded DB row
+            // and successfully complete the upstream Rivhit call.
+            group_private_token: "••••••••oken",
+            business_id: "12345",
+          },
         },
       });
       const res = await POST(req);
+      const body = await res.json();
 
       expect(res.status).toBe(200);
-      // Should have called getIntegrations to resolve masked values
-      expect(mockGetIntegrations).toHaveBeenCalled();
+      // Successful payment test confirms the resolver substituted the masked
+      // value (otherwise the route would have failed with a missing-token error).
+      expect(body.data.ok).toBe(true);
     });
 
     it("reports failure for missing api_key in payment", async () => {
