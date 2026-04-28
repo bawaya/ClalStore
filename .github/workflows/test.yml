@@ -29,6 +29,11 @@ jobs:
         run: npx tsc --noEmit
       - name: ESLint
         run: npx eslint . --max-warnings 0 || echo "::warning::ESLint has warnings (non-blocking)"
+      - name: Knip dead-code check
+        # `rules.exports`/`types` are "warn" in knip.json so this fails only on
+        # higher-signal categories: unused files, unused deps, unlisted deps,
+        # unlisted binaries, unresolved imports, duplicate exports.
+        run: npm run lint:dead
 
   unit-integration-tests:
     name: Unit & Integration Tests
