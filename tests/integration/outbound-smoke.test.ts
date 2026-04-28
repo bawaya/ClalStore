@@ -183,37 +183,33 @@ describe("outbound smoke — every guarded channel, one run, zero leaks", () => 
 });
 
 describe("outbound smoke — Mailpit live integration (skipped if not running)", () => {
-  // Skip this entire describe block when the Mailpit container isn't
-  // available — keeps the suite green for developers who haven't run
-  // docker compose up yet.
-  let mailpitAlive = false;
-  beforeAll(async () => {
-    mailpitAlive = await isMailpitRunning();
+  it("MailpitProvider delivers an email to the live Mailpit instance", async (ctx) => {
+    // Probe at run-time, not registration time, so the skip decision uses
+    // the live container state. (it.skipIf evaluates the condition when
+    // tests are registered — too early for an async probe.)
+    if (!(await isMailpitRunning())) {
+      ctx.skip();
+      return;
+    }
+
+    const { MailpitProvider } = await import("@/lib/integrations/mailpit");
+    await clearMailpit();
+
+    const provider = new MailpitProvider();
+    const result = await provider.send({
+      to: EMAIL,
+      subject: "Smoke test email",
+      html: "<p dir=\"rtl\">مرحبا — هذا اختبار من smoke suite</p>",
+    });
+
+    expect(result.success).toBe(true);
+
+    // Mailpit's storage is async; give it a moment to index.
+    await new Promise((r) => setTimeout(r, 200));
+
+    const messages = await getMailpitMessages();
+    expect(messages.length).toBeGreaterThanOrEqual(1);
+    const subject = messages.map((m) => m.Subject);
+    expect(subject).toContain("Smoke test email");
   });
-
-  it.skipIf(!mailpitAlive)(
-    "MailpitProvider delivers an email to the live Mailpit instance",
-    async () => {
-      // Lazy import after env stubs are in place.
-      const { MailpitProvider } = await import("@/lib/integrations/mailpit");
-      await clearMailpit();
-
-      const provider = new MailpitProvider();
-      const result = await provider.send({
-        to: EMAIL,
-        subject: "Smoke test email",
-        html: "<p dir=\"rtl\">مرحبا — هذا اختبار من smoke suite</p>",
-      });
-
-      expect(result.success).toBe(true);
-
-      // Mailpit's storage is async; give it a moment to index.
-      await new Promise((r) => setTimeout(r, 200));
-
-      const messages = await getMailpitMessages();
-      expect(messages.length).toBeGreaterThanOrEqual(1);
-      const subject = messages.map((m) => m.Subject);
-      expect(subject).toContain("Smoke test email");
-    },
-  );
 });
