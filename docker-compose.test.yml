@@ -1,0 +1,42 @@
+# Local-only test stack. Spin up with:
+#   docker compose -f docker-compose.test.yml up -d
+# Stop with:
+#   docker compose -f docker-compose.test.yml down
+#
+# Mailpit catches every email the app sends when MOCK_OUTBOUND=true.
+# The SMTP and HTTP ports bind to 127.0.0.1 only so neither leaks to
+# the LAN — required because the SMTP listener accepts mail without
+# authentication.
+
+services:
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: clalstore-mailpit
+    restart: unless-stopped
+    ports:
+      # Loopback only — the SMTP listener has no auth.
+      - "127.0.0.1:1025:1025" # SMTP (used by MailpitProvider)
+      - "127.0.0.1:8025:8025" # Web UI + HTTP API (open http://localhost:8025)
+    environment:
+      MP_MAX_MESSAGES: "5000"
+      MP_DATA_FILE: /data/mailpit.db
+      # Reject mail addressed to obviously real domains as a second-line guard.
+      # Empty value disables the rule, so we leave it empty by default.
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    volumes:
+      - mailpit-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --spider
+        - http://localhost:8025/api/v1/info
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  mailpit-data:

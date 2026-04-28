@@ -171,25 +171,39 @@ export async function initializeProviders() {
     registerProvider("payment", new RivhitProvider());
   }
 
-  // Email — honor the selected provider from the admin settings
-  const { integration: emailIntegration, config: emailCfg } = await getIntegrationByTypeWithSecrets("email");
-  if (emailIntegration?.status === "active") {
-    if (emailIntegration.provider === "SendGrid") {
-      if (emailCfg.api_key || process.env.SENDGRID_API_KEY) {
+  // Email — outbound guard runs first. If the guard blocks the channel
+  // (MOCK_OUTBOUND, non-prod, or sandbox-shaped key) we register Mailpit and
+  // return early so the real Resend/SendGrid path is never selected.
+  const { isOutboundBlocked } = await import("@/lib/outbound-guard");
+  const emailGuard = isOutboundBlocked("email");
+  if (emailGuard.blocked) {
+    console.warn(
+      `[PROVIDER REGISTRY] Using MailpitProvider for email — reason=${emailGuard.reason}`,
+    );
+    const { MailpitProvider } = await import("./mailpit");
+    registerProvider("email", new MailpitProvider());
+  } else {
+    // Genuine production send — honor the selected provider from admin settings.
+    const { integration: emailIntegration, config: emailCfg } =
+      await getIntegrationByTypeWithSecrets("email");
+    if (emailIntegration?.status === "active") {
+      if (emailIntegration.provider === "SendGrid") {
+        if (emailCfg.api_key || process.env.SENDGRID_API_KEY) {
+          const { SendGridProvider } = await import("./sendgrid");
+          registerProvider("email", new SendGridProvider());
+        }
+      } else if (emailIntegration.provider === "Resend") {
+        if (emailCfg.api_key || process.env.RESEND_API_KEY) {
+          const { ResendProvider } = await import("./resend");
+          registerProvider("email", new ResendProvider());
+        }
+      } else if (emailCfg.api_key || process.env.RESEND_API_KEY) {
+        const { ResendProvider } = await import("./resend");
+        registerProvider("email", new ResendProvider());
+      } else if (process.env.SENDGRID_API_KEY) {
         const { SendGridProvider } = await import("./sendgrid");
         registerProvider("email", new SendGridProvider());
       }
-    } else if (emailIntegration.provider === "Resend") {
-      if (emailCfg.api_key || process.env.RESEND_API_KEY) {
-        const { ResendProvider } = await import("./resend");
-        registerProvider("email", new ResendProvider());
-      }
-    } else if (emailCfg.api_key || process.env.RESEND_API_KEY) {
-      const { ResendProvider } = await import("./resend");
-      registerProvider("email", new ResendProvider());
-    } else if (process.env.SENDGRID_API_KEY) {
-      const { SendGridProvider } = await import("./sendgrid");
-      registerProvider("email", new SendGridProvider());
     }
   }
 
