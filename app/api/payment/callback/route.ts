@@ -12,6 +12,7 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { verifyWebhookSignature } from "@/lib/webhook-verify";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { getIntegrationConfig } from "@/lib/integrations/hub";
+import { recordPaymentOutcome } from "@/lib/analytics";
 
 export async function POST(req: NextRequest) {
   try {
@@ -126,6 +127,7 @@ export async function POST(req: NextRequest) {
         p_audit_details: { sale_id: saleId, amount, verified: false },
       });
 
+      recordPaymentOutcome({ orderId, status: "failed", amount, provider: "icredit" });
       return apiSuccess({ received: true, verified: false });
     }
 
@@ -152,6 +154,8 @@ export async function POST(req: NextRequest) {
           amount, card: cardLast4, installments: numPayments, verified,
         },
       });
+
+      recordPaymentOutcome({ orderId, status: "succeeded", amount, provider: "icredit" });
 
       try {
         // Payment confirmed — send status notification (NOT duplicate new-order notification)
@@ -189,6 +193,7 @@ export async function POST(req: NextRequest) {
         p_audit_action: `⏳ دفع معلّق (J5): ${orderId} — ₪${amount}`,
         p_audit_details: { sale_id: saleId, amount, status: "j5_hold" },
       });
+      recordPaymentOutcome({ orderId, status: "pending", amount, provider: "icredit" });
     } else {
       await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
         p_order_id: orderId,
@@ -205,6 +210,7 @@ export async function POST(req: NextRequest) {
         p_audit_action: `❌ فشل الدفع: ${orderId}`,
         p_audit_details: { sale_id: saleId, amount },
       });
+      recordPaymentOutcome({ orderId, status: "failed", amount, provider: "icredit" });
     }
 
     return apiSuccess({ received: true });

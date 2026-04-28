@@ -7,6 +7,7 @@ import { processMessage, type BotResponse } from "./engine";
 import { getIntegrationConfig } from "@/lib/integrations/hub";
 import { isOutboundBlocked } from "@/lib/outbound-guard";
 import { recordMockOutbound } from "@/lib/outbound-mock";
+import { recordWhatsAppSent } from "@/lib/analytics";
 
 const YCLOUD_API = "https://api.ycloud.com/v2";
 
@@ -72,6 +73,7 @@ export async function sendWhatsAppText(to: string, text: string, fromOverride?: 
       bodyPreview: text,
       meta: { type: "text", fromOverride: fromOverride || null },
     });
+    recordWhatsAppSent({ type: "text", blocked: true, reason: guard.reason });
     return mockWhatsAppResult(guard.reason);
   }
   const headers = await getHeaders();
@@ -93,6 +95,7 @@ export async function sendWhatsAppText(to: string, text: string, fromOverride?: 
     throw new Error(`yCloud error: ${res.status}`);
   }
 
+  recordWhatsAppSent({ type: "text", blocked: false });
   return res.json();
 }
 
@@ -113,6 +116,7 @@ export async function sendWhatsAppButtons(
       bodyPreview: bodyText,
       meta: { type: "buttons", buttons: buttons.map((b) => b.id) },
     });
+    recordWhatsAppSent({ type: "buttons", blocked: true, reason: guard.reason });
     return mockWhatsAppResult(guard.reason);
   }
   const headers = await getHeaders();
@@ -142,6 +146,7 @@ export async function sendWhatsAppButtons(
     console.error("yCloud buttons error:", err);
   }
 
+  recordWhatsAppSent({ type: "buttons", blocked: false });
   return res.json();
 }
 
@@ -162,6 +167,7 @@ export async function sendWhatsAppTemplate(
       bodyPreview: `[template: ${templateName}] params=${JSON.stringify(params)}`,
       meta: { type: "template", templateName, params },
     });
+    recordWhatsAppSent({ type: "template", blocked: true, reason: guard.reason });
     return mockWhatsAppResult(guard.reason);
   }
   const headers = await getHeaders();
@@ -186,6 +192,7 @@ export async function sendWhatsAppTemplate(
     }),
   });
 
+  recordWhatsAppSent({ type: "template", blocked: false });
   return res.json();
 }
 
@@ -206,6 +213,7 @@ export async function sendWhatsAppImage(
       bodyPreview: caption || `[image: ${imageUrl}]`,
       meta: { type: "image", imageUrl, caption: caption || null },
     });
+    recordWhatsAppSent({ type: "image", blocked: true, reason: guard.reason });
     return mockWhatsAppResult(guard.reason);
   }
   const headers = await getHeaders();
@@ -230,6 +238,7 @@ export async function sendWhatsAppImage(
     throw new Error(`yCloud image error: ${res.status}`);
   }
 
+  recordWhatsAppSent({ type: "image", blocked: false });
   return res.json();
 }
 
@@ -251,6 +260,7 @@ export async function sendWhatsAppDocument(
       bodyPreview: caption || `[document: ${filename}]`,
       meta: { type: "document", documentUrl, filename, caption: caption || null },
     });
+    recordWhatsAppSent({ type: "document", blocked: true, reason: guard.reason });
     return mockWhatsAppResult(guard.reason);
   }
   const headers = await getHeaders();
@@ -276,6 +286,7 @@ export async function sendWhatsAppDocument(
     throw new Error(`yCloud doc error: ${res.status}`);
   }
 
+  recordWhatsAppSent({ type: "document", blocked: false });
   return res.json();
 }
 
