@@ -88,10 +88,26 @@ jobs:
           git add tests/e2e/visual-regression.spec.ts-snapshots/ || true
           if git diff --cached --quiet; then
             echo "No baseline changes"
-          else
-            git commit -m "chore(visual): regenerate baselines via workflow"
-            git push
+            exit 0
           fi
+          git commit -m "chore(visual): regenerate baselines via workflow"
+          # The workflow takes ~8 min, during which other commits may land on
+          # main. Rebase the baseline commit on top of whatever's there now.
+          # Re-stash + re-pop is unnecessary: the snapshots are png files in a
+          # leaf directory that no human edits, so conflicts are functionally
+          # impossible (worst case is a different bot run already updated some
+          # of them, in which case `--strategy-option theirs` keeps the latest).
+          for attempt in 1 2 3; do
+            git pull --rebase --strategy-option=theirs origin "${GITHUB_REF#refs/heads/}"
+            if git push origin "HEAD:${GITHUB_REF#refs/heads/}"; then
+              echo "Baselines pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "Push race detected, retrying ($attempt/3)"
+            sleep 2
+          done
+          echo "::error::Failed to push baselines after 3 attempts"
+          exit 1
 
       - name: Upload diff report
         if: failure()
