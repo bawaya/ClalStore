@@ -233,7 +233,67 @@ the first place; flipping that on without fixes would block CI.
 This is queued as a follow-up to the current Phase 1 work in
 `docs/testing/AGREEMENTS.md` §6.
 
-### 5.7 Hosting the monitoring stack *(2026-04-28)*
+### 5.7 Phase 2 audit — what already shipped *(2026-04-28)*
+
+When the testing-stack plan was drafted we treated Phase 2 (E2E +
+visual + a11y + perf) as greenfield. It isn't. The repo already has
+substantial infrastructure that we'd have re-built for no reason:
+
+**E2E (`.github/workflows/test.yml`, Playwright job):**
+- 13 specs under `tests/e2e/` covering admin, auth, CRM, mobile, PWA,
+  store, tablet, website, chat-widget, i18n, performance.
+- Runs `--project=chromium-desktop` only in CI (mobile/tablet/webkit
+  defined in `playwright.config.ts` but skipped to keep CI under
+  ~5 minutes).
+- Tests block external network with a regex route fulfil so no real
+  Supabase / payment / WA / email leak.
+
+**Accessibility (`tests/e2e/{accessibility,a11y-expanded}.spec.ts`):**
+- Wired with `@axe-core/playwright`; runs WCAG 2.0 A + AA tags.
+- Asserts zero `critical` violations on `/`, `/store`, etc.
+- Runs as part of the same Playwright job (no separate workflow
+  needed).
+
+**Performance (`.github/workflows/lighthouse.yml`):**
+- Triggered on PR and `workflow_dispatch`.
+- Asserts: performance ≥ 0.7 (warn), accessibility ≥ 0.85 (error),
+  CLS ≤ 0.15 (error), LCP ≤ 4000 ms (warn), TBT ≤ 500 ms (warn),
+  FCP ≤ 2500 ms (warn).
+- 5 representative URLs, 2 runs each (median of two).
+- Reports uploaded to temporary public storage as artifacts.
+
+**Synthetic monitoring (`.github/workflows/synthetic.yml`):**
+- Cron: every 30 min against production
+  (`SYNTHETIC_BASE_URL` secret).
+- On failure: dedupes alert via `tests/monitor/alert-dedup.js` to
+  GitHub Issues + WhatsApp + email.
+- On recovery: auto-closes the alert issue.
+
+**Production smoke (`.github/workflows/smoke.yml`):**
+- Triggered on `deployment_status` + daily 06:00 UTC.
+- Targets `https://clalmobile.com` (or `SMOKE_TEST_URL` secret).
+- Same alert dedup pattern.
+
+**Mutation testing (`.github/workflows/mutation.yml`,
+`stryker.config.mjs`):**
+- Stryker against 20 high-coverage logic files (validators,
+  calculator, ledger, sync-orders, auth, sentiment, customer-timeline,
+  bot/intents, guardrails, playbook, payment-gateway, rate-limit,
+  webhook-verify, cities, brand-config, pwa/customer-linking, pwa
+  validators, supabase).
+- Thresholds: high 80, low 60, break 50.
+- Cron: weekly Sunday 04:00 UTC (mutation runs are expensive — 45 min
+  budget).
+
+**The single Phase 2 gap** identified by this audit is the visual
+regression baselines: `tests/e2e/visual-regression.spec.ts-snapshots/`
+does not exist, so the `visual-regression.yml` workflow has nothing
+to compare a PR against. The spec covers 20 pages × 3 viewports × 2
+languages = 120 PNGs. Triggering the workflow with `mode=update`
+generates them and commits them to `main` via the
+`github-actions[bot]` user (handled by the workflow's last step).
+
+### 5.8 Hosting the monitoring stack *(2026-04-28)*
 
 Hetzner CX22 VPS, €4.51 / month, frankfurt region. Hosts the future
 GlitchTip / Loki / Grafana / Uptime Kuma instances. Managed manually via
