@@ -10,6 +10,7 @@ import {
   replaysOnErrorSampleRate,
   replaysSessionSampleRate,
   scrubEvent,
+  scrubLog,
   sentryDsn,
   tracesSampleRate,
 } from "@/lib/sentry-helpers";
@@ -200,5 +201,84 @@ describe("scrubEvent()", () => {
   it("handles an empty event without throwing", () => {
     expect(() => scrubEvent({})).not.toThrow();
     expect(scrubEvent({})).toEqual({});
+  });
+});
+
+describe("scrubLog()", () => {
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "production");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("redacts phone numbers and emails inside the message string", () => {
+    const log = {
+      level: "info",
+      message: "Customer +972 50 123 4567 reached out via test@example.com",
+      attributes: {},
+    };
+    const out = scrubLog(log) as typeof log;
+    expect(out.message).not.toContain("+972");
+    expect(out.message).not.toContain("test@example.com");
+    expect(out.message).toContain("[REDACTED_PHONE]");
+    expect(out.message).toContain("[REDACTED_EMAIL]");
+  });
+
+  it("redacts PII attribute keys (customer_phone, email, etc.)", () => {
+    const log = {
+      level: "error",
+      message: "Order failed",
+      attributes: {
+        orderId: "ord_123",
+        customer_phone: "+972501234567",
+        email: "buyer@example.com",
+        amount: 199.0,
+      },
+    };
+    const out = scrubLog(log) as typeof log;
+    expect(out.attributes.customer_phone).toBe("[REDACTED]");
+    expect(out.attributes.email).toBe("[REDACTED]");
+    // Non-PII fields survive.
+    expect(out.attributes.orderId).toBe("ord_123");
+    expect(out.attributes.amount).toBe(199.0);
+  });
+
+  it("scrubs fmt-style template strings", () => {
+    const log = {
+      level: "info",
+      message: { template: "Customer +972501234567 placed order", params: [] },
+      attributes: {},
+    };
+    const out = scrubLog(log) as typeof log;
+    expect((out.message as { template: string }).template).toContain("[REDACTED_PHONE]");
+    expect((out.message as { template: string }).template).not.toContain("+972");
+  });
+
+  it("drops debug/trace logs in production", () => {
+    expect(scrubLog({ level: "debug", message: "noise" })).toBeNull();
+    expect(scrubLog({ level: "trace", message: "noise" })).toBeNull();
+    // info / warn / error / fatal are kept
+    expect(scrubLog({ level: "info", message: "x" })).not.toBeNull();
+    expect(scrubLog({ level: "warn", message: "x" })).not.toBeNull();
+    expect(scrubLog({ level: "error", message: "x" })).not.toBeNull();
+    expect(scrubLog({ level: "fatal", message: "x" })).not.toBeNull();
+  });
+
+  it("keeps debug/trace in development", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    expect(scrubLog({ level: "debug", message: "useful in dev" })).not.toBeNull();
+    expect(scrubLog({ level: "trace", message: "useful in dev" })).not.toBeNull();
+  });
+
+  it("returns the same reference when not dropped (caller's type preserved)", () => {
+    const log = { level: "info", message: "x", attributes: { ok: 1 } };
+    const out = scrubLog(log);
+    expect(out).toBe(log);
+  });
+
+  it("handles an empty log without throwing", () => {
+    expect(() => scrubLog({})).not.toThrow();
+    expect(scrubLog({ level: "info" })).not.toBeNull();
   });
 });

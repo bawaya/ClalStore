@@ -11,7 +11,7 @@
 // =====================================================
 
 import * as Sentry from "@sentry/nextjs";
-import { scrubEvent, sentryDsn, tracesSampleRate } from "@/lib/sentry-helpers";
+import { scrubEvent, scrubLog, sentryDsn, tracesSampleRate } from "@/lib/sentry-helpers";
 
 Sentry.init({
   dsn: sentryDsn(),
@@ -19,8 +19,19 @@ Sentry.init({
   // Sample rate is dynamic — see lib/sentry-helpers.ts.
   tracesSampleRate: tracesSampleRate(),
 
-  // Send our own structured logs to Sentry.
+  // Enable Sentry Logs (structured logs, separate from Issues). Forwards:
+  //   1. `Sentry.logger.info/warn/error/...` calls from app code, AND
+  //   2. `console.warn` / `console.error` from anywhere in the codebase
+  //      (~93 call sites in app/api/) via consoleLoggingIntegration below.
+  // PII is scrubbed in `beforeSendLog` before any log leaves the runtime.
   enableLogs: true,
+
+  integrations: [
+    // Forward console.warn / console.error to Sentry Logs. We deliberately
+    // skip "log" because most of our `console.log` calls are noisy /
+    // diagnostic and would burn the Logs free-tier quota.
+    Sentry.consoleLoggingIntegration({ levels: ["warn", "error"] }),
+  ],
 
   // Privacy: never let the SDK enrich events with PII automatically. The
   // beforeSend hooks below scrub anything that slipped in via the request
@@ -33,5 +44,8 @@ Sentry.init({
   },
   beforeSendTransaction(event) {
     return scrubEvent(event);
+  },
+  beforeSendLog(log) {
+    return scrubLog(log);
   },
 });

@@ -13,6 +13,7 @@ import {
   replaysOnErrorSampleRate,
   replaysSessionSampleRate,
   scrubEvent,
+  scrubLog,
   sentryDsn,
   tracesSampleRate,
 } from "@/lib/sentry-helpers";
@@ -20,8 +21,16 @@ import {
 Sentry.init({
   dsn: sentryDsn(),
 
-  // Replay only — see lib/sentry-helpers.ts for sample-rate rationale.
-  integrations: [Sentry.replayIntegration()],
+  integrations: [
+    // Replay only — see lib/sentry-helpers.ts for sample-rate rationale.
+    Sentry.replayIntegration(),
+    // Forward `console.warn` / `console.error` to Sentry Logs. Browser
+    // code uses console.error in error boundaries and fetch handlers;
+    // routing those to Sentry's Logs tab gives us trace-correlated
+    // visibility without per-callsite changes. PII scrubbed in
+    // beforeSendLog.
+    Sentry.consoleLoggingIntegration({ levels: ["warn", "error"] }),
+  ],
 
   tracesSampleRate: tracesSampleRate(),
   enableLogs: true,
@@ -39,6 +48,9 @@ Sentry.init({
   },
   beforeSendTransaction(event) {
     return scrubEvent(event);
+  },
+  beforeSendLog(log) {
+    return scrubLog(log);
   },
 });
 

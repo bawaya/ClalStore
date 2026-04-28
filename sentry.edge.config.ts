@@ -10,12 +10,19 @@
 // =====================================================
 
 import * as Sentry from "@sentry/nextjs";
-import { scrubEvent, sentryDsn, tracesSampleRate } from "@/lib/sentry-helpers";
+import { scrubEvent, scrubLog, sentryDsn, tracesSampleRate } from "@/lib/sentry-helpers";
 
 Sentry.init({
   dsn: sentryDsn(),
   tracesSampleRate: tracesSampleRate(),
+
+  // Enable Sentry Logs — see sentry.server.config.ts for the rationale
+  // and the consoleLoggingIntegration story.
   enableLogs: true,
+
+  integrations: [
+    Sentry.consoleLoggingIntegration({ levels: ["warn", "error"] }),
+  ],
 
   // Privacy — see sentry.server.config.ts for rationale.
   sendDefaultPii: false,
@@ -25,5 +32,8 @@ Sentry.init({
   },
   beforeSendTransaction(event) {
     return scrubEvent(event);
+  },
+  beforeSendLog(log) {
+    return scrubLog(log);
   },
 });

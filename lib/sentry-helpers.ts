@@ -156,3 +156,62 @@ export function scrubEvent<E>(event: E): E {
 
   return event;
 }
+
+/**
+ * `beforeSendLog` scrubber — runs on every Sentry Log record (the new
+ * structured-logs product, separate from Issues). Logs go through:
+ *   1. `Sentry.logger.info/warn/error/...` direct calls in app code, AND
+ *   2. `consoleLoggingIntegration` which forwards `console.warn` /
+ *      `console.error` to Sentry as logs.
+ *
+ * The forwarding is the dangerous one: ClalMobile has ~93 `console.error`
+ * call sites and some include user-supplied data
+ * (`console.error("Order failed for", customer.phone, ...)`). Without a
+ * scrubber, all that PII would land in Sentry's Logs tab, violating
+ * Israeli Privacy Protection Law Amendment 13 (`AGREEMENTS.md` §5.3).
+ *
+ * Returns:
+ *   - the (mutated) log to forward it, or
+ *   - `null` to drop the log entirely (we drop `debug`/`trace` levels in
+ *     production to stay under the Logs free quota).
+ */
+export function scrubLog<L>(log: L): L | null {
+  // Loose typing — Sentry's internal Log type isn't reliably exported.
+  // We treat the input as a record-of-anything and only touch known keys.
+  const l = log as {
+    level?: string;
+    message?: string | { template?: string; params?: unknown[] };
+    body?: string;
+    attributes?: Record<string, unknown>;
+    severity_text?: string;
+  };
+
+  // Drop debug/trace logs in production — they're too verbose for the
+  // 100K-logs / month free tier and not actionable from a dashboard.
+  if (process.env.NODE_ENV === "production") {
+    const lvl = (l.level ?? l.severity_text ?? "").toLowerCase();
+    if (lvl === "debug" || lvl === "trace") return null;
+  }
+
+  // Scrub the message string (or fmt template) so phone numbers and
+  // emails accidentally interpolated into a log message don't leak.
+  if (typeof l.message === "string") {
+    l.message = l.message.replace(PHONE_RX, "[REDACTED_PHONE]").replace(EMAIL_RX, "[REDACTED_EMAIL]");
+  } else if (l.message && typeof l.message === "object" && typeof l.message.template === "string") {
+    l.message.template = l.message.template
+      .replace(PHONE_RX, "[REDACTED_PHONE]")
+      .replace(EMAIL_RX, "[REDACTED_EMAIL]");
+  }
+  if (typeof l.body === "string") {
+    l.body = l.body.replace(PHONE_RX, "[REDACTED_PHONE]").replace(EMAIL_RX, "[REDACTED_EMAIL]");
+  }
+
+  // Attributes are key/value pairs the engineer attached to the log
+  // (e.g. `{ orderId, customerPhone }`). Run them through the same
+  // redact() that powers scrubEvent.
+  if (l.attributes) {
+    l.attributes = redact(l.attributes) as typeof l.attributes;
+  }
+
+  return log;
+}
