@@ -50,7 +50,8 @@ vi.mock("@/lib/supabase", async () => {
     id: "int1",
     type: "payment",
     provider: "rivhit",
-    config: { api_key: "sk-test-longkey123", business_id: "12345" },
+    // Fake fixture; gitleaks flags `sk-` style strings, so use a neutral placeholder.
+    config: { api_key: "FAKE_TEST_API_KEY", business_id: "12345" },
     status: "active",
   });
   const client = makeClient({
