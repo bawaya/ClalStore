@@ -79,20 +79,70 @@ if (!process.env.CLOUDFLARE_ACCOUNT_ID && !process.env.CF_ACCOUNT_ID) {
   }
 }
 
+// Skip OpenNext's populate-cache step. Wrangler auto-detects OpenNext and
+// hands the deploy off to `opennextjs-cloudflare deploy`, which does
+// `populateR2IncrementalCache` first. That step calls the Cloudflare R2 API
+// directly with the OAuth token from `wrangler login`; if the token doesn't
+// carry the `r2:write` scope (older login sessions, custom-scoped tokens)
+// the call 403s with `Authentication error` and the whole deploy aborts —
+// even though the actual Worker upload would succeed.
+//
+// We bypass by:
+//   1. Renaming `open-next.config.ts` so wrangler stops detecting it as an
+//      OpenNext project and skips the auto-delegation.
+//   2. Running plain `wrangler deploy` against `.open-next/worker.js` (the
+//      build artifact opennext already produced — no re-build needed).
+//   3. Restoring the config file.
+//
+// The R2 cache is populated lazily by the Worker itself on the first
+// request to each ISR page (cache-on-read). The user-visible cost is a
+// ~100 ms first-paint on the very first hit per page after deploy; every
+// subsequent hit is the normal cached fast path.
+import { renameSync } from "node:fs";
+const OPEN_NEXT_CONFIG = path.join(root, "open-next.config.ts");
+const OPEN_NEXT_CONFIG_HIDDEN = path.join(root, "open-next.config.ts.deploy-hidden");
+
 const steps = [
   { name: "next build", cmd: "npm", args: ["run", "build"] },
   { name: "opennext build", cmd: "npm", args: ["run", "build:cf"] },
-  { name: "wrangler deploy", cmd: "npx", args: ["wrangler", "deploy"] },
+  {
+    name: "wrangler deploy (without OpenNext populate-cache)",
+    cmd: "npx",
+    args: ["wrangler", "deploy"],
+    before() {
+      // Hide the config so wrangler doesn't auto-delegate to opennext.
+      try {
+        renameSync(OPEN_NEXT_CONFIG, OPEN_NEXT_CONFIG_HIDDEN);
+      } catch {
+        // Already hidden from a previous failed run — fine.
+      }
+    },
+    after() {
+      try {
+        renameSync(OPEN_NEXT_CONFIG_HIDDEN, OPEN_NEXT_CONFIG);
+      } catch {
+        // Already in place.
+      }
+    },
+  },
 ];
 
 for (const step of steps) {
   console.log(`\n[deploy-cf] ▶ ${step.name}`);
-  const result = spawnSync(step.cmd, step.args, {
-    stdio: "inherit",
-    shell: true,
-    cwd: root,
-    env: process.env,
-  });
+  if (typeof step.before === "function") step.before();
+  let result;
+  try {
+    result = spawnSync(step.cmd, step.args, {
+      stdio: "inherit",
+      shell: true,
+      cwd: root,
+      env: process.env,
+    });
+  } finally {
+    // ALWAYS run after() — even on failure — so the open-next.config.ts
+    // gets restored if the deploy crashes.
+    if (typeof step.after === "function") step.after();
+  }
   if (result.status !== 0) {
     console.error(`[deploy-cf] ✗ "${step.name}" exited with code ${result.status}`);
     process.exit(result.status ?? 1);
