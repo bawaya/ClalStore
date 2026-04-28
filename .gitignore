@@ -88,3 +88,6 @@ postman/*.local.postman_environment.json
 PRIVATE_*.md
 *_SECRETS.md
 *_CREDENTIALS.md
+
+# Outbound mock log (recordMockOutbound writes here when MOCK_OUTBOUND=true)
+logs/outbound/
