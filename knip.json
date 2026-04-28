@@ -1,0 +1,27 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "scripts/**/*.{ts,js,mjs}",
+    "tests/**/*.{ts,tsx}",
+    "stryker.config.mjs"
+  ],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "lib/**/*.{ts,tsx}",
+    "types/**/*.{ts,tsx}",
+    "scripts/**/*.{ts,js,mjs}",
+    "tests/**/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "prototypes/**"
+  ],
+  "ignoreDependencies": [
+    "axe-core",
+    "lighthouse",
+    "puppeteer"
+  ],
+  "ignoreBinaries": [
+    "supabase"
+  ]
+}

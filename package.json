@@ -14,6 +14,8 @@
     "deploy:cf": "npm run build && npm run build:cf && npx wrangler deploy",
     "start": "next start",
     "lint": "next lint",
+    "lint:dead": "knip",
+    "lint:dead:strict": "knip --strict",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
     "test": "vitest",
@@ -56,8 +58,10 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.2",
+    "@next/env": "^16.2.4",
     "@opennextjs/cloudflare": "^1.18.0",
     "@playwright/test": "^1.59.1",
+    "@stryker-mutator/api": "^9.6.1",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@testing-library/dom": "^10.0.0",
@@ -71,9 +75,12 @@
     "@vitest/coverage-v8": "^4.0.18",
     "autoprefixer": "^10.4.0",
     "axe-core": "^4.11.3",
+    "dotenv": "^17.4.2",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.1",
+    "glob": "^13.0.6",
     "jsdom": "^28.1.0",
+    "knip": "^6.7.0",
     "lighthouse": "^12.8.2",
     "nodemailer": "^8.0.7",
     "postcss": "^8.4.0",
@@ -85,6 +92,7 @@
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "vitest": "^4.0.18",
+    "wait-on": "^9.0.5",
     "wrangler": "^4.78.0"
   }
 }

@@ -168,7 +168,41 @@ To stay under the Free Tier ceiling and leave headroom for spike days:
 happens we always want the surrounding session, capped only by the much
 lower session sample rate.
 
-### 5.5 Hosting the monitoring stack *(2026-04-28)*
+### 5.5 Static analysis — Knip first, Biome deferred *(2026-04-28)*
+
+The original plan in §3 paired **Biome + Knip** as the static-analysis
+duo. After installing them on the live repo we revised the order:
+
+**Knip — adopted now.** It catches what ESLint cannot: orphan files,
+unused exports, unlisted dependencies, dead binaries. The first run on
+ClalMobile produced a high-signal report (26 unused files / 99 unused
+exports / 5 unlisted runtime deps), all worth triaging. Knip ships as a
+single dev-dependency, no formatting churn, no migration cost.
+`npm run lint:dead` is the daily driver; `npm run lint:dead:strict`
+exits non-zero so it can become a CI gate later.
+
+**Biome — deferred.** The migration cost outweighs the win at this
+stage:
+
+- `prettier-plugin-tailwindcss` (the class-sorter ClalMobile depends on
+  for its design system) has no Biome-native equivalent in v2. We would
+  have to keep Prettier around just for that plugin, which defeats the
+  "single tool" benefit.
+- Mass-formatting the entire repo to match Biome's defaults touches
+  thousands of lines and would dwarf the "real" cleanup commits we
+  actually want history to highlight.
+- Existing ESLint + Prettier setup is healthy; the speed win Biome
+  offers is real but not urgent.
+
+**Re-evaluation trigger:** when one of the following is true, we
+revisit:
+
+- `prettier-plugin-tailwindcss` ships an official Biome plugin (or
+  Biome merges Tailwind class-sorting natively).
+- ESLint or Prettier imposes a lint stage longer than ~30s on full repo.
+- We add a second linter to fight a rule ESLint's plugins can't express.
+
+### 5.6 Hosting the monitoring stack *(2026-04-28)*
 
 Hetzner CX22 VPS, €4.51 / month, frankfurt region. Hosts the future
 GlitchTip / Loki / Grafana / Uptime Kuma instances. Managed manually via
@@ -209,6 +243,7 @@ SSH for now; a `docker-compose` will land with Phase 5.
 | 2026-04-28 | `@sentry/nextjs` over `@sentry/cloudflare` | App Router + Replay outweigh the Workers-native SDK. |
 | 2026-04-28 | `sendDefaultPii: false` + `beforeSend` scrubber | Amendment 13 compliance. |
 | 2026-04-28 | Sample rates 0.1 / 0.01 in production | Stay under Free Tier; keep error replays at 100%. |
+| 2026-04-28 | Knip adopted, Biome deferred | High-signal dead-code report now; Biome gates on Tailwind class-sort plugin. |
 
 ---
 
@@ -223,3 +258,5 @@ SSH for now; a `docker-compose` will land with Phase 5.
 - `sentry.server.config.ts`, `sentry.edge.config.ts`,
   `instrumentation-client.ts` — runtime initialisers.
 - `lib/outbound-guard.ts` — outbound message gate referenced in §2.
+- `knip.json` — Knip configuration; the dead-code lint runs via
+  `npm run lint:dead`.
