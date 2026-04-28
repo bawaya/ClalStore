@@ -193,29 +193,6 @@ describe("middleware", () => {
   });
 
   // =========================================================================
-  // Open CORS for commission endpoints
-  // =========================================================================
-  describe("open CORS paths", () => {
-    it("returns 204 on OPTIONS for commission summary when no allowed origins configured", async () => {
-      const req = createMockRequest("/api/admin/commissions/summary", {
-        method: "OPTIONS",
-        headers: { origin: "https://some-app.com" },
-      });
-      const res = await middleware(req);
-      expect(res.status).toBe(204);
-    });
-
-    it("passes through GET for commission dashboard", async () => {
-      const req = createMockRequest("/api/admin/commissions/dashboard", {
-        headers: { origin: "https://some-app.com" },
-      });
-      const res = await middleware(req);
-      // Should pass through (NextResponse.next())
-      expect(res).toBeDefined();
-    });
-  });
-
-  // =========================================================================
   // Rate limiting
   // =========================================================================
   describe("rate limiting", () => {

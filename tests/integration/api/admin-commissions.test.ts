@@ -144,8 +144,6 @@ describe("Admin Commissions API", () => {
     (createAdminSupabase as any).mockImplementation(() => client);
     (createServerSupabase as any).mockImplementation(() => client);
     (requireAdmin as any).mockResolvedValue(hoisted.adminUser);
-    // Reset env for bearer token tests
-    process.env.COMMISSION_API_TOKEN = "test-token-123";
   });
 
   // ═══════════════════════════════════════════════
@@ -156,7 +154,6 @@ describe("Admin Commissions API", () => {
       it("returns paginated sales", async () => {
         const req = createMockRequest({
           url: "/api/admin/commissions/sales",
-          headers: { authorization: "Bearer test-token-123" },
         });
         const res = await salesGET(req);
         const body = await res.json();
@@ -172,9 +169,7 @@ describe("Admin Commissions API", () => {
         );
         const req = createMockRequest({
           url: "/api/admin/commissions/sales",
-          headers: { authorization: "Bearer wrong-token" },
         });
-        process.env.COMMISSION_API_TOKEN = "correct-token";
         const res = await salesGET(req);
 
         expect(res.status).toBe(401);
@@ -185,7 +180,6 @@ describe("Admin Commissions API", () => {
       it("creates a line sale", async () => {
         const req = createMockRequest({
           method: "POST",
-          headers: { authorization: "Bearer test-token-123" },
           body: {
             sale_type: "line",
             sale_date: "2026-04-15",
@@ -203,7 +197,6 @@ describe("Admin Commissions API", () => {
       it("returns 400 when sale_type missing", async () => {
         const req = createMockRequest({
           method: "POST",
-          headers: { authorization: "Bearer test-token-123" },
           body: { sale_date: "2026-04-15", package_price: 59 },
         });
         const res = await salesPOST(req);
@@ -214,7 +207,6 @@ describe("Admin Commissions API", () => {
       it("returns 400 when sale_type is invalid", async () => {
         const req = createMockRequest({
           method: "POST",
-          headers: { authorization: "Bearer test-token-123" },
           body: { sale_type: "invalid", sale_date: "2026-04-15", package_price: 59 },
         });
         const res = await salesPOST(req);
@@ -225,7 +217,6 @@ describe("Admin Commissions API", () => {
       it("returns 400 when package_price missing for line sale", async () => {
         const req = createMockRequest({
           method: "POST",
-          headers: { authorization: "Bearer test-token-123" },
           body: { sale_type: "line", sale_date: "2026-04-15" },
         });
         const res = await salesPOST(req);
@@ -238,7 +229,6 @@ describe("Admin Commissions API", () => {
       it("updates a sale record", async () => {
         const req = createMockRequest({
           method: "PUT",
-          headers: { authorization: "Bearer test-token-123" },
           body: { id: 1, customer_name: "Updated" },
         });
         const res = await salesPUT(req);
@@ -251,7 +241,6 @@ describe("Admin Commissions API", () => {
       it("returns 400 when id is missing", async () => {
         const req = createMockRequest({
           method: "PUT",
-          headers: { authorization: "Bearer test-token-123" },
           body: { customer_name: "No ID" },
         });
         const res = await salesPUT(req);
@@ -266,7 +255,6 @@ describe("Admin Commissions API", () => {
           method: "DELETE",
           url: "/api/admin/commissions/sales",
           searchParams: { id: "1" },
-          headers: { authorization: "Bearer test-token-123" },
         });
         const res = await salesDELETE(req);
         const body = await res.json();
@@ -279,7 +267,6 @@ describe("Admin Commissions API", () => {
         const req = createMockRequest({
           method: "DELETE",
           url: "/api/admin/commissions/sales",
-          headers: { authorization: "Bearer test-token-123" },
         });
         const res = await salesDELETE(req);
 
@@ -504,7 +491,6 @@ describe("Admin Commissions API", () => {
         (requireAdmin as any).mockResolvedValue(
           NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
         );
-        process.env.COMMISSION_API_TOKEN = "";
         const req = createMockRequest({
           url: "/api/admin/commissions/dashboard",
         });

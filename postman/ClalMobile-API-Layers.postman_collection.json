@@ -4473,44 +4473,6 @@
           ]
         },
         {
-          "name": "GET /api/admin/commissions/employees/list",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{commissionApiToken}}",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/api/admin/commissions/employees/list",
-            "description": "مُولّد آلي. عيّن متغيّرات البيئة. للبِدن الحقيقي راجع Zod/المعالج في route المقابلة."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const code = pm.response.code;",
-                  "pm.test('No internal 500/502 (يُقبل 503 لخدمات اختيارية بدون مفاتيح مثل product-assistant)', function () {",
-                  "  pm.expect([500, 502].includes(code)).to.be.false;",
-                  "});",
-                  "const ct = (pm.response.headers.get('content-type') || '');",
-                  "if (ct.includes('application/json')) {",
-                  "  try {",
-                  "    const j = pm.response.json();",
-                  "    pm.test('JSON root is object or array', function () {",
-                  "      pm.expect(j).to.satisfy((x) => x !== null && typeof x === 'object');",
-                  "    });",
-                  "  } catch (e) { pm.test('JSON parseable', function () { pm.expect.fail('body not valid JSON'); }); }",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "name": "GET /api/admin/commissions/export",
           "request": {
             "method": "GET",
@@ -4612,44 +4574,6 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/commissions/sanctions",
-            "description": "مُولّد آلي. عيّن متغيّرات البيئة. للبِدن الحقيقي راجع Zod/المعالج في route المقابلة."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const code = pm.response.code;",
-                  "pm.test('No internal 500/502 (يُقبل 503 لخدمات اختيارية بدون مفاتيح مثل product-assistant)', function () {",
-                  "  pm.expect([500, 502].includes(code)).to.be.false;",
-                  "});",
-                  "const ct = (pm.response.headers.get('content-type') || '');",
-                  "if (ct.includes('application/json')) {",
-                  "  try {",
-                  "    const j = pm.response.json();",
-                  "    pm.test('JSON root is object or array', function () {",
-                  "      pm.expect(j).to.satisfy((x) => x !== null && typeof x === 'object');",
-                  "    });",
-                  "  } catch (e) { pm.test('JSON parseable', function () { pm.expect.fail('body not valid JSON'); }); }",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /api/admin/commissions/summary",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{commissionApiToken}}",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/api/admin/commissions/summary",
             "description": "مُولّد آلي. عيّن متغيّرات البيئة. للبِدن الحقيقي راجع Zod/المعالج في route المقابلة."
           },
           "event": [
@@ -10805,44 +10729,6 @@
           ]
         },
         {
-          "name": "GET /api/admin/commissions/employees/list",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{commissionApiToken}}",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/api/admin/commissions/employees/list",
-            "description": "مُولّد آلي. عيّن متغيّرات البيئة. للبِدن الحقيقي راجع Zod/المعالج في route المقابلة."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const code = pm.response.code;",
-                  "pm.test('No internal 500/502 (يُقبل 503 لخدمات اختيارية بدون مفاتيح مثل product-assistant)', function () {",
-                  "  pm.expect([500, 502].includes(code)).to.be.false;",
-                  "});",
-                  "const ct = (pm.response.headers.get('content-type') || '');",
-                  "if (ct.includes('application/json')) {",
-                  "  try {",
-                  "    const j = pm.response.json();",
-                  "    pm.test('JSON root is object or array', function () {",
-                  "      pm.expect(j).to.satisfy((x) => x !== null && typeof x === 'object');",
-                  "    });",
-                  "  } catch (e) { pm.test('JSON parseable', function () { pm.expect.fail('body not valid JSON'); }); }",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "name": "GET /api/admin/commissions/export",
           "request": {
             "method": "GET",
@@ -10944,44 +10830,6 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/commissions/sanctions",
-            "description": "مُولّد آلي. عيّن متغيّرات البيئة. للبِدن الحقيقي راجع Zod/المعالج في route المقابلة."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const code = pm.response.code;",
-                  "pm.test('No internal 500/502 (يُقبل 503 لخدمات اختيارية بدون مفاتيح مثل product-assistant)', function () {",
-                  "  pm.expect([500, 502].includes(code)).to.be.false;",
-                  "});",
-                  "const ct = (pm.response.headers.get('content-type') || '');",
-                  "if (ct.includes('application/json')) {",
-                  "  try {",
-                  "    const j = pm.response.json();",
-                  "    pm.test('JSON root is object or array', function () {",
-                  "      pm.expect(j).to.satisfy((x) => x !== null && typeof x === 'object');",
-                  "    });",
-                  "  } catch (e) { pm.test('JSON parseable', function () { pm.expect.fail('body not valid JSON'); }); }",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /api/admin/commissions/summary",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{commissionApiToken}}",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/api/admin/commissions/summary",
             "description": "مُولّد آلي. عيّن متغيّرات البيئة. للبِدن الحقيقي راجع Zod/المعالج في route المقابلة."
           },
           "event": [

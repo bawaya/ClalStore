@@ -8,33 +8,13 @@ import {
   getCommissionTarget,
   resolveCommissionEmployeeFilter,
 } from "@/lib/commissions/ledger";
-import { corsHeaders } from "@/lib/commissions/cors";
 import { countWorkingDays, lastDayOfMonth } from "@/lib/commissions/date-utils";
-import { safeTokenEqual } from "@/lib/commissions/safe-compare";
-
-// OPTIONS preflight — handled by middleware OPEN_CORS_PATHS, but keep as fallback
-export async function OPTIONS(req: NextRequest) {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders(req.headers.get("origin")),
-  });
-}
 
 export async function GET(req: NextRequest) {
-  // Dual auth: bearer token (local app) OR admin session (admin panel)
-  const authHeader = req.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const validToken = process.env.COMMISSION_API_TOKEN;
-
-  let authed = false;
-  if (safeTokenEqual(bearerToken, validToken)) {
-    authed = true;
-  } else {
-    const auth = await requireAdmin(req);
-    if (!(auth instanceof NextResponse)) authed = true;
-    else return auth; // Return 401/403 from requireAdmin
-  }
-  if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Cookie-only auth — the legacy bearer-token path was decommissioned
+  // along with the standalone HOT Mobile commission HTML apps.
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
 
   const db = createAdminSupabase();
   if (!db) return apiError("DB unavailable", 500);

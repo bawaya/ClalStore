@@ -36,7 +36,7 @@ This document is generated from source. For conceptual descriptions see
   - `employee` — PWA sales agent session, checked via `requireEmployee`
   - `customer` — customer session (cookie), checked via customer auth helper
   - `public` — no guard; rate-limited only
-  - `service` — bearer token in `Authorization` header (`COMMISSION_API_TOKEN`, `CRON_SECRET`, or provider HMAC)
+  - `service` — bearer token in `Authorization` header (`CRON_SECRET` or provider HMAC)
   - `cron` — `Authorization: Bearer $CRON_SECRET` only
 
 ---
@@ -107,15 +107,13 @@ messages.
 
 | Path | Methods | Auth | Purpose |
 |---|---|---|---|
-| `/api/admin/commissions/dashboard` | GET | admin or service (Bearer) | Monthly dashboard with pace tracking. |
-| `/api/admin/commissions/summary` | GET | admin or service (Bearer) | Lightweight summary (external HTML app). |
+| `/api/admin/commissions/dashboard` | GET | admin | Monthly dashboard with pace tracking. |
 | `/api/admin/commissions/analytics` | GET | admin | Multi-month analytics + trend lines. |
-| `/api/admin/commissions/sales` | GET, POST, PUT, DELETE | admin or service | CRUD sales entries. |
+| `/api/admin/commissions/sales` | GET, POST, PUT, DELETE | admin | CRUD sales entries. |
 | `/api/admin/commissions/targets` | GET, POST, PATCH | admin | Monthly employee targets. |
 | `/api/admin/commissions/sanctions` | GET, POST, DELETE | admin | Sanctions (deductions). |
 | `/api/admin/commissions/profiles` | GET, POST, DELETE | admin | Per-employee commission profiles (rates, caps). |
 | `/api/admin/commissions/employees` | GET, POST, PATCH, DELETE | admin | Manage employees inside commissions module. |
-| `/api/admin/commissions/employees/list` | GET | service (Bearer) | Read-only employee list for external apps. |
 | `/api/admin/corrections` | GET | admin (`commissions:manage`) | Cross-employee list of correction requests (filter by status). |
 | `/api/admin/corrections/[id]` | PUT | admin (`commissions:manage`) | Respond to a pending request. Transitions `pending → {approved, rejected, resolved}`, adds an `employee_activity_log` row, emits `audit_log`. Already-resolved returns `409`. |
 | `/api/admin/announcements` | GET, POST | admin (POST: `settings:manage`) | List all broadcasts with readCount/totalRecipients, or publish a new one (priority + target + optional expiry). |
@@ -565,9 +563,6 @@ See [`docs/SECURITY.md`](./SECURITY.md) for the full model. Summary:
   customer-facing routes rely on RLS via the session client. See
   [migrations/...-rls-hardening.sql](../supabase/migrations/) and
   [`tests/rls-contract`](../tests/) for the contract.
-- **Bearer endpoints**: a limited set of commission endpoints accept
-  `Authorization: Bearer $COMMISSION_API_TOKEN` for an external HTML app.
-  These are read-mostly and scoped; rotate the token in `.env` to revoke.
 - **Cron endpoints**: authenticated by `CRON_SECRET` bearer only. Never log
   this token. Missing env var returns `503` (not `401`) to make
   misconfiguration obvious in staging.

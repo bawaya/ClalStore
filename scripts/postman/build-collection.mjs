@@ -254,26 +254,16 @@ function defaultBodyFor(clean, method) {
  * @param {string} method
  * @param {string} pathRaw
  */
-// Endpoints that authenticate via separate bearer tokens rather than the
-// admin session cookie. Hit list mirrors the route handlers' explicit
-// COMMISSION_API_TOKEN check.
-const COMMISSION_TOKEN_PATHS = new Set([
-  "/api/admin/commissions/employees/list",
-  "/api/admin/commissions/summary",
-]);
-
 function makeRequest(method, pathRaw) {
   const clean = pathRaw.replace(/\/$/, "");
   const needsJsonBody = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
   const isHealth = clean === "/api/health";
-  const usesCommissionToken = COMMISSION_TOKEN_PATHS.has(clean);
   const pathResolved = toUrlPath(pathRaw);
   const raw = `{{baseUrl}}${pathResolved}${querySuffix(clean, method)}`;
 
   const headers = {};
   if (needsJsonBody) headers["Content-Type"] = "application/json";
   if (isHealth) headers["Authorization"] = "Bearer {{healthCheckToken}}";
-  if (usesCommissionToken) headers["Authorization"] = "Bearer {{commissionApiToken}}";
 
   const headerArr = Object.entries(headers).map(([key, value]) => ({ key, value, type: "text" }));
 

@@ -1,3 +1,10 @@
+// =====================================================
+// ClalMobile — Commission Sales CRUD
+// Admin cookie session only.
+// (The bearer-token path for the standalone HOT Mobile HTML apps was
+// decommissioned together with those apps — see the cleanup commit.)
+// =====================================================
+
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase";
@@ -8,31 +15,7 @@ import {
   resolveCommissionEmployeeFilter,
   resolveLinkedAppUserId,
 } from "@/lib/commissions/ledger";
-import { corsHeaders as sharedCorsHeaders } from "@/lib/commissions/cors";
-import { safeTokenEqual } from "@/lib/commissions/safe-compare";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-// Local wrapper preserves the DELETE/PUT/POST methods list for this route.
-function corsHeaders(origin?: string | null): Record<string, string> {
-  return sharedCorsHeaders(origin, {
-    methods: "GET, POST, PUT, DELETE, OPTIONS",
-  });
-}
-
-export async function OPTIONS(req: NextRequest) {
-  return new NextResponse(null, { status: 204, headers: corsHeaders(req.headers.get("origin")) });
-}
-
-/** Dual auth: bearer COMMISSION_API_TOKEN OR admin cookie session */
-async function authenticate(req: NextRequest): Promise<boolean> {
-  const authHeader = req.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const validToken = process.env.COMMISSION_API_TOKEN;
-  if (safeTokenEqual(token, validToken)) return true;
-
-  const result = await requireAdmin(req);
-  return !(result instanceof NextResponse);
-}
 
 async function getEmployeeProfile(db: SupabaseClient, employeeId: string): Promise<EmployeeProfile | null> {
   const { data } = await db
@@ -50,8 +33,8 @@ async function recalculateDeviceMonth(db: SupabaseClient, saleDate?: string | nu
 }
 
 export async function GET(req: NextRequest) {
-  const authed = await authenticate(req);
-  if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders() });
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
 
   const db = createAdminSupabase();
   if (!db) return apiError("DB unavailable", 500);
@@ -111,8 +94,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authed = await authenticate(req);
-  if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders() });
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
 
   const db = createAdminSupabase();
   if (!db) return apiError("DB unavailable", 500);
@@ -188,8 +171,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const authed = await authenticate(req);
-  if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders() });
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
 
   const db = createAdminSupabase();
   if (!db) return apiError("DB unavailable", 500);
@@ -254,8 +237,8 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const authed = await authenticate(req);
-  if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders() });
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
 
   const db = createAdminSupabase();
   if (!db) return apiError("DB unavailable", 500);

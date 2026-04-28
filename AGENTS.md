@@ -82,7 +82,6 @@ npm run db:reset         # Reset DB
 - **Password recovery**: Supabase-driven. Request at `/forgot-password`, land on `/reset-password` from the recovery email. Applies to admin, CRM, and Sales PWA (single auth). Password strength rules mirror `/change-password`.
 - Middleware enforces: auth gating, CSRF (double-submit cookie), rate limiting, security headers, CORS.
 - CSRF exempt: `/api/webhook/*`, `/api/cron/*`, `/api/payment/callback`, `/api/csrf`, `/api/orders`.
-- Open CORS (no session required): `/api/admin/commissions/summary`, `/api/admin/commissions/dashboard` — these accept bearer token auth via `COMMISSION_API_TOKEN` env var.
 - Never hardcode secrets — use env vars. Integration configs stored in `integrations` table.
 - Public absolute URLs (payment redirects, webhooks, admin links): use `getPublicSiteUrl()` from `lib/public-site-url.ts` (`NEXT_PUBLIC_APP_URL`, then legacy `NEXT_PUBLIC_SITE_URL`). Production CSP omits `unsafe-eval` (still allowed in development).
 

@@ -4,10 +4,8 @@ import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit";
 import { generateCsrfToken, setCsrfCookie, validateCsrf } from "@/lib/csrf";
 import { getPublicSiteUrl } from "@/lib/public-site-url";
 
-const PUBLIC_API = ["/api/webhook", "/api/health", "/api/payment/callback", "/api/contact", "/api/auth", "/api/email", "/api/store", "/api/chat", "/api/reports", "/api/admin/commissions/summary"];
+const PUBLIC_API = ["/api/webhook", "/api/health", "/api/payment/callback", "/api/contact", "/api/auth", "/api/email", "/api/store", "/api/chat", "/api/reports"];
 const WEBHOOK_PATHS = ["/api/webhook", "/api/payment/callback"];
-const OPEN_CORS_PATHS = ["/api/admin/commissions/summary", "/api/admin/commissions/dashboard", "/api/admin/commissions/employees/list", "/api/admin/commissions/sales"];
-const COMMISSION_ALLOWED_ORIGINS = (process.env.COMMISSION_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
 const WEBHOOK_ORIGINS = [
   "https://api.ycloud.com",
   "https://api.twilio.com",
@@ -15,38 +13,6 @@ const WEBHOOK_ORIGINS = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // === Open CORS for token-authed API endpoints (local app sync) ===
-  const isOpenCors = OPEN_CORS_PATHS.some((p) => pathname.startsWith(p));
-  if (isOpenCors) {
-    const origin = request.headers.get("origin") || "";
-
-    if (COMMISSION_ALLOWED_ORIGINS.length === 0) {
-      // No origins configured — let requests through without CORS headers.
-      // Route handlers enforce their own auth (requireAdmin / bearer token).
-      // Cross-origin requests will be blocked by the browser (no CORS headers).
-      if (request.method === "OPTIONS") {
-        return new NextResponse(null, { status: 204 });
-      }
-      return NextResponse.next();
-    }
-
-    const allowedOrigin = COMMISSION_ALLOWED_ORIGINS.includes(origin) ? origin : COMMISSION_ALLOWED_ORIGINS[0];
-    if (request.method === "OPTIONS") {
-      return new NextResponse(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": allowedOrigin,
-          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-          "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        },
-      });
-    }
-    // Let the route handler run and add CORS headers
-    const response = NextResponse.next();
-    response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
-    return response;
-  }
 
   // === CORS for webhooks (restricted origins) ===
   if (PUBLIC_API.some((p) => pathname.startsWith(p))) {
