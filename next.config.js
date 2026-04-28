@@ -48,3 +48,37 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+
+
+// Injected content via Sentry wizard below
+
+const { withSentryConfig } = require("@sentry/nextjs");
+
+module.exports = withSentryConfig(module.exports, {
+  org: "clalmobile",
+  project: "javascript-nextjs",
+
+  // Only print Sentry build-plugin logs in CI; locally we want a quiet build.
+  silent: !process.env.CI,
+
+  // Upload extended source maps for readable stack traces. Source maps
+  // never reach the production bundle — they go straight to Sentry — so
+  // this is safe for our Cloudflare Workers deploy via OpenNext.
+  widenClientFileUpload: true,
+
+  // Tunnel browser → Sentry traffic through a Next.js rewrite so that
+  // ad-blockers and corporate proxies don't drop our client-side errors.
+  // The middleware allow-lists `/monitoring` (no CSRF, no auth) — keep
+  // them in sync.
+  tunnelRoute: "/monitoring",
+
+  // Tree-shake Sentry's debug logger out of the production bundle.
+  // We DO NOT enable `automaticVercelMonitors` — ClalMobile runs on
+  // Cloudflare Workers via OpenNext, and that flag only applies to
+  // Vercel Cron Monitors.
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+});

@@ -1,5 +1,8 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +10,13 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // Forward unhandled root errors to Sentry. The function-level useEffect runs
+  // after the initial render, ensuring `error` exists and Sentry is initialised
+  // (sentry.client is loaded by instrumentation-client.ts before any client code).
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   const isHe = typeof window !== "undefined" && localStorage.getItem("lang") === "he";
   return (
     <html lang={isHe ? "he" : "ar"} dir="rtl">

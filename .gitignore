@@ -91,3 +91,6 @@ PRIVATE_*.md
 
 # Outbound mock log (recordMockOutbound writes here when MOCK_OUTBOUND=true)
 logs/outbound/
+
+# Sentry Config File
+.env.sentry-build-plugin
