@@ -17,6 +17,7 @@
 
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { recordServerError } from "@/lib/analytics";
 
 interface ApiMeta {
   page?: number;
@@ -108,5 +109,9 @@ export function safeError(
       extra: { fallback, status },
     });
   }
+  // Cheap counter to Workers Analytics Engine. Sentry tells us
+  // *what's broken*; this counter tells us *how often* — useful for
+  // SLO dashboards without Sentry quota burn.
+  recordServerError({ route: context, status, context });
   return apiError(fallback, status);
 }
