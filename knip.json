@@ -9,6 +9,7 @@
     "app/**/*.{ts,tsx}",
     "components/**/*.{ts,tsx}",
     "lib/**/*.{ts,tsx}",
+    "stores/**/*.{ts,tsx}",
     "types/**/*.{ts,tsx}",
     "scripts/**/*.{ts,js,mjs}",
     "tests/**/*.{ts,tsx}"
@@ -23,5 +24,19 @@
   ],
   "ignoreBinaries": [
     "supabase"
-  ]
+  ],
+  "tags": ["+public"],
+  "rules": {
+    "files": "error",
+    "dependencies": "error",
+    "unlisted": "error",
+    "binaries": "error",
+    "unresolved": "error",
+    "duplicates": "error",
+    "exports": "warn",
+    "types": "warn",
+    "nsExports": "warn",
+    "nsTypes": "warn",
+    "enumMembers": "warn"
+  }
 }

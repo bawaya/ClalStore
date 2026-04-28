@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 
-export interface DonutChartDatum {
+interface DonutChartDatum {
   label: string;
   value: number;
   color: string;

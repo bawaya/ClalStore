@@ -202,7 +202,38 @@ revisit:
 - ESLint or Prettier imposes a lint stage longer than ~30s on full repo.
 - We add a second linter to fight a rule ESLint's plugins can't express.
 
-### 5.6 Hosting the monitoring stack *(2026-04-28)*
+### 5.6 tsconfig hardening — `noUnusedLocals` deferred *(2026-04-28)*
+
+We tried to add `noUnusedLocals: true` and `noUnusedParameters: true` to
+the existing `strict: true` block in `tsconfig.json`. Running
+`npx tsc --noEmit` afterwards surfaced **139 violations** (115 ×
+TS6133 "declared but never read" + 22 × TS6196 "type declared but
+never used").
+
+The fix-up isn't conceptually hard — most violations are dead imports
+or unused destructure bindings — but it touches ~50 files across
+`app/admin/*`, `app/api/admin/*`, and a few tests. Bundling that into
+the Knip / static-analysis commit would have ballooned the diff and
+muddied the scope. The current ESLint config explicitly sets
+`"no-unused-vars": "off"`, which is how the violations accumulated in
+the first place; flipping that on without fixes would block CI.
+
+**Plan to land it:**
+
+1. Add `eslint-plugin-unused-imports` (autofix-capable). Configure to
+   error on unused imports, warn on unused destructure / parameters.
+2. Run `eslint --fix` to clear the auto-fixable subset (likely most of
+   the 115 TS6133 violations).
+3. Hand-fix the residual unused params and types.
+4. Flip `noUnusedLocals` and `noUnusedParameters` on in
+   `tsconfig.json`.
+5. Commit as a single "static: enforce no unused locals/params"
+   change.
+
+This is queued as a follow-up to the current Phase 1 work in
+`docs/testing/AGREEMENTS.md` §6.
+
+### 5.7 Hosting the monitoring stack *(2026-04-28)*
 
 Hetzner CX22 VPS, €4.51 / month, frankfurt region. Hosts the future
 GlitchTip / Loki / Grafana / Uptime Kuma instances. Managed manually via
@@ -210,8 +241,16 @@ SSH for now; a `docker-compose` will land with Phase 5.
 
 ---
 
-## 6. Open Questions
+## 6. Open Questions / Queued Follow-ups
 
+- [ ] **`noUnusedLocals` + `noUnusedParameters`** — see §5.6. Plan
+  documented; needs a dedicated cleanup commit.
+- [ ] **Knip unused exports/types audit** — 194 exports flagged as
+  unused. The vast majority are legitimate public API (types, utility
+  helpers, service modules). Knip's `exports`/`types` rules are set to
+  `warn` so they don't block CI. A real audit pass should mark each
+  intentional export with `/** @public */` (Knip's `+public` tag) and
+  delete the genuinely dead ones.
 - [ ] **Package manager** — npm (verified from `package-lock.json`).
 - [ ] **Cloudflare paid features** — does ClalMobile use the paid Workers plan?
   Affects Workers Analytics Engine availability for Phase 5 metrics.

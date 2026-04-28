@@ -104,7 +104,7 @@ const STATUS_COLOR: Record<RowStatus, string> = {
   "will-create": "text-blue-300",
 };
 
-export type PriceUpdateMode = "phones" | "accessories";
+type PriceUpdateMode = "phones" | "accessories";
 
 interface PriceUpdatePanelProps {
   /**

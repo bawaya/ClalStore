@@ -55,10 +55,6 @@ export const upayMockResponses = {
   },
 };
 
-// ───── iCredit (legacy) ─────
-
-export const icreditMockResponses = rivhitMockResponses;
-
 // ───── fetch mock for payment providers ─────
 
 export function installPaymentFetchMock() {

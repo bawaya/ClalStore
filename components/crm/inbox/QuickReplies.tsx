@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from "react";
 
-export interface QuickReply {
+interface QuickReply {
   id: string;
   shortcut: string;
   title: string;

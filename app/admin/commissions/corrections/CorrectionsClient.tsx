@@ -15,13 +15,13 @@ import { csrfHeaders } from "@/lib/csrf-client";
 
 export type TabKey = "pending" | "approved" | "rejected" | "resolved" | "all";
 
-export type CorrectionStatus =
+type CorrectionStatus =
   | "pending"
   | "approved"
   | "rejected"
   | "resolved";
 
-export type CorrectionRequestType =
+type CorrectionRequestType =
   | "amount_error"
   | "wrong_type"
   | "wrong_date"

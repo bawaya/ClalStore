@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef } from "react";
 
-export interface LineChartDatum {
+interface LineChartDatum {
   label: string;
   value: number;
 }

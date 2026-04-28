@@ -19,7 +19,7 @@ import {
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 
-export type SortOption =
+type SortOption =
   | "default"
   | "price_asc"
   | "price_desc"

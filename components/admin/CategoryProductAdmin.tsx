@@ -22,9 +22,9 @@ import {
 import { ImageUpload, IMAGE_DIMS } from "@/components/admin/ImageUpload";
 import type { Product, ProductColor, ProductVariant, ProductVariantKind, ProductType } from "@/types/database";
 
-export type SubkindMap = Record<string, { label: string; labelHe: string; icon: string }>;
+type SubkindMap = Record<string, { label: string; labelHe: string; icon: string }>;
 
-export type SpecsField = {
+type SpecsField = {
   key: string;
   label: string;
   placeholder?: string;

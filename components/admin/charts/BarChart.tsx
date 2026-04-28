@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 
-export interface BarChartDatum {
+interface BarChartDatum {
   label: string;
   value: number;
 }
