@@ -5,6 +5,8 @@
 // =====================================================
 
 import { getIntegrationConfig } from "./hub";
+import { isOutboundBlocked } from "@/lib/outbound-guard";
+import { recordMockOutbound } from "@/lib/outbound-mock";
 
 const YCLOUD_API = "https://api.ycloud.com/v2";
 
@@ -13,6 +15,30 @@ async function getApiKey(): Promise<string> {
   const key = cfg.api_key || process.env.YCLOUD_API_KEY || "";
   if (!key) throw new Error("yCloud API key not configured");
   return key;
+}
+
+/**
+ * Second-line gate for write operations on the WhatsApp Business templates
+ * store. Even when the channel guard passes (e.g. a real production deploy
+ * with a real key), template create/delete still requires
+ * ALLOW_TEMPLATE_MUTATIONS=true so a routine deploy or accidental script
+ * run can never silently mutate the live template catalogue. Pattern
+ * mirrors AWS / Google's "destructive operation explicit confirmation".
+ */
+function templateMutationsAllowed(): boolean {
+  return process.env.ALLOW_TEMPLATE_MUTATIONS === "true";
+}
+
+let warnedOnRead = false;
+function warnOnTemplateRead(operation: string) {
+  if (process.env.NODE_ENV !== "production" && !warnedOnRead) {
+    warnedOnRead = true;
+    console.warn(
+      `[YCLOUD TEMPLATES] ${operation} hits the live yCloud API (read-only). ` +
+        `If you didn't mean to call this from a non-production environment, set ` +
+        `MOCK_OUTBOUND=true or unset YCLOUD_API_KEY.`,
+    );
+  }
 }
 
 function normalizePhoneLike(value: string): string {
@@ -25,6 +51,7 @@ function headers(apiKey: string) {
 
 /** Fetch WABA ID from yCloud phone numbers endpoint */
 export async function getWabaId(): Promise<string> {
+  warnOnTemplateRead("getWabaId");
   const apiKey = await getApiKey();
   const cfg = await getIntegrationConfig("whatsapp");
   const res = await fetch(`${YCLOUD_API}/whatsapp/phoneNumbers?limit=100`, {
@@ -66,6 +93,7 @@ export interface TemplateInfo {
 
 /** List all templates for the account */
 export async function listTemplates(): Promise<TemplateInfo[]> {
+  warnOnTemplateRead("listTemplates");
   const apiKey = await getApiKey();
   const wabaId = await getWabaId();
   const res = await fetch(`${YCLOUD_API}/whatsapp/templates?wabaId=${wabaId}&limit=100`, {
@@ -92,6 +120,32 @@ export async function createTemplate(template: {
   language: string;
   components: Record<string, unknown>[];
 }): Promise<{ success: boolean; status?: string; error?: string }> {
+  // Layer 1 — outbound guard. When blocked we record the *intent* (full
+  // template definition in meta) and return a mock-success.
+  const guard = isOutboundBlocked("whatsapp_template");
+  if (guard.blocked && guard.reason) {
+    await recordMockOutbound({
+      channel: "whatsapp_template",
+      reason: guard.reason,
+      to: template.name,
+      subject: `[create_template] ${template.name}`,
+      bodyPreview: JSON.stringify({ category: template.category, language: template.language }),
+      meta: { type: "create_template", template },
+    });
+    return { success: true, status: "PENDING_MOCKED" };
+  }
+  // Layer 2 — destructive-op confirmation. Even with a real key in real
+  // production, mutating the template catalogue requires an explicit env
+  // flag so a CI run or a script-gone-wrong can't reshape the store.
+  if (!templateMutationsAllowed()) {
+    return {
+      success: false,
+      error:
+        "Template mutation refused: ALLOW_TEMPLATE_MUTATIONS is not 'true'. " +
+        "Set the flag explicitly to confirm a real createTemplate call.",
+    };
+  }
+
   const apiKey = await getApiKey();
   const wabaId = await getWabaId();
 
@@ -113,6 +167,27 @@ export async function createTemplate(template: {
 
 /** Delete a template by name */
 export async function deleteTemplate(name: string): Promise<{ success: boolean; error?: string }> {
+  const guard = isOutboundBlocked("whatsapp_template");
+  if (guard.blocked && guard.reason) {
+    await recordMockOutbound({
+      channel: "whatsapp_template",
+      reason: guard.reason,
+      to: name,
+      subject: `[delete_template] ${name}`,
+      bodyPreview: name,
+      meta: { type: "delete_template", templateName: name },
+    });
+    return { success: true };
+  }
+  if (!templateMutationsAllowed()) {
+    return {
+      success: false,
+      error:
+        "Template mutation refused: ALLOW_TEMPLATE_MUTATIONS is not 'true'. " +
+        "Set the flag explicitly to confirm a real deleteTemplate call.",
+    };
+  }
+
   const apiKey = await getApiKey();
   const wabaId = await getWabaId();
 
@@ -308,6 +383,33 @@ export const REQUIRED_TEMPLATES = [
 export async function provisionRequiredTemplates(): Promise<{
   results: { name: string; status: string; error?: string }[];
 }> {
+  // When the channel is blocked, record the *intent* (the full list of
+  // templates that would have been created) and return per-template
+  // mock results instead of calling the YCloud API.
+  const guard = isOutboundBlocked("whatsapp_template");
+  if (guard.blocked && guard.reason) {
+    const plannedNames = REQUIRED_TEMPLATES.map((t) => t.name);
+    await recordMockOutbound({
+      channel: "whatsapp_template",
+      reason: guard.reason,
+      to: "(provision)",
+      subject: `[provision_required_templates] count=${plannedNames.length}`,
+      bodyPreview: plannedNames.join(", "),
+      meta: { type: "provision", plannedNames },
+    });
+    return {
+      results: REQUIRED_TEMPLATES.map((t) => ({
+        name: t.name,
+        status: "PENDING_MOCKED",
+      })),
+    };
+  }
+  // Even with a real key in real production, the wrapper inherits the
+  // ALLOW_TEMPLATE_MUTATIONS gate via createTemplate — each loop iteration
+  // returns { success: false, error: "Template mutation refused…" } until
+  // the flag is set. The continue-on-error contract is preserved: we always
+  // return one result per template, never throw mid-loop, so callers can
+  // diff which planned templates went through and which were refused.
   const existing = await listTemplates();
   const existingNames = new Set(existing.map((t) => t.name));
   const results: { name: string; status: string; error?: string }[] = [];

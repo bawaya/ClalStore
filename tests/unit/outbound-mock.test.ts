@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7,6 +7,7 @@ import {
   recordMockOutbound,
   readMockOutbound,
   clearMockOutbound,
+  maskPhone,
 } from "@/lib/outbound-mock";
 
 let tempDir: string;
@@ -110,6 +111,64 @@ describe("readMockOutbound", () => {
   it("returns [] when no log file exists yet", async () => {
     const entries = await readMockOutbound();
     expect(entries).toEqual([]);
+  });
+});
+
+describe("maskPhone", () => {
+  it("masks an Israeli mobile number to first 5 + last 4 with stars", () => {
+    expect(maskPhone("+972541230123")).toBe("+9725****0123");
+  });
+
+  it("masks a 10-digit number minimally", () => {
+    expect(maskPhone("0541230123")).toBe("05412****0123");
+  });
+
+  it("handles empty / undefined input", () => {
+    expect(maskPhone("")).toBe("");
+    expect(maskPhone(undefined)).toBe("");
+  });
+
+  it("returns very short numbers unchanged", () => {
+    expect(maskPhone("1234")).toBe("1234");
+  });
+});
+
+describe("recordMockOutbound — phone masking in console", () => {
+  it("logs a masked phone to console but writes the full number to JSONL", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await recordMockOutbound({
+      channel: "whatsapp",
+      reason: "mock_outbound_flag",
+      to: "+972541230123",
+      subject: null,
+      bodyPreview: "hello",
+    });
+
+    // Console must NOT contain the full phone — masked only.
+    const consoleCall = warnSpy.mock.calls[0]?.[0] as string;
+    expect(consoleCall).toContain("+9725****0123");
+    expect(consoleCall).not.toContain("+972541230123");
+
+    // JSONL must contain the FULL phone for test assertions / debugging.
+    const [entry] = await readMockOutbound();
+    expect(entry.to).toBe("+972541230123");
+
+    warnSpy.mockRestore();
+  });
+
+  it("does not mask email recipients (they need to round-trip exactly)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await recordMockOutbound({
+      channel: "email",
+      reason: "mock_outbound_flag",
+      to: "user@example.com",
+      subject: "test",
+      bodyPreview: "hello",
+    });
+
+    const consoleCall = warnSpy.mock.calls[0]?.[0] as string;
+    expect(consoleCall).toContain("user@example.com");
+    warnSpy.mockRestore();
   });
 });
 

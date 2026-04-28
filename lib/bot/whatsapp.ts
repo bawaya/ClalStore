@@ -5,8 +5,26 @@
 
 import { processMessage, type BotResponse } from "./engine";
 import { getIntegrationConfig } from "@/lib/integrations/hub";
+import { isOutboundBlocked } from "@/lib/outbound-guard";
+import { recordMockOutbound } from "@/lib/outbound-mock";
 
 const YCLOUD_API = "https://api.ycloud.com/v2";
+
+/**
+ * Mock send result returned when the outbound guard blocks a YCloud call.
+ * Includes the YCloud-style `id` field so callers like
+ * app/api/crm/inbox/[id]/send/route.ts that capture `result?.id` keep
+ * working without modification.
+ */
+function mockWhatsAppResult(reason: string) {
+  return {
+    success: true,
+    mocked: true,
+    reason,
+    id: `mock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    status: "sent",
+  };
+}
 
 /** Read yCloud credentials — DB first, env fallback */
 async function getYCloudConfig() {
@@ -44,6 +62,18 @@ export function normalizePhone(phone: string): string {
 // ===== Send Text Message =====
 export async function sendWhatsAppText(to: string, text: string, fromOverride?: string) {
   const phone = normalizePhone(to);
+  const guard = isOutboundBlocked("whatsapp");
+  if (guard.blocked && guard.reason) {
+    await recordMockOutbound({
+      channel: "whatsapp",
+      reason: guard.reason,
+      to: phone,
+      subject: null,
+      bodyPreview: text,
+      meta: { type: "text", fromOverride: fromOverride || null },
+    });
+    return mockWhatsAppResult(guard.reason);
+  }
   const headers = await getHeaders();
   const from = fromOverride || await getFromPhone();
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
@@ -73,6 +103,18 @@ export async function sendWhatsAppButtons(
   buttons: { id: string; title: string }[]
 ) {
   const phone = normalizePhone(to);
+  const guard = isOutboundBlocked("whatsapp");
+  if (guard.blocked && guard.reason) {
+    await recordMockOutbound({
+      channel: "whatsapp",
+      reason: guard.reason,
+      to: phone,
+      subject: null,
+      bodyPreview: bodyText,
+      meta: { type: "buttons", buttons: buttons.map((b) => b.id) },
+    });
+    return mockWhatsAppResult(guard.reason);
+  }
   const headers = await getHeaders();
   const from = await getFromPhone();
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
@@ -110,6 +152,18 @@ export async function sendWhatsAppTemplate(
   params: string[]
 ) {
   const phone = normalizePhone(to);
+  const guard = isOutboundBlocked("whatsapp");
+  if (guard.blocked && guard.reason) {
+    await recordMockOutbound({
+      channel: "whatsapp",
+      reason: guard.reason,
+      to: phone,
+      subject: null,
+      bodyPreview: `[template: ${templateName}] params=${JSON.stringify(params)}`,
+      meta: { type: "template", templateName, params },
+    });
+    return mockWhatsAppResult(guard.reason);
+  }
   const headers = await getHeaders();
   const from = await getFromPhone();
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
@@ -142,6 +196,18 @@ export async function sendWhatsAppImage(
   caption?: string
 ) {
   const phone = normalizePhone(to);
+  const guard = isOutboundBlocked("whatsapp");
+  if (guard.blocked && guard.reason) {
+    await recordMockOutbound({
+      channel: "whatsapp",
+      reason: guard.reason,
+      to: phone,
+      subject: null,
+      bodyPreview: caption || `[image: ${imageUrl}]`,
+      meta: { type: "image", imageUrl, caption: caption || null },
+    });
+    return mockWhatsAppResult(guard.reason);
+  }
   const headers = await getHeaders();
   const from = await getFromPhone();
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {
@@ -175,6 +241,18 @@ export async function sendWhatsAppDocument(
   caption?: string
 ) {
   const phone = normalizePhone(to);
+  const guard = isOutboundBlocked("whatsapp");
+  if (guard.blocked && guard.reason) {
+    await recordMockOutbound({
+      channel: "whatsapp",
+      reason: guard.reason,
+      to: phone,
+      subject: null,
+      bodyPreview: caption || `[document: ${filename}]`,
+      meta: { type: "document", documentUrl, filename, caption: caption || null },
+    });
+    return mockWhatsAppResult(guard.reason);
+  }
   const headers = await getHeaders();
   const from = await getFromPhone();
   const res = await fetch(`${YCLOUD_API}/whatsapp/messages/sendDirectly`, {

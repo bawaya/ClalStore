@@ -15,7 +15,18 @@
 // without dragging Supabase or other heavy modules.
 // =====================================================
 
-export type OutboundChannel = "email" | "sms" | "whatsapp";
+export type OutboundChannel =
+  | "email"
+  | "sms"
+  | "whatsapp"
+  /**
+   * Mutating WhatsApp Business template operations (createTemplate /
+   * deleteTemplate / provisionRequiredTemplates). Treated as its own channel
+   * so the JSONL log distinguishes a template mutation from a normal message
+   * send, and so the secondary ALLOW_TEMPLATE_MUTATIONS gate is documented
+   * next to the rest of the outbound machinery.
+   */
+  | "whatsapp_template";
 
 export interface OutboundGuardResult {
   blocked: boolean;
@@ -47,6 +58,7 @@ function readChannelKeys(channel: OutboundChannel): string[] {
         process.env.TWILIO_AUTH_TOKEN ?? "",
       ];
     case "whatsapp":
+    case "whatsapp_template":
       return [process.env.YCLOUD_API_KEY ?? ""];
   }
 }

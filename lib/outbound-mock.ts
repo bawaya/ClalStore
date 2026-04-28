@@ -53,6 +53,25 @@ function truncate(text: string | undefined): string {
 }
 
 /**
+ * Mask a phone number for console output: keep the first 5 chars (e.g.
+ * "+9725") and the last 4, replace the middle with stars. JSONL keeps the
+ * full number for test assertions; this helper is only used by the
+ * console signal so a screen-share or shoulder-surfer can't read a
+ * customer phone.
+ */
+export function maskPhone(phone: string | undefined): string {
+  if (!phone) return "";
+  const trimmed = phone.trim();
+  if (trimmed.length <= 9) {
+    // Too short for meaningful masking — keep prefix + last 2.
+    return trimmed.length <= 5
+      ? trimmed
+      : `${trimmed.slice(0, trimmed.length - 2)}**`;
+  }
+  return `${trimmed.slice(0, 5)}****${trimmed.slice(-4)}`;
+}
+
+/**
  * Append a mock entry to today's JSONL file. Always returns a result the
  * caller can return to its own caller — never throws — so a logging
  * failure never breaks application flow.
@@ -73,9 +92,14 @@ export async function recordMockOutbound(entry: Omit<OutboundMockEntry, "ts">): 
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.appendFile(file, `${JSON.stringify(full)}\n`, "utf8");
     // Single-line console signal so a developer skimming the dev server
-    // log immediately knows a message was caught instead of sent.
+    // log immediately knows a message was caught instead of sent. The full
+    // recipient is preserved in the JSONL above; the console gets a masked
+    // version so a screen-share can't leak a customer phone.
+    const recipientForConsole = full.channel === "email"
+      ? full.to
+      : maskPhone(full.to);
     console.warn(
-      `[OUTBOUND BLOCKED] channel=${full.channel} reason=${full.reason} to=${full.to}`,
+      `[OUTBOUND BLOCKED] channel=${full.channel} reason=${full.reason} to=${recipientForConsole}`,
     );
   } catch (err) {
     console.error("[OUTBOUND] mock log write failed:", err);

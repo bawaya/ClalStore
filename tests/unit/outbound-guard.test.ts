@@ -123,6 +123,26 @@ describe("isOutboundBlocked — Layer 3 (suspicious API keys)", () => {
   });
 });
 
+describe("isOutboundBlocked — whatsapp_template channel", () => {
+  it("uses the YCloud key for the template channel", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("YCLOUD_API_KEY", "test_yc_sandbox");
+
+    const result = isOutboundBlocked("whatsapp_template");
+    expect(result.blocked).toBe(true);
+    expect(result.reason).toBe("suspicious_api_key");
+  });
+
+  it("blocks template mutations in dev like any other channel", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("YCLOUD_API_KEY", "yc_realProductionKey1234567890");
+
+    const result = isOutboundBlocked("whatsapp_template");
+    expect(result.blocked).toBe(true);
+    expect(result.reason).toBe("non_production_no_escape_hatch");
+  });
+});
+
 describe("isOutboundBlocked — happy path (genuine production send)", () => {
   it("allows the call only when all three layers agree", () => {
     vi.stubEnv("NODE_ENV", "production");

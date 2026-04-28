@@ -7,9 +7,32 @@
 
 import type { SMSProvider } from "./hub";
 import { getIntegrationConfig } from "./hub";
+import { isOutboundBlocked } from "@/lib/outbound-guard";
+import { recordMockOutbound } from "@/lib/outbound-mock";
 
 const TWILIO_API = "https://api.twilio.com/2010-04-01";
 const TWILIO_VERIFY_API = "https://verify.twilio.com/v2";
+
+/**
+ * Mock verification status for checkTwilioVerification when the guard
+ * blocks the call. Twilio returns one of approved/pending/canceled in
+ * production; we accept those plus a synthetic "denied" / "error" so a
+ * test can simulate every branch.
+ */
+const VALID_MOCK_VERIFY_STATUSES = new Set([
+  "approved",
+  "pending",
+  "denied",
+  "canceled",
+  "error",
+]);
+
+function readMockVerifyStatus(): string {
+  const raw = (process.env.MOCK_TWILIO_VERIFY_RESULT || "approved")
+    .trim()
+    .toLowerCase();
+  return VALID_MOCK_VERIFY_STATUSES.has(raw) ? raw : "approved";
+}
 
 /** Read Twilio base credentials */
 async function getBaseConfig() {
@@ -47,6 +70,19 @@ export async function startTwilioVerification(
   channel: "sms" | "whatsapp" = "sms"
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const guard = isOutboundBlocked("sms");
+    if (guard.blocked && guard.reason) {
+      await recordMockOutbound({
+        channel: "sms",
+        reason: guard.reason,
+        to: formatPhoneE164(phone),
+        subject: null,
+        bodyPreview: `[twilio-verify-start] channel=${channel}`,
+        meta: { type: "verify_start", channel },
+      });
+      return { success: true };
+    }
+
     const { accountSid, authToken, verifyServiceSid } = await getBaseConfig();
     if (!accountSid || !authToken || !verifyServiceSid) {
       return { success: false, error: "Twilio Verify not configured" };
@@ -87,6 +123,24 @@ export async function checkTwilioVerification(
   code: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const guard = isOutboundBlocked("sms");
+    if (guard.blocked && guard.reason) {
+      const status = readMockVerifyStatus();
+      await recordMockOutbound({
+        channel: "sms",
+        reason: guard.reason,
+        to: formatPhoneE164(phone),
+        subject: null,
+        bodyPreview: `[twilio-verify-check] code=${code} mockStatus=${status}`,
+        meta: { type: "verify_check", code, mockStatus: status },
+      });
+      // Twilio's real `approved` is the only success state; everything else
+      // — pending/denied/canceled/error — is treated as a failed check.
+      return status === "approved"
+        ? { success: true }
+        : { success: false, error: `mock status: ${status}` };
+    }
+
     const { accountSid, authToken, verifyServiceSid } = await getBaseConfig();
     if (!accountSid || !authToken || !verifyServiceSid) {
       return { success: false, error: "Twilio Verify not configured" };
@@ -139,6 +193,22 @@ export class TwilioSMSProvider implements SMSProvider {
 
   async send(to: string, message: string): Promise<{ success: boolean; sid?: string; error?: string }> {
     try {
+      const guard = isOutboundBlocked("sms");
+      if (guard.blocked && guard.reason) {
+        await recordMockOutbound({
+          channel: "sms",
+          reason: guard.reason,
+          to: formatPhoneE164(to),
+          subject: null,
+          bodyPreview: message,
+          meta: { type: "raw_sms" },
+        });
+        return {
+          success: true,
+          sid: `SM_mock_${Date.now().toString(36)}`,
+        };
+      }
+
       const { accountSid, authToken, fromNumber, messagingServiceSid } = await getBaseConfig();
       if (!accountSid || !authToken) throw new Error("Twilio credentials missing");
       if (!fromNumber && !messagingServiceSid) throw new Error("No From number or Messaging Service");
