@@ -1,5 +1,5 @@
 import path from "node:path";
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page, type Route } from "@playwright/test";
 import {
   appendManifestArtifact,
   attachPageGuards,
@@ -12,7 +12,7 @@ const runId = process.env.TEST_RUN_ID || "release_local";
 const allowLogoUpload = process.env.E2E_ALLOW_LOGO_UPLOAD === "1";
 
 async function loginToRoute(
-  page: Parameters<typeof test>[0]["page"],
+  page: Page,
   route: string,
   expectedUrlPattern?: RegExp,
 ) {
@@ -27,11 +27,11 @@ async function loginToRoute(
   });
 }
 
-async function loginToAdminSettings(page: Parameters<typeof test>[0]["page"]) {
+async function loginToAdminSettings(page: Page) {
   await loginToRoute(page, "/admin/settings", /\/admin\/settings/);
 }
 
-async function acceptCookiesIfPresent(page: Parameters<typeof test>[0]["page"]) {
+async function acceptCookiesIfPresent(page: Page) {
   const acceptButton = page.getByRole("button", { name: /قبول الكل/ }).first();
   if (await acceptButton.isVisible().catch(() => false)) {
     await acceptButton.click();
@@ -39,7 +39,7 @@ async function acceptCookiesIfPresent(page: Parameters<typeof test>[0]["page"]) 
   }
 }
 
-async function blockAnalyticsEndpoints(page: Parameters<typeof test>[0]["page"]) {
+async function blockAnalyticsEndpoints(page: Page) {
   await page.route("https://www.google-analytics.com/**", async (route) => {
     await route.fulfill({ status: 204, body: "" });
   });
@@ -48,11 +48,11 @@ async function blockAnalyticsEndpoints(page: Parameters<typeof test>[0]["page"])
   });
 }
 
-async function openIntegrationsTab(page: Parameters<typeof test>[0]["page"]) {
+async function openIntegrationsTab(page: Page) {
   await page.getByRole("button", { name: "Ø§Ù„ØªÙƒØ§Ù…Ù„Ø§Øª" }).click();
 }
 
-async function findProviderPanel(page: Parameters<typeof test>[0]["page"], providerName: string) {
+async function findProviderPanel(page: Page, providerName: string) {
   const escapedProviderName = providerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const title = page.getByText(new RegExp(`Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª ${escapedProviderName}`)).first();
   const titleVisible = await title.isVisible().catch(() => false);
@@ -85,7 +85,7 @@ async function findProviderPanel(page: Parameters<typeof test>[0]["page"], provi
 }
 
 async function exerciseConfiguredIntegrationPanel(
-  page: Parameters<typeof test>[0]["page"],
+  page: Page,
   {
     providerName,
     noteTitle,
@@ -187,7 +187,7 @@ async function exerciseConfiguredIntegrationPanel(
   });
 }
 
-async function exerciseCrmReadonlyNavigation(page: Parameters<typeof test>[0]["page"]) {
+async function exerciseCrmReadonlyNavigation(page: Page) {
   const crmPages = [
     {
       path: "/crm",
@@ -245,7 +245,7 @@ async function exerciseCrmReadonlyNavigation(page: Parameters<typeof test>[0]["p
   });
 }
 
-async function exerciseStoreReadonlyNavigation(page: Parameters<typeof test>[0]["page"]) {
+async function exerciseStoreReadonlyNavigation(page: Page) {
   const storePages = [
     {
       path: "/store",
@@ -298,7 +298,7 @@ async function exerciseStoreReadonlyNavigation(page: Parameters<typeof test>[0][
 }
 
 async function exerciseStoreSecondaryReadonlyNavigation(
-  page: Parameters<typeof test>[0]["page"],
+  page: Page,
 ) {
   await page.addInitScript(() => {
     localStorage.removeItem("clal_cart");
@@ -370,7 +370,7 @@ async function exerciseStoreSecondaryReadonlyNavigation(
 test.describe.configure({ mode: "serial" });
 
 async function exerciseStoreSecondaryReadonlyNavigationSafe(
-  page: Parameters<typeof test>[0]["page"],
+  page: Page,
 ) {
   await page.addInitScript(() => {
     localStorage.removeItem("clal_cart");
