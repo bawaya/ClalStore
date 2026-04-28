@@ -93,9 +93,37 @@ describe("Chaos · yCloud WhatsApp outage", () => {
   // Actual contract: sendWhatsAppText THROWS on failure. Callers (webhook
   // handlers, cron jobs) are responsible for catching. These tests pin that
   // contract — if someone changes it to swallow errors, we'll catch it.
+  //
+  // The outbound guard normally blocks sends in non-production environments
+  // (Layer 2: NODE_ENV !== "production" && ALLOW_REAL_OUTBOUND !== "true").
+  // For chaos tests we explicitly want the real network path to run so we
+  // can observe how the function behaves on a failed fetch — so we mock
+  // the guard to allow the call through. Other tests still get the
+  // production-safe default.
   beforeEach(() => {
     process.env.YCLOUD_API_KEY = "test-key";
     process.env.WHATSAPP_PHONE_ID = "test-phone";
+    vi.doMock("@/lib/outbound-guard", () => ({
+      isOutboundBlocked: () => ({ blocked: false }),
+    }));
+    // Stub recordMockOutbound too in case anything else in the import graph
+    // touches it; chaos tests should never write to the JSONL store.
+    vi.doMock("@/lib/outbound-mock", () => ({
+      recordMockOutbound: vi.fn(async () => undefined),
+    }));
+    // Stub the integrations hub so getYCloudConfig() returns immediately
+    // without hitting Supabase. Without this the test waits ~5s for the
+    // DB call to time out before falling back to env vars.
+    vi.doMock("@/lib/integrations/hub", () => ({
+      getIntegrationConfig: async () => ({}),
+    }));
+  });
+
+  afterEach(() => {
+    vi.doUnmock("@/lib/outbound-guard");
+    vi.doUnmock("@/lib/outbound-mock");
+    vi.doUnmock("@/lib/integrations/hub");
+    vi.resetModules();
   });
 
   it("sendWhatsAppText throws a recognizable error on ECONNREFUSED", async () => {
