@@ -94,10 +94,12 @@ export async function recordMockOutbound(entry: Omit<OutboundMockEntry, "ts">): 
     // Single-line console signal so a developer skimming the dev server
     // log immediately knows a message was caught instead of sent. The full
     // recipient is preserved in the JSONL above; the console gets a masked
-    // version so a screen-share can't leak a customer phone.
-    const recipientForConsole = full.channel === "email"
-      ? full.to
-      : maskPhone(full.to);
+    // version for sms/whatsapp channels (real phone numbers) so a
+    // screen-share can't leak a customer phone. Email and whatsapp_template
+    // recipients (an address and a template name respectively) are not
+    // sensitive in the same way and stay readable.
+    const shouldMask = full.channel === "sms" || full.channel === "whatsapp";
+    const recipientForConsole = shouldMask ? maskPhone(full.to) : full.to;
     console.warn(
       `[OUTBOUND BLOCKED] channel=${full.channel} reason=${full.reason} to=${recipientForConsole}`,
     );

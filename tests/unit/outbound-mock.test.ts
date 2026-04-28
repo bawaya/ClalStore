@@ -170,6 +170,22 @@ describe("recordMockOutbound — phone masking in console", () => {
     expect(consoleCall).toContain("user@example.com");
     warnSpy.mockRestore();
   });
+
+  it("does not mask whatsapp_template recipients (they're template names, not phones)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await recordMockOutbound({
+      channel: "whatsapp_template",
+      reason: "mock_outbound_flag",
+      to: "order_confirm_template",
+      subject: "[create_template] order_confirm_template",
+      bodyPreview: "{}",
+    });
+
+    const consoleCall = warnSpy.mock.calls[0]?.[0] as string;
+    expect(consoleCall).toContain("order_confirm_template");
+    expect(consoleCall).not.toContain("****");
+    warnSpy.mockRestore();
+  });
 });
 
 describe("clearMockOutbound", () => {
