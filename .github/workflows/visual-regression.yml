@@ -21,6 +21,14 @@ on:
       - "next.config.js"
       - "tests/e2e/visual-regression.spec.ts"
 
+# `mode=update` commits regenerated baselines back to the branch the
+# workflow ran on, so the job needs write access to repo contents. PR
+# `compare` runs only need read access; granting write at the job
+# level is the same scope as our other "auto-commit" workflows
+# (publish-status, weekly-summary).
+permissions:
+  contents: write
+
 jobs:
   visual:
     name: Visual regression
