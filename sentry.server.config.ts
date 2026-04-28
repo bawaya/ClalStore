@@ -2,6 +2,12 @@
 // ClalMobile — Sentry server runtime (Node.js / Cloudflare Workers via OpenNext).
 // Sample rates, PII scrub, and the DSN env var live in lib/sentry-helpers.ts
 // so all three runtimes (server / edge / client) stay aligned.
+//
+// ⚠️  DO NOT RE-RUN `npx @sentry/wizard` — it will silently overwrite this
+//     file with PII-leaking defaults (`sendDefaultPii: true`, full
+//     `tracesSampleRate: 1`, hardcoded DSN). Privacy posture decisions
+//     are pinned in `docs/testing/AGREEMENTS.md` §5.3 (Israeli Privacy
+//     Protection Law Amendment 13). Edit by hand only.
 // =====================================================
 
 import * as Sentry from "@sentry/nextjs";

@@ -3,6 +3,10 @@
 // route handlers). Note: this is unrelated to Vercel Edge — it's the
 // "edge" Webpack target that Next.js uses for middleware.ts. On
 // OpenNext-Cloudflare the same code path runs inside a Worker.
+//
+// ⚠️  DO NOT RE-RUN `npx @sentry/wizard` — it will silently overwrite this
+//     file with PII-leaking defaults. See sentry.server.config.ts for the
+//     full warning + AGREEMENTS.md §5.3.
 // =====================================================
 
 import * as Sentry from "@sentry/nextjs";

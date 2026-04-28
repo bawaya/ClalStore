@@ -2,6 +2,10 @@
 // ClalMobile — Sentry browser runtime. Loaded automatically by Next.js
 // before any client-side code runs (App Router instrumentation contract).
 // Shared sample rates / PII scrubber live in lib/sentry-helpers.ts.
+//
+// ⚠️  DO NOT RE-RUN `npx @sentry/wizard` — it will silently overwrite this
+//     file with PII-leaking defaults. See sentry.server.config.ts for the
+//     full warning + AGREEMENTS.md §5.3.
 // =====================================================
 
 import * as Sentry from "@sentry/nextjs";
