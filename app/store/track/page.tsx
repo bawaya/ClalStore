@@ -20,6 +20,7 @@ const STATUS_ORDER = ["new", "approved", "processing", "shipped", "delivered"];
 export default function TrackPage() {
   const { lang } = useLang();
   const [orderId, setOrderId] = useState("");
+  const [verificationFactor, setVerificationFactor] = useState("");
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<{
     id: string;
@@ -32,8 +33,17 @@ export default function TrackPage() {
 
   const handleTrack = async () => {
     const id = orderId.trim().toUpperCase();
+    const verification = verificationFactor.trim();
     if (!id) {
       setError(lang === "he" ? "הזן מספר הזמנה" : "أدخل رقم الطلب");
+      return;
+    }
+    if (!verification) {
+      setError(
+        lang === "he"
+          ? "הזינו אימות: 4 ספרות אחרונות, אימייל או קוד לקוח"
+          : "أدخل وسيلة تحقق: آخر 4 أرقام، البريد، أو كود العميل"
+      );
       return;
     }
 
@@ -41,9 +51,8 @@ export default function TrackPage() {
     setOrder(null);
     setLoading(true);
     try {
-      const response = await fetch(
-        `/api/store/order-status?orderId=${encodeURIComponent(id)}`
-      );
+      const params = new URLSearchParams({ orderId: id, verification });
+      const response = await fetch(`/api/store/order-status?${params.toString()}`);
       const json = await response.json();
       const data = json.data ?? json;
 
@@ -81,8 +90,10 @@ export default function TrackPage() {
           badge: "מעקב הזמנות",
           title: "בדיקת מצב ההזמנה ממסך ברור אחד",
           subtitle:
-            "הקלידו את מספר ההזמנה וקבלו במהירות את הסטטוס, הסכום ותמונת ההתקדמות הנוכחית.",
+            "הקלידו מספר הזמנה ואימות קצר כדי לקבל את הסטטוס, הסכום ותמונת ההתקדמות הנוכחית.",
           placeholder: "CLM-12345",
+          verification: "אימות",
+          verificationPlaceholder: "4 ספרות אחרונות / אימייל / קוד לקוח",
           cta: "חפש",
           orderId: "מספר הזמנה",
           amount: "סכום",
@@ -95,8 +106,10 @@ export default function TrackPage() {
           badge: "تتبع الطلبات",
           title: "افحص حالة طلبك من شاشة واحدة واضحة",
           subtitle:
-            "أدخل رقم الطلب لتعرف مباشرة الحالة الحالية، قيمة الطلب، ومرحلة المعالجة دون الحاجة إلى التواصل أولًا.",
+            "أدخل رقم الطلب ووسيلة تحقق قصيرة لتعرف الحالة الحالية، قيمة الطلب، ومرحلة المعالجة.",
           placeholder: "CLM-12345",
+          verification: "وسيلة التحقق",
+          verificationPlaceholder: "آخر 4 أرقام / البريد / كود العميل",
           cta: "تتبع",
           orderId: "رقم الطلب",
           amount: "المبلغ",
@@ -150,12 +163,22 @@ export default function TrackPage() {
         </section>
 
         <section className="mb-4 rounded-[28px] border border-[#2f2f38] bg-[linear-gradient(180deg,#17171b_0%,#111115_100%)] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.24)] md:px-6 md:py-6">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_150px]">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_150px]">
             <input
               type="text"
               value={orderId}
               onChange={(event) => setOrderId(event.target.value.toUpperCase())}
               placeholder={intro.placeholder}
+              className="w-full rounded-2xl border border-[#4a4a54] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-[#8f8f99]"
+              dir="ltr"
+              onKeyDown={(event) => event.key === "Enter" && void handleTrack()}
+            />
+            <input
+              type="text"
+              value={verificationFactor}
+              onChange={(event) => setVerificationFactor(event.target.value)}
+              placeholder={intro.verificationPlaceholder}
+              aria-label={intro.verification}
               className="w-full rounded-2xl border border-[#4a4a54] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-[#8f8f99]"
               dir="ltr"
               onKeyDown={(event) => event.key === "Enter" && void handleTrack()}
