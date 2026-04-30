@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
   useRouter: vi.fn(() => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn(), refresh: vi.fn() })),
-  usePathname: vi.fn(() => "/admin/products"),
+  usePathname: vi.fn(() => "/admin/phones"),
   useSearchParams: vi.fn(() => new URLSearchParams()),
   useParams: vi.fn(() => ({})),
   redirect: vi.fn(),
@@ -70,20 +70,20 @@ vi.mock("@/lib/csrf-client", () => ({
   csrfHeaders: vi.fn(() => ({ "Content-Type": "application/json" })),
 }));
 
-import ProductsPage from "@/app/admin/products/page";
+import PhonesPage from "@/app/admin/phones/page";
 
-describe("ProductsPage", () => {
+describe("PhonesPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("renders without errors", () => {
-    const { container } = render(<ProductsPage />);
+    const { container } = render(<PhonesPage />);
     expect(container).toBeTruthy();
   });
 
   it("renders the page", () => {
-    const { container } = render(<ProductsPage />);
+    const { container } = render(<PhonesPage />);
     expect(container.firstChild).toBeTruthy();
   });
 });

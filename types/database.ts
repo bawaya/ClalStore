@@ -546,7 +546,17 @@ export type ComputerSubkind =
   | "other";
 export type TabletSubkind = "apple_pro" | "apple_air" | "apple_basic" | "kids" | "android" | "other";
 export type NetworkSubkind = "router_mesh" | "wifi_extender" | "switch" | "access_point" | "other";
-export type ProductSubkind = TvSubkind | ComputerSubkind | TabletSubkind | NetworkSubkind;
+export type AccessorySubkind =
+  | "case" | "case_tablet" | "case_laptop" | "screen_protector"
+  | "charger_wall" | "charger_car" | "charger_wireless" | "charger_watch"
+  | "cable" | "adapter" | "power_bank"
+  | "earbuds" | "headphones" | "earphones_wired" | "speaker_bluetooth"
+  | "holder_car" | "holder_desk" | "selfie_stick" | "tripod" | "stylus"
+  | "memory_card" | "usb_drive" | "watch_band" | "magsafe"
+  | "ring_holder" | "gaming_grip" | "lens_attachment" | "ring_light"
+  | "microphone" | "gimbal" | "cleaning_kit" | "battery_replacement"
+  | "sim_tool" | "vr_headset" | "other";
+export type ProductSubkind = TvSubkind | ComputerSubkind | TabletSubkind | NetworkSubkind | AccessorySubkind;
 
 export type ProductVariantKind = "storage" | "model" | "color_only";
 
@@ -579,6 +589,9 @@ export type Product = {
   variant_kind?: ProductVariantKind;
   appliance_kind?: ApplianceKind | null;
   subkind?: ProductSubkind | null;
+  needs_classification?: boolean;
+  classification_confidence?: number | null;
+  last_classified_at?: string | null;
   /**
    * Controls how the installment line renders on the product card.
    *  - "auto" (default): show ₪{monthly_price} × N when monthly_price is set.

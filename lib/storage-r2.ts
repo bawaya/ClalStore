@@ -41,7 +41,7 @@ export async function uploadToR2(
       // Use S3-compatible PUT with AWS Signature V4
       const url = `${R2_ENDPOINT(accountId)}/${bucket}/${objectKey}`;
       const now = new Date();
-      const dateStamp = now.toISOString().replace(/[-:T]/g, "").slice(0, 8);
+      const dateStamp = now.toISOString().replace(/-|:|T/g, "").slice(0, 8);
       const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
       const region = "auto";
       const service = "s3";

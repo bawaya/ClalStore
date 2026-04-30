@@ -51,11 +51,23 @@ export const COMPUTER_SUBKINDS = [
 ] as const;
 export const TABLET_SUBKINDS = ["apple_pro", "apple_air", "apple_basic", "kids", "android", "other"] as const;
 export const NETWORK_SUBKINDS = ["router_mesh", "wifi_extender", "switch", "access_point", "other"] as const;
+export const ACCESSORY_SUBKINDS = [
+  "case", "case_tablet", "case_laptop", "screen_protector",
+  "charger_wall", "charger_car", "charger_wireless", "charger_watch",
+  "cable", "adapter", "power_bank",
+  "earbuds", "headphones", "earphones_wired", "speaker_bluetooth",
+  "holder_car", "holder_desk", "selfie_stick", "tripod", "stylus",
+  "memory_card", "usb_drive", "watch_band", "magsafe",
+  "ring_holder", "gaming_grip", "lens_attachment", "ring_light",
+  "microphone", "gimbal", "cleaning_kit", "battery_replacement",
+  "sim_tool", "vr_headset", "other",
+] as const;
 export const ALL_SUBKINDS = [
   ...TV_SUBKINDS,
   ...COMPUTER_SUBKINDS,
   ...TABLET_SUBKINDS,
   ...NETWORK_SUBKINDS,
+  ...ACCESSORY_SUBKINDS,
 ] as const;
 
 const SUBKINDS_PER_TYPE: Record<string, readonly string[]> = {
@@ -63,6 +75,7 @@ const SUBKINDS_PER_TYPE: Record<string, readonly string[]> = {
   computer: COMPUTER_SUBKINDS,
   tablet: TABLET_SUBKINDS,
   network: NETWORK_SUBKINDS,
+  accessory: ACCESSORY_SUBKINDS,
 };
 
 export const productSchema = z.object({

@@ -135,6 +135,47 @@ async function testResend(cfg: Record<string, any>): Promise<TestResult> {
   }
 }
 
+async function testClaude(
+  cfg: Record<string, any>,
+  defaultModel = "claude-sonnet-4-20250514",
+  extraBeta?: string,
+): Promise<TestResult> {
+  const apiKey = String(cfg.api_key || "").trim();
+  const model = String(cfg.model || defaultModel).trim();
+  if (!apiKey) return { ok: false, message: "مفتاح Anthropic API مفقود" };
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    };
+    if (extraBeta) headers["anthropic-beta"] = extraBeta;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        max_tokens: 8,
+        messages: [{ role: "user", content: "ping" }],
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (res.ok) return { ok: true, message: "✅ Anthropic Claude متصل بنجاح" };
+
+    if ([400, 401, 403].includes(res.status)) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, message: text || "مفتاح Claude أو النموذج غير صحيح" };
+    }
+
+    return { ok: false, message: `Anthropic responded with ${res.status}` };
+  } catch (error: unknown) {
+    return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+  }
+}
+
 async function testOpenAI(cfg: Record<string, any>): Promise<TestResult> {
   const apiKey = String(cfg.api_key || "").trim();
   if (!apiKey) return { ok: false, message: "مفتاح OpenAI API مفقود" };
@@ -369,40 +410,16 @@ const TESTS: Record<string, (config: Record<string, any>, provider?: string) => 
     }
 
     if (provider === "Anthropic Claude") {
-      const apiKey = cfg.api_key;
-      const model = cfg.model || "claude-sonnet-4-20250514";
-      if (!apiKey) return { ok: false, message: "مفتاح Anthropic API مفقود" };
-
-      try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: 8,
-            messages: [{ role: "user", content: "ping" }],
-          }),
-          signal: AbortSignal.timeout(10000),
-        });
-
-        if (res.ok) return { ok: true, message: "✅ Anthropic Claude متصل بنجاح" };
-
-        if ([400, 401, 403].includes(res.status)) {
-          const text = await res.text().catch(() => "");
-          return { ok: false, message: text || "مفتاح Claude أو النموذج غير صحيح" };
-        }
-
-        return { ok: false, message: `Anthropic responded with ${res.status}` };
-      } catch (error: unknown) {
-        return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
-      }
+      return testClaude(cfg);
     }
 
     return { ok: false, message: `مزود غير مدعوم: ${provider}` };
+  },
+  ai_intelligence: async (cfg, provider) => {
+    if (provider && provider !== "Anthropic Claude") {
+      return { ok: false, message: `مزود غير مدعوم: ${provider}` };
+    }
+    return testClaude(cfg, "claude-opus-4-7", "context-1m-2025-08-07,prompt-caching-2024-07-31");
   },
   image_enhance: async (cfg) => {
     if (!cfg.api_key) {
@@ -416,6 +433,73 @@ const TESTS: Record<string, (config: Record<string, any>, provider?: string) => 
   },
   stock_images: async (cfg) => {
     return testPexels(cfg);
+  },
+  ai_vision: async (cfg) => {
+    const apiKey = String(cfg.api_key || "").trim();
+    if (!apiKey) return { ok: false, message: "مفتاح AI Gateway مفقود" };
+    try {
+      const res = await fetch("https://ai-gateway.vercel.sh/v1/ai/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: String(cfg.default_model || "google/gemini-2.5-flash"),
+          messages: [{ role: "user", content: "ping" }],
+          max_tokens: 10,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res.ok) return { ok: true, message: "✅ Vercel AI Gateway متصل بنجاح" };
+      const text = await res.text().catch(() => "");
+      return {
+        ok: false,
+        message: `AI Gateway ${res.status}: ${text.slice(0, 200) || "غير متاح"}`,
+      };
+    } catch (error: unknown) {
+      return { ok: false, message: `خطأ في الاتصال: ${errMsg(error, "Unknown error")}` };
+    }
+  },
+  image_search: async (cfg, provider) => {
+    if (provider === "Bing") {
+      const key = String(cfg.bing_key || cfg.api_key || "").trim();
+      if (!key) return { ok: false, message: "مفتاح Bing مفقود" };
+      try {
+        const res = await fetch(
+          "https://api.bing.microsoft.com/v7.0/images/search?q=phone&count=1",
+          {
+            headers: { "Ocp-Apim-Subscription-Key": key },
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        if (res.ok) return { ok: true, message: "✅ Bing Image Search متصل" };
+        return { ok: false, message: `Bing ${res.status}` };
+      } catch (error: unknown) {
+        return { ok: false, message: `خطأ: ${errMsg(error, "Unknown error")}` };
+      }
+    }
+    // Default: Google CSE
+    const apiKey = String(cfg.api_key || "").trim();
+    const cx = String(cfg.cx || "").trim();
+    if (!apiKey || !cx)
+      return { ok: false, message: "Google API Key أو CX مفقود" };
+    try {
+      const url = new URL("https://www.googleapis.com/customsearch/v1");
+      url.searchParams.set("key", apiKey);
+      url.searchParams.set("cx", cx);
+      url.searchParams.set("q", "phone");
+      url.searchParams.set("searchType", "image");
+      url.searchParams.set("num", "1");
+      const res = await fetch(url.toString(), {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) return { ok: true, message: "✅ Google CSE متصل بنجاح" };
+      const text = await res.text().catch(() => "");
+      return { ok: false, message: `Google CSE ${res.status}: ${text.slice(0, 160)}` };
+    } catch (error: unknown) {
+      return { ok: false, message: `خطأ: ${errMsg(error, "Unknown error")}` };
+    }
   },
   webhook_security: async (cfg) => {
     if (!cfg.verify_token) {

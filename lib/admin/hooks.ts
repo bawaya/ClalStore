@@ -66,6 +66,12 @@ export function useAdminApi<T>({ endpoint, autoFetch = true, paginate }: UseAdmi
   }, [endpoint, paginateLimit]);
 
   useEffect(() => {
+    // Reset pagination on endpoint change so a stale offset doesn't query
+    // beyond the new dataset's range (e.g. switching filters).
+    offsetRef.current = 0;
+    setPagination((prev) =>
+      prev ? { ...prev, offset: 0, page: 1, total: 0, totalPages: 0 } : prev,
+    );
     if (autoFetch) fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFetch, endpoint, paginateLimit]);

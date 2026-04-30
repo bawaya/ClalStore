@@ -204,6 +204,52 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
       required: true,
     },
   ],
+  "Vercel AI Gateway": [
+    {
+      key: "api_key",
+      label: "AI Gateway API Key",
+      type: "password",
+      placeholder: "vck_...",
+      required: true,
+    },
+    {
+      key: "default_model",
+      label: "Default vision model",
+      type: "text",
+      placeholder: "google/gemini-2.5-flash",
+    },
+    {
+      key: "fallback_model",
+      label: "Fallback model",
+      type: "text",
+      placeholder: "anthropic/claude-haiku-4.5",
+    },
+  ],
+  "Google CSE": [
+    {
+      key: "api_key",
+      label: "Google API Key",
+      type: "password",
+      placeholder: "AIza...",
+      required: true,
+    },
+    {
+      key: "cx",
+      label: "Custom Search Engine ID (cx)",
+      type: "text",
+      placeholder: "017576662512468...",
+      required: true,
+    },
+  ],
+  Bing: [
+    {
+      key: "bing_key",
+      label: "Bing Search API Key",
+      type: "password",
+      placeholder: "Ocp-Apim-Subscription-Key",
+      required: true,
+    },
+  ],
   "MobileAPI.dev": [
     {
       key: "api_key",
@@ -383,7 +429,7 @@ const INTEGRATION_GROUPS = [
     key: "communication",
     title: "التواصل والذكاء",
     description: "رسائل واتساب وSMS والبريد والمساعد الذكي في مكان واحد.",
-    types: ["whatsapp", "sms", "email", "ai_chat", "ai_admin"],
+    types: ["whatsapp", "sms", "email", "ai_chat", "ai_admin", "ai_intelligence"],
   },
   {
     key: "payments",
@@ -417,6 +463,7 @@ const INTEGRATION_NOTES: Record<string, string> = {
 };
 
 Object.assign(INTEGRATION_NOTES, {
+  ai_intelligence: "يغذي أداة /admin/intelligence (تصنيف، صحة، توليد، محادثة) عبر Claude Opus 4.7 (1M context). الموديل المقترح: claude-opus-4-7.",
   ai_admin: "يغذي أدوات الإدارة المبنية على OpenAI مثل تحسين النصوص ومطابقة الأسعار.",
   image_enhance: "هذا التكامل مسؤول عن إزالة الخلفية وتحسين صور الأجهزة داخل إدارة المنتجات.",
   device_data: "يغذي الاستكمال التلقائي لمواصفات الهواتف والأجهزة من مزود بيانات خارجي.",

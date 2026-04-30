@@ -23,11 +23,13 @@ import {
   Settings,
   ShoppingCart,
   Smartphone,
+  Sparkles,
   Star,
   Store,
   TabletSmartphone,
   TicketPercent,
   Tv,
+  Cable,
   Users,
   WalletCards,
   Wifi,
@@ -83,11 +85,25 @@ const NAV_SECTIONS: NavSection[] = [
     title: "الكتالوج والتجارة",
     items: [
       {
-        key: "products",
-        href: "/admin/products",
-        label: "الهواتف والإكسسوارات",
-        description: "الأجهزة الرئيسية والملحقات وأدوات الصور",
+        key: "phones",
+        href: "/admin/phones",
+        label: "الهواتف",
+        description: "الأجهزة الرئيسية وأدوات الصور",
         icon: Smartphone,
+      },
+      {
+        key: "accessories",
+        href: "/admin/accessories",
+        label: "الإكسسوارات",
+        description: "الجرابات، الكوابل، السماعات والشواحن",
+        icon: Cable,
+      },
+      {
+        key: "intelligence",
+        href: "/admin/intelligence",
+        label: "الذكاء الكتالوجي",
+        description: "تصنيف ذكي، تقارير صحة، توليد محتوى، محادثة",
+        icon: Sparkles,
       },
       {
         key: "appliances",
@@ -264,7 +280,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-const MOBILE_SHORTCUT_KEYS = ["dashboard", "orders", "products", "homepage"];
+const MOBILE_SHORTCUT_KEYS = ["dashboard", "orders", "phones", "homepage"];
 const FLAT_NAV_ITEMS = NAV_SECTIONS.flatMap((section) => section.items);
 
 function isItemActive(pathname: string, item: NavItem) {
