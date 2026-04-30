@@ -429,7 +429,7 @@ const INTEGRATION_GROUPS = [
     key: "communication",
     title: "التواصل والذكاء",
     description: "رسائل واتساب وSMS والبريد والمساعد الذكي في مكان واحد.",
-    types: ["whatsapp", "sms", "email", "ai_chat", "ai_admin", "ai_intelligence"],
+    types: ["whatsapp", "sms", "email", "ai_chat", "ai_admin", "ai_intelligence", "ai_vision"],
   },
   {
     key: "payments",
@@ -447,7 +447,7 @@ const INTEGRATION_GROUPS = [
     key: "media",
     title: "الصور والبيانات",
     description: "مصادر الصور وتحسينها واستكمال مواصفات الأجهزة من الخدمات الفعلية.",
-    types: ["image_enhance", "device_data", "stock_images", "storage"],
+    types: ["image_enhance", "device_data", "stock_images", "image_search", "storage"],
   },
 ] as const;
 
@@ -465,9 +465,11 @@ const INTEGRATION_NOTES: Record<string, string> = {
 Object.assign(INTEGRATION_NOTES, {
   ai_intelligence: "يغذي أداة /admin/intelligence (تصنيف، صحة، توليد، محادثة) عبر Claude Opus 4.7 (1M context). الموديل المقترح: claude-opus-4-7.",
   ai_admin: "يغذي أدوات الإدارة المبنية على OpenAI مثل تحسين النصوص ومطابقة الأسعار.",
+  ai_vision: "يغذي tab «صور المنتجات» داخل /admin/intelligence — البحث عن صور، تصفية، فحص جودة، OCR مواصفات، alt-text، اكتشاف ألوان. عبر Vercel AI Gateway (Gemini 2.5 Flash مع fallback لـ Claude Haiku 4.5).",
   image_enhance: "هذا التكامل مسؤول عن إزالة الخلفية وتحسين صور الأجهزة داخل إدارة المنتجات.",
   device_data: "يغذي الاستكمال التلقائي لمواصفات الهواتف والأجهزة من مزود بيانات خارجي.",
   stock_images: "يستخدم لجلب صور إضافية مساعدة للمنتجات والألوان عند الحاجة.",
+  image_search: "مصادر بحث صور للأنواع غير الهواتف (إكسسوار، أجهزة منزلية، تلفزيونات...). Google CSE هو الأفضل تغطية، Bing احتياطي. تُستخدم من tab «صور المنتجات».",
   webhook_security: "هنا تدار مفاتيح التحقق وأسرار التوقيع لواتساب وResend ونقاط الدفع العائدة.",
 });
 
