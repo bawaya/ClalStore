@@ -20,6 +20,8 @@ vi.mock("@/lib/customer-auth", () => ({
 import { GET } from "@/app/api/store/order-status/route";
 import { NextRequest } from "next/server";
 
+const TRACKING_LOOKUP_ERROR = "تعذر التحقق من الطلب";
+
 function makeReq(params: Record<string, string>, headers: Record<string, string> = {}): NextRequest {
   const url = new URL("http://localhost/api/store/order-status");
   for (const [key, value] of Object.entries(params)) {
@@ -29,7 +31,7 @@ function makeReq(params: Record<string, string>, headers: Record<string, string>
   return new NextRequest(url, { method: "GET", headers });
 }
 
-const order = {
+const baseOrder = {
   id: "CLM-99999",
   customer_id: "cust-1",
   status: "processing",
@@ -44,9 +46,19 @@ const order = {
   },
 };
 
+function makeOrder(overrides: Partial<typeof baseOrder> = {}) {
+  return {
+    ...baseOrder,
+    ...overrides,
+  };
+}
+
 describe("GET /api/store/order-status", () => {
+  let order = makeOrder();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    order = makeOrder();
     mockAuthenticateCustomer.mockResolvedValue(null);
     mockFrom.mockImplementation((table: string) => {
       if (table === "orders") return createSupabaseChain(order);
@@ -64,6 +76,16 @@ describe("GET /api/store/order-status", () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
+  it("rejects generated order number alone", async () => {
+    const res = await GET(makeReq({ orderId: "CLM-ABCD1234" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe(TRACKING_LOOKUP_ERROR);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
   it("rejects a wrong verification factor", async () => {
     const res = await GET(makeReq({ orderId: "CLM-99999", phoneSuffix: "0000" }));
     const body = await res.json();
@@ -73,7 +95,7 @@ describe("GET /api/store/order-status", () => {
     expect(body.error).toBe("تعذر التحقق من الطلب");
   });
 
-  it("returns order status with a valid phone suffix", async () => {
+  it("accepts a legacy order id with a valid phone suffix", async () => {
     const res = await GET(makeReq({ orderId: "CLM-99999", phoneSuffix: "7653" }));
     const body = await res.json();
 
@@ -86,6 +108,18 @@ describe("GET /api/store/order-status", () => {
       created_at: "2026-04-30T10:00:00.000Z",
       payment_status: "paid",
     });
+  });
+
+  it("accepts a generated order id with a valid verification factor", async () => {
+    order = makeOrder({ id: "CLM-ABCD1234" });
+
+    const res = await GET(makeReq({ orderId: "CLM-ABCD1234", verification: "7653" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data.order.id).toBe("CLM-ABCD1234");
+    expect(mockFrom).toHaveBeenCalledWith("orders");
   });
 
   it("returns order status with a valid email verification factor", async () => {
@@ -109,6 +143,17 @@ describe("GET /api/store/order-status", () => {
     expect(res.status).toBe(404);
     expect(body.success).toBe(false);
     expect(body.error).toBe("تعذر التحقق من الطلب");
+  });
+
+  it("returns the generic response for generated ids with a wrong verification factor", async () => {
+    order = makeOrder({ id: "CLM-ABCD1234" });
+
+    const res = await GET(makeReq({ orderId: "CLM-ABCD1234", verification: "0000" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe(TRACKING_LOOKUP_ERROR);
   });
 
   it("does not leak whether enumeration attempts hit an existing order", async () => {
@@ -140,6 +185,18 @@ describe("GET /api/store/order-status", () => {
     expect(res.status).toBe(200);
     expect(body.data.order.id).toBe("CLM-99999");
   });
+  it.each(["abc", "CLM-", "CLM-123", "CLM-123456789", "XYZ-ABCD1234"])(
+    "rejects malformed order id %s",
+    async (orderId) => {
+      const res = await GET(makeReq({ orderId, verification: "7653" }));
+      const body = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect(body.error).toBe(TRACKING_LOOKUP_ERROR);
+      expect(mockFrom).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("/store/track compatibility", () => {
