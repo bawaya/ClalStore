@@ -1,28 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createSupabaseChain } from "./_helpers/supabase-mock";
 
 // --- Supabase mock ---
 const { mockFrom, mockRpc } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockRpc: vi.fn(),
 }));
-
-function chainable(data: unknown = null, error: unknown = null) {
-  const obj: Record<string, unknown> = {
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    neq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data, error }),
-    maybeSingle: vi.fn().mockResolvedValue({ data, error }),
-  };
-  for (const k of Object.keys(obj)) {
-    if (typeof obj[k] === "function" && k !== "single" && k !== "maybeSingle") {
-      (obj[k] as ReturnType<typeof vi.fn>).mockReturnValue(obj);
-    }
-  }
-  return obj;
-}
 
 vi.mock("@/lib/supabase", () => ({
   createAdminSupabase: vi.fn(() => ({
@@ -97,8 +80,45 @@ function makeCallbackReq(
 }
 
 describe("POST /api/payment", () => {
+  const dbOrder = {
+    id: "CLM-99999",
+    customer_id: "cust-1",
+    status: "pending_payment",
+    total: 3999,
+    payment_status: "awaiting_redirect",
+    payment_details: {},
+    shipping_city: "Haifa",
+    shipping_address: "Main St 1",
+    customers: {
+      id: "cust-1",
+      name: "Ahmad",
+      phone: "0533337653",
+      email: "ahmad@example.com",
+      city: "Haifa",
+      address: "Main St 1",
+      id_number: null,
+    },
+  };
+
+  const dbItems = [
+    {
+      product_name: "iPhone 16",
+      price: 3999,
+      quantity: 1,
+    },
+  ];
+
+  function mockPaymentDb(order: unknown = dbOrder, items: unknown = dbItems) {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "orders") return createSupabaseChain(order);
+      if (table === "order_items") return createSupabaseChain(items);
+      return createSupabaseChain();
+    });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPaymentDb();
   });
 
   const validPayment = {
@@ -115,6 +135,15 @@ describe("POST /api/payment", () => {
     expect(body.success).toBe(true);
     expect(body.data.paymentUrl).toContain("icredit");
     expect(body.data.provider).toBe("icredit");
+    expect(createPaymentPage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: "CLM-99999",
+        amount: 3999,
+        customerName: "Ahmad",
+        customerPhone: "0533337653",
+        items: [{ name: "iPhone 16", price: 3999, quantity: 1 }],
+      }),
+    );
   });
 
   it("returns payment URL for UPay gateway", async () => {
@@ -140,6 +169,54 @@ describe("POST /api/payment", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects a tampered client amount", async () => {
+    const res = await POST(makeReq({ ...validPayment, amount: 1 }));
+    expect(res.status).toBe(409);
+    expect(createPaymentPage).not.toHaveBeenCalled();
+  });
+
+  it("passes when the client amount matches the database total", async () => {
+    const res = await POST(makeReq(validPayment));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(createPaymentPage).toHaveBeenCalled();
+  });
+
+  it("rejects a missing order", async () => {
+    mockPaymentDb(null);
+    const res = await POST(makeReq(validPayment));
+    expect(res.status).toBe(404);
+    expect(createPaymentPage).not.toHaveBeenCalled();
+  });
+
+  it("rejects payment when the submitted customer factor does not match the order", async () => {
+    const res = await POST(makeReq({ ...validPayment, customerPhone: "0500000000" }));
+    expect(res.status).toBe(403);
+    expect(createPaymentPage).not.toHaveBeenCalled();
+  });
+
+  it("reuses a recent payment attempt instead of creating a duplicate gateway page", async () => {
+    mockPaymentDb({
+      ...dbOrder,
+      payment_details: {
+        payment_attempt: {
+          provider: "icredit",
+          amount: 3999,
+          payment_url: "https://icredit.rivhit.co.il/pay/existing",
+          initiated_at: new Date().toISOString(),
+        },
+      },
+    });
+
+    const res = await POST(makeReq(validPayment));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.data.reused).toBe(true);
+    expect(body.data.paymentUrl).toBe("https://icredit.rivhit.co.il/pay/existing");
+    expect(createPaymentPage).not.toHaveBeenCalled();
+  });
+
   it("returns 400 when payment page creation fails", async () => {
     (createPaymentPage as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       success: false,
@@ -157,13 +234,13 @@ describe("POST /api/payment", () => {
     expect(res.status).toBe(500);
   });
 
-  it("respects forceGateway parameter", async () => {
+  it("ignores forceGateway and uses the database-derived gateway decision", async () => {
     const res = await POST(
       makeReq({ ...validPayment, forceGateway: "rivhit" })
     );
     const body = await res.json();
     expect(body.data.provider).toBe("icredit");
-    expect(detectPaymentGateway).not.toHaveBeenCalled();
+    expect(detectPaymentGateway).toHaveBeenCalledWith("Haifa");
   });
 });
 
@@ -199,7 +276,7 @@ describe("POST /api/payment/callback", () => {
         }
         return chain;
       }
-      return chainable();
+      return createSupabaseChain();
     });
   });
 

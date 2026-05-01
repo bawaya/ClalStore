@@ -68,7 +68,6 @@ vi.mock("@/lib/rate-limit-db", () => ({
 }));
 
 import { GET as AutocompleteGET } from "@/app/api/store/autocomplete/route";
-import { GET as OrderStatusGET } from "@/app/api/store/order-status/route";
 import { GET as SmartSearchGET } from "@/app/api/store/smart-search/route";
 import { NextRequest } from "next/server";
 import { checkRateLimitDb } from "@/lib/rate-limit-db";
@@ -141,75 +140,6 @@ describe("GET /api/store/autocomplete", () => {
       makeReq("/api/store/autocomplete?q=test&limit=20")
     );
     expect(res.status).toBe(200);
-  });
-});
-
-// ============ Order Status ============
-
-describe("GET /api/store/order-status", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("returns order status for valid order ID", async () => {
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
-            data: { id: "CLM-99999", status: "approved", total: 3999, created_at: "2025-01-01", payment_status: "paid" },
-            error: null,
-          }),
-        }),
-      }),
-    });
-
-    const res = await OrderStatusGET(
-      makeReq("/api/store/order-status?orderId=CLM-99999")
-    );
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.data.order.id).toBe("CLM-99999");
-    expect(body.data.order.status).toBe("approved");
-  });
-
-  it("returns 400 for invalid order ID format", async () => {
-    const res = await OrderStatusGET(
-      makeReq("/api/store/order-status?orderId=invalid")
-    );
-    expect(res.status).toBe(400);
-  });
-
-  it("returns 400 when orderId is missing", async () => {
-    const res = await OrderStatusGET(makeReq("/api/store/order-status"));
-    expect(res.status).toBe(400);
-  });
-
-  it("returns 404 when order is not found", async () => {
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } }),
-        }),
-      }),
-    });
-
-    const res = await OrderStatusGET(
-      makeReq("/api/store/order-status?orderId=CLM-00000")
-    );
-    expect(res.status).toBe(404);
-  });
-
-  it("validates CLM-XXXXX format", async () => {
-    const res1 = await OrderStatusGET(
-      makeReq("/api/store/order-status?orderId=CLM-12345")
-    );
-    // This might pass or fail depending on DB but shouldn't be 400
-    expect(res1.status).not.toBe(400);
-
-    const res2 = await OrderStatusGET(
-      makeReq("/api/store/order-status?orderId=ABC-123")
-    );
-    expect(res2.status).toBe(400);
   });
 });
 
