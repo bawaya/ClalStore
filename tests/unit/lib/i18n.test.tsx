@@ -1,218 +1,146 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import React from "react";
-import { useState, useEffect } from "react";
-import { renderToString } from "react-dom/server";
+import { describe, it, expect, beforeEach } from "vitest";
+import React, { useEffect } from "react";
+import { render, screen, waitFor } from "@testing-library/react";
 
-// We cannot use @testing-library/react renderHook (missing @testing-library/dom).
-// Instead we test the module exports directly and use renderToString for provider tests.
-
-// Import the module under test
 import { LangProvider, useLang } from "@/lib/i18n";
 
-// ─────────────────────────────────────────────
-// useLang default context (outside provider)
-// ─────────────────────────────────────────────
-describe("useLang outside LangProvider", () => {
-  it("returns default context values", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+type LangContextValue = ReturnType<typeof useLang>;
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
+function LangProbe({ onValue }: { onValue: (value: LangContextValue) => void }) {
+  const value = useLang();
 
-    renderToString(React.createElement(Spy));
+  useEffect(() => {
+    onValue(value);
+  }, [onValue, value]);
 
+  return null;
+}
+
+async function captureLangContext({ withProvider = false } = {}) {
+  let captured: LangContextValue | null = null;
+  const onValue = (value: LangContextValue) => {
+    captured = value;
+  };
+  const probe = React.createElement(LangProbe, { onValue });
+
+  render(
+    withProvider
+      ? React.createElement(LangProvider, null, probe)
+      : probe,
+  );
+
+  await waitFor(() => {
     expect(captured).not.toBeNull();
-    expect(captured!.lang).toBe("ar");
-    expect(captured!.dir).toBe("rtl");
-    expect(captured!.fontClass).toBe("font-arabic");
   });
 
-  it("t() returns key as fallback when used outside provider", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+  const value = captured as LangContextValue | null;
+  if (!value) {
+    throw new Error("Lang context was not captured");
+  }
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
+  return value;
+}
 
-    renderToString(React.createElement(Spy));
-    expect(captured!.t("any.key")).toBe("any.key");
+describe("useLang outside LangProvider", () => {
+  it("returns default context values", async () => {
+    const captured = await captureLangContext();
+
+    expect(captured.lang).toBe("ar");
+    expect(captured.dir).toBe("rtl");
+    expect(captured.fontClass).toBe("font-arabic");
+  });
+
+  it("t() returns key as fallback when used outside provider", async () => {
+    const captured = await captureLangContext();
+
+    expect(captured.t("any.key")).toBe("any.key");
   });
 });
 
-// ─────────────────────────────────────────────
-// LangProvider initial render (SSR/server side)
-// ─────────────────────────────────────────────
-describe("LangProvider server-side render", () => {
+describe("LangProvider initial render", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("provides dir as 'rtl'", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+  it("provides dir as 'rtl'", async () => {
+    const captured = await captureLangContext({ withProvider: true });
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
-
-    renderToString(
-      React.createElement(LangProvider, null, React.createElement(Spy))
-    );
-
-    expect(captured!.dir).toBe("rtl");
+    expect(captured.dir).toBe("rtl");
   });
 
-  it("provides default lang 'ar' on initial render", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+  it("provides default lang 'ar' on initial render", async () => {
+    const captured = await captureLangContext({ withProvider: true });
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
-
-    renderToString(
-      React.createElement(LangProvider, null, React.createElement(Spy))
-    );
-
-    expect(captured!.lang).toBe("ar");
+    expect(captured.lang).toBe("ar");
   });
 
-  it("provides fontClass 'font-arabic' for default Arabic", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+  it("provides fontClass 'font-arabic' for default Arabic", async () => {
+    const captured = await captureLangContext({ withProvider: true });
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
-
-    renderToString(
-      React.createElement(LangProvider, null, React.createElement(Spy))
-    );
-
-    expect(captured!.fontClass).toBe("font-arabic");
+    expect(captured.fontClass).toBe("font-arabic");
   });
 
-  it("t() translates known keys in Arabic", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+  it("t() translates known keys in Arabic", async () => {
+    const captured = await captureLangContext({ withProvider: true });
+    const translation = captured.t("nav.home");
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
-
-    renderToString(
-      React.createElement(LangProvider, null, React.createElement(Spy))
-    );
-
-    // Default is 'ar', "nav.home" should resolve to the Arabic translation
-    const translation = captured!.t("nav.home");
     expect(translation).toBeTruthy();
-    expect(translation).not.toBe("nav.home"); // not falling back to key
+    expect(translation).not.toBe("nav.home");
   });
 
-  it("t() returns key as fallback for unknown paths", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+  it("t() returns key as fallback for unknown paths", async () => {
+    const captured = await captureLangContext({ withProvider: true });
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
-
-    renderToString(
-      React.createElement(LangProvider, null, React.createElement(Spy))
-    );
-
-    expect(captured!.t("nonexistent.deep.path")).toBe("nonexistent.deep.path");
+    expect(captured.t("nonexistent.deep.path")).toBe("nonexistent.deep.path");
   });
 
-  it("t() returns key when path partially exists but final value is not a string", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+  it("t() returns key when path partially exists but final value is not a string", async () => {
+    const captured = await captureLangContext({ withProvider: true });
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
-
-    renderToString(
-      React.createElement(LangProvider, null, React.createElement(Spy))
-    );
-
-    // "nav" exists but is an object, not a string
-    expect(captured!.t("nav")).toBe("nav");
+    expect(captured.t("nav")).toBe("nav");
   });
 });
 
-// ─────────────────────────────────────────────
-// detectLang behavior (tested through localStorage)
-// ─────────────────────────────────────────────
 describe("detectLang via localStorage", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("defaults to 'ar' when localStorage is empty and navigator is not Hebrew", () => {
-    // In jsdom, navigator.language is typically 'en' or empty
-    let captured: ReturnType<typeof useLang> | null = null;
+  it("defaults to 'ar' when localStorage is empty and navigator is not Hebrew", async () => {
+    const captured = await captureLangContext({ withProvider: true });
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
-
-    renderToString(
-      React.createElement(LangProvider, null, React.createElement(Spy))
-    );
-
-    // Initial server render always starts with 'ar' (detectLang only runs in useEffect)
-    expect(captured!.lang).toBe("ar");
+    expect(captured.lang).toBe("ar");
   });
 
   it("detectLang reads from localStorage when set to 'he'", () => {
     localStorage.setItem("clal_lang", "he");
 
-    // We can verify detectLang would pick up 'he' by checking localStorage directly
-    // The useEffect in LangProvider calls detectLang on mount
     expect(localStorage.getItem("clal_lang")).toBe("he");
   });
 
   it("detectLang reads from localStorage when set to 'ar'", () => {
     localStorage.setItem("clal_lang", "ar");
+
     expect(localStorage.getItem("clal_lang")).toBe("ar");
   });
 
   it("ignores invalid localStorage values", () => {
     localStorage.setItem("clal_lang", "fr");
-    // detectLang should fall through to browser detection and default to 'ar'
-    // We verify by checking the stored value is not a valid Lang
     const stored = localStorage.getItem("clal_lang");
+
     expect(stored !== "ar" && stored !== "he").toBe(true);
   });
 });
 
-// ─────────────────────────────────────────────
-// setLang behavior (unit test the callback)
-// ─────────────────────────────────────────────
 describe("setLang behavior", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("setLang is a function in the context", () => {
-    let captured: ReturnType<typeof useLang> | null = null;
+  it("setLang is a function in the context", async () => {
+    const captured = await captureLangContext({ withProvider: true });
 
-    function Spy() {
-      captured = useLang();
-      return null;
-    }
-
-    renderToString(
-      React.createElement(LangProvider, null, React.createElement(Spy))
-    );
-
-    expect(typeof captured!.setLang).toBe("function");
+    expect(typeof captured.setLang).toBe("function");
   });
 
   it("renders children inside the provider", () => {
@@ -220,10 +148,8 @@ describe("setLang behavior", () => {
       return React.createElement("div", null, "child-content");
     }
 
-    const html = renderToString(
-      React.createElement(LangProvider, null, React.createElement(Child))
-    );
+    render(React.createElement(LangProvider, null, React.createElement(Child)));
 
-    expect(html).toContain("child-content");
+    expect(screen.getByText("child-content")).toBeInTheDocument();
   });
 });
