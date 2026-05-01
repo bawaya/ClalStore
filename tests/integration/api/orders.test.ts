@@ -68,6 +68,24 @@ import { POST } from "@/app/api/orders/route";
 import { NextRequest } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 
+type ProductRow = {
+  id: string;
+  price: number;
+  type: string;
+};
+
+type CreateOrderPayload = {
+  p_items: Array<{
+    product_id: string | null;
+    product_type: string;
+    price: number;
+  }>;
+  p_payment_method: string;
+  p_payment_details: {
+    payment_status: string;
+  };
+};
+
 function makeReq(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/orders", {
     method: "POST",
@@ -95,22 +113,37 @@ const validOrder = {
 };
 
 describe("POST /api/orders", () => {
+  let productRows: ProductRow[];
+
   beforeEach(() => {
     vi.clearAllMocks();
+    productRows = [
+      { id: "prod-1", price: 3999, type: "device" },
+      { id: "acc-1", price: 50, type: "accessory" },
+      { id: "tv-1", price: 1500, type: "tv" },
+      { id: "computer-1", price: 2500, type: "computer" },
+      { id: "tablet-1", price: 1200, type: "tablet" },
+      { id: "network-1", price: 500, type: "network" },
+    ];
 
     const custChain = chainable({ id: "cust-1", customer_code: "CLM-12345" });
-    const prodChain = chainable([{ id: "prod-1", price: 3999 }]);
     const couponChain = chainable(null);
 
     mockFrom.mockImplementation((table: string) => {
       if (table === "customers") return custChain;
-      if (table === "products") return prodChain;
+      if (table === "products") return chainable(productRows);
       if (table === "coupons") return couponChain;
       return chainable();
     });
 
     mockRpc.mockResolvedValue({ data: { order_id: "CLM-99999" }, error: null });
   });
+
+  function getCreateOrderPayload() {
+    const call = mockRpc.mock.calls.find(([fn]) => fn === "create_order_atomic");
+    expect(call).toBeDefined();
+    return call![1] as CreateOrderPayload;
+  }
 
   it("creates order successfully for existing customer", async () => {
     const res = await POST(makeReq(validOrder));
@@ -189,8 +222,55 @@ describe("POST /api/orders", () => {
     };
     const res = await POST(makeReq(order));
     const body = await res.json();
+    const payload = getCreateOrderPayload();
+
     expect(body.data.needsPayment).toBe(true);
     expect(body.data.status).toBe("pending_payment");
+    expect(payload.p_payment_method).toBe("credit");
+    expect(payload.p_payment_details.payment_status).toBe("awaiting_redirect");
+    expect(payload.p_items[0].product_type).toBe("accessory");
+  });
+
+  it("uses DB product type when the client tries to force accessory payment", async () => {
+    const order = {
+      ...validOrder,
+      items: [
+        {
+          productId: "prod-1",
+          name: "iPhone 16",
+          brand: "Apple",
+          type: "accessory",
+          price: 1,
+        },
+      ],
+    };
+
+    const res = await POST(makeReq(order));
+    const body = await res.json();
+    const payload = getCreateOrderPayload();
+
+    expect(body.data.needsPayment).toBe(false);
+    expect(body.data.status).toBe("new");
+    expect(payload.p_items[0].product_type).toBe("device");
+    expect(payload.p_items[0].price).toBe(3999);
+  });
+
+  it("uses DB non-accessory type when the client labels a tv as accessory", async () => {
+    const order = {
+      ...validOrder,
+      items: [
+        { productId: "tv-1", name: "TV", brand: "Generic", type: "accessory", price: 1 },
+      ],
+    };
+
+    const res = await POST(makeReq(order));
+    const body = await res.json();
+    const payload = getCreateOrderPayload();
+
+    expect(body.data.needsPayment).toBe(false);
+    expect(body.data.status).toBe("new");
+    expect(payload.p_items[0].product_type).toBe("tv");
+    expect(payload.p_items[0].price).toBe(1500);
   });
 
   it.each(["tv", "computer", "tablet", "network"])(
@@ -222,8 +302,40 @@ describe("POST /api/orders", () => {
 
     const res = await POST(makeReq(order));
     const body = await res.json();
+    const payload = getCreateOrderPayload();
 
     expect(body.data.needsPayment).toBe(false);
     expect(body.data.status).toBe("new");
+    expect(payload.p_items.map((item) => item.product_type)).toEqual(["accessory", "tv"]);
+  });
+
+  it("uses DB types for mixed carts even when the client labels every item as accessory", async () => {
+    const order = {
+      ...validOrder,
+      items: [
+        { productId: "acc-1", name: "Case", brand: "Generic", type: "accessory", price: 1 },
+        { productId: "tv-1", name: "TV", brand: "Generic", type: "accessory", price: 1 },
+      ],
+    };
+
+    const res = await POST(makeReq(order));
+    const body = await res.json();
+    const payload = getCreateOrderPayload();
+
+    expect(body.data.needsPayment).toBe(false);
+    expect(body.data.status).toBe("new");
+    expect(payload.p_items.map((item) => item.product_type)).toEqual(["accessory", "tv"]);
+    expect(payload.p_items.map((item) => item.price)).toEqual([50, 1500]);
+  });
+
+  it("rejects order creation when a product id is not found in the database", async () => {
+    productRows = [];
+
+    const res = await POST(makeReq(validOrder));
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.success).toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 });
