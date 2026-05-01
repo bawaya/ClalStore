@@ -14,6 +14,25 @@ import { apiSuccess, apiError } from "@/lib/api-response";
 import { getIntegrationConfig } from "@/lib/integrations/hub";
 import { recordPaymentOutcome } from "@/lib/analytics";
 
+type CallbackOrderItem = {
+  product_type?: string | null;
+};
+
+type CallbackOrder = {
+  id: string;
+  status?: string | null;
+  payment_status?: string | null;
+  total?: number | string | null;
+};
+
+function amountsMatch(providerAmount: number, orderTotal: number) {
+  return Math.abs(providerAmount - orderTotal) <= 1;
+}
+
+function isOnlinePaymentEligible(items: CallbackOrderItem[]) {
+  return items.length > 0 && items.every((item) => item.product_type === "accessory");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -26,6 +45,18 @@ export async function POST(req: NextRequest) {
     const paymentWebhookSecret = String(
       webhookCfg.payment_webhook_secret || process.env.PAYMENT_WEBHOOK_SECRET || ""
     ).trim();
+
+    const requireWebhookSignature = process.env.NODE_ENV === "production";
+
+    if (!paymentWebhookSecret && requireWebhookSignature) {
+      console.error("Payment webhook: missing HMAC secret in production");
+      return apiError("Invalid webhook signature", 401);
+    }
+
+    if (!webhookSignature && requireWebhookSignature) {
+      console.error("Payment webhook: missing HMAC signature in production");
+      return apiError("Invalid webhook signature", 401);
+    }
 
     if (webhookSignature && paymentWebhookSecret) {
       const valid = await verifyWebhookSignature(rawBody, webhookSignature, paymentWebhookSecret);
@@ -66,7 +97,7 @@ export async function POST(req: NextRequest) {
     const db = createAdminSupabase();
 
     const { data: existingOrder } = await db.from("orders")
-      .select("id, status, payment_status")
+      .select("id, status, payment_status, total")
       .eq("id", orderId)
       .single();
 
@@ -78,6 +109,56 @@ export async function POST(req: NextRequest) {
     if (existingOrder.payment_status === "paid") {
       console.warn("iCredit IPN: order already paid:", orderId);
       return apiSuccess({ received: true, note: "already_paid" });
+    }
+
+    const paymentOrder = existingOrder as CallbackOrder;
+    const { data: orderItems, error: itemsError } = await db
+      .from("order_items")
+      .select("product_type")
+      .eq("order_id", orderId);
+
+    if (itemsError || !isOnlinePaymentEligible((orderItems || []) as CallbackOrderItem[])) {
+      await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
+        p_order_id: orderId,
+        p_payment_status: "failed",
+        p_order_status: "",
+        p_transaction_id: "",
+        p_payment_details: {
+          type: "credit",
+          provider: "icredit",
+          sale_id: saleId,
+          amount,
+          error: "payment_not_eligible",
+        },
+        p_audit_action: `Payment rejected: ${orderId} is not eligible for online payment`,
+        p_audit_details: { sale_id: saleId, amount, error: "payment_not_eligible" },
+      });
+
+      recordPaymentOutcome({ orderId, status: "failed", amount, provider: "icredit" });
+      return apiError("This order is not eligible for online payment", 409);
+    }
+
+    const orderTotal = Number(paymentOrder.total || 0);
+    if (orderTotal > 0 && !amountsMatch(amount, orderTotal)) {
+      await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
+        p_order_id: orderId,
+        p_payment_status: "failed",
+        p_order_status: "",
+        p_transaction_id: "",
+        p_payment_details: {
+          type: "credit",
+          provider: "icredit",
+          sale_id: saleId,
+          amount,
+          expected: orderTotal,
+          error: "amount_mismatch",
+        },
+        p_audit_action: `Payment amount mismatch: ${orderId} paid ${amount} instead of ${orderTotal}`,
+        p_audit_details: { sale_id: saleId, paid: amount, expected: orderTotal },
+      });
+
+      recordPaymentOutcome({ orderId, status: "failed", amount, provider: "icredit" });
+      return apiError("Payment amount mismatch", 409);
     }
 
     // Replay protection: reject duplicate saleId

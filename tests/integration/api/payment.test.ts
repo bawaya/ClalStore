@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createSupabaseChain } from "./_helpers/supabase-mock";
 
 // --- Supabase mock ---
@@ -44,6 +44,10 @@ vi.mock("@/lib/integrations/upay", () => ({
     success: true,
     paymentUrl: "https://upay.co.il/pay/test",
   })),
+  verifyUpayTransaction: vi.fn(async () => ({
+    valid: true,
+    amount: 3999,
+  })),
 }));
 
 vi.mock("@/lib/webhook-verify", () => ({
@@ -51,14 +55,27 @@ vi.mock("@/lib/webhook-verify", () => ({
 }));
 
 vi.mock("@/lib/bot/notifications", () => ({
+  notifyNewOrder: vi.fn().mockResolvedValue(undefined),
   notifyStatusChange: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/bot/admin-notify", () => ({
+  notifyAdminNewOrder: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/public-site-url", () => ({
+  getPublicSiteUrl: vi.fn(() => "http://localhost"),
 }));
 
 import { POST } from "@/app/api/payment/route";
 import { POST as CallbackPOST, GET as CallbackGET } from "@/app/api/payment/callback/route";
+import { GET as UpayCallbackGET } from "@/app/api/payment/upay/callback/route";
 import { NextRequest } from "next/server";
 import { detectPaymentGateway } from "@/lib/payment-gateway";
 import { createPaymentPage } from "@/lib/integrations/rivhit";
+import { verifyIPN } from "@/lib/integrations/rivhit";
+import { verifyUpayTransaction } from "@/lib/integrations/upay";
+import { verifyWebhookSignature } from "@/lib/webhook-verify";
 
 function makeReq(body: unknown, method = "POST", headers: Record<string, string> = {}): NextRequest {
   return new NextRequest("http://localhost/api/payment", {
@@ -78,6 +95,19 @@ function makeCallbackReq(
     body,
   });
 }
+
+function makeUpayReq(params: Record<string, string>): NextRequest {
+  const url = new URL("http://localhost/api/payment/upay/callback");
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+
+  return new NextRequest(url, { method: "GET" });
+}
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("POST /api/payment", () => {
   const dbOrder = {
@@ -102,7 +132,8 @@ describe("POST /api/payment", () => {
 
   const dbItems = [
     {
-      product_name: "iPhone 16",
+      product_name: "Phone Case",
+      product_type: "accessory",
       price: 3999,
       quantity: 1,
     },
@@ -141,7 +172,7 @@ describe("POST /api/payment", () => {
         amount: 3999,
         customerName: "Ahmad",
         customerPhone: "0533337653",
-        items: [{ name: "iPhone 16", price: 3999, quantity: 1 }],
+        items: [{ name: "Phone Case", price: 3999, quantity: 1 }],
       }),
     );
   });
@@ -181,6 +212,40 @@ describe("POST /api/payment", () => {
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
     expect(createPaymentPage).toHaveBeenCalled();
+  });
+
+  it("rejects an order with no order items", async () => {
+    mockPaymentDb(dbOrder, []);
+
+    const res = await POST(makeReq(validPayment));
+
+    expect(res.status).toBe(409);
+    expect(createPaymentPage).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-accessory order before creating a payment page", async () => {
+    mockPaymentDb(dbOrder, [
+      { product_name: "iPhone 16", product_type: "device", price: 3999, quantity: 1 },
+    ]);
+
+    const res = await POST(makeReq(validPayment));
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.error).toBe("This order is not eligible for online payment");
+    expect(createPaymentPage).not.toHaveBeenCalled();
+  });
+
+  it("rejects a mixed accessory and non-accessory order before creating a payment page", async () => {
+    mockPaymentDb(dbOrder, [
+      { product_name: "Phone Case", product_type: "accessory", price: 99, quantity: 1 },
+      { product_name: "TV", product_type: "tv", price: 3900, quantity: 1 },
+    ]);
+
+    const res = await POST(makeReq(validPayment));
+
+    expect(res.status).toBe(409);
+    expect(createPaymentPage).not.toHaveBeenCalled();
   });
 
   it("rejects a missing order", async () => {
@@ -248,6 +313,8 @@ describe("POST /api/payment/callback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRpc.mockResolvedValue({ error: null });
+    (verifyIPN as ReturnType<typeof vi.fn>).mockResolvedValue({ verified: true });
+    (verifyWebhookSignature as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     // Counter distinguishes the 3 sequential db.from("orders") calls:
     // 1. select(...).eq("id").single()  → existingOrder
     // 2. select("id").neq("id").eq("payment_transaction_id").single()  → dup check
@@ -263,7 +330,7 @@ describe("POST /api/payment/callback", () => {
           neq: vi.fn().mockReturnThis(),
           single: vi.fn().mockResolvedValue(
             idx === 1
-              ? { data: { id: "CLM-99999", status: "new", payment_status: "pending" }, error: null }
+              ? { data: { id: "CLM-99999", status: "new", payment_status: "pending", total: 3999 }, error: null }
               : { data: null, error: null },
           ),
           maybeSingle: vi.fn().mockResolvedValue({
@@ -275,6 +342,9 @@ describe("POST /api/payment/callback", () => {
           (chain[k] as ReturnType<typeof vi.fn>).mockReturnValue(chain);
         }
         return chain;
+      }
+      if (table === "order_items") {
+        return createSupabaseChain([{ product_type: "accessory" }]);
       }
       return createSupabaseChain();
     });
@@ -296,6 +366,107 @@ describe("POST /api/payment/callback", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.data.received).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith(
+      "process_payment_callback",
+      expect.objectContaining({
+        p_payment_status: "paid",
+        p_order_status: "approved",
+      }),
+    );
+  });
+
+  it("rejects iCredit callback when provider amount does not match the order total", async () => {
+    const res = await CallbackPOST(
+      makeCallbackReq(JSON.stringify({
+        SaleId: "sale-123",
+        Custom1: "CLM-99999",
+        TransactionAmount: "1",
+      })),
+    );
+
+    expect(res.status).toBe(409);
+    expect(mockRpc).toHaveBeenCalledWith(
+      "process_payment_callback",
+      expect.objectContaining({
+        p_payment_status: "failed",
+        p_payment_details: expect.objectContaining({ error: "amount_mismatch" }),
+      }),
+    );
+  });
+
+  it("rejects iCredit callback for a non-accessory order", async () => {
+    let ordersCall = 0;
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "orders") {
+        ordersCall++;
+        if (ordersCall === 1) {
+          return createSupabaseChain({
+            id: "CLM-99999",
+            status: "new",
+            payment_status: "pending",
+            total: 3999,
+          });
+        }
+        return createSupabaseChain(null);
+      }
+      if (table === "order_items") {
+        return createSupabaseChain([{ product_type: "device" }]);
+      }
+      return createSupabaseChain();
+    });
+
+    const res = await CallbackPOST(
+      makeCallbackReq(JSON.stringify({
+        SaleId: "sale-123",
+        Custom1: "CLM-99999",
+        TransactionAmount: "3999",
+      })),
+    );
+
+    expect(res.status).toBe(409);
+    expect(mockRpc).toHaveBeenCalledWith(
+      "process_payment_callback",
+      expect.objectContaining({
+        p_payment_status: "failed",
+        p_payment_details: expect.objectContaining({ error: "payment_not_eligible" }),
+      }),
+    );
+  });
+
+  it("fails closed in production when iCredit callback signature is missing", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PAYMENT_WEBHOOK_SECRET", "secret");
+
+    const res = await CallbackPOST(
+      makeCallbackReq(JSON.stringify({
+        SaleId: "sale-123",
+        Custom1: "CLM-99999",
+        TransactionAmount: "3999",
+      })),
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("fails closed in production when iCredit callback signature is invalid", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PAYMENT_WEBHOOK_SECRET", "secret");
+    (verifyWebhookSignature as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+
+    const res = await CallbackPOST(
+      makeCallbackReq(
+        JSON.stringify({
+          SaleId: "sale-123",
+          Custom1: "CLM-99999",
+          TransactionAmount: "3999",
+        }),
+        { "x-signature": "bad-signature" },
+      ),
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it("returns 400 when orderId is missing from IPN", async () => {
@@ -345,5 +516,104 @@ describe("GET /api/payment/callback", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.data.status).toBe("ok");
+  });
+});
+
+describe("GET /api/payment/upay/callback", () => {
+  function mockUpayDb(
+    order: unknown = {
+      id: "CLM-99999",
+      status: "pending_payment",
+      payment_status: "pending",
+      total: 3999,
+    },
+    items: unknown = [{ product_type: "accessory" }],
+  ) {
+    const ordersChain = createSupabaseChain(order) as ReturnType<typeof createSupabaseChain> & {
+      update: ReturnType<typeof vi.fn>;
+    };
+    const updateSpy = vi.fn(() => ordersChain);
+    ordersChain.update = updateSpy;
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "orders") return ordersChain;
+      if (table === "order_items") return createSupabaseChain(items);
+      if (table === "audit_log") return createSupabaseChain();
+      return createSupabaseChain();
+    });
+
+    return updateSpy;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (verifyUpayTransaction as ReturnType<typeof vi.fn>).mockResolvedValue({
+      valid: true,
+      amount: 3999,
+    });
+  });
+
+  it("marks a valid accessory-only UPay order as paid", async () => {
+    const updateSpy = mockUpayDb();
+
+    const res = await UpayCallbackGET(
+      makeUpayReq({
+        order_id: "CLM-99999",
+        transactionid: "tx-123",
+        providererrordescription: "SUCCESS",
+        amount: "3999",
+      }),
+    );
+
+    expect(res.headers.get("location")).toContain("/store/checkout/success");
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_status: "paid",
+        payment_transaction_id: "tx-123",
+        status: "approved",
+      }),
+    );
+  });
+
+  it("rejects a non-accessory UPay order before marking it paid", async () => {
+    const updateSpy = mockUpayDb(undefined, [{ product_type: "device" }]);
+
+    const res = await UpayCallbackGET(
+      makeUpayReq({
+        order_id: "CLM-99999",
+        transactionid: "tx-123",
+        providererrordescription: "SUCCESS",
+        amount: "3999",
+      }),
+    );
+
+    expect(res.headers.get("location")).toContain("error=payment_not_eligible");
+    const orderUpdates = updateSpy.mock.calls as unknown as Array<[Record<string, unknown>]>;
+    expect(orderUpdates.some(([payload]) => payload.payment_status === "paid")).toBe(false);
+  });
+
+  it("keeps rejecting UPay callbacks when the verified amount does not match", async () => {
+    const updateSpy = mockUpayDb();
+    (verifyUpayTransaction as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      valid: true,
+      amount: 1,
+    });
+
+    const res = await UpayCallbackGET(
+      makeUpayReq({
+        order_id: "CLM-99999",
+        transactionid: "tx-123",
+        providererrordescription: "SUCCESS",
+        amount: "1",
+      }),
+    );
+
+    expect(res.headers.get("location")).toContain("error=amount_mismatch");
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_status: "failed",
+        payment_details: expect.objectContaining({ error: "amount_mismatch" }),
+      }),
+    );
   });
 });

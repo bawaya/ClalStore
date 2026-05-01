@@ -48,6 +48,7 @@ type PaymentOrder = {
 
 type PaymentOrderItem = {
   product_name?: string | null;
+  product_type?: string | null;
   price?: number | string | null;
   quantity?: number | string | null;
 };
@@ -106,6 +107,10 @@ function getSavedMaxInstallments(paymentDetails: Record<string, unknown>) {
   const value = Number(paymentDetails.installments || paymentDetails.maxInstallments);
   if (Number.isInteger(value) && value >= 1 && value <= 12) return value;
   return 12;
+}
+
+function isOnlinePaymentEligible(items: PaymentOrderItem[]) {
+  return items.length > 0 && items.every((item) => item.product_type === "accessory");
 }
 
 export async function POST(req: NextRequest) {
@@ -168,6 +173,20 @@ export async function POST(req: NextRequest) {
     const paymentDetails = isRecord(paymentOrder.payment_details)
       ? paymentOrder.payment_details
       : {};
+    const { data: orderItems, error: itemsError } = await supabase
+      .from("order_items")
+      .select("product_name, product_type, price, quantity")
+      .eq("order_id", paymentOrder.id);
+
+    if (itemsError || !orderItems || orderItems.length === 0) {
+      return apiError("This order is not eligible for online payment", 409);
+    }
+
+    const typedOrderItems = orderItems as PaymentOrderItem[];
+    if (!isOnlinePaymentEligible(typedOrderItems)) {
+      return apiError("This order is not eligible for online payment", 409);
+    }
+
     const reusableAttempt = getReusablePaymentAttempt(paymentDetails, serverAmount);
     if (reusableAttempt) {
       return apiSuccess({
@@ -177,16 +196,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { data: orderItems, error: itemsError } = await supabase
-      .from("order_items")
-      .select("product_name, price, quantity")
-      .eq("order_id", paymentOrder.id);
-
-    if (itemsError || !orderItems || orderItems.length === 0) {
-      return apiError("تعذر بدء الدفع لهذا الطلب", 409);
-    }
-
-    const gatewayItems = (orderItems as PaymentOrderItem[]).map((item) => ({
+    const gatewayItems = typedOrderItems.map((item) => ({
       name: item.product_name || `طلب ${paymentOrder.id}`,
       price: Number(item.price || 0),
       quantity: Number(item.quantity || 1),

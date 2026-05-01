@@ -27,6 +27,10 @@ interface CartItem {
   productName?: string;
 }
 
+interface VerifiedCartItem extends CartItem {
+  product_type: Product["type"];
+}
+
 interface OrderRequestBody {
   customer: {
     name: string;
@@ -42,6 +46,10 @@ interface OrderRequestBody {
   couponCode?: string;
   discountAmount?: number;
   source?: string;
+}
+
+function isOnlinePaymentEligible(items: VerifiedCartItem[]) {
+  return items.length > 0 && items.every((item) => item.product_type === "accessory");
 }
 
 export async function POST(req: NextRequest) {
@@ -78,18 +86,58 @@ export async function POST(req: NextRequest) {
       return apiError("عناصر غير صالحة — يجب أن يحتوي كل منتج على معرّف", 400);
     }
 
-    const hasInstallment = items.some(
-      (i: CartItem) => i.type === "device" || i.type === "appliance",
-    );
-    if (hasInstallment && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
-      return apiError("رقم هوية غير صالح", 400);
-    }
-
     const supabase = createAdminSupabase();
 
     if (!supabase) {
       console.error("Order API: Supabase admin client is null — check SUPABASE_SERVICE_ROLE_KEY");
       return apiError("خطأ في إعدادات السيرفر", 500);
+    }
+
+    // === 1. Verify product price and type from DB ===
+    const productIds = items.map((i: CartItem) => i.productId).filter(Boolean);
+    let verifiedItems: VerifiedCartItem[] = [];
+
+    if (productIds.length > 0) {
+      const { data: dbProducts, error: productsError } = await supabase
+        .from("products")
+        .select("id, price, type")
+        .in("id", productIds);
+
+      if (productsError) {
+        console.error("Product verification error:", productsError);
+        return apiError("خطأ في التحقق من المنتجات", 500);
+      }
+
+      const productById = new Map<string, Pick<Product, "id" | "price" | "type">>(
+        (dbProducts || []).map((product: Pick<Product, "id" | "price" | "type">) => [
+          product.id,
+          product,
+        ]),
+      );
+
+      const missingProduct = items.find(
+        (item: CartItem) => !item.productId || !productById.has(item.productId),
+      );
+
+      if (missingProduct) {
+        return apiError("منتج في السلة لم يعد متوفراً — أعد تحديث السلة وأزل العناصر القديمة", 409);
+      }
+
+      verifiedItems = items.map((item: CartItem) => {
+        const dbProduct = productById.get(item.productId!);
+
+        return {
+          ...item,
+          price: Number(dbProduct!.price),
+          product_type: dbProduct!.type,
+        };
+      });
+    }
+
+    const onlinePaymentEligible = isOnlinePaymentEligible(verifiedItems);
+    const requiresManualCompletion = !onlinePaymentEligible;
+    if (requiresManualCompletion && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
+      return apiError("رقم هوية غير صالح", 400);
     }
 
     // === 1. Upsert Customer ===
@@ -202,24 +250,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // === 2. Verify prices from DB ===
+    // === 2. Calculate totals from verified products ===
     let orderId = generateOrderId();
-    const productIds = items.map((i: CartItem) => i.productId).filter(Boolean);
-    let priceMap: Record<string, number> = {};
-    if (productIds.length > 0) {
-      const { data: dbProducts } = await supabase
-        .from("products")
-        .select("id, price")
-        .in("id", productIds);
-      if (dbProducts) {
-        priceMap = Object.fromEntries(dbProducts.map((p: Pick<Product, "id" | "price">) => [p.id, Number(p.price)]));
-      }
-    }
-    const verifiedItems: CartItem[] = items.map((i: CartItem) => {
-      const dbPrice = i.productId ? priceMap[i.productId] : undefined;
-      return { ...i, price: dbPrice ?? i.price };
-    });
-    const itemsTotal = verifiedItems.reduce((s: number, i: CartItem) => s + i.price * (i.quantity || 1), 0);
+    const itemsTotal = verifiedItems.reduce(
+      (s: number, i: VerifiedCartItem) => s + i.price * (i.quantity || 1),
+      0,
+    );
 
     let discount = 0;
     if (couponCode && typeof couponCode === "string") {
@@ -252,14 +288,13 @@ export async function POST(req: NextRequest) {
       }
     }
     const total = Math.max(0, itemsTotal - discount);
-    const _onlyAccessories = !hasInstallment && items.length > 0;
 
     // === 2b. Atomic order creation via RPC (single transaction) ===
-    const orderItems = verifiedItems.map((i: CartItem) => ({
+    const orderItems = verifiedItems.map((i: VerifiedCartItem) => ({
       product_id: i.productId || null,
       product_name: i.name,
       product_brand: i.brand,
-      product_type: i.type,
+      product_type: i.product_type,
       price: i.price,
       quantity: i.quantity || 1,
       color: i.color || null,
@@ -278,10 +313,10 @@ export async function POST(req: NextRequest) {
         p_discount_amount: discount,
         p_total: total,
         p_coupon_code: couponCode || "",
-        p_payment_method: hasInstallment ? "bank" : "credit",
+        p_payment_method: onlinePaymentEligible ? "credit" : "bank",
         p_payment_details: {
           ...(payment || {}),
-          payment_status: hasInstallment ? "pending" : "awaiting_redirect",
+          payment_status: onlinePaymentEligible ? "awaiting_redirect" : "pending",
         },
         p_shipping_city: customer.city,
         p_shipping_address: customer.address,
@@ -325,7 +360,7 @@ export async function POST(req: NextRequest) {
         customerPhone: customer.phone,
         total,
         source: source || "store",
-        items: verifiedItems.map((i: CartItem) => ({
+        items: verifiedItems.map((i: VerifiedCartItem) => ({
           name: i.name || i.productName || "منتج",
           qty: i.quantity || 1,
           price: Number(i.price || 0),
@@ -346,8 +381,8 @@ export async function POST(req: NextRequest) {
             orderId,
             customer.name,
             total,
-            verifiedItems.map((i: CartItem) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
-            hasInstallment ? "bank" : "credit",
+            verifiedItems.map((i: VerifiedCartItem) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
+            onlinePaymentEligible ? "credit" : "bank",
             customer.city,
             customer.address,
           );
@@ -365,12 +400,12 @@ export async function POST(req: NextRequest) {
     return apiSuccess({
       orderId,
       total,
-      status: hasInstallment ? "new" : "pending_payment",
-      // Only accessories get Rivhit payment redirect
-      needsPayment: !hasInstallment,
+      status: onlinePaymentEligible ? "pending_payment" : "new",
+      // Only accessory-only orders get an online payment redirect.
+      needsPayment: onlinePaymentEligible,
       customerCode: customerCode || undefined,
       isNewCustomer,
-      message: hasInstallment
+      message: !onlinePaymentEligible
         ? "تم استلام الطلب — الفريق سيتواصل معك"
         : "جاري تحويلك لصفحة الدفع الآمنة...",
     });
