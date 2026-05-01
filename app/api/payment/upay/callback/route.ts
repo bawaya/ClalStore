@@ -10,6 +10,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase";
 import { getPublicSiteUrl } from "@/lib/public-site-url";
 
+type CallbackOrderItem = {
+  product_type?: string | null;
+};
+
+function isOnlinePaymentEligible(items: CallbackOrderItem[]) {
+  return items.length > 0 && items.every((item) => item.product_type === "accessory");
+}
+
 async function buildSuccessRedirect(
   appUrl: string,
   orderId: string,
@@ -71,6 +79,35 @@ export async function GET(req: NextRequest) {
 
     if (existingOrder.payment_status === "paid") {
       return NextResponse.redirect(await buildSuccessRedirect(appUrl, orderId));
+    }
+
+    const { data: orderItems, error: itemsError } = await supabase
+      .from("order_items")
+      .select("product_type")
+      .eq("order_id", orderId);
+
+    if (itemsError || !isOnlinePaymentEligible((orderItems || []) as CallbackOrderItem[])) {
+      console.error("[UPay Callback] Order is not eligible for online payment:", orderId);
+      await supabase.from("orders").update({
+        payment_status: "failed",
+        payment_details: {
+          provider: "upay",
+          transaction_id: transactionId,
+          error: "payment_not_eligible",
+        },
+      }).eq("id", orderId);
+
+      await supabase.from("audit_log").insert({
+        user_name: "UPay",
+        action: `Payment rejected: ${orderId} is not eligible for online payment`,
+        entity_type: "payment",
+        entity_id: orderId,
+        details: { transactionId, error: "payment_not_eligible" },
+      });
+
+      return NextResponse.redirect(
+        `${appUrl}/store/checkout/failed?order=${orderId}&error=payment_not_eligible`
+      );
     }
 
     if (errorMessage) {

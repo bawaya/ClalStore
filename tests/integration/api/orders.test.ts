@@ -6,27 +6,23 @@ const { mockRpc, mockFrom } = vi.hoisted(() => ({
 }));
 
 function chainable(data: unknown = null, error: unknown = null) {
-  const obj: Record<string, unknown> = {
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    delete: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    neq: vi.fn().mockReturnThis(),
-    in: vi.fn().mockReturnThis(),
-    is: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data, error }),
-    maybeSingle: vi.fn().mockResolvedValue({ data, error }),
-    // Proper thenable so `await chain` resolves immediately
-    then: (resolve: (v: { data: unknown; error: unknown }) => unknown) =>
-      resolve({ data: Array.isArray(data) ? data : data == null ? [] : data, error }),
-  };
-  for (const k of Object.keys(obj)) {
-    if (typeof obj[k] === "function" && k !== "single" && k !== "maybeSingle" && k !== "then") {
-      (obj[k] as ReturnType<typeof vi.fn>).mockReturnValue(obj);
-    }
-  }
-  return obj;
+  const resultPromise = Promise.resolve({
+    data: Array.isArray(data) ? data : data == null ? [] : data,
+    error,
+  });
+
+  return Object.assign(resultPromise, {
+    select: vi.fn(() => resultPromise),
+    insert: vi.fn(() => resultPromise),
+    update: vi.fn(() => resultPromise),
+    delete: vi.fn(() => resultPromise),
+    eq: vi.fn(() => resultPromise),
+    neq: vi.fn(() => resultPromise),
+    in: vi.fn(() => resultPromise),
+    is: vi.fn(() => resultPromise),
+    single: vi.fn(() => Promise.resolve({ data, error })),
+    maybeSingle: vi.fn(() => Promise.resolve({ data, error })),
+  });
 }
 
 vi.mock("@/lib/supabase", () => ({
@@ -194,5 +190,40 @@ describe("POST /api/orders", () => {
     const res = await POST(makeReq(order));
     const body = await res.json();
     expect(body.data.needsPayment).toBe(true);
+    expect(body.data.status).toBe("pending_payment");
+  });
+
+  it.each(["tv", "computer", "tablet", "network"])(
+    "sets needsPayment=false for %s orders",
+    async (type) => {
+      const order = {
+        ...validOrder,
+        items: [
+          { productId: `${type}-1`, name: "Non accessory", brand: "Generic", type, price: 500 },
+        ],
+      };
+
+      const res = await POST(makeReq(order));
+      const body = await res.json();
+
+      expect(body.data.needsPayment).toBe(false);
+      expect(body.data.status).toBe("new");
+    },
+  );
+
+  it("sets needsPayment=false for mixed accessory and non-accessory orders", async () => {
+    const order = {
+      ...validOrder,
+      items: [
+        { productId: "acc-1", name: "Case", brand: "Generic", type: "accessory", price: 50 },
+        { productId: "tv-1", name: "TV", brand: "Generic", type: "tv", price: 1500 },
+      ],
+    };
+
+    const res = await POST(makeReq(order));
+    const body = await res.json();
+
+    expect(body.data.needsPayment).toBe(false);
+    expect(body.data.status).toBe("new");
   });
 });

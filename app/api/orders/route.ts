@@ -44,6 +44,10 @@ interface OrderRequestBody {
   source?: string;
 }
 
+function isOnlinePaymentEligible(items: CartItem[]) {
+  return items.length > 0 && items.every((item) => item.type === "accessory");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const raw = await req.json();
@@ -78,10 +82,9 @@ export async function POST(req: NextRequest) {
       return apiError("عناصر غير صالحة — يجب أن يحتوي كل منتج على معرّف", 400);
     }
 
-    const hasInstallment = items.some(
-      (i: CartItem) => i.type === "device" || i.type === "appliance",
-    );
-    if (hasInstallment && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
+    const onlinePaymentEligible = isOnlinePaymentEligible(items);
+    const requiresManualCompletion = !onlinePaymentEligible;
+    if (requiresManualCompletion && customer.idNumber && !validateIsraeliID(customer.idNumber)) {
       return apiError("رقم هوية غير صالح", 400);
     }
 
@@ -252,7 +255,6 @@ export async function POST(req: NextRequest) {
       }
     }
     const total = Math.max(0, itemsTotal - discount);
-    const _onlyAccessories = !hasInstallment && items.length > 0;
 
     // === 2b. Atomic order creation via RPC (single transaction) ===
     const orderItems = verifiedItems.map((i: CartItem) => ({
@@ -278,10 +280,10 @@ export async function POST(req: NextRequest) {
         p_discount_amount: discount,
         p_total: total,
         p_coupon_code: couponCode || "",
-        p_payment_method: hasInstallment ? "bank" : "credit",
+        p_payment_method: onlinePaymentEligible ? "credit" : "bank",
         p_payment_details: {
           ...(payment || {}),
-          payment_status: hasInstallment ? "pending" : "awaiting_redirect",
+          payment_status: onlinePaymentEligible ? "awaiting_redirect" : "pending",
         },
         p_shipping_city: customer.city,
         p_shipping_address: customer.address,
@@ -347,7 +349,7 @@ export async function POST(req: NextRequest) {
             customer.name,
             total,
             verifiedItems.map((i: CartItem) => ({ name: i.productName || i.name, qty: i.quantity || 1, price: i.price })),
-            hasInstallment ? "bank" : "credit",
+            onlinePaymentEligible ? "credit" : "bank",
             customer.city,
             customer.address,
           );
@@ -365,12 +367,12 @@ export async function POST(req: NextRequest) {
     return apiSuccess({
       orderId,
       total,
-      status: hasInstallment ? "new" : "pending_payment",
-      // Only accessories get Rivhit payment redirect
-      needsPayment: !hasInstallment,
+      status: onlinePaymentEligible ? "pending_payment" : "new",
+      // Only accessory-only orders get an online payment redirect.
+      needsPayment: onlinePaymentEligible,
       customerCode: customerCode || undefined,
       isNewCustomer,
-      message: hasInstallment
+      message: !onlinePaymentEligible
         ? "تم استلام الطلب — الفريق سيتواصل معك"
         : "جاري تحويلك لصفحة الدفع الآمنة...",
     });
