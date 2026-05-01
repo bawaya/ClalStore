@@ -1,28 +1,15 @@
 import { vi } from "vitest";
 
 export function createSupabaseChain(data: unknown = null, error: unknown = null) {
-  const obj: Record<string, unknown> = {
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    neq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data, error }),
-    maybeSingle: vi.fn().mockResolvedValue({ data, error }),
-    then: (resolve: (value: { data: unknown; error: unknown }) => unknown) =>
-      resolve({ data, error }),
-  };
+  const resultPromise = Promise.resolve({ data, error });
 
-  for (const key of Object.keys(obj)) {
-    if (
-      typeof obj[key] === "function" &&
-      key !== "single" &&
-      key !== "maybeSingle" &&
-      key !== "then"
-    ) {
-      (obj[key] as ReturnType<typeof vi.fn>).mockReturnValue(obj);
-    }
-  }
-
-  return obj;
+  return Object.assign(resultPromise, {
+    select: vi.fn(() => resultPromise),
+    insert: vi.fn(() => resultPromise),
+    update: vi.fn(() => resultPromise),
+    eq: vi.fn(() => resultPromise),
+    neq: vi.fn(() => resultPromise),
+    single: vi.fn(() => resultPromise),
+    maybeSingle: vi.fn(() => resultPromise),
+  });
 }
