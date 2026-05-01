@@ -284,13 +284,27 @@ describe("POST /api/payment", () => {
   it("rejects a missing order", async () => {
     mockPaymentDb(null);
     const res = await POST(makeReq(validPayment));
+    const body = await res.json();
+
     expect(res.status).toBe(404);
+    expect(body.success).toBe(false);
     expect(createPaymentPage).not.toHaveBeenCalled();
   });
 
-  it("rejects payment when the submitted customer factor does not match the order", async () => {
-    const res = await POST(makeReq({ ...validPayment, customerPhone: "0500000000" }));
-    expect(res.status).toBe(403);
+  it("returns identical generic 404 responses for missing orders and ownership mismatch", async () => {
+    mockPaymentDb(null);
+    const missingOrderRes = await POST(makeReq(validPayment));
+    const missingOrderBody = await missingOrderRes.json();
+
+    mockPaymentDb();
+    const ownershipMismatchRes = await POST(
+      makeReq({ ...validPayment, customerPhone: "0500000000" }),
+    );
+    const ownershipMismatchBody = await ownershipMismatchRes.json();
+
+    expect(missingOrderRes.status).toBe(404);
+    expect(ownershipMismatchRes.status).toBe(404);
+    expect(ownershipMismatchBody).toEqual(missingOrderBody);
     expect(createPaymentPage).not.toHaveBeenCalled();
   });
 
@@ -408,6 +422,25 @@ describe("POST /api/payment/callback", () => {
     );
   });
 
+  it("accepts iCredit callback amount within tolerance", async () => {
+    const res = await CallbackPOST(
+      makeCallbackReq(JSON.stringify({
+        SaleId: "sale-123",
+        Custom1: "CLM-99999",
+        TransactionAmount: "3999.75",
+      })),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRpc).toHaveBeenCalledWith(
+      "process_payment_callback",
+      expect.objectContaining({
+        p_payment_status: "paid",
+        p_payment_details: expect.objectContaining({ amount: 3999.75 }),
+      }),
+    );
+  });
+
   it("rejects iCredit callback when provider amount does not match the order total", async () => {
     const res = await CallbackPOST(
       makeCallbackReq(JSON.stringify({
@@ -425,6 +458,12 @@ describe("POST /api/payment/callback", () => {
         p_payment_details: expect.objectContaining({ error: "amount_mismatch" }),
       }),
     );
+    const paidCalls = mockRpc.mock.calls.filter(
+      ([fn, payload]) =>
+        fn === "process_payment_callback" &&
+        (payload as { p_payment_status?: string }).p_payment_status === "paid",
+    );
+    expect(paidCalls).toHaveLength(0);
   });
 
   it("rejects iCredit callback for a non-accessory order", async () => {

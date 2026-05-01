@@ -72,9 +72,13 @@ type ProductRow = {
   id: string;
   price: number;
   type: string;
+  variants?: Array<{ storage: string; price: number }>;
 };
 
 type CreateOrderPayload = {
+  p_items_total: number;
+  p_discount_amount: number;
+  p_total: number;
   p_items: Array<{
     product_id: string | null;
     product_type: string;
@@ -119,6 +123,15 @@ describe("POST /api/orders", () => {
     vi.clearAllMocks();
     productRows = [
       { id: "prod-1", price: 3999, type: "device" },
+      {
+        id: "prod-variant",
+        price: 3000,
+        type: "device",
+        variants: [
+          { storage: "256GB", price: 3500 },
+          { storage: "512GB", price: 4200 },
+        ],
+      },
       { id: "acc-1", price: 50, type: "accessory" },
       { id: "tv-1", price: 1500, type: "tv" },
       { id: "computer-1", price: 2500, type: "computer" },
@@ -253,6 +266,71 @@ describe("POST /api/orders", () => {
     expect(body.data.status).toBe("new");
     expect(payload.p_items[0].product_type).toBe("device");
     expect(payload.p_items[0].price).toBe(3999);
+  });
+
+  it("uses DB base product price when no variant is selected", async () => {
+    const order = {
+      ...validOrder,
+      items: [
+        {
+          productId: "prod-variant",
+          name: "iPhone 16",
+          brand: "Apple",
+          type: "device",
+          price: 1,
+        },
+      ],
+    };
+
+    const res = await POST(makeReq(order));
+    const body = await res.json();
+    const payload = getCreateOrderPayload();
+
+    expect(body.data.total).toBe(3000);
+    expect(payload.p_items[0].price).toBe(3000);
+    expect(payload.p_items_total).toBe(3000);
+    expect(payload.p_total).toBe(3000);
+  });
+
+  it("uses DB variant price when storage is selected", async () => {
+    const order = {
+      ...validOrder,
+      items: [
+        {
+          productId: "prod-variant",
+          name: "iPhone 16",
+          brand: "Apple",
+          type: "device",
+          price: 1,
+          storage: "512GB",
+        },
+      ],
+    };
+
+    const res = await POST(makeReq(order));
+    const body = await res.json();
+    const payload = getCreateOrderPayload();
+
+    expect(body.data.total).toBe(4200);
+    expect(payload.p_items[0].price).toBe(4200);
+    expect(payload.p_items_total).toBe(4200);
+    expect(payload.p_total).toBe(4200);
+  });
+
+  it("ignores request discountAmount without a valid server-side coupon", async () => {
+    const res = await POST(
+      makeReq({
+        ...validOrder,
+        discountAmount: 3999,
+      }),
+    );
+    const body = await res.json();
+    const payload = getCreateOrderPayload();
+
+    expect(body.data.total).toBe(3999);
+    expect(payload.p_items_total).toBe(3999);
+    expect(payload.p_discount_amount).toBe(0);
+    expect(payload.p_total).toBe(3999);
   });
 
   it("uses DB non-accessory type when the client labels a tv as accessory", async () => {
