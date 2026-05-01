@@ -9,6 +9,7 @@ const ROOT = path.resolve(__dirname, "../..");
 const TYPES_FILE = path.join(ROOT, "types/database.ts");
 const DATABASE_DOC_FILE = path.join(ROOT, "docs/DATABASE.md");
 const MIGRATIONS_DIR = path.join(ROOT, "supabase/migrations");
+const MIGRATION_DECLARED_PUBLIC_TABLES = ["classification_history"] as const;
 
 function read(filePath: string) {
   return fs.readFileSync(filePath, "utf-8");
@@ -136,6 +137,17 @@ describe("schema contracts", () => {
 
   it("app/lib source files only query declared public tables", () => {
     const tableNames = new Set(tableRowTypes.keys());
+    const missingMigrationEvidence = MIGRATION_DECLARED_PUBLIC_TABLES.filter((table) => {
+      const createTableRe = new RegExp(`CREATE TABLE(?: IF NOT EXISTS)? ${table}\\b`, "i");
+      return !createTableRe.test(migrationCorpus);
+    });
+
+    expect(missingMigrationEvidence).toEqual([]);
+
+    for (const table of MIGRATION_DECLARED_PUBLIC_TABLES) {
+      tableNames.add(table);
+    }
+
     const unknownTables = new Set<string>();
     const fromRe = /\.from\((["'`])([A-Za-z0-9_]+)\1\)/g;
 
