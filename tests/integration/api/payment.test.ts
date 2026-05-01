@@ -1,30 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createSupabaseChain } from "./_helpers/supabase-mock";
 
 // --- Supabase mock ---
 const { mockFrom, mockRpc } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockRpc: vi.fn(),
 }));
-
-function chainable(data: unknown = null, error: unknown = null) {
-  const obj: Record<string, unknown> = {
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    neq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data, error }),
-    maybeSingle: vi.fn().mockResolvedValue({ data, error }),
-    then: (resolve: (value: { data: unknown; error: unknown }) => unknown) =>
-      resolve({ data, error }),
-  };
-  for (const k of Object.keys(obj)) {
-    if (typeof obj[k] === "function" && k !== "single" && k !== "maybeSingle" && k !== "then") {
-      (obj[k] as ReturnType<typeof vi.fn>).mockReturnValue(obj);
-    }
-  }
-  return obj;
-}
 
 vi.mock("@/lib/supabase", () => ({
   createAdminSupabase: vi.fn(() => ({
@@ -129,9 +110,9 @@ describe("POST /api/payment", () => {
 
   function mockPaymentDb(order: unknown = dbOrder, items: unknown = dbItems) {
     mockFrom.mockImplementation((table: string) => {
-      if (table === "orders") return chainable(order);
-      if (table === "order_items") return chainable(items);
-      return chainable();
+      if (table === "orders") return createSupabaseChain(order);
+      if (table === "order_items") return createSupabaseChain(items);
+      return createSupabaseChain();
     });
   }
 
@@ -295,7 +276,7 @@ describe("POST /api/payment/callback", () => {
         }
         return chain;
       }
-      return chainable();
+      return createSupabaseChain();
     });
   });
 

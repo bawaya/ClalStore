@@ -1,29 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
+import { createSupabaseChain } from "./_helpers/supabase-mock";
 
 const { mockFrom, mockAuthenticateCustomer } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockAuthenticateCustomer: vi.fn(),
 }));
-
-function chainable(data: unknown = null, error: unknown = null) {
-  const obj: Record<string, unknown> = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data, error }),
-    maybeSingle: vi.fn().mockResolvedValue({ data, error }),
-    then: (resolve: (value: { data: unknown; error: unknown }) => unknown) =>
-      resolve({ data, error }),
-  };
-
-  for (const k of Object.keys(obj)) {
-    if (typeof obj[k] === "function" && k !== "single" && k !== "maybeSingle" && k !== "then") {
-      (obj[k] as ReturnType<typeof vi.fn>).mockReturnValue(obj);
-    }
-  }
-
-  return obj;
-}
 
 vi.mock("@/lib/supabase", () => ({
   createAdminSupabase: vi.fn(() => ({
@@ -67,8 +49,8 @@ describe("GET /api/store/order-status", () => {
     vi.clearAllMocks();
     mockAuthenticateCustomer.mockResolvedValue(null);
     mockFrom.mockImplementation((table: string) => {
-      if (table === "orders") return chainable(order);
-      return chainable();
+      if (table === "orders") return createSupabaseChain(order);
+      return createSupabaseChain();
     });
   });
 
@@ -117,8 +99,8 @@ describe("GET /api/store/order-status", () => {
 
   it("returns a generic response for a non-existing order", async () => {
     mockFrom.mockImplementation((table: string) => {
-      if (table === "orders") return chainable(null, { message: "not found" });
-      return chainable();
+      if (table === "orders") return createSupabaseChain(null, { message: "not found" });
+      return createSupabaseChain();
     });
 
     const res = await GET(makeReq({ orderId: "CLM-00000", phoneSuffix: "7653" }));
@@ -134,8 +116,8 @@ describe("GET /api/store/order-status", () => {
     const wrongFactorBody = await wrongFactorRes.json();
 
     mockFrom.mockImplementation((table: string) => {
-      if (table === "orders") return chainable(null, { message: "not found" });
-      return chainable();
+      if (table === "orders") return createSupabaseChain(null, { message: "not found" });
+      return createSupabaseChain();
     });
 
     const missingOrderRes = await GET(makeReq({ orderId: "CLM-00000", phoneSuffix: "0000" }));
