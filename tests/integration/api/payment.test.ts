@@ -177,6 +177,28 @@ describe("POST /api/payment", () => {
     );
   });
 
+  it("accepts a generated-style order id and reaches normal payment logic", async () => {
+    const generatedOrderId = "CLM-ABCD1234";
+    mockPaymentDb({ ...dbOrder, id: generatedOrderId });
+
+    const res = await POST(
+      makeReq({
+        ...validPayment,
+        orderId: generatedOrderId,
+      }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(createPaymentPage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: generatedOrderId,
+        amount: 3999,
+      }),
+    );
+  });
+
   it("returns payment URL for UPay gateway", async () => {
     (detectPaymentGateway as ReturnType<typeof vi.fn>).mockReturnValueOnce("upay");
     const res = await POST(makeReq(validPayment));
@@ -192,6 +214,17 @@ describe("POST /api/payment", () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it.each(["abc", "CLM-", "CLM-123", "CLM-123456789", "XYZ-ABCD1234"])(
+    "returns 400 for malformed order id %s",
+    async (orderId) => {
+      const res = await POST(makeReq({ ...validPayment, orderId }));
+
+      expect(res.status).toBe(400);
+      expect(mockFrom).not.toHaveBeenCalled();
+      expect(createPaymentPage).not.toHaveBeenCalled();
+    },
+  );
 
   it("returns 400 when amount is missing", async () => {
     const res = await POST(
