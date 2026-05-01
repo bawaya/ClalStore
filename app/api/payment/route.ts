@@ -16,7 +16,7 @@ import { createAdminSupabase } from "@/lib/supabase";
 import { authenticateCustomer } from "@/lib/customer-auth";
 
 const paymentRequestSchema = z.object({
-  orderId: z.string().trim().toUpperCase().regex(/^CLM-\d{5}$/),
+  orderId: z.string().trim().toUpperCase().regex(/^CLM-(\d{5}|[A-Z0-9]{8})$/),
   amount: z.coerce.number().positive(),
   customerPhone: z.string().trim().optional(),
   customerEmail: z.string().trim().optional(),
