@@ -138,29 +138,6 @@ export async function POST(req: NextRequest) {
       return apiError("This order is not eligible for online payment", 409);
     }
 
-    const orderTotal = Number(paymentOrder.total || 0);
-    if (orderTotal > 0 && !amountsMatch(amount, orderTotal)) {
-      await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
-        p_order_id: orderId,
-        p_payment_status: "failed",
-        p_order_status: "",
-        p_transaction_id: "",
-        p_payment_details: {
-          type: "credit",
-          provider: "icredit",
-          sale_id: saleId,
-          amount,
-          expected: orderTotal,
-          error: "amount_mismatch",
-        },
-        p_audit_action: `Payment amount mismatch: ${orderId} paid ${amount} instead of ${orderTotal}`,
-        p_audit_details: { sale_id: saleId, paid: amount, expected: orderTotal },
-      });
-
-      recordPaymentOutcome({ orderId, status: "failed", amount, provider: "icredit" });
-      return apiError("Payment amount mismatch", 409);
-    }
-
     // Replay protection: reject duplicate saleId
     if (saleId) {
       const { data: dupOrder } = await db.from("orders")
@@ -210,6 +187,29 @@ export async function POST(req: NextRequest) {
 
       recordPaymentOutcome({ orderId, status: "failed", amount, provider: "icredit" });
       return apiSuccess({ received: true, verified: false });
+    }
+
+    const orderTotal = Number(paymentOrder.total || 0);
+    if (orderTotal > 0 && !amountsMatch(amount, orderTotal)) {
+      await (db.rpc as (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)("process_payment_callback", {
+        p_order_id: orderId,
+        p_payment_status: "failed",
+        p_order_status: "",
+        p_transaction_id: "",
+        p_payment_details: {
+          type: "credit",
+          provider: "icredit",
+          sale_id: saleId,
+          amount,
+          expected: orderTotal,
+          error: "amount_mismatch",
+        },
+        p_audit_action: `Payment amount mismatch: ${orderId} paid ${amount} instead of ${orderTotal}`,
+        p_audit_details: { sale_id: saleId, paid: amount, expected: orderTotal },
+      });
+
+      recordPaymentOutcome({ orderId, status: "failed", amount, provider: "icredit" });
+      return apiError("Payment amount mismatch", 409);
     }
 
     if (saleId && amount > 0 && !isJ5) {

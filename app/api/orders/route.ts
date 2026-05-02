@@ -29,6 +29,7 @@ interface CartItem {
 
 interface VerifiedCartItem extends CartItem {
   product_type: Product["type"];
+  price: number;
 }
 
 interface OrderRequestBody {
@@ -50,6 +51,28 @@ interface OrderRequestBody {
 
 function isOnlinePaymentEligible(items: VerifiedCartItem[]) {
   return items.length > 0 && items.every((item) => item.product_type === "accessory");
+}
+
+type ProductForPricing = Pick<Product, "id" | "price" | "type" | "variants">;
+
+function normalizeVariantLabel(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getAuthoritativePrice(product: ProductForPricing, item: CartItem) {
+  const selectedStorage = normalizeVariantLabel(item.storage);
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const matchedVariant = selectedStorage
+    ? variants.find((variant) => normalizeVariantLabel(variant.storage) === selectedStorage)
+    : undefined;
+  const variantPrice = Number(matchedVariant?.price);
+
+  if (matchedVariant && Number.isFinite(variantPrice) && variantPrice >= 0) {
+    return variantPrice;
+  }
+
+  const basePrice = Number(product.price);
+  return Number.isFinite(basePrice) && basePrice >= 0 ? basePrice : 0;
 }
 
 export async function POST(req: NextRequest) {
@@ -100,7 +123,7 @@ export async function POST(req: NextRequest) {
     if (productIds.length > 0) {
       const { data: dbProducts, error: productsError } = await supabase
         .from("products")
-        .select("id, price, type")
+        .select("id, price, type, variants")
         .in("id", productIds);
 
       if (productsError) {
@@ -108,8 +131,8 @@ export async function POST(req: NextRequest) {
         return apiError("خطأ في التحقق من المنتجات", 500);
       }
 
-      const productById = new Map<string, Pick<Product, "id" | "price" | "type">>(
-        (dbProducts || []).map((product: Pick<Product, "id" | "price" | "type">) => [
+      const productById = new Map<string, ProductForPricing>(
+        (dbProducts || []).map((product: ProductForPricing) => [
           product.id,
           product,
         ]),
@@ -128,7 +151,7 @@ export async function POST(req: NextRequest) {
 
         return {
           ...item,
-          price: Number(dbProduct!.price),
+          price: getAuthoritativePrice(dbProduct!, item),
           product_type: dbProduct!.type,
         };
       });

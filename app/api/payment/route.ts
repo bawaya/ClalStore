@@ -22,6 +22,7 @@ const paymentRequestSchema = z.object({
   customerEmail: z.string().trim().optional(),
 }).passthrough();
 
+const PAYMENT_LOOKUP_ERROR = "تعذر بدء الدفع لهذا الطلب";
 const PAYMENT_REUSE_WINDOW_MS = 15 * 60_000;
 
 type PaymentCustomer = {
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (orderError || !order) {
-      return apiError("تعذر بدء الدفع لهذا الطلب", 404);
+      return apiError(PAYMENT_LOOKUP_ERROR, 404);
     }
 
     const paymentOrder = order as PaymentOrder;
@@ -164,10 +165,10 @@ export async function POST(req: NextRequest) {
       const authCustomerId = String((authenticatedCustomer as { id?: string }).id || "");
       const orderCustomerId = String(paymentOrder.customer_id || customer?.id || "");
       if (!authCustomerId || !orderCustomerId || authCustomerId !== orderCustomerId) {
-        return apiError("غير مصرح بالدفع لهذا الطلب", 403);
+        return apiError(PAYMENT_LOOKUP_ERROR, 404);
       }
     } else if (!customerMatchesRequest(customer, customerPhone, customerEmail)) {
-      return apiError("تعذر التحقق من ملكية الطلب", 403);
+      return apiError(PAYMENT_LOOKUP_ERROR, 404);
     }
 
     const paymentDetails = isRecord(paymentOrder.payment_details)
