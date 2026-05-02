@@ -8,7 +8,7 @@ import { authenticateCustomer } from "@/lib/customer-auth";
 const TRACKING_LOOKUP_ERROR = "تعذر التحقق من الطلب";
 
 const orderStatusQuerySchema = z.object({
-  orderId: z.string().trim().toUpperCase().regex(/^CLM-\d{5}$/),
+  orderId: z.string().trim().toUpperCase().regex(/^CLM-(\d{5}|[A-Z0-9]{8})$/),
   verification: z.string().trim().optional(),
   phone: z.string().trim().optional(),
   phoneSuffix: z.string().trim().optional(),
