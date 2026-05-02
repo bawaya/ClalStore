@@ -17,7 +17,7 @@ export function HomeClient({ products, plans, cms }: { products: any[]; plans: a
       <FAQSection cms={cms?.faq} />
       <CTASection cms={cms?.cta} />
       <Footer cms={cms?.footer} />
-      <StickyCartBar />
+      <StickyCartBar variant="top" />
       <WebChatWidget />
     </div>
   );
