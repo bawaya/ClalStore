@@ -48,17 +48,20 @@ export async function GET(req: NextRequest) {
       supabase
         .from("orders")
         .select("id, total, status, source, created_at")
+        .is("deleted_at", null)
         .gte("created_at", thisMonthStart)
         .order("created_at", { ascending: true }),
       supabase
         .from("orders")
         .select("id, total, status, source, created_at")
+        .is("deleted_at", null)
         .gte("created_at", prevMonthStart)
         .lt("created_at", prevMonthEnd)
         .order("created_at", { ascending: true }),
       supabase
         .from("orders")
         .select("id, total, status, source, created_at")
+        .is("deleted_at", null)
         .gte("created_at", thirtyDaysAgo)
         .order("created_at", { ascending: true }),
       supabase

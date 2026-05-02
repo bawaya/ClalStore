@@ -231,8 +231,8 @@ export async function GET(req: NextRequest) {
       ai_used: aiUsed,
     };
 
-    // Cache result
     const response = apiSuccess(responseData);
+    response.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
     resultCache.set(cacheKey, { data: responseData, time: Date.now() });
 
     return response;

@@ -101,7 +101,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // === CSRF Protection (double-submit cookie) ===
-  const CSRF_EXEMPT = ["/api/webhook", "/api/cron", "/api/payment/callback", "/api/csrf", "/api/orders", "/api/test"];
+  const CSRF_EXEMPT = ["/api/webhook", "/api/cron", "/api/payment/callback", "/api/csrf"];
   const stateChanging = ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
   const csrfExempt = CSRF_EXEMPT.some((p) => pathname.startsWith(p));
 
@@ -257,7 +257,9 @@ export const config = {
     "/api/chat", "/api/reports/:path*", "/api/cron/:path*",
     "/api/push/:path*", "/api/orders", "/api/payment",
     "/api/coupons/:path*", "/api/customer/:path*",
-    "/api/reviews/:path*", "/api/cart/:path*", "/api/notifications/:path*",
+    "/api/reviews", "/api/reviews/:path*", "/api/cart/:path*",
+    "/api/notifications", "/api/notifications/:path*",
     "/api/csrf", "/api/settings/:path*",
+    "/api/employee/:path*", "/api/webchat/:path*", "/api/consent",
   ],
 };

@@ -244,10 +244,24 @@ export async function getBridgeDashboard(month?: string): Promise<BridgeDashboar
     db.from("commission_sales").select("sale_type, commission_amount, device_sale_amount").is("deleted_at", null).eq("sale_date", todayStr),
   ]);
 
-  const sales: any[] = salesRes.data || [];
-  const sanctions: any[] = sanctionsRes.data || [];
-  const orders: any[] = ordersRes.data || [];
-  const todaySales: any[] = todaySalesRes.data || [];
+  type SaleRow = {
+    sale_type: "line" | "device";
+    commission_amount: number;
+    source: string;
+    package_price?: number;
+    device_sale_amount?: number;
+    loyalty_start_date?: string | null;
+    loyalty_status?: string | null;
+    employee_name?: string | null;
+  };
+  type SanctionRow = { amount: number };
+  type OrderRow = { id: string; status: string; total: number; commission_synced?: boolean };
+  type TodaySaleRow = { sale_type: "line" | "device"; commission_amount?: number; device_sale_amount?: number };
+
+  const sales = (salesRes.data || []) as SaleRow[];
+  const sanctions = (sanctionsRes.data || []) as SanctionRow[];
+  const orders = (ordersRes.data || []) as OrderRow[];
+  const todaySales = (todaySalesRes.data || []) as TodaySaleRow[];
 
   // Commission aggregation
   const linesSales = sales.filter((s) => s.sale_type === "line");

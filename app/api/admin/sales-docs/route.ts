@@ -45,6 +45,6 @@ export const GET = withPermission("commissions", "manage", async (req: NextReque
 });
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200 });
+  return apiSuccess({});
 }
 

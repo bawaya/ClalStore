@@ -44,7 +44,7 @@ export default function LiveDashboard() {
       const res = await fetch(`/api/admin/commissions/bridge?view=dashboard&month=${month}`);
       if (!res.ok) throw new Error("HTTP " + res.status);
       const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "API Error");
+      if (!json.success) throw new Error(json.error || "API Error");
       setData(json.data);
       setLastUpdate(new Date().toLocaleTimeString("ar-EG"));
     } catch (e: any) {

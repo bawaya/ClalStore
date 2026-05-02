@@ -69,5 +69,5 @@ export const GET = withPermission(
 );
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200 });
+  return apiSuccess({});
 }
