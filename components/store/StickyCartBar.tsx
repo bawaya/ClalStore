@@ -18,7 +18,7 @@ export function StickyCartBar({ variant = "bottom" }: { variant?: "bottom" | "to
 
   return (
     <div
-      className={`sticky-cart-bar ${isTop ? "fixed top-[60px] left-0 right-0 z-[49] border-b" : "border-t"} border-[#2f2f38]`}
+      className={`sticky-cart-bar ${isTop ? "fixed top-20 left-0 right-0 z-[49] border-b" : "border-t"} border-[#2f2f38]`}
       style={{
         background: "linear-gradient(180deg, rgba(23,23,27,0.96), rgba(17,17,21,0.98))",
         boxShadow: isTop ? "0 18px 36px rgba(0,0,0,0.28)" : "0 -18px 36px rgba(0,0,0,0.28)",
