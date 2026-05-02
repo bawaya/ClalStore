@@ -152,7 +152,15 @@ export default function AdminDealsPage() {
               {/* Image */}
               <div className="w-12 h-12 bg-surface-elevated rounded-lg flex items-center justify-center flex-shrink-0">
                 {d.image_url ? (
-                  <img src={d.image_url} alt={d.title_ar || "عرض"} className="w-10 h-10 object-contain" />
+                  <img
+                    src={d.image_url}
+                    alt={d.title_ar || "عرض"}
+                    width={40}
+                    height={40}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-10 h-10 object-contain"
+                  />
                 ) : (
                   <span className="text-2xl">🔥</span>
                 )}

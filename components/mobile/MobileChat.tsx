@@ -62,12 +62,19 @@ function MediaContent({ message }: { message: InboxMessage }) {
         <img
           src={message.media_url}
           alt="صورة"
+          loading="lazy"
+          decoding="async"
           className="max-w-[200px] rounded-lg cursor-pointer"
           onClick={() => setExpanded(!expanded)}
         />
         {expanded && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setExpanded(false)}>
-            <img src={message.media_url} alt="صورة" className="max-w-full max-h-full rounded-lg" />
+            <img
+              src={message.media_url}
+              alt="صورة"
+              decoding="async"
+              className="max-w-full max-h-full rounded-lg"
+            />
           </div>
         )}
       </div>
