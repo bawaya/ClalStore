@@ -30,7 +30,10 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-bg/90 backdrop-blur-xl border-b border-surface-border">
+    <nav
+      className="fixed left-0 right-0 z-50 bg-surface-bg/90 backdrop-blur-xl border-b border-surface-border"
+      style={{ top: "var(--cart-bar-h, 0px)" }}
+    >
       <div className="max-w-6xl mx-auto flex items-center justify-between" style={{ padding: scr.mobile ? "10px 16px" : "12px 24px" }}>
         {/* CTA + Lang */}
         <div className="flex items-center gap-2">

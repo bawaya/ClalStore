@@ -1,24 +1,48 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ShoppingCart, ChevronLeft } from "lucide-react";
 import { useCart } from "@/lib/store/cart";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 
-export function StickyCartBar({ variant = "bottom" }: { variant?: "bottom" | "top" } = {}) {
+export function StickyCartBar({ variant = "top" }: { variant?: "bottom" | "top" } = {}) {
   const scr = useScreen();
   const { t } = useLang();
   const itemCount = useCart((s) => s.getItemCount());
   const total = useCart((s) => s.getTotal());
+  const ref = useRef<HTMLDivElement>(null);
+  const isTop = variant === "top";
+  const active = isTop && itemCount > 0;
+
+  useEffect(() => {
+    if (!active) return;
+    const update = () => {
+      const h = ref.current?.offsetHeight ?? (scr.mobile ? 50 : 56);
+      const px = `${h}px`;
+      document.documentElement.style.setProperty("--cart-bar-h", px);
+      document.body.style.paddingTop = px;
+    };
+    update();
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && ref.current) {
+      observer = new ResizeObserver(update);
+      observer.observe(ref.current);
+    }
+    return () => {
+      observer?.disconnect();
+      document.documentElement.style.removeProperty("--cart-bar-h");
+      document.body.style.paddingTop = "";
+    };
+  }, [active, scr.mobile]);
 
   if (itemCount === 0) return null;
 
-  const isTop = variant === "top";
-
   return (
     <div
-      className={`sticky-cart-bar ${isTop ? "fixed top-20 left-0 right-0 z-[49] border-b" : "border-t"} border-[#2f2f38]`}
+      ref={ref}
+      className={`sticky-cart-bar ${isTop ? "fixed top-0 left-0 right-0 z-[60] border-b" : "border-t"} border-[#2f2f38]`}
       style={{
         background: "linear-gradient(180deg, rgba(23,23,27,0.96), rgba(17,17,21,0.98))",
         boxShadow: isTop ? "0 18px 36px rgba(0,0,0,0.28)" : "0 -18px 36px rgba(0,0,0,0.28)",
