@@ -432,7 +432,7 @@ export default function CartPage() {
     try {
       const response = await fetch("/api/coupons/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({ code: couponInput, total: subtotal }),
       });
       const json = await response.json();
@@ -499,7 +499,7 @@ export default function CartPage() {
 
       const orderResponse = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         body: JSON.stringify({
           customer: info,
           items: items.map((item) => ({

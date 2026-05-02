@@ -13,9 +13,9 @@ const db = () => createAdminSupabase();
 export async function getDashboardStats() {
   const s = db();
   const [orders, products, customers] = await Promise.all([
-    s.from("orders").select("id, status, source, total, created_at"),
-    s.from("products").select("id, stock, sold, price, active"),
-    s.from("customers").select("id, segment, total_spent"),
+    s.from("orders").select("id, status, source, total, created_at").is("deleted_at", null).limit(5000),
+    s.from("products").select("id, stock, sold, price, active").limit(5000),
+    s.from("customers").select("id, segment, total_spent").limit(5000),
   ]);
 
   const ordersData = (orders.data || []) as Array<{ id: string; status: string; source: string; total: number; created_at: string }>;

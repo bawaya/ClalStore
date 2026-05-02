@@ -6,6 +6,7 @@ import { Footer } from "@/components/website/sections";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 type Step = "phone" | "channel" | "otp";
 type Channel = "sms" | "whatsapp";
@@ -54,7 +55,7 @@ export default function AuthPage() {
       try {
         const response = await fetch("/api/auth/customer", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders(),
           body: JSON.stringify({
             phone: phone.replace(/[-\s]/g, ""),
             action: "send_otp",
@@ -93,7 +94,7 @@ export default function AuthPage() {
       try {
         const response = await fetch("/api/auth/customer", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders(),
           body: JSON.stringify({
             phone: phone.replace(/[-\s]/g, ""),
             action: "verify_otp",

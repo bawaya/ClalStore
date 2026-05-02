@@ -18,7 +18,9 @@ export async function GET(req: NextRequest) {
     const { data, error } = await q.order("sort_order", { ascending: true });
 
     if (error) throw error;
-    return apiSuccess(data);
+    const res = apiSuccess(data);
+    res.headers.set("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
+    return res;
   } catch (err: unknown) {
     console.error("Categories GET error:", err);
     return apiError("فشل في جلب التصنيفات", 500);

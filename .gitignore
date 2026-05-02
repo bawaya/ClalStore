@@ -94,3 +94,7 @@ logs/outbound/
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Editor / scratch backups
+*.bak
+*.backup
