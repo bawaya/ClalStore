@@ -312,11 +312,15 @@ describe("middleware", () => {
       expect(res.status).not.toBe(403);
     });
 
-    it("exempts /api/orders from CSRF", async () => {
+    it("requires CSRF on /api/orders POST", async () => {
+      // /api/orders was previously exempt because the cart submitted it as a
+      // webhook-style call, but the cart now sends x-csrf-token via
+      // csrfHeaders(). Order creation MUST validate CSRF to block CSRF-driven
+      // forced order submission against authenticated customer sessions.
       validateCsrfMock.mockReturnValue(false);
       const req = createMockRequest("/api/orders", { method: "POST" });
       const res = await middleware(req);
-      expect(res.status).not.toBe(403);
+      expect(res.status).toBe(403);
     });
   });
 
