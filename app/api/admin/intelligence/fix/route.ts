@@ -18,6 +18,12 @@ import type { Product } from "@/types/database";
 
 const uuid = z.string().uuid();
 
+/** Log a Supabase error server-side and return a sanitized 500 to the client. */
+function dbErrorResponse(err: unknown, ctx: string) {
+  console.error(`intelligence/fix ${ctx}:`, err);
+  return apiError("Operation failed", 500);
+}
+
 const inputSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("delete_duplicates"),
@@ -88,7 +94,7 @@ export async function POST(req: NextRequest) {
       if (targets.length === 0) return apiError("Nothing to delete", 400);
 
       const { error } = await sb.from("products").delete().in("id", targets);
-      if (error) { console.error("intelligence/fix error:", error); return apiError("Operation failed", 500); }
+      if (error) return dbErrorResponse(error, "db");
 
       await logAction(
         "مدير",
@@ -126,7 +132,7 @@ export async function POST(req: NextRequest) {
         .from("products")
         .update(update)
         .eq("id", input.product_id);
-      if (error) { console.error("intelligence/fix error:", error); return apiError("Operation failed", 500); }
+      if (error) return dbErrorResponse(error, "db");
 
       await logAction(
         "مدير",
@@ -161,7 +167,7 @@ export async function POST(req: NextRequest) {
         .from("products")
         .update(update)
         .eq("id", input.product_id);
-      if (error) { console.error("intelligence/fix error:", error); return apiError("Operation failed", 500); }
+      if (error) return dbErrorResponse(error, "db");
 
       await sb.from("classification_history").insert({
         product_id: input.product_id,
@@ -193,7 +199,7 @@ export async function POST(req: NextRequest) {
         .from("products")
         .update({ brand: input.brand })
         .in("id", input.product_ids);
-      if (error) { console.error("intelligence/fix error:", error); return apiError("Operation failed", 500); }
+      if (error) return dbErrorResponse(error, "db");
 
       // Append a history row per product so rollback can restore the prior brand.
       const historyRows = input.product_ids.map((pid) => ({
@@ -222,7 +228,7 @@ export async function POST(req: NextRequest) {
         .from("products")
         .update({ subkind: input.subkind })
         .eq("id", input.product_id);
-      if (error) { console.error("intelligence/fix error:", error); return apiError("Operation failed", 500); }
+      if (error) return dbErrorResponse(error, "db");
 
       await sb.from("classification_history").insert({
         product_id: input.product_id,
@@ -260,7 +266,7 @@ export async function POST(req: NextRequest) {
           .from("products")
           .update(update)
           .eq("id", input.product_id);
-        if (error) { console.error("intelligence/fix error:", error); return apiError("Operation failed", 500); }
+        if (error) return dbErrorResponse(error, "db");
 
         await sb.from("classification_history").insert({
           product_id: input.product_id,
@@ -309,7 +315,7 @@ export async function POST(req: NextRequest) {
         .from("products")
         .update(update)
         .eq("id", input.product_id);
-      if (error) { console.error("intelligence/fix error:", error); return apiError("Operation failed", 500); }
+      if (error) return dbErrorResponse(error, "db");
 
       await sb.from("classification_history").insert({
         product_id: input.product_id,
@@ -338,7 +344,7 @@ export async function POST(req: NextRequest) {
         .order("applied_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (histErr) { console.error("intelligence/fix histErr:", histErr); return apiError("Operation failed", 500); }
+      if (histErr) return dbErrorResponse(histErr, "history");
       if (!history) return apiError("No history to rollback", 404);
 
       const before = (history as { before_data: Record<string, unknown> }).before_data || {};
@@ -366,7 +372,7 @@ export async function POST(req: NextRequest) {
         .from("products")
         .update(restore)
         .eq("id", input.product_id);
-      if (updErr) { console.error("intelligence/fix updErr:", updErr); return apiError("Operation failed", 500); }
+      if (updErr) return dbErrorResponse(updErr, "update");
 
       await sb.from("classification_history").insert({
         product_id: input.product_id,
