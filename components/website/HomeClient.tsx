@@ -2,6 +2,7 @@
 
 import { Navbar, HeroSection, StatsStrip, FeaturedProducts, LinePlansSection, FeaturesSection, FAQSection, CTASection, Footer } from "./sections";
 import { WebChatWidget } from "@/components/chat/WebChatWidget";
+import { StickyCartBar } from "@/components/store/StickyCartBar";
 import type { WebsiteContent } from "@/types/database";
 
 export function HomeClient({ products, plans, cms }: { products: any[]; plans: any[]; cms?: Record<string, WebsiteContent> }) {
@@ -16,6 +17,7 @@ export function HomeClient({ products, plans, cms }: { products: any[]; plans: a
       <FAQSection cms={cms?.faq} />
       <CTASection cms={cms?.cta} />
       <Footer cms={cms?.footer} />
+      <StickyCartBar />
       <WebChatWidget />
     </div>
   );
