@@ -1,18 +1,36 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 import { csrfHeaders } from "@/lib/csrf-client";
 
 // =====================================================
 // ClalMobile — PWA Install Prompt + SW Registration
-// Shows install banner on mobile/desktop if not installed
+//
+// The install banner is intentionally narrow in scope:
+//   - Only on the homepage `/` or the main storefront `/store`
+//   - At most ONCE per browser session (any path that triggers it
+//     marks it as shown; subsequent visits in the same session are
+//     skipped silently — even if the user didn't click the X)
+//   - If the user explicitly dismisses (X), it stays hidden for the
+//     rest of the session via a separate flag
+//   - If the app is already installed, hidden forever (localStorage)
+//
+// The Service Worker registration runs on EVERY page (not gated),
+// since push notifications + offline cache rely on it being installed
+// regardless of which route the user lands on.
 // =====================================================
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
+
+const ALLOWED_PROMPT_PATHS = ["/", "/store"] as const;
+const SHOWN_SESSION_KEY = "pwa_shown_session";
+const DISMISSED_SESSION_KEY = "pwa_dismissed";
+const INSTALLED_KEY = "pwa_installed";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -59,86 +77,111 @@ async function subscribeToPush(reg: ServiceWorkerRegistration) {
 
 export function PWAInstallPrompt() {
   const { t } = useLang();
+  const path = usePathname();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
+  // ---------------------------------------------------------------
+  // Effect 1 — Service Worker registration (runs once, all pages)
+  // ---------------------------------------------------------------
   useEffect(() => {
-    // Register service worker + subscribe to push notifications
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js")
-        .then(async (reg) => {
-          // Auto-subscribe to push if permission already granted
-          if (Notification.permission === "granted") {
-            subscribeToPush(reg);
-          }
-        })
-        .catch(() => {
-          // SW registration failed — ignore silently
-        });
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then(async (reg) => {
+        if (Notification.permission === "granted") {
+          subscribeToPush(reg);
+        }
+      })
+      .catch(() => {
+        // SW registration failed — ignore silently
+      });
+  }, []);
+
+  // ---------------------------------------------------------------
+  // Effect 2 — Install prompt (path-gated, once per session)
+  // ---------------------------------------------------------------
+  useEffect(() => {
+    // 1. Path gate: only on / or /store. Re-runs on SPA route change so
+    //    if the user lands on /about then navigates to /store, the
+    //    prompt logic activates on /store (subject to all other gates).
+    if (!path || !(ALLOWED_PROMPT_PATHS as readonly string[]).includes(path)) {
+      return;
     }
 
-    // Check if already installed (standalone mode or previously accepted install)
+    // 2. Already installed? Hide forever.
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    if (isStandalone || localStorage.getItem(INSTALLED_KEY)) return;
 
-    if (isStandalone || localStorage.getItem("pwa_installed")) return;
-
-    // Re-read fresh from sessionStorage on every potential trigger so a dismissal
-    // mid-session also blocks repeat fires of beforeinstallprompt or the iOS timer.
-    const wasDismissed = () => sessionStorage.getItem("pwa_dismissed") === "1";
+    // 3. Explicitly dismissed in this session? Hide for the rest of session.
+    const wasDismissed = () => sessionStorage.getItem(DISMISSED_SESSION_KEY) === "1";
     if (wasDismissed()) return;
 
+    // 4. Already SHOWN once in this session? Skip — user-requested rate limit.
+    //    This is what stops the prompt reappearing on every refresh.
+    if (sessionStorage.getItem(SHOWN_SESSION_KEY) === "1") return;
+
     // Detect iOS
-    const iosCheck = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const iosCheck =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+      !(window as unknown as { MSStream?: unknown }).MSStream;
     setIsIOS(iosCheck);
+
+    // Helper: mark as shown for the session BEFORE displaying. This way
+    // any subsequent path change / refresh in the same session is
+    // short-circuited by the gate at step 4.
+    const markShownAndDisplay = () => {
+      sessionStorage.setItem(SHOWN_SESSION_KEY, "1");
+      setShowBanner(true);
+    };
 
     // Listen for beforeinstallprompt (Chrome/Edge/Samsung)
     const handler = (e: Event) => {
       e.preventDefault();
       if (wasDismissed()) return;
+      // Recheck shown gate in case another tab raced ahead
+      if (sessionStorage.getItem(SHOWN_SESSION_KEY) === "1") return;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShowBanner(true);
+      markShownAndDisplay();
     };
 
     window.addEventListener("beforeinstallprompt", handler);
 
     // Mark as installed when the browser confirms installation
     const installedHandler = () => {
-      localStorage.setItem("pwa_installed", "1");
+      localStorage.setItem(INSTALLED_KEY, "1");
       setShowBanner(false);
       setDeferredPrompt(null);
     };
     window.addEventListener("appinstalled", installedHandler);
 
-    // Show iOS banner after 5 seconds
+    // Show iOS banner after 5s on the same page (no beforeinstallprompt on iOS Safari)
+    let iosTimer: ReturnType<typeof setTimeout> | null = null;
     if (iosCheck) {
-      const timer = setTimeout(() => {
+      iosTimer = setTimeout(() => {
         if (wasDismissed()) return;
-        setShowBanner(true);
+        if (sessionStorage.getItem(SHOWN_SESSION_KEY) === "1") return;
+        markShownAndDisplay();
       }, 5000);
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener("beforeinstallprompt", handler);
-        window.removeEventListener("appinstalled", installedHandler);
-      };
     }
 
     return () => {
+      if (iosTimer) clearTimeout(iosTimer);
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("appinstalled", installedHandler);
     };
-  }, []);
+  }, [path]);
 
   const handleInstall = async () => {
     if (deferredPrompt) {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === "accepted") {
-        localStorage.setItem("pwa_installed", "1");
+        localStorage.setItem(INSTALLED_KEY, "1");
         setShowBanner(false);
         // Request push permission after install
         if ("Notification" in window && Notification.permission === "default") {
@@ -158,7 +201,7 @@ export function PWAInstallPrompt() {
   const handleDismiss = () => {
     setShowBanner(false);
     setShowIOSGuide(false);
-    sessionStorage.setItem("pwa_dismissed", "1");
+    sessionStorage.setItem(DISMISSED_SESSION_KEY, "1");
   };
 
   if (!showBanner) return null;
