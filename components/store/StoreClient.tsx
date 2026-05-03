@@ -12,7 +12,7 @@ import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "./StoreHeader";
 // StickyCartBar is now mounted globally in app/layout.tsx via PublicChrome
-import { HeroCarousel } from "./HeroCarousel";
+// HeroCarousel removed from /store — was the "موسم هواتف وعروض واضحة" banner
 import { ProductCard } from "./ProductCard";
 import { LinePlans } from "./LinePlans";
 import { ReviewsSection } from "./ReviewsSection";
@@ -20,7 +20,7 @@ import { Footer } from "@/components/website/sections";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { SortDropdown } from "./SortDropdown";
 import { useProductListing } from "./useProductListing";
-import type { Hero, LinePlan, Product } from "@/types/database";
+import type { LinePlan, Product } from "@/types/database";
 
 const FALLBACK_PRODUCTS: Product[] = [
   {
@@ -137,7 +137,6 @@ const FALLBACK_PRODUCTS: Product[] = [
 
 interface Props {
   products: Product[];
-  heroes: Hero[];
   linePlans: LinePlan[];
 }
 
@@ -149,7 +148,7 @@ function getFilterButtonClass(active: boolean) {
   }`;
 }
 
-export function StoreClient({ products, heroes, linePlans }: Props) {
+export function StoreClient({ products, linePlans }: Props) {
   const scr = useScreen();
   const searchParams = useSearchParams();
   const { t, lang } = useLang();
@@ -361,7 +360,6 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
       }}
     >
       <StoreHeader />
-      <HeroCarousel heroes={heroes} />
 
       <div
         className="mx-auto max-w-[1540px]"
