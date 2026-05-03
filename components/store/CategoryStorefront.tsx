@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "./StoreHeader";
-import { StickyCartBar } from "./StickyCartBar";
+// StickyCartBar is now mounted globally in app/layout.tsx via PublicChrome
 import { ProductCard } from "./ProductCard";
 import { Footer } from "@/components/website/sections";
 import { ProductAssistantWidget } from "./ProductAssistantWidget";
@@ -210,7 +210,6 @@ export function CategoryStorefront({
       }}
     >
       <StoreHeader />
-      <StickyCartBar />
 
       <div
         className="mx-auto max-w-[1540px]"

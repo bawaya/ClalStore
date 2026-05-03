@@ -12,14 +12,14 @@ vi.mock("@/lib/i18n", () => ({
   useLang: vi.fn(() => ({ lang: "ar", setLang: vi.fn(), t: (k: string) => k, dir: "rtl", fontClass: "font-arabic" })),
   LangProvider: ({ children }: any) => children,
 }));
-vi.mock("@/components/chat/WebChatWidget", () => ({
-  WebChatWidget: () => <div data-testid="webchat-widget">Chat</div>,
-}));
 vi.mock("@/components/store/CompareBar", () => ({
   CompareBar: () => <div data-testid="compare-bar">Compare</div>,
 }));
 
 import StoreLayout from "@/app/store/layout";
+
+// Note: WebChatWidget moved to root layout (app/layout.tsx) via PublicChrome,
+// so it is no longer mounted by StoreLayout and is no longer asserted here.
 
 describe("StoreLayout", () => {
   it("renders children", () => {
@@ -43,17 +43,7 @@ describe("StoreLayout", () => {
     expect(screen.getByTestId("compare-bar")).toBeInTheDocument();
   });
 
-  it("renders WebChatWidget component", () => {
-    render(
-      <StoreLayout>
-        <div>Content</div>
-      </StoreLayout>
-    );
-
-    expect(screen.getByTestId("webchat-widget")).toBeInTheDocument();
-  });
-
-  it("renders children before CompareBar and WebChatWidget", () => {
+  it("renders children before CompareBar", () => {
     const { container } = render(
       <StoreLayout>
         <div data-testid="main-content">Main</div>
@@ -63,6 +53,5 @@ describe("StoreLayout", () => {
     const allTestIds = container.querySelectorAll("[data-testid]");
     const testIdOrder = Array.from(allTestIds).map((el) => el.getAttribute("data-testid"));
     expect(testIdOrder.indexOf("main-content")).toBeLessThan(testIdOrder.indexOf("compare-bar"));
-    expect(testIdOrder.indexOf("main-content")).toBeLessThan(testIdOrder.indexOf("webchat-widget"));
   });
 });

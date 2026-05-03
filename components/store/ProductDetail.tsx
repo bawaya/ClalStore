@@ -18,7 +18,7 @@ import {
   trackViewProduct,
 } from "@/components/shared/Analytics";
 import { StoreHeader } from "./StoreHeader";
-import { StickyCartBar } from "./StickyCartBar";
+// StickyCartBar is now mounted globally in app/layout.tsx via PublicChrome
 import { ProductCard } from "./ProductCard";
 import { ProductReviews } from "./ProductReviews";
 import { Footer } from "@/components/website/sections";
@@ -257,7 +257,6 @@ export function ProductDetailClient({
       }}
     >
       <StoreHeader showBack />
-      <StickyCartBar />
 
       <div
         className="mx-auto max-w-[1540px]"

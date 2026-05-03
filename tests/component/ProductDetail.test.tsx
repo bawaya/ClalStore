@@ -170,10 +170,11 @@ describe("ProductDetailClient", () => {
     expect(screen.getByText("ايفون 15 برو الجديد من آبل")).toBeInTheDocument();
   });
 
-  it("renders header, cart bar, and footer", () => {
+  it("renders header and footer", () => {
+    // Note: StickyCartBar is mounted globally in app/layout.tsx via PublicChrome,
+    // so it is no longer rendered by ProductDetailClient and is not asserted here.
     render(<ProductDetailClient product={baseProduct as any} related={[]} />);
     expect(screen.getByTestId("store-header")).toBeInTheDocument();
-    expect(screen.getByTestId("sticky-cart-bar")).toBeInTheDocument();
     expect(screen.getByTestId("footer")).toBeInTheDocument();
   });
 
