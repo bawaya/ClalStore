@@ -291,13 +291,48 @@ export function runValidations(
   return warnings;
 }
 
-/** Apply new prices to all variants of a product, returning the updated array. */
+/**
+ * Apply a price to product variants.
+ *
+ * - If `targetStorage` is provided and matches one of the variants, ONLY that
+ *   variant is updated; the others are left untouched. This is the correct
+ *   behavior when the import row is per-variant (e.g. one Excel row per
+ *   storage size — "iPhone 17 Pro Max 256GB", "iPhone 17 Pro Max 512GB"...)
+ *   so each row writes to its own variant instead of clobbering them all.
+ *
+ * - If `targetStorage` is provided but no variant matches, the variants array
+ *   is returned unchanged (no-op). Caller should inspect this case if it
+ *   matters (e.g. surface a warning that the row's storage isn't in catalog).
+ *
+ * - If `targetStorage` is null/undefined (legacy callers + non-storage
+ *   products), the price is broadcast to ALL variants — the original
+ *   pre-fix behavior, preserved for backward compatibility.
+ */
 export function applyPriceToVariants(
   variants: ProductLite["variants"],
   cash: number,
   monthly: number,
+  targetStorage?: string | null,
 ): ProductLite["variants"] {
   if (!Array.isArray(variants) || variants.length === 0) return [];
+
+  const target = targetStorage ? normalizeName(targetStorage) : null;
+
+  if (target) {
+    // Per-variant update: only touch the matching storage row.
+    return variants.map((v) => {
+      if (normalizeName(v.storage) === target) {
+        return {
+          ...v,
+          price: Math.round(cash),
+          monthly_price: monthly > 0 ? Math.round(monthly) : v.monthly_price,
+        };
+      }
+      return v;
+    });
+  }
+
+  // Broadcast (legacy): apply to every variant.
   return variants.map((v) => ({
     ...v,
     price: Math.round(cash),
