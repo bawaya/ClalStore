@@ -5,7 +5,7 @@
 
 import { createAdminSupabase } from "@/lib/supabase";
 import { INTEGRATION_TYPES } from "@/lib/constants";
-import type { Product, Coupon, Hero, LinePlan, Integration } from "@/types/database";
+import type { Product, Coupon, Hero, LinePlan, Integration, StoreSpotlight } from "@/types/database";
 
 const db = () => createAdminSupabase();
 
@@ -160,6 +160,46 @@ export async function updateHero(id: string, updates: Partial<Hero>) {
 
 export async function deleteHero(id: string) {
   const { error } = await db().from("heroes").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ===== Store Spotlights CRUD =====
+// Editorial spotlight slots on /store. position 1 = big card, 2..4 = small cards.
+// Only one ACTIVE row per position (enforced by partial unique index in DB).
+export async function getAdminSpotlights() {
+  const { data, error } = await db()
+    .from("store_spotlights")
+    .select("*")
+    .order("position");
+  if (error) throw error;
+  return (data || []) as StoreSpotlight[];
+}
+
+export async function createSpotlight(
+  spotlight: Omit<StoreSpotlight, "id" | "created_at" | "updated_at">
+) {
+  const { data, error } = await db()
+    .from("store_spotlights")
+    .insert(spotlight)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as StoreSpotlight;
+}
+
+export async function updateSpotlight(id: string, updates: Partial<StoreSpotlight>) {
+  const { data, error } = await db()
+    .from("store_spotlights")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as StoreSpotlight;
+}
+
+export async function deleteSpotlight(id: string) {
+  const { error } = await db().from("store_spotlights").delete().eq("id", id);
   if (error) throw error;
 }
 

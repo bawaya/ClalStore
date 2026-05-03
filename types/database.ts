@@ -800,6 +800,22 @@ export type Hero = {
   created_at: string;
 }
 
+// Editorial spotlight slots on /store (1 big hero + 3 smaller). Managed from
+// /admin/store-spotlights. position=1 is the big card; 2..4 are the small ones.
+export type StoreSpotlight = {
+  id: string;
+  product_id: string;
+  position: 1 | 2 | 3 | 4;
+  eyebrow_ar?: string;
+  eyebrow_he?: string;
+  tagline_ar: string;
+  tagline_he?: string;
+  custom_image_url?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type SubPage = {
   id: string;
   slug: string;
