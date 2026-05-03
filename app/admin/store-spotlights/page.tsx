@@ -57,7 +57,12 @@ export default function StoreSpotlightsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/admin/products?limit=500");
+        // No `?limit=` query param: triggers the no-pagination branch in the
+        // admin products API, which respects the 500 internal safety cap
+        // instead of the 200 cap applied to paginated requests. This makes
+        // ALL product types (phones + accessories + appliances + TVs + ...)
+        // discoverable in the picker, not just the first 200 by sort_position.
+        const res = await fetch("/api/admin/products");
         const json = await res.json();
         if (!cancelled && json?.data) setProducts(json.data as Product[]);
       } catch (err) {
@@ -81,15 +86,39 @@ export default function StoreSpotlightsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
 
+  // Product picker search state — drives the searchable combobox below.
+  const [productSearch, setProductSearch] = useState("");
+
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) => {
+      const fields = [
+        p.brand,
+        p.name_ar,
+        p.name_he,
+        p.model_number || "",
+        p.type,
+      ];
+      return fields.some((field) => field.toLowerCase().includes(q));
+    });
+  }, [products, productSearch]);
+
+  const selectedProduct = form.product_id
+    ? productById.get(form.product_id) ?? null
+    : null;
+
   const openCreate = (position?: Position) => {
     setForm({ ...EMPTY, position: position ?? 1 });
     setEditId(null);
+    setProductSearch("");
     setModal(true);
   };
 
   const openEdit = (s: StoreSpotlight) => {
     setForm({ ...s });
     setEditId(s.id);
+    setProductSearch("");
     setModal(true);
   };
 
@@ -273,18 +302,97 @@ export default function StoreSpotlightsPage() {
         }
       >
         <FormField label="المنتج" required>
-          <select
+          {/* Selected product chip — shown when product_id is set and we have
+              the product loaded. Click ✕ to clear and pick a different one. */}
+          {selectedProduct && (
+            <div className="mb-2 flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/[0.06] px-3 py-2">
+              <div className="flex-1 text-right">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/55">
+                  {selectedProduct.brand}
+                </div>
+                <div className="text-sm font-semibold text-white">
+                  {selectedProduct.name_ar}
+                </div>
+                <div className="text-xs text-white/50">
+                  ₪{selectedProduct.price.toLocaleString()} · {selectedProduct.type}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm({ ...form, product_id: "" });
+                  setProductSearch("");
+                }}
+                className="w-7 h-7 rounded-lg border border-state-error/30 bg-transparent text-state-error text-xs cursor-pointer flex items-center justify-center"
+                aria-label="تغيير المنتج"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Search input — always visible. Filters by brand, name (ar+he),
+              model_number, and type. */}
+          <input
             className="input"
-            value={form.product_id || ""}
-            onChange={(e) => setForm({ ...form, product_id: e.target.value })}
-          >
-            <option value="">— اختر منتج —</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.brand} — {p.name_ar} (₪{p.price.toLocaleString()})
-              </option>
-            ))}
-          </select>
+            type="text"
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            placeholder="ابحث: iPhone 16، Galaxy، Apple، شاحن، 256GB..."
+            dir="rtl"
+          />
+
+          {/* Filtered results — shows top 50 matches. If empty after search,
+              shows a hint. Caps at 50 visible to keep DOM light. */}
+          <div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-surface-border bg-surface-elevated">
+            {filteredProducts.length === 0 ? (
+              <div className="py-6 text-center text-xs text-muted">
+                {productSearch
+                  ? `لا توجد نتائج لـ "${productSearch}"`
+                  : "ابحث عن منتج للاختيار"}
+              </div>
+            ) : (
+              <ul className="divide-y divide-surface-border">
+                {filteredProducts.slice(0, 50).map((p) => {
+                  const isSelected = p.id === form.product_id;
+                  return (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm({ ...form, product_id: p.id });
+                          setProductSearch("");
+                        }}
+                        className={`w-full text-right px-3 py-2 text-xs transition-colors hover:bg-brand/10 ${
+                          isSelected ? "bg-brand/15" : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[10px] text-white/40 shrink-0">
+                            ₪{p.price.toLocaleString()}
+                          </div>
+                          <div className="flex-1 truncate">
+                            <span className="font-bold text-white/55">{p.brand}</span>
+                            {" · "}
+                            <span className="text-white">{p.name_ar}</span>
+                            {p.model_number && (
+                              <span className="text-white/40 mr-1">({p.model_number})</span>
+                            )}
+                            <span className="text-[9px] text-brand/70 mr-1">[{p.type}]</span>
+                          </div>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {filteredProducts.length > 50 && (
+              <div className="px-3 py-2 text-[10px] text-muted text-center border-t border-surface-border">
+                يعرض أول 50 من {filteredProducts.length} نتيجة — اكتب أكثر لتقليلها
+              </div>
+            )}
+          </div>
         </FormField>
 
         <FormField label="الموضع" required>
