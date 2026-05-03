@@ -25,7 +25,7 @@ interface Props {
   titleHe?: string;
   subtitle: string;
   subtitleHe?: string;
-  backLabel?: string;
+  // backLabel removed: intro banner was deleted; breadcrumbs handle back-nav.
   subkindOptions?: SubkindMap | null;
   subkindRowLabel?: string;
   showPriceFilter?: boolean;
@@ -48,7 +48,7 @@ export function CategoryStorefront({
   titleHe,
   subtitle,
   subtitleHe,
-  backLabel,
+  // backLabel removed; see Props interface.
   subkindOptions,
   subkindRowLabel,
   showPriceFilter = true,
@@ -235,60 +235,8 @@ export function CategoryStorefront({
           />
         </div>
 
-        <section className="mb-4 rounded-[30px] border border-[#2d2d35] bg-[linear-gradient(180deg,rgba(23,23,27,0.96),rgba(18,18,22,0.96))] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.28)] md:px-7 md:py-6">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
-            <div>
-              <span className="inline-flex rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 text-xs font-semibold text-[#ff8da0]">
-                {intro.categoryTitle}
-              </span>
-              <h1 className="mt-3 text-2xl font-black leading-tight md:text-[2.6rem]">
-                {intro.title}
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-8 text-[#b8b8c2] md:text-base">
-                {intro.subtitle}
-              </p>
-              <div className="mt-4">
-                <LinkBack
-                  href="/store"
-                  label={backLabel || t("nav.store")}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
-                <strong className="block text-xl font-black text-white">
-                  {filtered.length}
-                </strong>
-                <span className="text-sm text-[#b8b8c2]">
-                  {lang === "he" ? "תוצאות" : "نتيجة"}
-                </span>
-              </div>
-              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
-                <strong className="block text-xl font-black text-white">
-                  {brands.length}
-                </strong>
-                <span className="text-sm text-[#b8b8c2]">
-                  {lang === "he" ? "מותגים" : "علامات"}
-                </span>
-              </div>
-              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
-                <strong className="block text-xl font-black text-white">
-                  {kindSet?.size || subkindEntries.length || "—"}
-                </strong>
-                <span className="text-sm text-[#b8b8c2]">
-                  {subkindEntries.length > 0
-                    ? lang === "he"
-                      ? "תתי-קטגוריות"
-                      : "فئات فرعية"
-                    : lang === "he"
-                      ? "סינון"
-                      : "تصفية"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* Intro banner removed per user request. Breadcrumbs provide the
+            back-to-/store navigation; result count is in the toolbar. */}
 
         <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <aside className="self-start lg:sticky lg:top-[170px]">
@@ -521,13 +469,5 @@ export function CategoryStorefront({
   );
 }
 
-function LinkBack({ href, label }: { href: string; label: string }) {
-  return (
-    <a
-      href={href}
-      className="inline-flex min-h-[42px] items-center rounded-full border border-[#353540] bg-[#17171b] px-4 text-sm font-semibold text-[#d6d6dd] transition-colors hover:border-[#ff3351]/35 hover:text-white"
-    >
-      {label}
-    </a>
-  );
-}
+// LinkBack removed: was only used inside the intro banner that has been
+// deleted. Breadcrumbs now handle the back-to-/store navigation.
