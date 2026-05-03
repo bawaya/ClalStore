@@ -389,52 +389,9 @@ export function StoreClient({ products, linePlans, spotlights = [] }: Props) {
           />
         </div>
 
-        <section className="mb-4 rounded-[30px] border border-[#2d2d35] bg-[linear-gradient(180deg,rgba(23,23,27,0.96),rgba(18,18,22,0.96))] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.28)] md:px-7 md:py-6">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
-            <div>
-              <span className="inline-flex rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 text-xs font-semibold text-[#ff8da0]">
-                {typeLabels[typeCat]}
-              </span>
-              <h1 className="mt-3 text-2xl font-black leading-tight md:text-[2.6rem]">
-                {intro.title}
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-8 text-[#b8b8c2] md:text-base">
-                {intro.subtitle}
-              </p>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
-                <strong className="block text-xl font-black text-white">
-                  {filtered.length}
-                </strong>
-                <span className="text-sm text-[#b8b8c2]">{intro.results}</span>
-              </div>
-              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
-                <strong className="block text-xl font-black text-white">
-                  {brands.length}
-                </strong>
-                <span className="text-sm text-[#b8b8c2]">
-                  {lang === "he" ? "מותגים" : "علامات متاحة"}
-                </span>
-              </div>
-              <div className="rounded-[22px] border border-[#30303a] bg-white/[0.03] px-4 py-4">
-                <strong className="block text-xl font-black text-white">
-                  {smartResults !== null
-                    ? lang === "he"
-                      ? "חכם"
-                      : "ذكي"
-                    : lang === "he"
-                      ? "ישיר"
-                      : "مباشر"}
-                </strong>
-                <span className="text-sm text-[#b8b8c2]">
-                  {lang === "he" ? "מסלול החיפוש" : "مسار البحث"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* Intro banner removed per user request. The result count + brand
+            count are still surfaced in the toolbar above the grid (alongside
+            the SortDropdown), so the user-facing information is preserved. */}
 
         {/* Editorial Spotlight (1 big + up to 3 small). Managed from
             /admin/store-spotlights. Renders nothing if no active rows. */}
