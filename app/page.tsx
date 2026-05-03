@@ -26,17 +26,30 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  let products: any[] = [];
-  let plans: any[] = [];
-  let cms: Record<string, WebsiteContent> = {};
+  // Use Promise.allSettled so a single failing fetch doesn't blank out the homepage,
+  // and so each failure is logged independently for observability.
+  const results = await Promise.allSettled([
+    getProducts({ featured: true, types: ["device", "accessory"] }),
+    getLinePlans(),
+    getWebsiteContent(),
+  ]);
 
-  try {
-    [products, plans, cms] = await Promise.all([
-      getProducts({ featured: true, types: ["device", "accessory"] }),
-      getLinePlans(),
-      getWebsiteContent(),
-    ]);
-  } catch {}
+  const [productsResult, plansResult, cmsResult] = results;
+
+  const products = productsResult.status === "fulfilled" ? productsResult.value : [];
+  const plans = plansResult.status === "fulfilled" ? plansResult.value : [];
+  const cms: Record<string, WebsiteContent> =
+    cmsResult.status === "fulfilled" ? cmsResult.value : {};
+
+  if (productsResult.status === "rejected") {
+    console.error("[home page] getProducts failed:", productsResult.reason);
+  }
+  if (plansResult.status === "rejected") {
+    console.error("[home page] getLinePlans failed:", plansResult.reason);
+  }
+  if (cmsResult.status === "rejected") {
+    console.error("[home page] getWebsiteContent failed:", cmsResult.reason);
+  }
 
   return <HomeClient products={products} plans={plans} cms={cms} />;
 }

@@ -79,17 +79,11 @@ export function Navbar() {
 // ===== Hero Section =====
 export function HeroSection({ cms }: { cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t, lang } = useLang();
   const c = cms?.content || {};
-  const badge = lang === "he" ? (c.badge_he || t("hero.badge")) : (c.badge_ar || t("hero.badge"));
-  const desc = lang === "he" ? (c.description_he || t("hero.desc")) : (c.description_ar || t("hero.desc"));
-  const ctaStore = lang === "he" ? (c.cta_store_he || t("hero.browseStore")) : (c.cta_store_ar || t("hero.browseStore"));
-  const ctaPlans = lang === "he" ? (c.cta_plans_he || t("hero.viewPlans")) : (c.cta_plans_ar || t("hero.viewPlans"));
-  const title = cms ? (lang === "he" ? (cms.title_he || cms.title_ar || "ClalMobile") : (cms.title_ar || "ClalMobile")) : null;
 
   return (
     <section className="relative overflow-hidden" style={{ paddingTop: scr.mobile ? 100 : 120, paddingBottom: scr.mobile ? 40 : 80 }}>
-      {/* BG gradient */}
+      {/* BG gradient — preserved from original */}
       <div className="absolute inset-0 pointer-events-none" style={{
         background: c.bg_image
           ? `url(${c.bg_image}) center/cover no-repeat`
@@ -97,71 +91,59 @@ export function HeroSection({ cms }: { cms?: WebsiteContent }) {
       }} />
 
       <div className="max-w-6xl mx-auto px-4 text-center relative z-10">
-        <div className="inline-block bg-brand/10 text-brand text-[10px] font-bold px-3 py-1 rounded-full mb-4">
-          {badge}
+        {/* HOT Mobile official dealer badge — 11px, white/80 (in scale) */}
+        <div className="inline-flex items-center gap-1.5 text-[11px] text-white/80 mb-3.5 px-2.5 py-1 border border-[#ff0e34]/40 rounded-full">
+          <span className="w-1.5 h-1.5 bg-[#ff0e34] rounded-full"></span>
+          وكيل رسمي HOT Mobile
         </div>
 
-        <h1 className="font-black leading-tight mb-4" style={{ fontSize: scr.mobile ? 28 : 52 }}>
-          <span className="text-white">{title || t("hero.line1")}</span><br />
-          <span className="text-brand">{t("hero.line2")}</span><br />
-          <span className="text-white">{t("hero.line3")}</span>
+        <h1 className="font-black leading-tight mb-2 text-white" style={{ fontSize: scr.mobile ? 28 : 48 }}>
+          الأجهزة والباقات اللي بدّك إياها.
         </h1>
 
-        <p className="text-muted max-w-xl mx-auto mb-6" style={{ fontSize: scr.mobile ? 13 : 16 }}>
-          {desc}
+        <p className="font-black leading-tight text-white/60 mb-3" style={{ fontSize: scr.mobile ? 22 : 36 }}>
+          بالطريقة اللي بترتاح لها.
         </p>
 
-        <div className="flex items-center justify-center gap-3">
-          <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            {ctaStore}
-          </Link>
-          <Link href="/#plans" className="btn-outline" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            {ctaPlans}
-          </Link>
-        </div>
+        <p className="text-[13px] text-white/55 max-w-md mx-auto mt-3 mb-3.5 leading-relaxed">
+          اشتري اللي بدّك إياه بسعر الكاش. ادفعه على 18 دفعة بدون أي فائدة.
+        </p>
 
-        {/* Trust badges */}
-        <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
-          {[t("hero.trust1"), t("hero.trust2"), t("hero.trust3"), t("hero.trust4")].map((b) => (
-            <span key={b} className="text-dim text-[12px] bg-surface-elevated px-3 py-1.5 rounded-full">{b}</span>
-          ))}
+        <p className="text-[12px] text-white/40 mb-7">
+          هواتف · تابلت / آيباد · لابتوبات · تلفزيونات · منزل ذكي · إكسسوارات
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-2.5 justify-center items-center">
+          <Link
+            href="/store"
+            className="bg-[#ff0e34] text-white rounded-full px-6 py-2.5 text-[13px] font-medium hover:opacity-90 transition"
+          >
+            ابدأ التسوّق
+          </Link>
+          <Link
+            href="/payment"
+            className="border border-white/30 text-white rounded-full px-6 py-2.5 text-[13px] hover:bg-white/5 transition"
+          >
+            كيف ندفع؟
+          </Link>
         </div>
       </div>
     </section>
   );
 }
 
-// ===== Stats Strip =====
-export function StatsStrip({ cms }: { cms?: WebsiteContent }) {
-  const scr = useScreen();
-  const { t, lang } = useLang();
-  const cmsItems = cms?.content?.items;
-  const stats = cmsItems?.length ? cmsItems.map((item: any) => ({
-    value: item.value,
-    label: lang === "he" ? (item.label_he || item.label_ar) : (item.label_ar || item.label_he),
-    icon: item.icon,
-  })) : [
-    { value: "500+", label: t("stats.customers"), icon: "👥" },
-    { value: "50+", label: t("stats.products"), icon: "📱" },
-    { value: "24h", label: t("stats.delivery"), icon: "🚚" },
-    { value: "100%", label: t("stats.guarantee"), icon: "✅" },
-  ];
-
+// ===== Stats Strip (now Trust Strip — value props instead of stats) =====
+export function StatsStrip({ cms: _cms }: { cms?: WebsiteContent }) {
   return (
-    <section className="bg-surface-card border-y border-surface-border">
-      <div className="max-w-6xl mx-auto grid gap-0" style={{
-        gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr",
-        padding: scr.mobile ? "16px" : "24px",
-      }}>
-        {stats.map((s: { value: string; label: string; icon: string }) => (
-          <div key={s.label} className="text-center" style={{ padding: scr.mobile ? 8 : 16 }}>
-            <div className="text-xl mb-1">{s.icon}</div>
-            <div className="font-black text-brand" style={{ fontSize: scr.mobile ? 20 : 28 }}>{s.value}</div>
-            <div className="text-muted" style={{ fontSize: scr.mobile ? 12 : 14 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-    </section>
+    <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 py-3.5 px-6 border-t border-b border-white/[0.06] text-[11px] text-white/[0.62]">
+      <span>18× بسعر الكاش</span>
+      <span className="text-white/[0.18]">·</span>
+      <span>بدون حجز سقف بطاقة</span>
+      <span className="text-white/[0.18]">·</span>
+      <span>توصيل 1-2 يوم</span>
+      <span className="text-white/[0.18]">·</span>
+      <span>ضمان سنتين</span>
+    </div>
   );
 }
 
@@ -234,80 +216,122 @@ export function LinePlansSection({ plans }: { plans: any[] }) {
   );
 }
 
-// ===== Features Section =====
-export function FeaturesSection({ cms }: { cms?: WebsiteContent }) {
-  const scr = useScreen();
-  const { t, lang } = useLang();
-  const cmsItems = cms?.content?.items;
-  const features = cmsItems?.length ? cmsItems.map((item: any) => ({
-    icon: item.icon,
-    title: lang === "he" ? (item.title_he || item.title_ar) : (item.title_ar || item.title_he),
-    desc: lang === "he" ? (item.desc_he || item.desc_ar) : (item.desc_ar || item.desc_he),
-  })) : [
-    { icon: "🏪", title: t("features.agent"), desc: t("features.agentDesc") },
-    { icon: "🚚", title: t("features.delivery"), desc: t("features.deliveryDesc") },
-    { icon: "💳", title: t("features.installments"), desc: t("features.installmentsDesc") },
-    { icon: "📱", title: t("features.latest"), desc: t("features.latestDesc") },
-    { icon: "🔒", title: t("features.secure"), desc: t("features.secureDesc") },
-    { icon: "💬", title: t("features.support"), desc: t("features.supportDesc") },
+// ===== Features Section ("Why ClalMobile") — 3 focused cards, no icons/emoji =====
+export function FeaturesSection({ cms: _cms }: { cms?: WebsiteContent }) {
+  const cards = [
+    {
+      title: "تشتري كأنك بدفع كاش",
+      body: "18 دفعة. صفر فوائد. بطاقتك حرة.",
+    },
+    {
+      title: "أصلي. بضمان. من الوكيل الرسمي.",
+      body: "Apple, Samsung, Xiaomi. كلها أصلية، كلها بضمان سنتين معتمد.",
+    },
+    {
+      title: "عند بابك خلال يومين",
+      body: "توصيل مجاني لكل البلاد. متابعة بكل خطوة.",
+    },
   ];
 
   return (
-    <section style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-6">
-          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("features.title")}</h2>
-        </div>
-        <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr" }}>
-          {features.map((f: { icon: string; title: string; desc: string }) => (
-            <div key={f.title} className="card text-center" style={{ padding: scr.mobile ? 16 : 24 }}>
-              <div className="text-3xl mb-2">{f.icon}</div>
-              <div className="font-bold mb-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>{f.title}</div>
-              <div className="text-muted" style={{ fontSize: scr.mobile ? 13 : 14 }}>{f.desc}</div>
-            </div>
-          ))}
-        </div>
+    <section className="py-12 px-6">
+      <h2 className="text-[20px] font-medium text-center mb-6">ليش ClalMobile؟</h2>
+      <div className="grid lg:grid-cols-3 gap-3 max-w-4xl mx-auto">
+        {cards.map((c) => (
+          <div
+            key={c.title}
+            className="bg-[#0d0d0f] rounded-2xl p-[22px] border border-white/[0.04]"
+          >
+            <h3 className="text-[14px] font-medium mb-2">{c.title}</h3>
+            <p className="text-[12px] text-white/60 leading-[1.55]">{c.body}</p>
+          </div>
+        ))}
       </div>
     </section>
   );
 }
 
-// ===== FAQ Section =====
-export function FAQSection({ faqs, cms }: { faqs?: { q: string; a: string }[]; cms?: WebsiteContent }) {
+// ===== FAQ Section — 5 questions, installment-first, null-answer fallback =====
+type FaqItem = { q: string; a: string | null };
+
+const DEFAULT_FAQS: FaqItem[] = [
+  {
+    q: "كيف بشتغل التقسيط بسعر الكاش؟",
+    a: "بكل بساطة: السعر اللي بتشوفه هو السعر الحقيقي. بدل ما تدفعه دفعة وحدة، بنقسّمه على 18 شهر بدون أي فائدة. مش تمويل بنكي، يعني سقف بطاقتك بضل حر تستخدمه باللي بدّك. لو بدّك تقسّمه على 36 شهر، عندنا تمويل بنكي مريح كمان.",
+  },
+  // TODO(Mohammad): fill answers below
+  { q: "هل ضروري آخذ باقة عشان أشتري جهاز؟", a: null },
+  { q: "كم مدة التوصيل وكيف بتتبّع طلبي؟", a: null },
+  { q: "شو الضمان؟ وشو إذا الجهاز خرب؟", a: null },
+  { q: "هل بقدر أرجّع/أبدّل الجهاز؟", a: null },
+];
+
+export function FAQSection({ faqs, cms }: { faqs?: FaqItem[]; cms?: WebsiteContent }) {
   const scr = useScreen();
-  const { t, lang } = useLang();
+  const { lang } = useLang();
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   const cmsItems = cms?.content?.items;
-  const defaultFaqs = cmsItems?.length ? cmsItems.map((item: any) => ({
-    q: lang === "he" ? (item.q_he || item.q_ar) : (item.q_ar || item.q_he),
-    a: lang === "he" ? (item.a_he || item.a_ar) : (item.a_ar || item.a_he),
-  })) : (faqs || [
-    { q: t("faq.q1"), a: t("faq.a1") },
-    { q: t("faq.q2"), a: t("faq.a2") },
-    { q: t("faq.q3"), a: t("faq.a3") },
-    { q: t("faq.q4"), a: t("faq.a4") },
-    { q: t("faq.q5"), a: t("faq.a5") },
-    { q: t("faq.q6"), a: t("faq.a6") },
-  ]);
+  const items: FaqItem[] = cmsItems?.length
+    ? cmsItems.map((item: any) => ({
+        q: lang === "he" ? (item.q_he || item.q_ar) : (item.q_ar || item.q_he),
+        a: lang === "he" ? (item.a_he || item.a_ar || null) : (item.a_ar || item.a_he || null),
+      }))
+    : (faqs || DEFAULT_FAQS);
 
   return (
     <section id="faq" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-6">
-          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>{t("faq.title")}</h2>
+          <h2 className="font-black" style={{ fontSize: scr.mobile ? 20 : 32 }}>الأسئلة الشائعة</h2>
         </div>
         <div className="space-y-1.5">
-          {defaultFaqs.map((f: { q: string; a: string }, i: number) => (
-            <div key={i} className="card cursor-pointer" onClick={() => setOpenIdx(openIdx === i ? null : i)}
-              role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenIdx(openIdx === i ? null : i); } }}
-              style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}>
+          {items.map((f, i) => (
+            <div
+              key={i}
+              className="card cursor-pointer"
+              onClick={() => setOpenIdx(openIdx === i ? null : i)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setOpenIdx(openIdx === i ? null : i);
+                }
+              }}
+              style={{ padding: scr.mobile ? "12px 14px" : "16px 20px" }}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-brand transition-transform" style={{ transform: openIdx === i ? "rotate(45deg)" : "rotate(0)", fontSize: 16 }}>+</span>
-                <span className="font-bold text-right flex-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>{f.q}</span>
+                <span
+                  className="text-brand transition-transform"
+                  style={{ transform: openIdx === i ? "rotate(45deg)" : "rotate(0)", fontSize: 16 }}
+                >
+                  +
+                </span>
+                <span className="font-bold text-right flex-1" style={{ fontSize: scr.mobile ? 12 : 14 }}>
+                  {f.q}
+                </span>
               </div>
               {openIdx === i && (
-                <div className="text-muted text-right mt-2 leading-relaxed" style={{ fontSize: scr.mobile ? 11 : 13 }}>{f.a}</div>
+                <div
+                  className="text-right mt-2 leading-relaxed"
+                  style={{ fontSize: scr.mobile ? 11 : 13 }}
+                >
+                  {f.a ? (
+                    <span className="text-muted">{f.a}</span>
+                  ) : (
+                    <span className="text-white/50">
+                      الإجابة قيد التحديث. تواصل معنا عبر واتساب:{" "}
+                      <a
+                        href="https://wa.me/972533337653"
+                        className="text-[#ff0e34] hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        053-3337653
+                      </a>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           ))}
@@ -317,34 +341,34 @@ export function FAQSection({ faqs, cms }: { faqs?: { q: string; a: string }[]; c
   );
 }
 
-// ===== CTA Section =====
-export function CTASection({ cms }: { cms?: WebsiteContent }) {
-  const scr = useScreen();
-  const { t, lang } = useLang();
-  const c = cms?.content || {};
-  const title = lang === "he" ? (c.title_he || t("cta.title")) : (c.title_ar || t("cta.title"));
-  const desc = lang === "he" ? (c.desc_he || t("cta.desc")) : (c.desc_ar || t("cta.desc"));
-  const btn1 = lang === "he" ? (c.btn1_he || t("cta.store")) : (c.btn1_ar || t("cta.store"));
-  const btn2 = lang === "he" ? (c.btn2_he || t("cta.contact")) : (c.btn2_ar || t("cta.contact"));
-  const btn1Link = c.btn1_link || "/store";
-  const btn2Link = c.btn2_link || "/contact";
-
+// ===== CTA Section — final upsell with mobile-first stacking =====
+export function CTASection({ cms: _cms }: { cms?: WebsiteContent }) {
   return (
-    <section className="relative overflow-hidden" style={{ padding: scr.mobile ? "32px 16px" : "64px 24px" }}>
-      <div className="absolute inset-0 pointer-events-none" style={{
-        background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(196,16,64,0.12) 0%, transparent 70%)",
-      }} />
-      <div className="max-w-3xl mx-auto text-center relative z-10">
-        <h2 className="font-black mb-2" style={{ fontSize: scr.mobile ? 20 : 32 }}>{title}</h2>
-        <p className="text-muted mb-5" style={{ fontSize: scr.mobile ? 12 : 15 }}>
-          {desc}
+    <section className="relative overflow-hidden py-14 px-6 text-center">
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(196,16,64,0.12) 0%, transparent 70%)",
+        }}
+      />
+      <div className="max-w-3xl mx-auto relative z-10">
+        <h2 className="text-[32px] font-medium tracking-tight mb-2.5">ابدأ من هون.</h2>
+        <p className="text-[14px] text-white/60 mb-6">
+          أحدث الأجهزة، بأفضل الأسعار، وتقسيط بسعر الكاش.
         </p>
-        <div className="flex items-center justify-center gap-3">
-          <Link href={btn1Link} className="btn-primary" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            {btn1}
+        <div className="flex flex-col sm:flex-row gap-2.5 justify-center items-center">
+          <Link
+            href="/store"
+            className="bg-[#ff0e34] text-white rounded-full px-6 py-2.5 text-[13px] font-medium hover:opacity-90 transition"
+          >
+            تسوّق الأجهزة
           </Link>
-          <Link href={btn2Link} className="btn-outline" style={{ fontSize: scr.mobile ? 13 : 15, padding: scr.mobile ? "12px 24px" : "14px 36px" }}>
-            {btn2}
+          <Link
+            href="/#plans"
+            className="border border-white/30 text-white rounded-full px-6 py-2.5 text-[13px] hover:bg-white/5 transition"
+          >
+            شوف الباقات
           </Link>
         </div>
       </div>
