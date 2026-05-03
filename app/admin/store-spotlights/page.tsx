@@ -57,15 +57,13 @@ export default function StoreSpotlightsPage() {
     let cancelled = false;
     (async () => {
       try {
-        // Restrict the picker to:
-        //   - types=device,accessory (only what /store actually renders)
-        //   - active=true (only live products — picking an inactive one would
-        //     leave a dead spotlight slot, since /store filters to active)
-        // Combined with the bumped 2000 cap inside getAdminProducts, this
-        // surfaces every live phone + accessory in the admin picker.
-        const res = await fetch(
-          "/api/admin/products?types=device,accessory&active=true"
-        );
+        // Hybrid picker (Shopify-like): show ALL device+accessory products,
+        // active AND inactive, with status badges + warnings on selection.
+        // The 2000 cap inside getAdminProducts surfaces the full catalog.
+        // Inactive items still appear so admins can prep spotlights ahead of
+        // launch; a per-row badge + a warning panel on the selected chip
+        // make the status unambiguous.
+        const res = await fetch("/api/admin/products?types=device,accessory");
         const json = await res.json();
         if (!cancelled && json?.data) setProducts(json.data as Product[]);
       } catch (err) {
@@ -95,18 +93,27 @@ export default function StoreSpotlightsPage() {
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
     // Autocomplete behavior: don't show any list until the user types.
-    // Avoids dumping 500 products on screen and lets the search guide them.
     if (!q) return [];
-    return products.filter((p) => {
-      const fields = [
-        p.brand,
-        p.name_ar,
-        p.name_he,
-        p.model_number || "",
-        p.type,
-      ];
-      return fields.some((field) => field.toLowerCase().includes(q));
-    });
+    return products
+      .filter((p) => {
+        const fields = [
+          p.brand,
+          p.name_ar,
+          p.name_he,
+          p.model_number || "",
+          p.type,
+        ];
+        return fields.some((field) => field.toLowerCase().includes(q));
+      })
+      .sort((a, b) => {
+        // Sort active products first so the most-relevant matches surface
+        // at the top. Within the same active state, preserve sort_position
+        // (lower comes first), then created_at.
+        if (a.active !== b.active) return a.active ? -1 : 1;
+        const aPos = a.sort_position ?? Number.MAX_SAFE_INTEGER;
+        const bPos = b.sort_position ?? Number.MAX_SAFE_INTEGER;
+        return aPos - bPos;
+      });
   }, [products, productSearch]);
 
   const selectedProduct = form.product_id
@@ -249,6 +256,11 @@ export default function StoreSpotlightsPage() {
                       <div className="text-muted mt-1" style={{ fontSize: scr.mobile ? 10 : 11 }}>
                         <span className="font-semibold text-white/80">{product.brand}</span>{" "}
                         — {product.name_ar}
+                        {!product.active && (
+                          <span className="ms-2 inline-block text-[9px] font-bold text-state-warning bg-state-warning/[0.12] border border-state-warning/30 px-1.5 py-0.5 rounded">
+                            ⚠ منتج غير نشط
+                          </span>
+                        )}
                         {slot.tagline_ar && (
                           <span className="block text-[#ff8da0] mt-0.5">
                             “{slot.tagline_ar}”
@@ -310,30 +322,66 @@ export default function StoreSpotlightsPage() {
           {/* Selected product chip — shown when product_id is set and we have
               the product loaded. Click ✕ to clear and pick a different one. */}
           {selectedProduct && (
-            <div className="mb-2 flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/[0.06] px-3 py-2">
-              <div className="flex-1 text-right">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/55">
-                  {selectedProduct.brand}
+            <>
+              <div className="mb-2 flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/[0.06] px-3 py-2">
+                <div className="flex-1 text-right">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/55 flex items-center gap-1.5 justify-end">
+                    {!selectedProduct.active && (
+                      <span className="text-[9px] font-bold text-state-warning bg-state-warning/[0.15] border border-state-warning/35 px-1.5 py-0.5 rounded normal-case tracking-normal">
+                        غير نشط
+                      </span>
+                    )}
+                    {selectedProduct.stock === 0 && (
+                      <span className="text-[9px] font-bold text-state-error bg-state-error/[0.15] border border-state-error/35 px-1.5 py-0.5 rounded normal-case tracking-normal">
+                        نفد
+                      </span>
+                    )}
+                    <span>{selectedProduct.brand}</span>
+                  </div>
+                  <div className="text-sm font-semibold text-white">
+                    {selectedProduct.name_ar}
+                  </div>
+                  <div className="text-xs text-white/50">
+                    ₪{selectedProduct.price.toLocaleString()} · {selectedProduct.type}
+                  </div>
                 </div>
-                <div className="text-sm font-semibold text-white">
-                  {selectedProduct.name_ar}
-                </div>
-                <div className="text-xs text-white/50">
-                  ₪{selectedProduct.price.toLocaleString()} · {selectedProduct.type}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm({ ...form, product_id: "" });
+                    setProductSearch("");
+                  }}
+                  className="w-7 h-7 rounded-lg border border-state-error/30 bg-transparent text-state-error text-xs cursor-pointer flex items-center justify-center"
+                  aria-label="تغيير المنتج"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setForm({ ...form, product_id: "" });
-                  setProductSearch("");
-                }}
-                className="w-7 h-7 rounded-lg border border-state-error/30 bg-transparent text-state-error text-xs cursor-pointer flex items-center justify-center"
-                aria-label="تغيير المنتج"
-              >
-                ✕
-              </button>
-            </div>
+
+              {/* Inline warning when the picked product is inactive — the
+                  spotlight will save fine but won't render on /store until
+                  the admin activates the product. */}
+              {!selectedProduct.active && (
+                <div className="mb-3 rounded-xl border border-state-warning/35 bg-state-warning/[0.08] px-3 py-2 text-[11px] leading-relaxed text-state-warning">
+                  ⚠️ هذا المنتج <strong>غير نشط</strong> حالياً.
+                  الـ spotlight سيُحفظ لكن <strong>لن يظهر للزبون</strong> على /store حتى تُفعّل المنتج من{" "}
+                  <a
+                    href={selectedProduct.type === "device" ? "/admin/phones" : "/admin/accessories"}
+                    className="underline font-bold"
+                  >
+                    لوحة المنتجات
+                  </a>
+                  .
+                </div>
+              )}
+
+              {/* Soft notice when product is active but out-of-stock */}
+              {selectedProduct.active && selectedProduct.stock === 0 && (
+                <div className="mb-3 rounded-xl border border-state-error/30 bg-state-error/[0.06] px-3 py-2 text-[11px] leading-relaxed text-state-error/85">
+                  ℹ️ المنتج نشط لكن المخزون <strong>نفد</strong>. يظهر للزبون مع شارة &ldquo;نفد المخزون&rdquo; — تأكّد إذا فعلاً تريد spotlight لمنتج غير متوفر.
+                </div>
+              )}
+            </>
           )}
 
           {/* Search input — always visible. Filters by brand, name (ar+he),
@@ -364,6 +412,8 @@ export default function StoreSpotlightsPage() {
                 <ul className="divide-y divide-surface-border">
                   {filteredProducts.slice(0, 30).map((p) => {
                     const isSelected = p.id === form.product_id;
+                    const isInactive = !p.active;
+                    const isOutOfStock = p.stock === 0;
                     return (
                       <li key={p.id}>
                         <button
@@ -374,7 +424,7 @@ export default function StoreSpotlightsPage() {
                           }}
                           className={`w-full text-right px-3 py-2 text-xs transition-colors hover:bg-brand/10 ${
                             isSelected ? "bg-brand/15" : ""
-                          }`}
+                          } ${isInactive ? "opacity-65" : ""}`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="text-[10px] text-white/40 shrink-0">
@@ -388,6 +438,16 @@ export default function StoreSpotlightsPage() {
                                 <span className="text-white/40 mr-1">({p.model_number})</span>
                               )}
                               <span className="text-[9px] text-brand/70 mr-1">[{p.type}]</span>
+                              {isInactive && (
+                                <span className="ms-1 inline-block text-[9px] font-bold text-state-warning bg-state-warning/[0.12] border border-state-warning/30 px-1.5 py-0.5 rounded">
+                                  غير نشط
+                                </span>
+                              )}
+                              {isOutOfStock && (
+                                <span className="ms-1 inline-block text-[9px] font-bold text-state-error bg-state-error/[0.12] border border-state-error/30 px-1.5 py-0.5 rounded">
+                                  نفد
+                                </span>
+                              )}
                             </div>
                           </div>
                         </button>
