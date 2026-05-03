@@ -88,9 +88,19 @@ export async function GET(req: NextRequest) {
       .filter((t): t is AllowedType => (ALLOWED_TYPES as readonly string[]).includes(t));
     const types = rawTypes.length > 0 ? [...new Set(rawTypes)] : undefined;
 
+    // ?active=true — restrict to active products only (used by pickers like
+    // /admin/store-spotlights that should not surface inactive items).
+    const activeParam = searchParams.get("active");
+    const active = activeParam === "true" ? true : activeParam === "false" ? false : undefined;
+
+    // ?q=iPhone — case-insensitive search across name_ar/name_he/brand/model_number.
+    const q = searchParams.get("q")?.trim() || undefined;
+
     const { data: products, total } = await getAdminProducts({
       ...(limit > 0 ? { limit, offset } : {}),
       ...(types ? { types } : {}),
+      ...(active !== undefined ? { active } : {}),
+      ...(q ? { q } : {}),
     });
     return apiSuccess(
       products,
