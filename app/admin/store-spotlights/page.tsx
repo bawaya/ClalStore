@@ -94,16 +94,35 @@ export default function StoreSpotlightsPage() {
     const q = productSearch.trim().toLowerCase();
     // Autocomplete behavior: don't show any list until the user types.
     if (!q) return [];
+
+    // Tokenize the query so multi-word searches like
+    //   "iPhone 17 Pro Max 256GB أسود"
+    // succeed even when the storage / color isn't part of the product
+    // name in the DB. Each token must appear somewhere in the haystack.
+    const tokens = q.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
+
     return products
       .filter((p) => {
-        const fields = [
+        // Build a single searchable string per product, including:
+        //   - brand, name (ar+he), model_number, type
+        //   - storage variants (e.g. "128GB 256GB 512GB 1TB")
+        //   - color names in both languages
+        const colorNames = (p.colors || [])
+          .flatMap((c) => [c.name_ar, c.name_he])
+          .filter(Boolean) as string[];
+        const haystack = [
           p.brand,
           p.name_ar,
           p.name_he,
           p.model_number || "",
           p.type,
-        ];
-        return fields.some((field) => field.toLowerCase().includes(q));
+          ...(p.storage_options || []),
+          ...colorNames,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return tokens.every((token) => haystack.includes(token));
       })
       .sort((a, b) => {
         // Sort active products first so the most-relevant matches surface
@@ -384,14 +403,17 @@ export default function StoreSpotlightsPage() {
             </>
           )}
 
-          {/* Search input — always visible. Filters by brand, name (ar+he),
-              model_number, and type. */}
+          {/* Search input — always visible. Token-based fuzzy match across
+              brand, name (ar+he), model_number, type, storage_options and
+              color names. Multi-word queries succeed across fields:
+                  "iPhone 17 Pro Max 256GB أسود"
+              splits into 6 tokens — all must appear somewhere on the product. */}
           <input
             className="input"
             type="text"
             value={productSearch}
             onChange={(e) => setProductSearch(e.target.value)}
-            placeholder="ابحث: iPhone 16، Galaxy، Apple، شاحن، 256GB..."
+            placeholder="ابحث: iPhone 17 Pro Max، Galaxy 256GB، Apple أسود..."
             dir="rtl"
           />
 
@@ -399,9 +421,18 @@ export default function StoreSpotlightsPage() {
               Empty input shows a single-line hint instead of dumping the full
               product list. Bordered scroll container appears only on active search. */}
           {productSearch.trim() === "" ? (
-            <p className="mt-2 text-[10px] text-muted text-right leading-5">
-              💡 اكتب اسم المنتج، الماركة (Apple, Samsung, Xiaomi…)، أو الموديل لرؤية النتائج.
-            </p>
+            <div className="mt-2 space-y-1.5 text-right">
+              <p className="text-[10px] text-muted leading-5">
+                💡 ابحث بـ: الاسم، الماركة (Apple, Samsung…)، الموديل، السعة (256GB)، أو اللون.
+                <br />
+                <span className="text-white/40">
+                  مثال: <code className="bg-surface-elevated px-1 rounded">iPhone 17 Pro Max 256GB</code>
+                </span>
+              </p>
+              <p className="text-[10px] text-state-warning/75 leading-5">
+                ℹ️ الـ spotlight يربط بـ <strong>منتج واحد</strong> — الزبون يختار السعة واللون في صفحة التفاصيل.
+              </p>
+            </div>
           ) : (
             <div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-surface-border bg-surface-elevated">
               {filteredProducts.length === 0 ? (
@@ -414,6 +445,8 @@ export default function StoreSpotlightsPage() {
                     const isSelected = p.id === form.product_id;
                     const isInactive = !p.active;
                     const isOutOfStock = p.stock === 0;
+                    const storageLabel = (p.storage_options || []).join(" · ");
+                    const colorCount = (p.colors || []).length;
                     return (
                       <li key={p.id}>
                         <button
@@ -426,27 +459,45 @@ export default function StoreSpotlightsPage() {
                             isSelected ? "bg-brand/15" : ""
                           } ${isInactive ? "opacity-65" : ""}`}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="text-[10px] text-white/40 shrink-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-[10px] text-white/40 shrink-0 pt-0.5">
                               ₪{p.price.toLocaleString()}
                             </div>
-                            <div className="flex-1 truncate">
-                              <span className="font-bold text-white/55">{p.brand}</span>
-                              {" · "}
-                              <span className="text-white">{p.name_ar}</span>
-                              {p.model_number && (
-                                <span className="text-white/40 mr-1">({p.model_number})</span>
-                              )}
-                              <span className="text-[9px] text-brand/70 mr-1">[{p.type}]</span>
-                              {isInactive && (
-                                <span className="ms-1 inline-block text-[9px] font-bold text-state-warning bg-state-warning/[0.12] border border-state-warning/30 px-1.5 py-0.5 rounded">
-                                  غير نشط
-                                </span>
-                              )}
-                              {isOutOfStock && (
-                                <span className="ms-1 inline-block text-[9px] font-bold text-state-error bg-state-error/[0.12] border border-state-error/30 px-1.5 py-0.5 rounded">
-                                  نفد
-                                </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="truncate">
+                                <span className="font-bold text-white/55">{p.brand}</span>
+                                {" · "}
+                                <span className="text-white">{p.name_ar}</span>
+                                {p.model_number && (
+                                  <span className="text-white/40 mr-1">({p.model_number})</span>
+                                )}
+                                <span className="text-[9px] text-brand/70 mr-1">[{p.type}]</span>
+                                {isInactive && (
+                                  <span className="ms-1 inline-block text-[9px] font-bold text-state-warning bg-state-warning/[0.12] border border-state-warning/30 px-1.5 py-0.5 rounded">
+                                    غير نشط
+                                  </span>
+                                )}
+                                {isOutOfStock && (
+                                  <span className="ms-1 inline-block text-[9px] font-bold text-state-error bg-state-error/[0.12] border border-state-error/30 px-1.5 py-0.5 rounded">
+                                    نفد
+                                  </span>
+                                )}
+                              </div>
+                              {/* Variants line — surfaces storage + color count
+                                  so the admin doesn't have to guess what's
+                                  available on this product. */}
+                              {(storageLabel || colorCount > 0) && (
+                                <div className="mt-0.5 text-[9px] text-white/35 truncate">
+                                  {storageLabel && <span>سعات: {storageLabel}</span>}
+                                  {storageLabel && colorCount > 0 && (
+                                    <span className="mx-1.5">·</span>
+                                  )}
+                                  {colorCount > 0 && (
+                                    <span>
+                                      {colorCount} {colorCount === 1 ? "لون" : "ألوان"}
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
