@@ -13,7 +13,9 @@ import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
 import { useCart } from "@/lib/store/cart";
-import { ProductCard } from "@/components/store/ProductCard";
+// ProductCard (full version with inline color/storage selection) is used in store
+// listings only. Homepage FeaturedProducts uses the lighter ProductCardCompact.
+import { ProductCardCompact } from "@/components/website/ProductCardCompact";
 import type { WebsiteContent } from "@/types/database";
 
 // Cart icon with badge — always visible in Navbar (right-side cluster in RTL)
@@ -211,7 +213,7 @@ export function FeaturedProducts({ products }: { products: any[] }) {
 
         <div className="grid gap-3" style={{ gridTemplateColumns: scr.mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr" }}>
           {products.slice(0, scr.mobile ? 4 : 8).map((p) => (
-            <ProductCard key={p.id} product={p} />
+            <ProductCardCompact key={p.id} product={p} />
           ))}
         </div>
 
