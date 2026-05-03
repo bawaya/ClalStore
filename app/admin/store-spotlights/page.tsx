@@ -57,12 +57,13 @@ export default function StoreSpotlightsPage() {
     let cancelled = false;
     (async () => {
       try {
-        // No `?limit=` query param: triggers the no-pagination branch in the
-        // admin products API, which respects the 500 internal safety cap
-        // instead of the 200 cap applied to paginated requests. This makes
-        // ALL product types (phones + accessories + appliances + TVs + ...)
-        // discoverable in the picker, not just the first 200 by sort_position.
-        const res = await fetch("/api/admin/products");
+        // Restrict the picker to product types that actually render on /store
+        // (devices + accessories). Without this filter, the 500-product cap
+        // gets eaten by appliances / TVs / microwaves that have low
+        // sort_position values, and phones never reach the response.
+        // Spotlights joining to other types wouldn't render anyway because
+        // /store only shows device + accessory products.
+        const res = await fetch("/api/admin/products?types=device,accessory");
         const json = await res.json();
         if (!cancelled && json?.data) setProducts(json.data as Product[]);
       } catch (err) {
@@ -91,7 +92,9 @@ export default function StoreSpotlightsPage() {
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
-    if (!q) return products;
+    // Autocomplete behavior: don't show any list until the user types.
+    // Avoids dumping 500 products on screen and lets the search guide them.
+    if (!q) return [];
     return products.filter((p) => {
       const fields = [
         p.brand,
@@ -342,57 +345,62 @@ export default function StoreSpotlightsPage() {
             dir="rtl"
           />
 
-          {/* Filtered results — shows top 50 matches. If empty after search,
-              shows a hint. Caps at 50 visible to keep DOM light. */}
-          <div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-surface-border bg-surface-elevated">
-            {filteredProducts.length === 0 ? (
-              <div className="py-6 text-center text-xs text-muted">
-                {productSearch
-                  ? `لا توجد نتائج لـ "${productSearch}"`
-                  : "ابحث عن منتج للاختيار"}
-              </div>
-            ) : (
-              <ul className="divide-y divide-surface-border">
-                {filteredProducts.slice(0, 50).map((p) => {
-                  const isSelected = p.id === form.product_id;
-                  return (
-                    <li key={p.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForm({ ...form, product_id: p.id });
-                          setProductSearch("");
-                        }}
-                        className={`w-full text-right px-3 py-2 text-xs transition-colors hover:bg-brand/10 ${
-                          isSelected ? "bg-brand/15" : ""
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-[10px] text-white/40 shrink-0">
-                            ₪{p.price.toLocaleString()}
+          {/* Autocomplete results — only shown when the user has typed something.
+              Empty input shows a single-line hint instead of dumping the full
+              product list. Bordered scroll container appears only on active search. */}
+          {productSearch.trim() === "" ? (
+            <p className="mt-2 text-[10px] text-muted text-right leading-5">
+              💡 اكتب اسم المنتج، الماركة (Apple, Samsung, Xiaomi…)، أو الموديل لرؤية النتائج.
+            </p>
+          ) : (
+            <div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-surface-border bg-surface-elevated">
+              {filteredProducts.length === 0 ? (
+                <div className="py-6 text-center text-xs text-muted">
+                  لا توجد نتائج لـ &ldquo;{productSearch}&rdquo;
+                </div>
+              ) : (
+                <ul className="divide-y divide-surface-border">
+                  {filteredProducts.slice(0, 30).map((p) => {
+                    const isSelected = p.id === form.product_id;
+                    return (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm({ ...form, product_id: p.id });
+                            setProductSearch("");
+                          }}
+                          className={`w-full text-right px-3 py-2 text-xs transition-colors hover:bg-brand/10 ${
+                            isSelected ? "bg-brand/15" : ""
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-[10px] text-white/40 shrink-0">
+                              ₪{p.price.toLocaleString()}
+                            </div>
+                            <div className="flex-1 truncate">
+                              <span className="font-bold text-white/55">{p.brand}</span>
+                              {" · "}
+                              <span className="text-white">{p.name_ar}</span>
+                              {p.model_number && (
+                                <span className="text-white/40 mr-1">({p.model_number})</span>
+                              )}
+                              <span className="text-[9px] text-brand/70 mr-1">[{p.type}]</span>
+                            </div>
                           </div>
-                          <div className="flex-1 truncate">
-                            <span className="font-bold text-white/55">{p.brand}</span>
-                            {" · "}
-                            <span className="text-white">{p.name_ar}</span>
-                            {p.model_number && (
-                              <span className="text-white/40 mr-1">({p.model_number})</span>
-                            )}
-                            <span className="text-[9px] text-brand/70 mr-1">[{p.type}]</span>
-                          </div>
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {filteredProducts.length > 50 && (
-              <div className="px-3 py-2 text-[10px] text-muted text-center border-t border-surface-border">
-                يعرض أول 50 من {filteredProducts.length} نتيجة — اكتب أكثر لتقليلها
-              </div>
-            )}
-          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {filteredProducts.length > 30 && (
+                <div className="px-3 py-2 text-[10px] text-muted text-center border-t border-surface-border">
+                  يعرض أول 30 من {filteredProducts.length} نتيجة — اكتب أكثر لتقليلها
+                </div>
+              )}
+            </div>
+          )}
         </FormField>
 
         <FormField label="الموضع" required>
