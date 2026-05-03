@@ -195,6 +195,23 @@ export const heroSchema = z.object({
 
 export const heroUpdateSchema = heroSchema.partial();
 
+// ===== Store Spotlights =====
+// Editorial spotlight slots on /store (1 big + 3 small). product_id must
+// reference an existing product. position 1..4. Only one ACTIVE row per position
+// is allowed at the DB level (partial unique index).
+export const spotlightSchema = z.object({
+  product_id: z.string().min(1).max(64),
+  position: z.number().int().min(1).max(4),
+  eyebrow_ar: z.string().max(120).nullable().default(""),
+  eyebrow_he: z.string().max(120).nullable().default(""),
+  tagline_ar: z.string().min(1).max(280),
+  tagline_he: z.string().max(280).nullable().default(""),
+  custom_image_url: z.string().max(1000).nullable().default(""),
+  active: z.boolean().nullable().default(true),
+});
+
+export const spotlightUpdateSchema = spotlightSchema.partial();
+
 export const categorySchema = z.object({
   name_ar: z.string().min(1).max(200),
   name_he: z.string().max(200).nullable().default(""),

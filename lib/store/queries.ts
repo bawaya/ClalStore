@@ -4,7 +4,7 @@
 // =====================================================
 
 import { createServerSupabase } from "@/lib/supabase";
-import type { Product, Hero, LinePlan, Coupon, Category, WebsiteContent, CategoryKind, ProductType } from "@/types/database";
+import type { Product, Hero, LinePlan, Coupon, Category, WebsiteContent, CategoryKind, ProductType, StoreSpotlight } from "@/types/database";
 
 // ===== Products =====
 export async function getProducts(options?: {
@@ -66,6 +66,21 @@ export async function getHeroes(): Promise<Hero[]> {
     .order("sort_order");
 
   return (data as Hero[]) || [];
+}
+
+// ===== Store Spotlights (active only, sorted by position) =====
+// Used by the /store page to render the editorial 1+3 spotlight grid.
+// Returns up to 4 rows (one per position). The frontend joins each row to its
+// product via a separate getProduct() lookup, so we don't widen the response shape.
+export async function getStoreSpotlights(): Promise<StoreSpotlight[]> {
+  const supabase = createServerSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from("store_spotlights")
+    .select("*")
+    .eq("active", true)
+    .order("position");
+  return (data as StoreSpotlight[]) || [];
 }
 
 // ===== Line Plans =====

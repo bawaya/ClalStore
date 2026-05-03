@@ -196,6 +196,13 @@ const NAV_SECTIONS: NavSection[] = [
         icon: ImageIcon,
       },
       {
+        key: "store-spotlights",
+        href: "/admin/store-spotlights",
+        label: "🔥 Spotlight المتجر",
+        description: "قسم Editorial في الصفحة الرئيسية للمتجر (1 كرت كبير + 3 صغار)",
+        icon: Star,
+      },
+      {
         key: "website",
         href: "/admin/website",
         label: "مركز المحتوى",
