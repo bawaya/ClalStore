@@ -9,6 +9,9 @@ import { StoreHeader } from "./StoreHeader";
 import { ProductCard } from "./ProductCard";
 import { Footer } from "@/components/website/sections";
 import { ProductAssistantWidget } from "./ProductAssistantWidget";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { SortDropdown } from "./SortDropdown";
+import { useProductListing } from "./useProductListing";
 import type { Product } from "@/types/database";
 
 type SubkindMap = Record<
@@ -51,7 +54,9 @@ export function CategoryStorefront({
   showPriceFilter = true,
   showWarrantyFilter = false,
   showScreenSizeFilter = false,
-  emptyIcon = "📦",
+  // emptyIcon prop kept for backward compatibility but no longer rendered
+  // (replaced by SVG icon for a more polished empty state)
+  emptyIcon: _emptyIcon = "📦",
 }: Props) {
   const scr = useScreen();
   const { t, lang } = useLang();
@@ -138,6 +143,10 @@ export function CategoryStorefront({
     return list;
   }, [products, brandCat, kindSet, search, maxPrice, minWarranty, sizeRange]);
 
+  // Sort + Load-More pagination over the already-filtered list
+  const { sortBy, setSortBy, visible, hasMore, remaining, loadMore } =
+    useProductListing(filtered);
+
   const intro =
     lang === "he"
       ? {
@@ -215,6 +224,17 @@ export function CategoryStorefront({
         className="mx-auto max-w-[1540px]"
         style={{ padding: scr.mobile ? "16px 14px 84px" : "24px 24px 110px" }}
       >
+        {/* Breadcrumbs: Home → Store → [Category] */}
+        <div className="mb-3">
+          <Breadcrumbs
+            items={[
+              { label: t("nav.home"), href: "/" },
+              { label: lang === "he" ? "החנות" : "المتجر", href: "/store" },
+              { label: lang === "he" ? (titleHe || title) : title },
+            ]}
+          />
+        </div>
+
         <section className="mb-4 rounded-[30px] border border-[#2d2d35] bg-[linear-gradient(180deg,rgba(23,23,27,0.96),rgba(18,18,22,0.96))] px-5 py-5 shadow-[0_24px_48px_rgba(0,0,0,0.28)] md:px-7 md:py-6">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
             <div>
@@ -451,29 +471,44 @@ export function CategoryStorefront({
                     {intro.foundPrefix} {filtered.length} {intro.products}
                   </span>
 
-                  <div className="inline-flex items-center gap-1 rounded-full border border-[#383842] bg-[#151519] px-1 py-1 text-xs">
-                    <span className="rounded-full border border-[#ff3351]/20 bg-[#ff3351]/10 px-3 py-1 font-semibold text-white">
-                      {lang === "he" ? "רשת" : "شبكة"}
-                    </span>
-                    <span className="px-3 py-1 text-[#9999a4]">
-                      {lang === "he" ? "מורחב" : "موسع"}
-                    </span>
-                  </div>
+                  <SortDropdown value={sortBy} onChange={setSortBy} />
                 </div>
               </div>
             </section>
 
             {filtered.length === 0 ? (
               <div className="rounded-[26px] border border-[#2f2f38] bg-[#17171b] px-6 py-14 text-center text-[#b8b8c2] shadow-[0_24px_48px_rgba(0,0,0,0.24)]">
-                <div className="text-4xl">{emptyIcon}</div>
-                <div className="mt-3 text-sm">{intro.noResults}</div>
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#3a3a44] bg-white/[0.03] text-white/40" aria-hidden>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="text-sm">{intro.noResults}</div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {filtered.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {visible.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+
+                {hasMore && (
+                  <div className="mt-6 text-center">
+                    <button
+                      type="button"
+                      onClick={loadMore}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#ff0e34] bg-[#ff0e34]/10 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#ff0e34]/20"
+                    >
+                      {lang === "he" ? "טען עוד" : "تحميل المزيد"}
+                      <span className="text-white/55">
+                        ({remaining} {lang === "he" ? "נותרו" : "متبقّي"})
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

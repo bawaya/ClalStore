@@ -231,7 +231,9 @@ export const ProductCard = memo(function ProductCard({
       </div>
 
       {compareToast && (
-        <div className="absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-full border border-[#363640] bg-[#121216] px-4 py-2 text-xs font-bold text-white shadow-lg">
+        // Toast pinned to viewport bottom-center (above StickyCartBar) instead of
+        // covering the card image. z-[70] keeps it above StickyCartBar's z-[60].
+        <div className="fixed bottom-24 left-1/2 z-[70] -translate-x-1/2 rounded-full border border-[#363640] bg-[#121216] px-4 py-2 text-xs font-bold text-white shadow-lg">
           {compareToast}
         </div>
       )}
@@ -287,7 +289,8 @@ export const ProductCard = memo(function ProductCard({
         </h2>
 
         {description && (
-          <p className="mt-3 min-h-[3.3rem] text-sm leading-7 text-[#b8b8c2]">
+          // Hidden on mobile to reduce card density; visible on lg+ where there's room.
+          <p className="mt-3 hidden lg:block min-h-[3.3rem] text-sm leading-7 text-[#b8b8c2]">
             {description.length > 88 ? `${description.slice(0, 88)}...` : description}
           </p>
         )}
@@ -356,8 +359,9 @@ export const ProductCard = memo(function ProductCard({
                 aria-label={getColorName(color, lang)}
                 className="rounded-full transition-all"
                 style={{
-                  width: scr.mobile ? 19 : 21,
-                  height: scr.mobile ? 19 : 21,
+                  // Bigger touch target on mobile (was 19px — borderline for 44pt HIG)
+                  width: scr.mobile ? 32 : 24,
+                  height: scr.mobile ? 32 : 24,
                   background: color.hex,
                   border:
                     selColor === index
