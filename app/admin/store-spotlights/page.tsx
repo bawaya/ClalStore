@@ -57,13 +57,15 @@ export default function StoreSpotlightsPage() {
     let cancelled = false;
     (async () => {
       try {
-        // Restrict the picker to product types that actually render on /store
-        // (devices + accessories). Without this filter, the 500-product cap
-        // gets eaten by appliances / TVs / microwaves that have low
-        // sort_position values, and phones never reach the response.
-        // Spotlights joining to other types wouldn't render anyway because
-        // /store only shows device + accessory products.
-        const res = await fetch("/api/admin/products?types=device,accessory");
+        // Restrict the picker to:
+        //   - types=device,accessory (only what /store actually renders)
+        //   - active=true (only live products — picking an inactive one would
+        //     leave a dead spotlight slot, since /store filters to active)
+        // Combined with the bumped 2000 cap inside getAdminProducts, this
+        // surfaces every live phone + accessory in the admin picker.
+        const res = await fetch(
+          "/api/admin/products?types=device,accessory&active=true"
+        );
         const json = await res.json();
         if (!cancelled && json?.data) setProducts(json.data as Product[]);
       } catch (err) {

@@ -53,20 +53,48 @@ export async function getAdminProducts(opts?: {
    *  pre-appliance behavior so the mobile admin page is never polluted
    *  with appliance rows. */
   types?: Array<"device" | "accessory" | "appliance" | "tv" | "computer" | "tablet" | "network">;
+  /** Optional active filter. Omit to include both active+inactive (default
+   *  admin behavior). Pass `true` to restrict to active products — useful
+   *  for pickers that should only surface live-on-store items. */
+  active?: boolean;
+  /** Optional case-insensitive search across name_ar, name_he, brand,
+   *  and model_number. Wildcards in the input are stripped to keep the
+   *  ILIKE pattern safe. */
+  q?: string;
 }) {
   const limit = opts?.limit ?? 0;
   const offset = opts?.offset ?? 0;
   const types = opts?.types;
+  const active = opts?.active;
+  const rawQuery = (opts?.q ?? "").trim();
+  // Strip ILIKE wildcards / OR-filter delimiters so user input can't break
+  // the or() expression below or yield surprising matches.
+  const search = rawQuery ? rawQuery.replace(/[%_,]/g, "") : "";
+
+  const applyFilters = <T extends ReturnType<typeof db>["from"] extends (...args: any) => infer R ? R : never>(
+    base: T
+  ): T => {
+    let q: any = base;
+    if (types && types.length > 0) q = q.in("type", types);
+    if (active !== undefined) q = q.eq("active", active);
+    if (search) {
+      // OR across the most useful searchable fields.
+      q = q.or(
+        `name_ar.ilike.%${search}%,name_he.ilike.%${search}%,brand.ilike.%${search}%,model_number.ilike.%${search}%`
+      );
+    }
+    return q as T;
+  };
 
   const buildBase = () => {
-    let q = db().from("products").select("*");
-    if (types && types.length > 0) q = q.in("type", types);
-    return q.order("sort_position", { ascending: true }).order("created_at", { ascending: false });
+    const base = db().from("products").select("*");
+    return applyFilters(base)
+      .order("sort_position", { ascending: true })
+      .order("created_at", { ascending: false });
   };
   const buildCount = () => {
-    let q = db().from("products").select("id", { count: "exact", head: true });
-    if (types && types.length > 0) q = q.in("type", types);
-    return q;
+    const base = db().from("products").select("id", { count: "exact", head: true });
+    return applyFilters(base);
   };
 
   if (limit > 0) {
@@ -78,9 +106,13 @@ export async function getAdminProducts(opts?: {
     return { data: (data || []) as Product[], total: count ?? 0 };
   }
 
-  // No pagination — safety cap + exact total count (avoid misleading totals when > 500 rows)
+  // No pagination — safety cap + exact total count.
+  // Bumped from 500 → 2000 so admin pickers (e.g. /admin/store-spotlights)
+  // see the full catalog of devices+accessories even on stores with hundreds
+  // of variants. 2000 rows ≈ a few MB JSON which is fine for an admin-only
+  // request that runs once on mount.
   const [{ data }, { count }] = await Promise.all([
-    buildBase().limit(500),
+    buildBase().limit(2000),
     buildCount(),
   ]);
   return { data: (data || []) as Product[], total: count ?? (data || []).length };
