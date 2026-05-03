@@ -90,6 +90,14 @@ interface ApplyInput {
         productId: string;
         cash: number;
         monthly: number;
+        /**
+         * Original Excel row name (e.g. "iPhone 17 Pro Max 256GB"). Used
+         * server-side to extract the target storage and update ONLY the
+         * matching variant — instead of broadcasting the price across all
+         * variants of a multi-storage product. Optional for backward
+         * compatibility with older clients.
+         */
+        excelName?: string;
       }
     | {
         kind: "create";
@@ -392,14 +400,43 @@ async function handleApply(req: NextRequest, adminId: string): Promise<NextRespo
           continue;
         }
         const oldVariants = Array.isArray(existing.variants) ? existing.variants : [];
+
+        // Extract the target storage from the original Excel row name so we
+        // update ONLY the matching variant. Without this, all four rows for
+        // "iPhone 17 Pro Max [256GB|512GB|1TB|2TB]" would broadcast the same
+        // price to every variant on each call — and the last row processed
+        // (typically the highest storage = highest price) would win, leaving
+        // every variant pinned to that single price.
+        const targetStorage = item.excelName ? extractStorage(item.excelName) : null;
+
         const newVariants =
           oldVariants.length > 0
-            ? applyPriceToVariants(oldVariants as ProductLite["variants"], item.cash, item.monthly)
+            ? applyPriceToVariants(
+                oldVariants as ProductLite["variants"],
+                item.cash,
+                item.monthly,
+                targetStorage,
+              )
             : oldVariants;
+
+        // For multi-variant products, product.price represents the "starting
+        // from" price — i.e. the cheapest variant — used in listing cards and
+        // the storefront badge. Recompute it from the (possibly partially)
+        // updated variants array so it reflects reality after this row's edit.
+        // For products without variants, fall back to the row's cash price.
+        const newProductPrice =
+          newVariants.length > 0
+            ? Math.min(
+                ...(newVariants as ProductLite["variants"]).map((v) =>
+                  Math.round(Number(v.price) || 0),
+                ),
+              )
+            : Math.round(item.cash);
+
         const { error: updErr } = await supabase
           .from("products")
           .update({
-            price: Math.round(item.cash),
+            price: newProductPrice,
             variants: newVariants,
             installment_display: installmentDisplay,
             updated_at: new Date().toISOString(),
@@ -414,8 +451,11 @@ async function handleApply(req: NextRequest, adminId: string): Promise<NextRespo
           batch_id: batchId,
           product_id: item.productId,
           action: "update",
+          // Log the actual product.price written (min-of-variants for
+          // multi-variant products), so revert and reporting stay consistent
+          // with what's in the DB. Per-variant prices live in new_variants.
           old_price: existing.price,
-          new_price: Math.round(item.cash),
+          new_price: newProductPrice,
           old_monthly: oldVariants[0]?.monthly_price ?? null,
           new_monthly: item.monthly > 0 ? Math.round(item.monthly) : null,
           old_variants: oldVariants,

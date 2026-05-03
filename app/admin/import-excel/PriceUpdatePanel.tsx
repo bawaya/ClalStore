@@ -253,6 +253,11 @@ export function PriceUpdatePanel({ mode = "phones" }: PriceUpdatePanelProps = {}
             productId: r.matched.productId,
             cash: r.cash,
             monthly: r.monthly,
+            // Pass the original Excel row name so the server can extract
+            // the target storage (e.g. "256GB") and update only the
+            // matching variant — instead of broadcasting the price across
+            // all storage variants of a multi-variant product.
+            excelName: r.name,
           };
         }
         return {

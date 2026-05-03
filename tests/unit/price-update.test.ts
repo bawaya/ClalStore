@@ -245,4 +245,56 @@ describe("applyPriceToVariants", () => {
   it("returns empty for no variants", () => {
     expect(applyPriceToVariants([], 1000, 30)).toEqual([]);
   });
+
+  // Per-variant targeting (regression for the iPhone 17 Pro Max bug where 4
+  // Excel rows for the same product were broadcasting their prices across
+  // every variant, leaving every storage pinned to whichever row was
+  // processed last — usually the most expensive 2TB.)
+  describe("with targetStorage", () => {
+    const baseVariants = [
+      { storage: "256GB", price: 1000, monthly_price: 30 },
+      { storage: "512GB", price: 1500, monthly_price: 42 },
+      { storage: "1TB",   price: 2000, monthly_price: 55 },
+    ];
+
+    it("updates only the matching variant", () => {
+      const out = applyPriceToVariants(baseVariants, 1100, 31, "256GB");
+      expect(out[0].price).toBe(1100);
+      expect(out[0].monthly_price).toBe(31);
+      // others untouched
+      expect(out[1].price).toBe(1500);
+      expect(out[1].monthly_price).toBe(42);
+      expect(out[2].price).toBe(2000);
+      expect(out[2].monthly_price).toBe(55);
+    });
+
+    it("matches storage case-insensitively (256gb vs 256GB)", () => {
+      const out = applyPriceToVariants(baseVariants, 1100, 31, "256gb");
+      expect(out[0].price).toBe(1100);
+      expect(out[1].price).toBe(1500); // 512GB untouched
+    });
+
+    it("leaves all variants unchanged when targetStorage matches none", () => {
+      const out = applyPriceToVariants(baseVariants, 9999, 99, "999GB");
+      expect(out[0].price).toBe(1000);
+      expect(out[1].price).toBe(1500);
+      expect(out[2].price).toBe(2000);
+    });
+
+    it("preserves existing monthly_price on non-targeted variants", () => {
+      const out = applyPriceToVariants(baseVariants, 1100, 0, "256GB");
+      // targeted variant: monthly stays as old (since cash had monthly=0)
+      expect(out[0].monthly_price).toBe(30);
+      // non-targeted: untouched
+      expect(out[1].monthly_price).toBe(42);
+    });
+
+    it("falls back to broadcast when targetStorage is null", () => {
+      // Backward-compat: legacy callers (no per-variant info) still broadcast.
+      const out = applyPriceToVariants(baseVariants, 9999, 99, null);
+      expect(out[0].price).toBe(9999);
+      expect(out[1].price).toBe(9999);
+      expect(out[2].price).toBe(9999);
+    });
+  });
 });
