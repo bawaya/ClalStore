@@ -1,6 +1,6 @@
 
 import type { Metadata } from "next";
-import { getProducts, getLinePlans } from "@/lib/store/queries";
+import { getProducts, getLinePlans, getStoreSpotlights } from "@/lib/store/queries";
 import { StoreClient } from "@/components/store/StoreClient";
 import { getStoreMetadata } from "@/lib/seo";
 
@@ -12,14 +12,22 @@ export async function generateMetadata(): Promise<Metadata> {
   return getStoreMetadata();
 }
 
-// Note: HeroCarousel removed from /store on user request — banners are still
-// editable from /admin/heroes for use elsewhere if needed.
+// Note: HeroCarousel removed from /store. The new editorial Spotlight section
+// (1 big + 3 small) is fed by getStoreSpotlights() and managed from
+// /admin/store-spotlights.
 export default async function StorePage() {
-  const [products, linePlans] = await Promise.all([
+  const [products, linePlans, spotlights] = await Promise.all([
     getProducts({ limit: 500, types: ["device", "accessory"] }),
     // Note: appliance / tv / computer / tablet / network have their own dedicated storefronts.
     getLinePlans(),
+    getStoreSpotlights(),
   ]);
 
-  return <StoreClient products={products} linePlans={linePlans} />;
+  return (
+    <StoreClient
+      products={products}
+      linePlans={linePlans}
+      spotlights={spotlights}
+    />
+  );
 }
