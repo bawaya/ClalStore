@@ -20,7 +20,8 @@ import { Footer } from "@/components/website/sections";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { SortDropdown } from "./SortDropdown";
 import { useProductListing } from "./useProductListing";
-import type { LinePlan, Product } from "@/types/database";
+import { FeaturedSpotlight, type SpotlightWithProduct } from "./FeaturedSpotlight";
+import type { LinePlan, Product, StoreSpotlight } from "@/types/database";
 
 const FALLBACK_PRODUCTS: Product[] = [
   {
@@ -138,6 +139,7 @@ const FALLBACK_PRODUCTS: Product[] = [
 interface Props {
   products: Product[];
   linePlans: LinePlan[];
+  spotlights?: StoreSpotlight[];
 }
 
 function getFilterButtonClass(active: boolean) {
@@ -148,7 +150,7 @@ function getFilterButtonClass(active: boolean) {
   }`;
 }
 
-export function StoreClient({ products, linePlans }: Props) {
+export function StoreClient({ products, linePlans, spotlights = [] }: Props) {
   const scr = useScreen();
   const searchParams = useSearchParams();
   const { t, lang } = useLang();
@@ -168,6 +170,18 @@ export function StoreClient({ products, linePlans }: Props) {
           : FALLBACK_PRODUCTS,
     [products]
   );
+
+  // Join active spotlights to their products. Drops any spotlight whose
+  // product isn't in the visible list (inactive product, wrong type filter,
+  // missing record). Sorted by position so position=1 stays the hero card.
+  const spotlightItems: SpotlightWithProduct[] = useMemo(() => {
+    if (!spotlights || spotlights.length === 0) return [];
+    const productById = new Map(items.map((p) => [p.id, p]));
+    return spotlights
+      .map((s) => ({ spotlight: s, product: productById.get(s.product_id) }))
+      .filter((x): x is SpotlightWithProduct => Boolean(x.product))
+      .sort((a, b) => a.spotlight.position - b.spotlight.position);
+  }, [spotlights, items]);
 
   useEffect(() => {
     const q = searchParams.get("q") ?? "";
@@ -421,6 +435,10 @@ export function StoreClient({ products, linePlans }: Props) {
             </div>
           </div>
         </section>
+
+        {/* Editorial Spotlight (1 big + up to 3 small). Managed from
+            /admin/store-spotlights. Renders nothing if no active rows. */}
+        {spotlightItems.length > 0 && <FeaturedSpotlight items={spotlightItems} />}
 
         <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <aside className="self-start lg:sticky lg:top-[170px]">
