@@ -149,7 +149,7 @@ export function StoreHeader({ showBack }: { showBack?: boolean }) {
   return (
     <header
       className="sticky z-50 bg-[#111114]/92 text-white backdrop-blur-xl"
-      style={{ top: "var(--cart-bar-h, 0px)" }}
+      style={{ top: "calc(var(--cart-bar-h, 0px) + var(--top-promo-h, 0px))" }}
     >
       <div className="border-t-2 border-[#ff0e34] bg-[#070709]">
         <div className="mx-auto flex max-w-[1540px] items-center justify-center gap-4 px-4 py-2 text-[11px] text-[#f4f4f5] md:text-xs">

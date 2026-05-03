@@ -7,12 +7,33 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ShoppingCart } from "lucide-react";
 import { useScreen } from "@/lib/hooks";
 import { Logo } from "@/components/shared/Logo";
 import { LangSwitcher } from "@/components/shared/LangSwitcher";
 import { useLang } from "@/lib/i18n";
+import { useCart } from "@/lib/store/cart";
 import { ProductCard } from "@/components/store/ProductCard";
 import type { WebsiteContent } from "@/types/database";
+
+// Cart icon with badge — always visible in Navbar (right-side cluster in RTL)
+function CartIconButton() {
+  const itemCount = useCart((s) => s.getItemCount());
+  return (
+    <Link
+      href="/store/cart"
+      aria-label="السلة"
+      className="relative p-2 text-white/80 hover:text-white transition"
+    >
+      <ShoppingCart size={18} strokeWidth={1.6} />
+      {itemCount > 0 && (
+        <span className="absolute -top-0.5 -left-1 bg-[#ff0e34] text-white text-[10px] font-medium min-w-[16px] h-[16px] rounded-full flex items-center justify-center px-1 leading-none">
+          {itemCount}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 // ===== Navbar =====
 export function Navbar() {
@@ -24,6 +45,7 @@ export function Navbar() {
     { href: "/", label: t("nav.home") },
     { href: "/store", label: t("nav.store") },
     { href: "/#plans", label: t("nav.plans") },
+    { href: "/payment", label: "كيف ندفع؟" },
     { href: "/about", label: t("nav.about") },
     { href: "/faq", label: t("nav.faq") },
     { href: "/contact", label: t("nav.contact") },
@@ -32,43 +54,70 @@ export function Navbar() {
   return (
     <nav
       className="fixed left-0 right-0 z-50 bg-surface-bg/90 backdrop-blur-xl border-b border-surface-border"
-      style={{ top: "var(--cart-bar-h, 0px)" }}
+      style={{ top: "calc(var(--cart-bar-h, 0px) + var(--top-promo-h, 0px))" }}
     >
-      <div className="max-w-6xl mx-auto flex items-center justify-between" style={{ padding: scr.mobile ? "10px 16px" : "12px 24px" }}>
-        {/* CTA + Lang */}
-        <div className="flex items-center gap-2">
-          <Link href="/store" className="btn-primary" style={{ fontSize: scr.mobile ? 12 : 14, padding: scr.mobile ? "6px 12px" : "8px 20px" }}>
-            {t("nav.shopNow")}
-          </Link>
-          <LangSwitcher size={scr.mobile ? "sm" : "md"} />
-        </div>
+      <div
+        className="max-w-6xl mx-auto flex items-center justify-between gap-3"
+        style={{ padding: scr.mobile ? "10px 16px" : "12px 24px" }}
+      >
+        {/* RIGHT EDGE in RTL: Logo (first DOM child = right edge in RTL flexbox) */}
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Logo size={36} showText={!scr.mobile} label="ClalMobile" />
+        </Link>
 
-        {/* Desktop links */}
+        {/* CENTER (desktop only): nav links */}
         {scr.desktop && (
           <div className="flex items-center gap-5">
             {links.map((l) => (
-              <Link key={l.href} href={l.href} className="text-white font-bold text-sm hover:text-brand transition-colors">{l.label}</Link>
+              <Link
+                key={l.href}
+                href={l.href}
+                className="text-white font-bold text-sm hover:text-brand transition-colors"
+              >
+                {l.label}
+              </Link>
             ))}
           </div>
         )}
 
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <Logo size={36} showText={!scr.mobile} label="ClalMobile" />
-        </Link>
-
-        {/* Mobile menu */}
-        {scr.mobile && (
-          <button onClick={() => setMenuOpen(!menuOpen)} aria-label="القائمة" aria-expanded={menuOpen} className="text-white bg-transparent border-0 cursor-pointer text-xl">☰</button>
-        )}
+        {/* LEFT EDGE in RTL: Shop CTA (desktop only) + Cart + Lang + Hamburger (mobile) */}
+        <div className="flex items-center gap-2 shrink-0">
+          {scr.desktop && (
+            <Link
+              href="/store"
+              className="btn-primary"
+              style={{ fontSize: 14, padding: "8px 20px" }}
+            >
+              {t("nav.shopNow")}
+            </Link>
+          )}
+          <CartIconButton />
+          <LangSwitcher size={scr.mobile ? "sm" : "md"} />
+          {scr.mobile && (
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="القائمة"
+              aria-expanded={menuOpen}
+              className="text-white bg-transparent border-0 cursor-pointer text-xl p-1"
+            >
+              ☰
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Mobile dropdown */}
       {scr.mobile && menuOpen && (
         <div className="bg-surface-card border-t border-surface-border px-4 py-3 space-y-2">
           {links.map((l) => (
-            <Link key={l.href} href={l.href} onClick={() => setMenuOpen(false)}
-              className="block text-right text-white font-bold text-sm py-1.5 hover:text-brand">{l.label}</Link>
+            <Link
+              key={l.href}
+              href={l.href}
+              onClick={() => setMenuOpen(false)}
+              className="block text-right text-white font-bold text-sm py-1.5 hover:text-brand"
+            >
+              {l.label}
+            </Link>
           ))}
         </div>
       )}

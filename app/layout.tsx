@@ -5,6 +5,7 @@ import { CookieConsent } from "@/components/shared/CookieConsent";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
 import { Analytics } from "@/components/shared/Analytics";
 import { Providers } from "@/components/shared/Providers";
+import { ChromeMountsTop, ChromeMountsBottom } from "@/components/shared/ChromeMounts";
 import { getCachedPublicSettings } from "@/lib/settings/public-cached";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -93,7 +94,10 @@ export default async function RootLayout({
       </head>
       <body className="font-arabic bg-surface-bg text-white min-h-screen antialiased" style={{ backgroundColor: '#09090b', color: '#fafafa' }}>
         <Providers>
+          {/* Global chrome via client island — hides on admin/CRM/auth routes. */}
+          <ChromeMountsTop />
           {children}
+          <ChromeMountsBottom />
           <CookieConsent />
           <PWAInstallPrompt />
           <Analytics />

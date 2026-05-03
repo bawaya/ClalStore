@@ -1,6 +1,7 @@
-import { WebChatWidget } from "@/components/chat/WebChatWidget";
 import { CompareBar } from "@/components/store/CompareBar";
 
+// WebChatWidget is now mounted globally in app/layout.tsx via PublicChrome
+// to avoid double-mount on store pages.
 export default function StoreLayout({
   children,
 }: {
@@ -10,7 +11,6 @@ export default function StoreLayout({
     <>
       {children}
       <CompareBar />
-      <WebChatWidget />
     </>
   );
 }

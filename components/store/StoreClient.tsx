@@ -11,7 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { useScreen } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import { StoreHeader } from "./StoreHeader";
-import { StickyCartBar } from "./StickyCartBar";
+// StickyCartBar is now mounted globally in app/layout.tsx via PublicChrome
 import { HeroCarousel } from "./HeroCarousel";
 import { ProductCard } from "./ProductCard";
 import { LinePlans } from "./LinePlans";
@@ -354,7 +354,6 @@ export function StoreClient({ products, heroes, linePlans }: Props) {
       }}
     >
       <StoreHeader />
-      <StickyCartBar />
       <HeroCarousel heroes={heroes} />
 
       <div
